@@ -301,6 +301,8 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     bootLog("step 11: createHttpApp entering");
     const app = createHttpApp({
       servers: runtime.servers,
+      reopenCapabilityNote: (conversationId) =>
+        runtime.reopenCapabilityInventory(conversationId),
       providers,
       retrieval,
       media,

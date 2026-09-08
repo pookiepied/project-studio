@@ -95,3 +95,88 @@ proves nothing about the new one.
 
 The end-to-end shape worth an integration test: switch a server on, and assert
 that a conversation's first note names its tools - which fails today.
+
+## Done, 2026-09-08
+
+Both halves, as specified, with one finding the handover's condition missed:
+
+**Fix one** - `McpManagementService` gained an optional `reconcile` callback,
+fired beside - never instead of - `extensions.changed()` from every mutating
+path (save, remove, setEnabled, both credential paths). The runtime supplies
+it: a background `extensions.reconcile(#reconcileProjects())`, caught on both
+the promise and the synchronous side, logging through the runtime's own
+logger. The callback cannot block or fail a settings response. The management
+service additionally catches a throwing callback at its own boundary, so the
+contract holds no matter who supplies the callback.
+
+**Fix two** - `CapabilityInventory.blockFor` settles only when the build is
+"one worth keeping", decided by a new `settled` predicate supplied by the
+runtime: every enabled server has either completed a catalog read or failed
+terminally. An unsettled build renders a pending sentence. **The re-ask
+happens only between submissions**, at the turn-settings middleware - after
+the submission's settings are settled, before Flue composes the run's
+instruction document - and only for a *pending* note: a settled note is
+refused for the conversation's life. The condition is read from the
+supervisor's status and the catalog's completed reads - never from the
+emptiness of a tool list.
+
+**The second finding: the block may never move within a run.** Flue
+re-renders the agent function for every model step and digests the composed
+instruction document; a run whose system prompt changed between two steps is
+narrated an instructions signal ("System instructions updated.") as a user
+message and re-runs the model. Two placements of the re-ask were measured and
+rejected before the right one was found: per render (the agent function
+body), and inside the sandbox factory's `createSandbox` (once per submission,
+but AFTER the first render has already composed the run's instructions - so
+the memo deleted there was rebuilt by the second step's render, the digest
+moved mid-run, and the MCP integration suite failed with the run settling as
+text instead of calling the tool). The pre-run middleware is the only seam
+strictly between submissions, and it is the harness's own code.
+
+**The finding: `ready` alone is not "connected".** The supervisor applies
+`ready` at the handshake, *before* its `onReady` (the catalog's `tools/list`)
+runs - `supervisor.ts` does this deliberately so a death in that window is a
+running server's death. Settling on `ready` alone would therefore freeze
+`0 tools` one handshake later, in the window the fix was written to close.
+The settled condition is `ready` **and** `catalog.hasRefreshed(id)` (a new
+read: presence of a completed read, never the emptiness of the list, so a
+genuinely empty server settles on its true `0 tools`). `failed` is also not
+settled - a server mid-backoff may recover, and a note that settled on its
+worst moment would describe a recovering server as an empty one. `given-up`
+settles; the backoff has decided.
+
+ADR 0048 §1 carries the exception's reasoning beside the stability rule, and
+two new required-proof lines. The byte-identical empty-block test is untouched
+and passing; the three original `blockFor` memoization tests now pass a
+settle-true predicate explicitly, pinning that the ordinary stillness rule is
+undisturbed.
+
+**Negative controls, each run and reverted (the final design, after the
+middleware seam):**
+- `#applyNow`'s fire disabled: the three management tests fail with
+  `reconciles` never advancing; all pre-existing management tests stay green.
+- The settled condition disabled (`settled = true`): the four pending-then-
+  settle tests fail - the unit suite's pending/stillness/boundary cases and
+  the end-to-end integration case - while every byte-identical and stillness
+  test stays green.
+- `reopen`'s pending-only guard removed: the boundary test fails with the
+  settled note rebuilding to different bytes at a boundary - the ADR 0048 §1
+  violation the guard exists to prevent, in the assertion's own words.
+- Both fixes stashed (old src, new tests, run before the seam redesign): the
+  end-to-end integration test failed with the received note literally
+  containing `mcp:echo-server - Echoes text back, for testing. - 0 tools` -
+  the bug reproduced in its own words - and the pre-existing integration
+  cases stayed green, isolating the fix.
+
+## Verified, 2026-09-08
+
+Both suites, run serially against a fresh build:
+
+- Harness: 1835 passed / 25 skipped - the 1818 baseline plus the 17 new
+  tests, nothing broken. The previously-failing mcp-flue case passes with
+  the middleware seam, and the new end-to-end case passes with it.
+- Client: 892 passed, the baseline exactly.
+
+Lint and typecheck clean; all temporary instrumentation removed (verified
+by grep - nothing in src or tests references the diagnostic markers, and the
+three files that carried them show no diff at all).

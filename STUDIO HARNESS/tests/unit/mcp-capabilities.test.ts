@@ -250,4 +250,30 @@ describe("MCP capability catalog", () => {
     expect(tools.map((tool) => tool.descriptor.id.name)).toEqual(["valid"]);
     expect(diagnostics).toHaveLength(6);
   });
+
+  it("answers whether a server has completed a read, without reading the list", async () => {
+    // The settled verdict of the capability inventory depends on this
+    // distinction, and it is a presence question, never an emptiness one:
+    // a connected server that exposes nothing has an EMPTY list stored under
+    // its id and answers true - it has answered, and "0 tools" is then the
+    // true sentence. What answers false is a server whose read has not
+    // happened: never refreshed, or removed by a stop.
+    const catalog = new McpCapabilityCatalog();
+    const record = server("http");
+    expect(catalog.hasRefreshed(record.id)).toBe(false);
+
+    // An empty answer is a completed read. The connection says the server has
+    // nothing to expose; the catalog stores the empty list, and presence is
+    // what `hasRefreshed` reports.
+    await catalog.refresh(record, {
+      request: async () => ({ tools: [] }),
+    });
+    expect(catalog.tools([record.id])).toHaveLength(0);
+    expect(catalog.hasRefreshed(record.id)).toBe(true);
+
+    // And a stop takes the answer away again, so a server that is restarting
+    // is not mistaken for one that has answered.
+    catalog.remove(record.id);
+    expect(catalog.hasRefreshed(record.id)).toBe(false);
+  });
 });

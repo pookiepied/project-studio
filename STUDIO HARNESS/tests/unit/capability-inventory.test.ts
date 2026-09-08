@@ -230,10 +230,13 @@ describe("the inventory is settled once and then held still", () => {
     // it - at a hundred thousand tokens, re-billed at full rate, mid-turn. So
     // the source is allowed to change here and the answer is not.
     let call = 0;
-    const inventory = new CapabilityInventory(() => {
-      call += 1;
-      return [entry({ toolNames: Array.from({ length: call }, (_, i) => `tool_${i}`) })];
-    });
+    const inventory = new CapabilityInventory(
+      () => {
+        call += 1;
+        return [entry({ toolNames: Array.from({ length: call }, (_, i) => `tool_${i}`) })];
+      },
+      () => true,
+    );
 
     const first = inventory.blockFor("cnv_one");
     const second = inventory.blockFor("cnv_one");
@@ -250,10 +253,13 @@ describe("the inventory is settled once and then held still", () => {
     // Sharing one answer across conversations would mean the first one ever
     // rendered decided for every conversation the process outlives.
     const seen: string[] = [];
-    const inventory = new CapabilityInventory((conversationId) => {
-      seen.push(conversationId);
-      return [entry({ id: `mcp:${conversationId}` })];
-    });
+    const inventory = new CapabilityInventory(
+      (conversationId) => {
+        seen.push(conversationId);
+        return [entry({ id: `mcp:${conversationId}` })];
+      },
+      () => true,
+    );
 
     expect(inventory.blockFor("one")).toContain("mcp:one");
     expect(inventory.blockFor("two")).toContain("mcp:two");
@@ -266,10 +272,155 @@ describe("the inventory is settled once and then held still", () => {
     // switched a server on mid-conversation - which is the expensive direction
     // and the one nobody would connect to what they just clicked.
     let enabled: CapabilityInventoryEntry[] = [];
-    const inventory = new CapabilityInventory(() => enabled);
+    const inventory = new CapabilityInventory(() => enabled, () => true);
 
     expect(inventory.blockFor("cnv")).toBe("");
     enabled = [entry()];
+    expect(inventory.blockFor("cnv")).toBe("");
+  });
+});
+
+/**
+ * The settled-ness exception, and its boundaries.
+ *
+ * The rule above is stillness; this is when stillness may begin. A
+ * conversation whose enabled server has not answered yet would freeze `0
+ * tools` into its system block for life - the bug found by hand on
+ * 2026-09-08 - so the predicate decides whether an answer is worth keeping,
+ * and a conversation whose answer is not yet an answer is handed a pending
+ * sentence instead. Two things here are load-bearing and both are pinned:
+ * the pending sentence never claims `0 tools`, and the block only ever moves
+ * at a submission boundary (`reopen`) - never between the steps of one run,
+ * where Flue digests the instructions and a change would re-bill the prefix
+ * mid-turn. Everything here settles, because the exception's danger is the
+ * other direction: a predicate that never said yes would unmoor the block
+ * entirely.
+ */
+describe("the inventory does not freeze an answer that was not an answer yet", () => {
+  it("answers a pending block that says what is happening, never silence", () => {
+    // The unanswered case must render as SOMETHING, and as an honest
+    // sentence: "" would collide with the settled empty answer, and a heading
+    // with nothing under it would cost the same tokens for no information.
+    // The sentence tells the model what to do - keep going, discover later -
+    // which is the one thing a model reading a provisional note needs.
+    const inventory = new CapabilityInventory(
+      () => [entry({ toolNames: [] })],
+      () => false,
+    );
+
+    const pending = inventory.blockFor("cnv");
+    expect(pending).toContain("# Capabilities available on request");
+    expect(pending).toContain("still being read");
+    expect(pending).not.toContain("0 tools");
+    expect(pending).not.toBe("");
+  });
+
+  it("holds the pending block still within a run, however the sources change", () => {
+    // Flue rebuilds the tool array for every model step and digests the
+    // composed instructions; a block that settled between step one and step
+    // two of one run moved the system prompt mid-turn, which is the ruinous
+    // direction of §3.3 taken inside a single run. So the pending answer is
+    // memoized too, and the server answering mid-run changes nothing until
+    // the next submission reopens the question.
+    let answered = false;
+    const inventory = new CapabilityInventory(
+      () => [entry({ toolNames: answered ? ["add_camera"] : [] })],
+      (entries) => entries.every((one) => one.toolNames.length > 0 || answered),
+    );
+
+    const pending = inventory.blockFor("cnv");
+    expect(pending).toContain("still being read");
+
+    answered = true;
+    // Same run, same ask, same bytes - even though the predicate would now
+    // settle. The step asking again is a model step, not a submission.
+    expect(inventory.blockFor("cnv")).toBe(pending);
+    answered = false;
+    expect(inventory.blockFor("cnv")).toBe(pending);
+  });
+
+  it("settles on the true block at the next submission boundary", () => {
+    // The whole point of the exception, at the boundary the handover priced:
+    // turn one carries the pending sentence, `reopen` forgets it at the next
+    // submission's start, and the second turn's first ask settles on the real
+    // answer with the real names. One re-billed system block on the second
+    // turn, against a wrong note for the conversation's whole life.
+    let answered = false;
+    const inventory = new CapabilityInventory(
+      () => [entry({ toolNames: answered ? ["add_camera"] : [] })],
+      (entries) => entries.every((one) => one.toolNames.length > 0 || answered),
+    );
+
+    const first = inventory.blockFor("cnv");
+    expect(first).toContain("still being read");
+
+    answered = true;
+    inventory.reopen("cnv");
+    const second = inventory.blockFor("cnv");
+    expect(second).toContain("1 tool");
+    expect(second).not.toBe(first);
+
+    // And the settled answer keeps still afterwards - even against a reopen,
+    // which is the ordinary rule kept whole: once settled, the block does not
+    // move for the conversation's life, and a later settings toggle cannot
+    // make it. Re-asking a settled note would re-bill the history behind it
+    // for a change nobody priced.
+    answered = false;
+    expect(inventory.blockFor("cnv")).toBe(second);
+    inventory.reopen("cnv");
+    expect(inventory.blockFor("cnv")).toBe(second);
+  });
+
+  it("does not disturb a conversation it did not reopen", () => {
+    // Reopen is addressed: one conversation's submission boundary reopens
+    // that conversation's note and nobody else's, because the memo's key is
+    // the conversation the system block is cached against.
+    const inventory = new CapabilityInventory(
+      (conversationId) => [entry({ id: `mcp:${conversationId}` })],
+      () => false,
+    );
+
+    const one = inventory.blockFor("one");
+    inventory.reopen("two");
+    expect(inventory.blockFor("one")).toBe(one);
+  });
+
+  it("settles on the first ask when the server has already answered", () => {
+    // The ordinary case must not pay for the exception: a conversation that
+    // starts after the server connected reads the true block on ask one and
+    // never rebuilds. The `settled` predicate is consulted once, exactly when
+    // the memoization decision is made.
+    let builds = 0;
+    const inventory = new CapabilityInventory(
+      () => {
+        builds += 1;
+        return [entry()];
+      },
+      () => true,
+    );
+
+    const block = inventory.blockFor("cnv");
+    expect(inventory.blockFor("cnv")).toBe(block);
+    expect(inventory.blockFor("cnv")).toBe(block);
+    expect(builds).toBe(1);
+  });
+
+  it("does not turn a settled empty answer into a moving one", () => {
+    // A conversation with no enabled servers settles immediately - there is
+    // nothing to wait for - and its block is the byte-identical empty string,
+    // whatever the predicate later says. This is the test the handover named:
+    // the empty case is legitimate settled and must keep working.
+    let settledAnswer = true;
+    const inventory = new CapabilityInventory(
+      () => [],
+      () => settledAnswer,
+    );
+
+    expect(inventory.blockFor("cnv")).toBe("");
+
+    // Even a predicate that goes on to answer false cannot disturb it: the
+    // empty answer was settled on the first ask, and stillness keeps it.
+    settledAnswer = false;
     expect(inventory.blockFor("cnv")).toBe("");
   });
 });

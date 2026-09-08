@@ -404,6 +404,24 @@ export class McpServerRegistry {
   }
 
   /**
+   * The server a namespace belongs to, or `undefined` when the string is not
+   * one this class would have written.
+   *
+   * The inverse of `namespaceOf`, held beside it because a reader that needs
+   * to undo a namespace must not spell its own slice: the day `namespaceOf`'s
+   * spelling changed, a private un-joiner would be splitting on a separator
+   * that is no longer the one that joined. `undefined` rather than an error
+   * because the strings this reads arrive from places that never promised to
+   * be namespaces, and a reader that cannot tolerate a string it does not
+   * recognize is a reader that cannot be pointed at anything but itself.
+   */
+  static serverOf(namespace: string): string | undefined {
+    return namespace.startsWith("mcp:") && namespace.length > "mcp:".length
+      ? namespace.slice("mcp:".length)
+      : undefined;
+  }
+
+  /**
    * Everything about how this server is reached, as one comparable string.
    *
    * **The list of fields that matter, written once.** Three questions read it

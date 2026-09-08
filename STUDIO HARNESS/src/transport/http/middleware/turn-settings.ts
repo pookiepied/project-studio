@@ -84,6 +84,25 @@ export interface TurnSettingsMiddlewareOptions {
    * silently keeps every conversation on the eight-word derivation.
    */
   readonly titling?: ConversationTitlingPort;
+  /**
+   * Re-asks a conversation's capability note, before the run renders.
+   *
+   * The seam exists for one narrow case: a conversation whose note was
+   * *pending* - an enabled server that had not answered yet - may have its
+   * question re-asked, so the note a run is announced with is as current as
+   * the turn settings beside it. It has to be HERE, not anywhere inside the
+   * run: Flue composes the instruction document at the harness's first
+   * render and digests it, and a note that changed between the renders of
+   * one submission would move that digest mid-run, narrate an instructions
+   * signal, re-run the model, and re-bill the prefix inside a single turn.
+   * The middleware runs after the settings are settled and before Flue's
+   * dispatch, so a re-ask here lands strictly between submissions - the one
+   * boundary a block may move, and the one re-bill the settled-ness
+   * exception is priced at. The callback itself refuses settled answers, so
+   * it is called unconditionally and the distinction lives in the
+   * inventory.
+   */
+  readonly reopenCapabilityNote?: (conversationId: string) => void;
 }
 
 const AGENT_SUBMISSION_PATH = /^\/agents\/studio\/([^/]+)$/;
@@ -154,6 +173,10 @@ export function createTurnSettingsMiddleware(
       // lives here, because this is the only moment the message crosses the
       // harness.
       options.titling?.firstAdmission(conversationId, message);
+      // Before the run: the settings are settled, and this is the one place
+      // a pending capability note may be re-asked ahead of the render that
+      // composes the run's instruction document.
+      options.reopenCapabilityNote?.(conversationId);
       await next();
       if (context.res.status >= 400) {
         // The send was refused: the row this request created leaves with it.
@@ -177,6 +200,9 @@ export function createTurnSettingsMiddleware(
           : { permissionMode: settings.permissionMode }),
       });
     }
+    // Before the run, exactly as the first-turn branch does: the same
+    // between-submissions boundary, reached for every later turn.
+    options.reopenCapabilityNote?.(conversationId);
     await next();
   };
 }

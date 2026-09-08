@@ -13,6 +13,23 @@ import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
 import { openDatabase } from "../../src/storage/database.js";
 
+/**
+ * Polls until true, and fails naming the budget. Local rather than shared for
+ * the same reason `mcp-flue.test.ts` carries its own: extracting the
+ * integration helpers is deliberately queued elsewhere.
+ */
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 20_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Condition was not met within ${timeoutMs}ms.`);
+}
+
 const SERVER = `
 process.stdin.setEncoding("utf8");
 let buffer = "";
@@ -445,6 +462,137 @@ describe("MCP application runtime", () => {
     } finally {
       // Awaited for the same reason the other case's finally is: the child
       // runs in a directory afterEach removes.
+      await runtime.stop();
+      database.close();
+    }
+  }, 30_000);
+
+  /**
+   * The sequence found by hand on 2026-09-08, reproduced exactly: a server
+   * installed and switched on after the runtime's startup pass has already
+   * settled, then a conversation asking for its note without anyone running a
+   * reconcile by hand. The note that came back said `0 tools` for a server
+   * that was running, and because the note is frozen per conversation, that
+   * wrong sentence would have stood for the conversation's whole life.
+   *
+   * Three decisions compose, and this is the only place that can see all of
+   * them together:
+   *
+   * - `setEnabled` fires a background reconcile, so the server starts
+   *   without waiting for the next submission's `createSandbox`;
+   * - the inventory refuses to freeze a note built while an enabled server
+   *   had not answered yet, rendering the pending sentence instead;
+   * - the pending note may only be replaced at the next submission's seam
+   *   (`createAgentSandbox` reopens it), never between the steps of one run,
+   *   because Flue digests the instructions and a mid-run change re-bills
+   *   the prefix - the ruinous direction of §3.3, taken inside a turn.
+   *
+   * The rig above cannot be used here, because it enables the server BEFORE
+   * `runtime.start()` - which is the arrangement that never showed the bug.
+   * This case installs and enables after the startup pass has settled, which
+   * is the arrangement a person actually produces from the settings screen.
+   */
+  itContained("names a switched-on server's tools on a conversation's first settled note", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "studio-mcp-first-note-"));
+    temporaryDirectories.push(directory);
+    const projectRoot = join(directory, "project");
+    await mkdir(projectRoot, { recursive: true });
+    const script = join(directory, "server.mjs");
+    const databasePath = join(directory, "studio.db");
+    await writeFile(script, SERVER, "utf8");
+
+    const database = openDatabase({ path: databasePath });
+    const runtime = new StudioRuntime({
+      database,
+      projectRoot,
+      credentials,
+      approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
+    });
+    try {
+      new WorkspaceTrustStore(database).set(projectRoot, true);
+      // The startup pass, exactly as `app.ts` runs it at boot: settled before
+      // anything is installed, so the server below is not covered by it.
+      await runtime.start();
+
+      // Installed after boot, then switched on - the settings screen's
+      // sequence. `save` and `setEnabled` both fire their own background
+      // reconcile; neither is awaited here, because no person's settings
+      // screen waits for a handshake either.
+      runtime.servers.save(
+        {
+          id: "echo-server",
+          title: "Echo server",
+          description: "Echoes text back, for testing.",
+          transport: "stdio",
+          command: process.execPath,
+          args: [script],
+          env: {},
+          auth: "none",
+          provenance: "user",
+        },
+        AUTH_CONTEXT,
+      );
+      runtime.servers.setEnabled(
+        projectScope(runtime.projectId),
+        "echo-server",
+        true,
+        AUTH_CONTEXT,
+      );
+
+      // The first note, asked the way a conversation's first submission asks
+      // it: the render runs before `createSandbox` has launched anything
+      // (Phase 0's measured ordering), so the note is built against an
+      // enabled server that has not answered. Before the fixes this froze
+      // `0 tools` here for the conversation's whole life. Now the settled
+      // verdict refuses, and what renders is the pending sentence.
+      const firstSandbox = runtime.createAgentSandbox({
+        agentId: "studio",
+        conversationId: "first-note",
+      });
+      const pending = runtime.conversationCapabilityInventory("first-note");
+      expect(pending).toContain("still being read");
+      expect(pending).not.toContain("0 tools");
+
+      // The background pass from `setEnabled` is what starts the server -
+      // no manual reconcile anywhere. Polled through the management
+      // surface, the same read a settings screen makes, until the
+      // supervisor says the server is ready; a fixed sleep would race a
+      // slow handshake and a short one would not prove the pass ran.
+      await waitUntil(
+        () => runtime.servers.get("echo-server")?.status?.state === "ready",
+      );
+
+      // THE NEXT SUBMISSION. The between-submissions boundary is the HTTP
+      // middleware's in production; here, with no HTTP in front of the
+      // runtime, the same call the middleware makes is made by hand - the
+      // runtime exposes it for exactly this seam. The first ask of the new
+      // submission settles on the real answer with the real names - the
+      // exact sentence the report said the note should have carried on the
+      // first try, and the one re-billed system block the fix is priced at.
+      runtime.reopenCapabilityInventory("first-note");
+      const settled = runtime.conversationCapabilityInventory("first-note");
+      expect(settled).toContain(
+        "mcp:echo-server - Echoes text back, for testing. - 2 tools",
+      );
+      expect(settled).toContain("echo");
+      expect(settled).toContain("resource");
+
+      // And it is settled: a later ask, with nothing changing, answers the
+      // same string - and a further boundary does not move it either, which
+      // is the ordinary rule kept whole. The exception bought one boundary,
+      // not a moving block.
+      expect(runtime.conversationCapabilityInventory("first-note")).toBe(settled);
+      runtime.reopenCapabilityInventory("first-note");
+      expect(runtime.conversationCapabilityInventory("first-note")).toBe(settled);
+      void firstSandbox;
+
+      // A conversation that starts AFTER everything is connected gets the
+      // true note on its first ask, and never sees the pending sentence at
+      // all - the ordinary case must not pay for the exception.
+      const later = runtime.conversationCapabilityInventory("later-conversation");
+      expect(later).toContain("mcp:echo-server - Echoes text back, for testing. - 2 tools");
+      expect(runtime.conversationCapabilityInventory("later-conversation")).toBe(later);
+    } finally {
       await runtime.stop();
       database.close();
     }

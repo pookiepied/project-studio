@@ -115,6 +115,53 @@ whose tools changed is described by its old sentence until the next
 conversation, which is a stale sentence rather than a wrong tools array — and
 the array is what governs what can actually be called.
 
+*One narrow exception, found by hand (2026-09-08): settling is deferred while
+an enabled server has not answered yet.* The stability rule is about the block's
+*content* after it settles; it was silently also deciding the question of
+*when* settling happens, and the first turn is not always the right answer to
+that. The render that builds the inventory runs before the sandbox factory
+launches a newly switched-on server — that is the harness's measured ordering,
+not an accident — so a conversation whose first turn races a settings change
+builds its note against a catalog that is still empty. Freezing there printed
+`mcp:firecrawl — search and read of the internet — 0 tools` for a server that
+was starting, and kept that sentence for the conversation's whole life. That is
+not a stale sentence, the case the rule above already weighed and accepted; it
+is a wrong one, written before the server ever had a chance to answer, and the
+note is what the model reads before it knows to ask.
+
+So the block settles only when the answer is one worth keeping: when every
+enabled server has either completed a catalog read (the supervisor's `ready`
+*and* the catalog's read, because `ready` lands at the handshake, before
+`tools/list`) or failed terminally (`given-up` — a server mid-backoff is still
+trying, and settling on its worst moment would describe a server that recovers
+as one that has nothing). Until then the block renders one honest pending
+sentence.
+
+**And the replacement happens only between submissions, never within a
+run.** Flue re-renders the agent function for every model step and *digests
+the composed instruction document*: a run whose system prompt changed between
+step one and step two is narrated an instructions signal, re-runs the model,
+and re-bills the prefix mid-turn — the ruinous direction of §3.3, taken inside
+a single turn, which no exception may do. (Measured, not assumed, and measured
+twice: an earlier draft of this fix re-asked the pending note per render, and
+a later one re-asked it inside the sandbox factory's `createSandbox` — which
+Flue awaits once per submission, but *after* the first render has already
+composed the run's instructions. Each placement moved the digest between two
+steps of one submission, the signal landed between the discovery step and the
+tool step, and the integration suite failed with the run settling as text
+instead of calling. The seam that works is the harness's own turn-settings
+middleware, which runs after the submission's settings are settled and before
+Flue composes anything: strictly between runs.) The settled-ness exception
+therefore has one seam — the pre-run middleware re-asks a pending note, and a
+run's every render reads the same memoized string, pending or true. The cost
+lands where it was priced: one re-billed system block on that conversation's
+*second turn*, against a wrong system block for life. The two settled answers
+that must not be disturbed are part of the same rule — a conversation with no
+enabled servers settles immediately and keeps its byte-identical empty block,
+and a connected server that genuinely exposes nothing settles on its true
+`0 tools`, because the condition reads the supervisor and the catalog, never
+the emptiness of the tool list.*
+
 ### 2. One discovery tool, taking a scope
 
 ```
@@ -263,3 +310,9 @@ in the prefix.
   and makes the call fail as unavailable.
 - A conversation with no enabled servers has a system block with no inventory
   section in it — byte-identical to one built before this ADR.
+- A conversation whose first turn races a newly switched-on server is not
+  frozen on `0 tools`: the note settles only once that server has answered,
+  and the settled note names its real tools.
+- A server that is connected and genuinely exposes nothing settles on its true
+  `0 tools`, and a conversation with nothing enabled settles on the empty
+  block, immediately in both cases.

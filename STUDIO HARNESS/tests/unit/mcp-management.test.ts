@@ -49,6 +49,8 @@ describe("MCP management", () => {
   let changed: number;
   let stopped: string[];
   let credentials: InMemoryCredentialStore;
+  let reconciles: number;
+  let reconcileRefuses: boolean;
   let management: McpManagementService;
 
   beforeEach(() => {
@@ -58,6 +60,8 @@ describe("MCP management", () => {
     selection = new ExtensionSelectionStore(db);
     changed = 0;
     stopped = [];
+    reconciles = 0;
+    reconcileRefuses = false;
     credentials = new InMemoryCredentialStore();
     // The harness's own project, as the runtime supplies it. The readings
     // below only make sense against a fixed wider leg: which project a
@@ -71,6 +75,13 @@ describe("MCP management", () => {
       supervisor: {
         stop: async (id) => { stopped.push(id); },
         status: () => ({ state: "idle" }) as ReturnType<McpSupervisor["status"]>,
+      },
+      // The fast half of a settings change: counted, and (in one case below)
+      // made to refuse, so the tests can pin that the settings response never
+      // waits on the pass and never fails because of it.
+      reconcile: () => {
+        reconciles += 1;
+        if (reconcileRefuses) throw new Error("pass refused to run");
       },
       credentials,
       projectId: "workspace-root",
@@ -155,6 +166,52 @@ describe("MCP management", () => {
     expect(selection.decisionAt({ kind: "mcp", extensionId: "example", scope: projectScope("project") })).toBe(false);
     expect(changed).toBe(2);
     expect(stopped).toEqual([]);
+  });
+
+  /**
+   * The fast half of a settings change, pinned per mutating path.
+   *
+   * Found by hand, 2026-09-08: switching a server on marked the desired set
+   * dirty and nothing else, so the server did not start until some
+   * submission's sandbox setup deigned to reconcile - and a conversation
+   * rendered before that point announced the server with `0 tools`, then
+   * froze the lie for its whole life. Every mutation that changes the
+   * desired set now fires the pass in the background, beside the `changed()`
+   * it always made.
+   */
+  it("fires a background reconcile when a server is switched on", () => {
+    management.save(server(), AUTH_CONTEXT);
+    expect(reconciles).toBe(1);
+
+    management.setEnabled(projectScope("project"), "example", true, AUTH_CONTEXT);
+
+    expect(reconciles).toBe(2);
+    // The dirty generation is still bumped - the pass is the fast path, not a
+    // replacement for the turn boundary's slow one.
+    expect(changed).toBe(2);
+  });
+
+  it("fires the reconcile from the install and remove paths too", async () => {
+    management.save(server(), AUTH_CONTEXT);
+    expect(reconciles).toBe(1);
+
+    expect(await management.remove("example", AUTH_CONTEXT)).toBe(true);
+    expect(reconciles).toBe(2);
+  });
+
+  it("does not fail a settings change when the pass refuses to run", () => {
+    // The contract, not an implementation detail: the callback is
+    // fire-and-forget, so a settings screen never waits on a handshake and
+    // never sees a pass's failure as its own. A reconcile that cannot run
+    // costs one stale cycle - the turn boundary still applies the change -
+    // which is the reconciler's whole argument for `changed()` remaining
+    // beside this.
+    reconcileRefuses = true;
+    management.save(server(), AUTH_CONTEXT);
+
+    expect(reconciles).toBe(1);
+    expect(changed).toBe(1);
+    expect(registry.get("example")).toBeDefined();
   });
 
   it("restarts a live server after credential rotation", async () => {

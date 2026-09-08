@@ -609,8 +609,20 @@ export class StudioRuntime implements AgentHost {
     // chain. What has not changed is when it is settled - the first build
     // decides, and the memo (not the closure) is what keeps the block still
     // for the conversation's life, which is ADR 0048 §1's rule.
-    this.#capabilities = new CapabilityInventory((conversationId) =>
-      this.#capabilityEntries(this.#enablementContext(conversationId)),
+    //
+    // The second argument is §1's one narrow exception, and it exists because
+    // of the order a turn runs in: the render that asks this question happens
+    // before `createSandbox` has launched a newly switched-on server, so the
+    // first build of a conversation that races a settings change would
+    // otherwise freeze "0 tools" for that server into the system block for
+    // the conversation's whole life. `#capabilityEntriesAreSettled` decides
+    // when an answer is one worth keeping; until it says yes, the inventory
+    // rebuilds on every ask and settles the moment the server answers (or
+    // fails for good). See ADR 0048 §1 for the trade, and for why it is an
+    // exception rather than a violation.
+    this.#capabilities = new CapabilityInventory(
+      (conversationId) => this.#capabilityEntries(this.#enablementContext(conversationId)),
+      (entries) => this.#capabilityEntriesAreSettled(entries),
     );
     this.#management = new McpManagementService({
       registry: this.#registry,
@@ -621,6 +633,15 @@ export class StudioRuntime implements AgentHost {
       credentials: this.#credentials,
       projectId: this.#projectId,
       conversationProject: (conversationId) => this.#conversationProject(conversationId),
+      // The fast half of every settings change: the pass runs now, in the
+      // background, over every project that may want a server (the same list
+      // `reconcile()` reads - a decision made on a project's own screen has
+      // to be enough to start what that project's conversations resolve to).
+      // Fire-and-forget by contract, and cannot throw - not even
+      // synchronously - so a settings change never waits on a handshake and
+      // never fails because the pass did. See the method for what a failure
+      // costs.
+      reconcile: () => this.#reconcileAfterSettingsChange(),
     });
   }
 
@@ -717,6 +738,48 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
+   * A settings change just altered the desired set; run a pass now.
+   *
+   * Background and never throwing, both by contract with the management
+   * service: its HTTP response has already answered by now, and the point of
+   * this pass is to shorten the window between a switch being flipped and a
+   * server being reachable - not to make the settings screen wait for a
+   * handshake, and not to fail one because a server refused to start. A
+   * failure costs what a startup failure already costs: the supervisor holds
+   * the reason and the retry, the kind's own pass aborts with the message,
+   * and the generation is left dirty - the turn boundary's reconcile remains
+   * the correct slow path, so a fast path that dies changes when the change
+   * applies, never whether it does.
+   *
+   * Nothing here resets a backoff by design: the reconciler asks `ensure` for
+   * what is live and not what is failed, and a server mid-retry is left for
+   * its own timer - `mcp/reconcile.ts` says so, and this pass runs the same
+   * code the turn boundary does.
+   */
+  #reconcileAfterSettingsChange(): void {
+    try {
+      this.#extensions
+        .reconcile(this.#reconcileProjects())
+        .catch((error: unknown) => {
+          this.#logger?.warn(
+            `Extension reconcile after a settings change failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+    } catch (error) {
+      // The synchronous half of the same contract: a store that refuses a
+      // read throws before any promise exists, and the settings response is
+      // not the place it surfaces.
+      this.#logger?.warn(
+        `Extension reconcile after a settings change could not start: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
    * The installed servers one context actually gets.
    *
    * One function because two readers must never disagree. `refreshTools`
@@ -772,6 +835,49 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
+   * Whether one build of the inventory is an answer worth keeping for the
+   * conversation's whole life.
+   *
+   * The one question this answers is: has every enabled server *answered*?
+   * Not "does it have tools" - a connected server that exposes nothing has
+   * answered, and `0 tools` is then the true sentence, settled like any
+   * other. What is not keepable is a server that has not spoken yet, and the
+   * two states that mean that are `starting` (the handshake is in flight) and
+   * `failed` (the handshake failed and the supervisor's backoff is still
+   * deciding; a server that recovers on its second attempt would otherwise be
+   * described as empty for this conversation's life by a note that settled on
+   * its worst moment). `given-up` is keepable - the supervisor has decided it
+   * will not try again, and that is as answered as a server gets.
+   *
+   * Read from the supervisor and the catalog rather than inferred from the
+   * entries: the entries say what the tools *are*, and an empty list is the
+   * honest answer for a server with nothing to expose. And both conditions,
+   * not the supervisor's alone: the supervisor reports `ready` the moment the
+   * handshake lands, which is before the catalog's `tools/list` has been
+   * read - settling there would freeze "0 tools" in the window between the
+   * two, which is the same bug one handshake later.
+   *
+   * An empty entry list settles: a conversation with no enabled servers has
+   * nothing to wait for, and the byte-identical empty block must not become
+   * a moving target.
+   */
+  #capabilityEntriesAreSettled(entries: readonly CapabilityInventoryEntry[]): boolean {
+    return entries.every((entry) => {
+      // The id is one this runtime just wrote via `namespaceOf`, so the inverse
+      // is always defined here; the undefined branch is the type system's
+      // answer to "what if it were not", and an unrecognized namespace is
+      // treated as settled rather than as a reason to never settle.
+      const serverId = McpServerRegistry.serverOf(entry.id);
+      if (serverId === undefined) return true;
+      const status = this.#supervisor.status(serverId);
+      return (
+        status?.state === "given-up" ||
+        (status?.state === "ready" && this.#catalog.hasRefreshed(serverId))
+      );
+    });
+  }
+
+  /**
    * The capability inventory for one conversation's system block.
    *
    * A string rather than records, for the same reason the background jobs are
@@ -782,6 +888,23 @@ export class StudioRuntime implements AgentHost {
    */
   conversationCapabilityInventory(conversationId: string): string {
     return this.#capabilities.blockFor(conversationId);
+  }
+
+  /**
+   * Re-asks this conversation's capability note, before a run renders.
+   *
+   * The HTTP middleware calls this between submissions, which is the one
+   * boundary a note may move: a *pending* note - an enabled server that had
+   * not answered - is rebuilt and re-memoized here, so the next run's first
+   * render composes the current truth; a settled note is refused untouched,
+   * for the conversation's life. Nothing inside a run calls this, because
+   * Flue digests the composed instruction document per render and a note
+   * that moved between the renders of one submission would be narrated as an
+   * instructions signal and re-bill the prefix mid-turn - the ruinous
+   * direction, taken inside a single run.
+   */
+  reopenCapabilityInventory(conversationId: string): void {
+    this.#capabilities.reopen(conversationId);
   }
 
   /**

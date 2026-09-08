@@ -189,6 +189,48 @@ export function capabilityInventoryBlock(
  * the same string. Discovery appends to the tools array - the free direction -
  * and this stays exactly as it was.
  *
+ * **One narrow exception, and it is settled-ness, not stillness, that is
+ * deferred.** The block is frozen when the answer is one worth keeping; the
+ * exception is the answer that is not yet an answer at all. A server switched
+ * on before a conversation's first turn starts its process during that turn's
+ * sandbox setup, and the render that builds this section runs *before* the
+ * sandbox exists - so the first build can see an enabled server whose catalog
+ * is still empty. Freezing there would print `0 tools` for a server that is
+ * starting, and keep it for the conversation's whole life, which is the exact
+ * sentence the exception exists to refuse: the note is what the model reads
+ * before it knows to ask. The `settled` predicate says whether the answer is
+ * ready to be kept; while it answers false the block renders one honest
+ * pending sentence and memorizes nothing.
+ *
+ * **But it may only change across submissions, never within one run.** Flue
+ * re-renders the agent function for every model step and *digests the
+ * composed instruction document*: a run whose system prompt changed between
+ * step one and step two is narrated an instructions signal and re-billed at
+ * the provider - the ruinous direction of §3.3, taken mid-turn, which no fix
+ * may do. (Measured, not assumed: two earlier placements of the re-ask - per
+ * render, and inside the sandbox factory's `createSandbox`, which runs after
+ * the first render has already composed the run's instructions - each moved
+ * the digest between steps of one submission, and the MCP integration suite
+ * failed exactly this way. The seam that works is the HTTP middleware,
+ * between submissions, before Flue composes anything.) So the unsettled
+ * block does not settle on its own: it is re-asked only at that boundary,
+ * and within a run every ask is handed the same string it first built -
+ * pending or true, whatever this run started with. And only a *pending*
+ * answer is re-asked even there: a settled one is settled for the
+ * conversation's life, so a later settings toggle cannot move the block and
+ * re-bill the history behind it - the ordinary rule, kept whole. The cost
+ * lands where the handover priced it: one re-billed system block on that
+ * conversation's *second turn*, never mid-run; that trade - one re-bill at a
+ * boundary against a wrong system block for life - is written down beside
+ * ADR 0048 §1, because the rule this bends is that rule, and a reader who
+ * found the bend without the reasoning would call it a violation.
+ *
+ * The predicate is a property of the *sources*, not of the string. A
+ * conversation with no enabled servers settles immediately whatever the
+ * entries say, and so does one whose every enabled server has answered - so
+ * the empty answer stays exactly as cheap as it was, and the byte-identical
+ * empty block is not disturbed by this exception.
+ *
  * Keyed by conversation because that is the lifetime the system block is
  * cached against. The entries are strings and there is one per conversation
  * this process has rendered, which is small enough that nothing evicts them;
@@ -197,17 +239,104 @@ export function capabilityInventoryBlock(
  */
 export class CapabilityInventory {
   readonly #build: (conversationId: string) => readonly CapabilityInventoryEntry[];
+  readonly #settled: (entries: readonly CapabilityInventoryEntry[]) => boolean;
   readonly #blocks = new Map<string, string>();
+  /**
+   * The conversations currently holding a pending answer.
+   *
+   * A pending answer is the only one a submission boundary may re-ask, so it
+   * is the one fact this class records beside the string. A settled answer
+   * never re-asks - not at a boundary, not anywhere - because that is ADR
+   * 0048 §1's rule whole: once settled, the block does not move for the
+   * conversation's life, and a reopen that forgot a settled note would let a
+   * settings toggle re-bill the whole history behind it, which the ordinary
+   * rule (and an integration test) both forbid.
+   */
+  readonly #pending = new Set<string>();
 
-  constructor(build: (conversationId: string) => readonly CapabilityInventoryEntry[]) {
+  /**
+   * @param settled Whether one build's answer is one worth keeping. Read
+   *   from the live sources - the supervisor's states and the catalog's
+   *   completed reads - and never inferred from the entries themselves: "0
+   *   tools" is a true answer for a connected server that exposes nothing,
+   *   and it is only un-kept for a server that has not answered yet.
+   */
+  constructor(
+    build: (conversationId: string) => readonly CapabilityInventoryEntry[],
+    settled: (entries: readonly CapabilityInventoryEntry[]) => boolean,
+  ) {
     this.#build = build;
+    this.#settled = settled;
+  }
+
+  /**
+   * Re-asks the question, but only where it was never answered.
+   *
+   * Called between submissions - the HTTP middleware, after the turn's
+   * settings are settled and before Flue composes the run's instruction
+   * document. That is the one boundary at which a block may move, and the
+   * reason it must be there rather than anywhere inside a run: Flue
+   * re-renders the agent function once per model step and digests the
+   * composed instructions, so a memo deleted mid-run would be rebuilt by the
+   * next render - possibly to different bytes - and the digest would move
+   * between two steps of one submission, narrated as an instructions signal,
+   * re-running the model, and re-billing the prefix inside a single turn.
+   *
+   * This forgets only a *pending* answer: the one boundary a block may move
+   * is the one where the previous turn had nothing true to say, which is the
+   * single re-bill the settled-ness exception is priced at. A settled answer
+   * is left untouched, whatever has changed behind it since; and an unknown
+   * conversation has nothing to forget, which makes the boundary caller
+   * unconditional and this method the one place the distinction lives.
+   */
+  reopen(conversationId: string): void {
+    if (!this.#pending.has(conversationId)) return;
+    this.#pending.delete(conversationId);
+    this.#blocks.delete(conversationId);
   }
 
   blockFor(conversationId: string): string {
     const existing = this.#blocks.get(conversationId);
     if (existing !== undefined) return existing;
-    const block = capabilityInventoryBlock(this.#build(conversationId));
+    const entries = this.#build(conversationId);
+    // The settled check is made against this ask's build, not remembered from
+    // an earlier one, because the two must read the same moment: a predicate
+    // answer carried over from a previous turn would settle this turn against
+    // a state that has since changed. A pending answer is memoized like any
+    // other - within one submission every ask must answer the same bytes, or
+    // the instruction digest moves mid-run - and recorded in #pending so the
+    // next submission's boundary knows this is the one answer it may re-ask.
+    const settled = this.#settled(entries);
+    const block = settled ? capabilityInventoryBlock(entries) : this.#pendingBlock();
+    if (settled) this.#pending.delete(conversationId);
+    else this.#pending.add(conversationId);
     this.#blocks.set(conversationId, block);
     return block;
+  }
+
+  /**
+   * The answer that is not yet an answer, spelled for the model.
+   *
+   * One honest sentence for the turns the server takes to connect, and
+   * memoized like any other answer once built, because a block that changed
+   * between the steps of one run would move the instruction digest mid-turn.
+   * The empty string is NOT used here, because "" is a settled answer with a
+   * test pinning it: a conversation with nothing enabled must keep a
+   * byte-identical prompt, and a pending block that rendered as "" would be
+   * indistinguishable from that settled one - and a future "optimization"
+   * that memoized it would freeze exactly the silence this exception exists
+   * to prevent.
+   */
+  #pendingBlock(): string {
+    return [
+      "",
+      "# Capabilities available on request",
+      "",
+      "One or more extensions were switched on for this conversation just",
+      "now, and their tools are still being read. Say what you were asked to",
+      "say; if you need one of them, the discover tool will know its tools",
+      "from your next step.",
+      "",
+    ].join("\n");
   }
 }

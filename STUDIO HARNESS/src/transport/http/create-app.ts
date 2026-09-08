@@ -34,6 +34,15 @@ import { createSandboxRoutes } from "./routes/sandbox.js";
 export interface CreateHttpAppOptions {
   /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
   readonly servers: McpAdministration;
+  /**
+   * Re-asks a conversation's capability note, called by the turn-settings
+   * middleware between submissions. A port of the same shape as `servers`:
+   * the runtime implements it and this layer must not learn why. Optional
+   * for tests; production always wires it, because a composition without
+   * it leaves a pending note pending for the conversation's whole life -
+   * the bug the settled-ness exception exists to prevent.
+   */
+  readonly reopenCapabilityNote?: (conversationId: string) => void;
   /** The provider administration surface — a port of the same shape. */
   readonly providers: ProviderAdministration;
   /**
@@ -174,6 +183,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
       conversations: options.conversations,
       isModelServed: options.isModelServed,
       ...(options.titling === undefined ? {} : { titling: options.titling }),
+      ...(options.reopenCapabilityNote === undefined
+        ? {}
+        : { reopenCapabilityNote: options.reopenCapabilityNote }),
     }),
   );
   // The URL shape is ours and must not move: the webview, the Tauri IPC seam

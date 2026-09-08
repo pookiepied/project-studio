@@ -282,6 +282,23 @@ export class McpCapabilityCatalog {
     if (this.#connections.has(serverId)) this.#dirty.add(serverId);
   }
 
+  /**
+   * Whether this server's tools have been read to completion at least once
+   * since it was last removed.
+   *
+   * Presence, never emptiness: a connected server that genuinely exposes no
+   * tools has an empty list stored under its id and answers true — the
+   * question is "has it answered?", not "does it have anything?". The one
+   * reader that matters is the capability inventory's settled verdict: the
+   * supervisor reports `ready` the moment the handshake lands, which is
+   * *before* this class's `refresh` has read `tools/list`, so a note that
+   * settled on `ready` alone would freeze `0 tools` in the window between the
+   * two. This read is what closes that window.
+   */
+  hasRefreshed(serverId: string): boolean {
+    return this.#tools.has(serverId);
+  }
+
   async refreshDirty(records: readonly McpServerRecord[]): Promise<void> {
     const byId = new Map(records.map((record) => [record.id, record]));
     for (const serverId of [...this.#dirty]) {

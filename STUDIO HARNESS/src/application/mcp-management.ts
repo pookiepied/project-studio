@@ -56,6 +56,23 @@ export interface McpManagementOptions {
   readonly selection: ExtensionSelectionStore;
   readonly supervisor: Pick<McpSupervisor, "stop" | "status">;
   readonly extensions: Pick<ExtensionReconciler, "changed">;
+  /**
+   * Fires a reconcile pass for the change just written, without waiting for it.
+   *
+   * `extensions.changed()` marks the desired set dirty; this is the fast half
+   * that applies the change now rather than at the next turn boundary. A
+   * decision that starts a process must not wait for the process: a server
+   * that takes ten seconds to handshake must not hold the settings screen's
+   * response for ten seconds, so the callback is fire-and-forget by contract —
+   * it must not throw, and nothing awaits its return. A server that fails to
+   * start fails into the supervisor, which already holds the reason and the
+   * retry.
+   *
+   * Optional because the turn boundary remains the correct slow path: a
+   * composition without this still reconciles, just later, and nothing
+   * anywhere depends on the pass having run.
+   */
+  readonly reconcile?: () => void;
   readonly credentials?: SecureCredentialStore;
   /**
    * This harness's own project: the scope whose decisions its tools array
@@ -111,6 +128,7 @@ export class McpManagementService implements McpAdministration {
   readonly #selection: ExtensionSelectionStore;
   readonly #supervisor: Pick<McpSupervisor, "stop" | "status">;
   readonly #extensions: Pick<ExtensionReconciler, "changed">;
+  readonly #reconcile: (() => void) | undefined;
   readonly #credentials: SecureCredentialStore | undefined;
   readonly #projectId: string;
   readonly #conversationProject:
@@ -123,9 +141,37 @@ export class McpManagementService implements McpAdministration {
     this.#selection = options.selection;
     this.#supervisor = options.supervisor;
     this.#extensions = options.extensions;
+    this.#reconcile = options.reconcile;
     this.#credentials = options.credentials;
     this.#projectId = options.projectId;
     this.#conversationProject = options.conversationProject;
+  }
+
+  /**
+   * Applies the change now, in the background, in every mutating path.
+   *
+   * Not a replacement for `changed()` — both are called, always. The
+   * reconciler's whole argument is that a missed notification costs one stale
+   * cycle rather than a permanent lie, and that argument survives this: the
+   * pass is the fast path, the dirty generation is the correct slow one, and
+   * a failure of the fast path leaves the slow one exactly as it was.
+   *
+   * A throwing callback is caught here rather than trusted not to throw,
+   * because the caller just made a settings change and the settings change
+   * succeeded: failing the mutation because a background pass could not
+   * start would report a breakage that did not happen, and un-apply nothing —
+   * the durable row is already written. The pass's own failures report
+   * themselves — a kind that fails aborts its pass with the message, and the
+   * supervisor holds any server's failure — so swallowing here costs a
+   * log-shaped nothing.
+   */
+  #applyNow(): void {
+    this.#extensions.changed();
+    try {
+      this.#reconcile?.();
+    } catch {
+      // Deliberately empty: see above.
+    }
   }
 
   /**
@@ -217,7 +263,7 @@ export class McpManagementService implements McpAdministration {
       this.#grants.revokeNamespace(McpServerRegistry.namespaceOf(input.id));
     }
 
-    this.#extensions.changed();
+    this.#applyNow();
     return this.#view(after);
   }
 
@@ -237,7 +283,7 @@ export class McpManagementService implements McpAdministration {
     this.#grants.revokeNamespace(McpServerRegistry.namespaceOf(id));
     this.#selection.forget("mcp", id);
     await this.#supervisor.stop(id);
-    this.#extensions.changed();
+    this.#applyNow();
     return true;
   }
 
@@ -259,7 +305,7 @@ export class McpManagementService implements McpAdministration {
     const key = { kind: "mcp", extensionId: id, scope } as const;
     if (enabled === null) this.#selection.clear(key);
     else this.#selection.set(key, enabled);
-    this.#extensions.changed();
+    this.#applyNow();
   }
 
   async setCredential(
@@ -282,7 +328,7 @@ export class McpManagementService implements McpAdministration {
     }
     await credentials.set({ scope: "mcp", id }, secret);
     await this.#supervisor.stop(id);
-    this.#extensions.changed();
+    this.#applyNow();
   }
 
   async deleteCredential(id: string, _auth: AuthContext): Promise<boolean> {
@@ -295,7 +341,7 @@ export class McpManagementService implements McpAdministration {
     }
     const deleted = await credentials.delete({ scope: "mcp", id });
     await this.#supervisor.stop(id);
-    this.#extensions.changed();
+    this.#applyNow();
     return deleted;
   }
 
