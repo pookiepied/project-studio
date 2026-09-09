@@ -511,6 +511,21 @@ export function createConversationClient(options: ConversationClientOptions): Co
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),
         reasoningLevel: wire.reasoningLevel,
         ...(wire.permissionMode === undefined ? {} : { permissionMode: wire.permissionMode }),
+        // The project travels with the words, and this is the only place it
+        // can. The row a first turn creates is written by the harness's
+        // admission middleware BEFORE the run renders, and the run reads that
+        // row to decide where it stands. The index write the app sends after
+        // the receipt is too late to be read by the turn it belongs to.
+        //
+        // Leaving it out of this body was a silent version of no project at
+        // all: a conversation started on a project page stood in its own
+        // scratch directory for its whole first turn, could not read a file
+        // of the project that was open on screen, and reported the project's
+        // own folder as outside its workspace. Built by
+        // `turnSettingsToWire`, carried here, and never sent as null - the
+        // harness only ever sets this field, so a later turn cannot unfile a
+        // conversation somebody moved.
+        ...(wire.projectId === undefined ? {} : { projectId: wire.projectId }),
         ...(carried.length === 0 ? {} : { attachments: carried }),
       }))
       if ('failure' in sent) return { ok: false, error: sent.failure }

@@ -150,6 +150,38 @@ describe('submitting a turn', () => {
     expect(JSON.parse(init.body)).toEqual({ kind: 'user', body: 'hello', reasoningLevel: 'default' })
   })
 
+  it('carries the project, because the run that answers reads it before any later write', async () => {
+    // The harness writes the conversation's row at admission, before the run
+    // renders, and the run reads that row to decide where it stands. Dropping
+    // this key here left a conversation started on a project page standing in
+    // its own scratch directory for its whole first turn, unable to read the
+    // project that was open on screen.
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    await client.submitTurn('hello', {
+      modelId: null,
+      reasoningLevel: 'default',
+      projectId: 'prj_abc',
+    })
+
+    const init = calls[0]?.args['init'] as { body: string }
+    expect(JSON.parse(init.body)).toEqual({
+      kind: 'user',
+      body: 'hello',
+      reasoningLevel: 'default',
+      projectId: 'prj_abc',
+    })
+
+    // Off a project the key is absent rather than null: the harness only ever
+    // sets this field, so a turn cannot unfile a conversation.
+    await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' })
+    const later = calls[1]?.args['init'] as { body: string }
+    expect(JSON.parse(later.body)).not.toHaveProperty('projectId')
+  })
+
   it('carries the permission mode in the harness vocabulary, and omits it when the stored mode stands', async () => {
     const { invoke, calls } = scriptedInvoke({
       service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
