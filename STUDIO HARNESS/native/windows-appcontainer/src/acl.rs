@@ -359,7 +359,95 @@ pub fn holds(path: &str, sid: &OwnedSid, mode: Mode) -> Result<bool, String> {
     Ok(granted & wanted == wanted)
 }
 
+/// Whether this exact entry is already on the path, mask and inheritance both.
+///
+/// Stricter than {@link holds}, and for a different question. `holds` asks
+/// whether the rights are present at all, summing every entry for the trustee,
+/// which is the right question for "is this machine prepared". This asks
+/// whether *this* grant has already been made — one entry carrying both the
+/// rights and the inheritance flags — because that is what decides whether
+/// writing it again would change anything.
+///
+/// The tree below is not inspected, and does not need to be: an inheritable
+/// entry on the directory is inherited by everything created under it
+/// afterwards, and the propagating write that first placed it already fixed
+/// what existed before. The one state this does not repair is a tree left half
+/// written by a propagation that died in the middle; `revoke` then `grant`
+/// still does, and nothing here is a barrier to it.
+fn already_applied(path: &str, sid: &OwnedSid, mode: Mode) -> Result<bool, String> {
+    let wide_path = to_wide(path);
+    let mut dacl: *mut ACL = std::ptr::null_mut();
+    let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+
+    let status = unsafe {
+        GetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut dacl,
+            std::ptr::null_mut(),
+            &mut descriptor,
+        )
+    };
+    if status != ERROR_SUCCESS {
+        return Err(format!("could not read the permissions of {path} (error {status})"));
+    }
+
+    let wanted_mask = mode.mask();
+    let wanted_inheritance = mode.inheritance() as u8;
+    let mut found = false;
+
+    if !dacl.is_null() {
+        let count = unsafe { (*dacl).AceCount } as u32;
+        for index in 0..count {
+            let mut ace: *mut core::ffi::c_void = std::ptr::null_mut();
+            if unsafe { GetAce(dacl, index, &mut ace) } == 0 {
+                continue;
+            }
+            let header = ace as *const ACE_HEADER;
+            if unsafe { (*header).AceType } != ACCESS_ALLOWED {
+                continue;
+            }
+            // Only the two inheritance bits are compared. Windows sets
+            // `INHERITED_ACE` on the copies it pushes downwards and may set
+            // `INHERIT_ONLY`; neither says anything about whether the entry we
+            // asked for is here.
+            let flags = unsafe { (*header).AceFlags } & (OBJECT_INHERIT_ACE as u8 | CONTAINER_INHERIT_ACE as u8);
+            let allowed = ace as *const ACCESS_ALLOWED_ACE;
+            let ace_sid = unsafe { std::ptr::addr_of!((*allowed).SidStart) } as PSID;
+            if unsafe { EqualSid(ace_sid, sid.raw()) } == 0 {
+                continue;
+            }
+            let mask = unsafe { (*allowed).Mask };
+            if mask & wanted_mask == wanted_mask && flags == wanted_inheritance {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    unsafe { LocalFree(descriptor as _) };
+    Ok(found)
+}
+
+/// Places the entry, unless it is already exactly there.
+///
+/// **The skip is the point, not a saving.** A granting write with propagation
+/// rewrites the security descriptor of every file under the path, and every
+/// such rewrite is a change event to anything watching the directory — which,
+/// on a project the user is developing, is their own toolchain. Studio's
+/// desktop shell watches its own source tree, so an unconditional re-grant on
+/// every start of a contained process made the shell rebuild, which restarted
+/// the harness, which started the contained process again: an endless loop
+/// with nothing in it that had actually changed. Measured on 2026-09-09 by
+/// watching a directory across two identical grants; the second fired the same
+/// events as the first, and now fires none.
 pub fn grant(path: &str, sid: &OwnedSid, mode: Mode) -> Result<(), String> {
+    if already_applied(path, sid, mode)? {
+        return Ok(());
+    }
     apply(path, sid, mode.mask(), mode.inheritance(), SET_ACCESS, mode.propagates())
 }
 

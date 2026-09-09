@@ -497,3 +497,36 @@ never resolves a main module — ten green tests all taking the same shortcut, p
 a containment that broke `node build.js`. There is now a case that runs a script
 *file*, and removing the traversal fix fails that one and no other, which is the
 measurement of how blind the rest were.
+
+## A grant is written once, because writing it again is not free
+
+Added 2026-09-09, after the desktop shell rebuilt itself in a loop that nothing
+had actually changed.
+
+A read or write grant is inheritable, and placing one makes Windows walk down
+from the granted directory and rewrite the security descriptor of every file
+underneath. That walk is necessary the first time: files that already exist do
+not pick up a new inheritable entry until something touches them. It is
+necessary exactly once. Every repeat rewrites the same descriptors to the same
+values, and each rewrite is a change event to anything watching the tree.
+
+That is not a hypothetical audience. A project is the user's own source, and
+their toolchain is usually watching it. Studio's own desktop shell watches its
+own source tree, so enabling an MCP server for the Studio project granted the
+project, the grant rewrote `src-tauri/build.rs` and `tauri.conf.json`, the shell
+rebuilt, the rebuild restarted the harness, the harness started the enabled
+server again, and the grant ran again. Measured by watching a directory across
+two identical grants: the second reported the same files changed as the first.
+
+So `grant` now asks before it writes. If the trustee already holds an entry with
+the same rights and the same inheritance flags, there is nothing to do and
+nothing is written. The check is stricter than `holds`, which sums the rights
+across every entry to answer "is this machine prepared" - the question here is
+whether *this* grant has already been made, which only one entry carrying both
+the mask and the flags can answer.
+
+The tree below the directory is not inspected, and does not need to be: what
+existed was fixed by the propagating write that first placed the entry, and what
+is created afterwards inherits it. The one state this does not repair is a tree
+left half written by a propagation that died in the middle, which `revoke` then
+`grant` still repairs.
