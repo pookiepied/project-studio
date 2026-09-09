@@ -288,6 +288,22 @@ async fn service_fetch(
   services::service_fetch(&supervisor, service, path, init).await
 }
 
+/// The same seam, for bodies that are not text.
+///
+/// The harness's attachment route answers with the raw bytes of a screenshot
+/// frame, which the text seam's lossy UTF-8 decode would corrupt on arrival.
+/// Success crosses as raw bytes (`invoke` resolves an ArrayBuffer); a refusal
+/// is the same error vocabulary as every other command. The credential and
+/// the path rule are the text seam's, for the same reason.
+#[tauri::command]
+async fn service_fetch_bytes(
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+  service: services::ServiceId,
+  path: String,
+) -> Result<tauri::ipc::Response, services::ServiceError> {
+  services::service_fetch_bytes(&supervisor, service, path).await
+}
+
 /// The same seam, streaming: the webview additionally names the offset it
 /// last saw, and events arrive over the channel as they happen — each
 /// carrying the offset to resume from, so any interruption is answered by
@@ -461,6 +477,7 @@ pub fn run() {
       restart_harness,
       get_harness_status,
       service_fetch,
+      service_fetch_bytes,
       service_stream,
       service_stream_cancel
     ])

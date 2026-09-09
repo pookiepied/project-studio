@@ -45,7 +45,7 @@ afterEach(() => {
 
 describe('what a message being written says about how it ended', () => {
   it('says nothing at all while it is the one being written', () => {
-    const { container } = render(<AssistantTurn item={assistant({ state: 'stopped' })} live />)
+    const { container } = render(<AssistantTurn conversationId="conv" item={assistant({ state: 'stopped' })} live />)
     expect(screen.queryByText('Stopped before finishing')).toBeNull()
     // The caret is what stands there instead: this message is being written,
     // which is the whole claim the ending line was contradicting.
@@ -56,7 +56,7 @@ describe('what a message being written says about how it ended', () => {
     // The whole reason EndLine exists (Task 26): a message left unfinished by
     // a crash, a harness stop or an abort must say so immediately, with no
     // turn running and nothing else on screen to explain it.
-    render(<AssistantTurn item={assistant({ state: 'stopped' })} live={false} />)
+    render(<AssistantTurn conversationId="conv" item={assistant({ state: 'stopped' })} live={false} />)
     expect(screen.getByText('Stopped before finishing')).toBeTruthy()
   })
 
@@ -65,13 +65,13 @@ describe('what a message being written says about how it ended', () => {
     // settlement carried; a wider guard here would hide them for as long as
     // the phase said a turn was running.
     render(
-      <AssistantTurn item={assistant({ state: 'failed', reason: 'the provider gave up' })} live />,
+      <AssistantTurn conversationId="conv" item={assistant({ state: 'failed', reason: 'the provider gave up' })} live />,
     )
     expect(screen.getByText('This turn failed')).toBeTruthy()
     expect(screen.getByText('the provider gave up')).toBeTruthy()
 
     cleanup()
-    render(<AssistantTurn item={assistant({ state: 'aborted', reason: null })} live />)
+    render(<AssistantTurn conversationId="conv" item={assistant({ state: 'aborted', reason: null })} live />)
     expect(screen.getByText('Aborted')).toBeTruthy()
   })
 })
@@ -97,7 +97,7 @@ describe('the action row under a finished answer', () => {
       ...globalThis.navigator,
       clipboard: { writeText: async (text: string) => void writes.push(text) },
     })
-    render(<AssistantTurn item={finished()} live={false} onBranch={() => undefined} />)
+    render(<AssistantTurn conversationId="conv" item={finished()} live={false} onBranch={() => undefined} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
     await waitFor(() => expect(writes).toEqual(['first paragraph\n\nsecond paragraph']))
@@ -108,7 +108,7 @@ describe('the action row under a finished answer', () => {
     // on both — redoing a turn that touched a workspace is the person's call
     // through their own tooling, not a button.
     const branch = vi.fn()
-    render(<AssistantTurn item={finished()} live={false} onBranch={branch} />)
+    render(<AssistantTurn conversationId="conv" item={finished()} live={false} onBranch={branch} />)
     expect(screen.getByRole('button', { name: 'Branch from here' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeTruthy()
 
@@ -117,7 +117,7 @@ describe('the action row under a finished answer', () => {
   })
 
   it('withholds branch when no fork path was given, but copy stays', () => {
-    render(<AssistantTurn item={finished()} live={false} />)
+    render(<AssistantTurn conversationId="conv" item={finished()} live={false} />)
     expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Branch from here' })).toBeNull()
   })
@@ -126,14 +126,14 @@ describe('the action row under a finished answer', () => {
     // A message can be complete while its run is not -- parked on a question
     // or a permission -- and a copy row under a run still owing its next
     // word is stray furniture, not an offer. Hovered or not.
-    const { container } = render(<AssistantTurn item={finished()} live={false} turnInFlight />)
+    const { container } = render(<AssistantTurn conversationId="conv" item={finished()} live={false} turnInFlight />)
     fireEvent.pointerEnter(container.firstElementChild ?? container)
     const row = screen.getByRole('button', { name: 'Copy' }).closest('[class*="mb-4"]')
     expect(row?.className).toContain('pointer-events-none')
   })
 
   it('answers to hover once the submission has settled', () => {
-    const { container } = render(<AssistantTurn item={finished()} live={false} />)
+    const { container } = render(<AssistantTurn conversationId="conv" item={finished()} live={false} />)
     const row = screen.getByRole('button', { name: 'Copy' }).closest('[class*="mb-4"]')
     expect(row?.className).toContain('pointer-events-none')
     fireEvent.pointerEnter(container.firstElementChild ?? container)
@@ -168,7 +168,7 @@ describe('the memo boundary', () => {
     useEffect(() => {
       mark(item.id)
     })
-    return <AssistantTurn item={item} live={false} />
+    return <AssistantTurn conversationId="conv" item={item} live={false} />
   })
 
   function Pair({ a, b }: { a: Extract<TranscriptItem, { kind: 'assistant' }>; b: Extract<TranscriptItem, { kind: 'assistant' }> }) {

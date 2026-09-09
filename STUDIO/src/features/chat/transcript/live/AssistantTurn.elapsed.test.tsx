@@ -63,7 +63,7 @@ afterEach(() => {
 describe('the duration a reasoning run is allowed to claim', () => {
   it('measures the reasoning itself, ignoring the wait before it', () => {
     render(
-      <AssistantTurn
+      <AssistantTurn conversationId="conv"
         item={turn({ startedAt: ARRIVED, updatedAt: ARRIVED + 4_000 })}
         live={false}
       />,
@@ -76,14 +76,14 @@ describe('the duration a reasoning run is allowed to claim', () => {
     // is the common case on a provider that emits its reasoning at the end,
     // and a fabricated "a moment" there reads as an answer.
     render(
-      <AssistantTurn item={turn({ startedAt: ARRIVED, updatedAt: ARRIVED })} live={false} />,
+      <AssistantTurn conversationId="conv" item={turn({ startedAt: ARRIVED, updatedAt: ARRIVED })} live={false} />,
     )
     expect(screen.getByText('Thought')).toBeTruthy()
     expect(screen.queryByText(/Thought for/)).toBeNull()
   })
 
   it('claims nothing for a run that was replayed rather than watched', () => {
-    render(<AssistantTurn item={turn({ startedAt: null, updatedAt: null })} live={false} />)
+    render(<AssistantTurn conversationId="conv" item={turn({ startedAt: null, updatedAt: null })} live={false} />)
     expect(screen.getByText('Thought')).toBeTruthy()
     expect(screen.queryByText(/Thought for/)).toBeNull()
   })

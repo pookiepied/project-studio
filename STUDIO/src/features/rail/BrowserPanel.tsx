@@ -1,25 +1,48 @@
+import { useState } from 'react'
+import { cn } from '@/lib/cn'
+import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
+import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
 import type { RailEntry } from '@/stores/rail'
 
 /**
  * The browser preview, at a size worth looking at.
  *
- * The transcript row shows a frame inline because a reader following the work
- * wants to see it happen. This is the same frame with room around it, for when
- * somebody actually wants to *look* — at a layout, at a font, at whether the
- * mobile breakpoint did what it was supposed to do.
+ * The transcript row shows the report inline because a reader following the
+ * work wants to see it happen. This is the same report with room around it,
+ * for when somebody actually wants to *look* — at a layout, at a font, at
+ * whether the mobile breakpoint did what it was supposed to do.
  *
  * **It is a preview and not a browser** (ADR 0049 §7). No address bar, no back
  * button, nothing clickable. Those need history, cookie and profile
  * management, a download policy and a clear-data control, which is a second
  * product inside this one — built for a person who has a real browser one
- * keystroke away. What is here instead is the sequence: where the page is, and
- * what the model has done to it.
+ * keystroke away. What is here instead is the sequence: where the page is,
+ * what the model has done to it, and the picture any step brought back.
+ *
+ * ---- The frame on top is a choice, not a default ---------------------------
+ *
+ * The picture shown is the selected step's — the newest one until a hand
+ * picks another. The entry holds the sequence, so the rail can answer "what
+ * did it look like *then*" and not only "what does it look like now", which
+ * is the one question a single latest frame cannot. Nothing here builds a
+ * `data:` URL of its own: frames arrive as the log carries them (an
+ * attachment reference, usually) and resolve through the same hook the
+ * transcript uses, so a picture is either truly present or truly absent —
+ * never a broken glyph claiming bytes that are not here.
  */
 export function BrowserPanel({
   entry,
 }: {
   entry: Extract<RailEntry, { kind: 'browser' }>
 }) {
+  // The newest step with something to show, which is where a reader's eye
+  // starts: "now" is what they came to see. A list walked backwards once beats
+  // a state initialiser racing an entry that replaces itself mid-render.
+  const latest = latestStepId(entry.steps)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected =
+    entry.steps.find((step) => step.id === (selectedId ?? latest)) ?? null
+
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -36,24 +59,11 @@ export function BrowserPanel({
         )}
       </div>
 
-      {entry.frame === null ? (
-        <p className="text-caption text-muted-foreground">
-          The browser has not sent a picture yet.
-        </p>
-      ) : (
-        <div className="overflow-hidden rounded-md border border-border bg-background">
-          <img
-            src={`data:${entry.frame.mimeType};base64,${entry.frame.data}`}
-            alt={
-              entry.title === null
-                ? 'The page as the browser saw it'
-                : `${entry.title}, as the browser saw it`
-            }
-            className="w-full object-contain object-top"
-            draggable={false}
-          />
-        </div>
-      )}
+      <BrowserFrameView
+        conversationId={entry.conversationId}
+        step={selected}
+        title={entry.title}
+      />
 
       {entry.steps.length === 0 ? null : (
         <div className="flex flex-col gap-1">
@@ -62,16 +72,148 @@ export function BrowserPanel({
             {/* Newest last, because that is the order it happened in and the
                 bottom of a list is where a reader looks for "now". */}
             {entry.steps.map((step, index) => (
-              <li
-                key={`${String(index)}-${step}`}
-                className="studio-selectable truncate text-caption text-muted-foreground"
-              >
-                {step}
-              </li>
+              <BrowserPanelStep
+                key={step.id}
+                step={step}
+                ordinal={index + 1}
+                selected={selected?.id === step.id}
+                hasFrame={step.frame !== null}
+                onSelect={() => setSelectedId(step.id)}
+              />
             ))}
           </ol>
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * The id of the newest step whose frame a reader could look at, or null.
+ *
+ * A failed step's frame is the log saying there is none, so it never becomes
+ * the default; a step still running has not produced one either. The scan
+ * takes the newest *answer*, which is the picture the page actually stood in
+ * most recently.
+ */
+function latestStepId(steps: readonly BrowserStep[]): string | null {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const step = steps[index]
+    if (step !== undefined && step.frame !== null) return step.id
+  }
+  return null
+}
+
+/**
+ * The step's picture, or the sentence that says why there is none.
+ *
+ * Three absences, and they are not the same absence: no picture yet (the
+ * browser has not sent one), a step still working (its answer has not
+ * landed), and a selected step that brought no frame (a click, a read —
+ * actions that do not photograph the page). Naming the difference is the
+ * whole job; a single "no image" would be wrong about two of the three.
+ * The one line this cannot improve on is an attachment reference that has
+ * not resolved — the resolver answers null for both "in flight" and "asked
+ * and refused", and the sentence below is the one that stays true across
+ * both.
+ */
+function BrowserFrameView({
+  conversationId,
+  step,
+  title,
+}: {
+  conversationId: string
+  step: BrowserStep | null
+  title: string | null
+}) {
+  const frameUrl = useAttachmentFrame(conversationId, step?.frame ?? null)
+  if (step === null) {
+    return (
+      <p className="text-caption text-muted-foreground">
+        The browser has not sent a picture yet.
+      </p>
+    )
+  }
+  if (frameUrl === null) {
+    return (
+      <p className="text-caption text-muted-foreground">
+        {step.frame === null
+          ? 'This step brought no picture.'
+          : step.failed
+            ? 'This step failed, and brought no picture.'
+            : 'The picture has not arrived yet.'}
+      </p>
+    )
+  }
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-background">
+      <img
+        src={frameUrl}
+        alt={
+          title === null
+            ? 'The page as the browser saw it'
+            : `${title}, as the browser saw it`
+        }
+        className="w-full object-contain object-top"
+        draggable={false}
+      />
+    </div>
+  )
+}
+
+/**
+ * One line of the sequence, and the handle that points the frame above at
+ * it.
+ *
+ * A step that returned a picture is the selectable kind: pressing it shows
+ * that step's frame, which is the panel's answer to "what did it look like
+ * when it did this". A step without one stays a line — selectable furniture
+ * that changes nothing is a lie told twice per click.
+ */
+function BrowserPanelStep({
+  step,
+  ordinal,
+  selected,
+  hasFrame,
+  onSelect,
+}: {
+  step: BrowserStep
+  ordinal: number
+  selected: boolean
+  hasFrame: boolean
+  onSelect: () => void
+}) {
+  const line = (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="shrink-0 tabular-nums text-muted-foreground/70">{ordinal}</span>
+      <span className={cn('shrink-0', step.failed && 'text-danger')}>
+        {step.failed ? 'failed' : step.verb}
+      </span>
+      {step.subject === null ? null : (
+        <span className="truncate">{step.subject}</span>
+      )}
+    </span>
+  )
+  if (!hasFrame) {
+    return (
+      <li className="studio-selectable text-caption text-muted-foreground">{line}</li>
+    )
+  }
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className={cn(
+          'flex w-full items-center rounded-md pr-1.5 py-0.5 text-left text-caption transition-colors duration-fast',
+          selected
+            ? 'bg-muted text-foreground'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        {line}
+      </button>
+    </li>
   )
 }

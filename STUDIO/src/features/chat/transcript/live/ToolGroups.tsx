@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Icons } from '@/components/icons'
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 
-import { BrowserCard } from './BrowserCard'
-import { browserAction, browserSubject, browserVerb, readBrowserCall } from './browserCall'
+import { browserAction } from './browserCall'
 import { netOf } from './groupNet'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
 import { RollingCount } from './RollingCount'
+import { BrowserReport } from './BrowserReport'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 
@@ -49,6 +49,7 @@ import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/pro
 export function ToolGroups({
   groups,
   live = false,
+  conversationId,
 }: {
   groups: readonly ToolGroupView[]
   /**
@@ -58,6 +59,8 @@ export function ToolGroups({
    * it left unanswered reads as "pending", which is all that is known.
    */
   live?: boolean
+  /** The conversation the calls ran in, which keys their attachments. */
+  conversationId: string
 }) {
   // The segment's LAST file row is the question: nothing mutating has landed
   // after it. Reads do not close a run -- the retry pattern re-reads the file
@@ -74,22 +77,66 @@ export function ToolGroups({
       break
     }
   }
-  return (
-    <div className="my-1 flex flex-col gap-0.5">
-      {groups.map((group) =>
-        group.file !== null && group.calls.length > 1 ? (
-          <FileRunRow
-            key={group.id}
-            group={group}
-            live={live}
-            receiving={live && group.id === receivingId}
-          />
-        ) : (
-          group.calls.map((call) => <ToolCallRow key={call.toolCallId} call={call} live={live} />)
-        ),
-      )}
-    </div>
-  )
+  // The browser's calls are one story, not a row each (ADR 0049 §7). When the
+  // segment holds any, they all lift into one report - latest frame on top,
+  // every call a step beneath - placed where the first of them stood, and the
+  // rows that are not the browser's keep the ordinary rendering unchanged.
+  const browserCalls = groups
+    .flatMap((group) => group.calls)
+    .filter((call) => browserAction(call.toolName) !== null)
+  if (browserCalls.length === 0) {
+    return (
+      <div className="my-1 flex flex-col gap-0.5">
+        {groups.map((group) =>
+          group.file !== null && group.calls.length > 1 ? (
+            <FileRunRow
+              key={group.id}
+              group={group}
+              live={live}
+              receiving={live && group.id === receivingId}
+            />
+          ) : (
+            group.calls.map((call) => (
+              <ToolCallRow key={call.toolCallId} call={call} live={live} />
+            ))
+          ),
+        )}
+      </div>
+    )
+  }
+  const rows: ReactNode[] = []
+  let reportPlaced = false
+  for (const group of groups) {
+    if (group.file !== null && group.calls.length > 1) {
+      rows.push(
+        <FileRunRow
+          key={group.id}
+          group={group}
+          live={live}
+          receiving={live && group.id === receivingId}
+        />,
+      )
+      continue
+    }
+    for (const call of group.calls) {
+      if (browserAction(call.toolName) !== null) {
+        if (!reportPlaced) {
+          reportPlaced = true
+          rows.push(
+            <BrowserReport
+              key={`browser:${call.toolCallId}`}
+              calls={browserCalls}
+              live={live}
+              conversationId={conversationId}
+            />,
+          )
+        }
+        continue
+      }
+      rows.push(<ToolCallRow key={call.toolCallId} call={call} live={live} />)
+    }
+  }
+  return <div className="my-1 flex flex-col gap-0.5">{rows}</div>
 }
 
 /* -------------------------------------------------------------------------- */
@@ -305,15 +352,8 @@ function GroupCallRow({
 
 function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const [open, setOpen] = useState(false)
-  // Studio's own browser is a capability with a face, not a row of JSON. It
-  // arrives through MCP like anything else, so it is recognised by name here
-  // rather than by a flag the wire does not carry - and every other MCP tool
-  // keeps the ordinary row, which is the point: the browser is special
-  // because we wrote its result shape, not because it came over MCP.
-  const browser = browserAction(call.toolName)
-  const action = browser === null ? ACTIONS[call.toolName] : ACTIONS.browserUse
-  const subject =
-    browser === null ? subjectOf(call) : browserSubject(browser, call.input?.value)
+  const action = ACTIONS[call.toolName]
+  const subject = subjectOf(call)
   const file = FILE_TOOLS.has(call.toolName) ? subject : null
   const outcome = outcomeOf(call)
   const rawDiff = diffOf(call)
@@ -327,13 +367,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const answered = answeredOf(call)
   const running = call.errorText === null && !answered
   const verb =
-    browser !== null
-      ? browserVerb(browser, running)
-      : action === undefined
-        ? call.toolName
-        : running
-          ? action.running
-          : action.done
+    action === undefined ? call.toolName : running ? action.running : action.done
 
   return (
     <DisclosureRow
@@ -411,26 +445,6 @@ function CallWorkingOut({
   outcome: FileToolOutcome | null
 }) {
   const diffed = diff !== null && file !== null
-  // Our own browser answers in a shape we designed, so it is drawn rather
-  // than pretty-printed. Read once here, and only when the answer has landed:
-  // a running call has nothing to show and gets the ordinary input echo,
-  // which is the honest picture of a page still loading.
-  const browser =
-    call.output !== null && call.output.present
-      ? readBrowserCall(call.toolName, call.output.value, call.errorText)
-      : null
-  if (browser !== null) {
-    return (
-      <div className="flex flex-col gap-2">
-        <BrowserCard call={browser} />
-        {call.errorText === null ? null : (
-          <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-danger">
-            {call.errorText}
-          </pre>
-        )}
-      </div>
-    )
-  }
   return (
     <div className="flex flex-col gap-1">
       {diffed ? (

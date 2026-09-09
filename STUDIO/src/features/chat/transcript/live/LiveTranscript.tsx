@@ -47,6 +47,7 @@ export function LiveTranscript({
   pending,
   phase,
   viewport,
+  conversationId,
   onBranch,
 }: {
   items: readonly TranscriptItem[]
@@ -59,6 +60,8 @@ export function LiveTranscript({
   phase: ConversationPhase
   /** The scroll container, needed to hold position while paging older turns. */
   viewport: React.RefObject<HTMLElement | null>
+  /** The conversation the tool calls ran in, which keys their attachments. */
+  conversationId: string
   /** Forks the conversation with everything up to the named answer. */
   onBranch?: (messageId: string) => void
 }) {
@@ -110,6 +113,7 @@ export function LiveTranscript({
           <AssistantTurn
             key={item.id}
             item={item}
+            conversationId={conversationId}
             live={
               generating &&
               retrying === null &&

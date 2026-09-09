@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn'
+import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserCallView } from './browserCall'
 
 /**
@@ -14,8 +15,16 @@ import type { BrowserCallView } from './browserCall'
  * is working: where the page is, what was just done to it, and what it looked
  * like immediately afterwards.
  */
-export function BrowserCard({ call }: { call: BrowserCallView }) {
+export function BrowserCard({
+  call,
+  conversationId,
+}: {
+  call: BrowserCallView
+  /** The conversation the call ran in, which keys its attachments. */
+  conversationId: string
+}) {
   const { frame, url, title, said } = call
+  const frameUrl = useAttachmentFrame(conversationId, frame)
 
   return (
     <div className="flex flex-col gap-2">
@@ -35,7 +44,11 @@ export function BrowserCard({ call }: { call: BrowserCallView }) {
         </div>
       )}
 
-      {frame === null ? null : (
+      {/* No frame URL is no image element — an attachment still being
+          fetched and one the harness cannot produce both read as a card
+          without its picture, because a broken-image glyph claims the bytes
+          were here and failed to draw, which is never the truth. */}
+      {frameUrl === null ? null : (
         <div
           className={cn(
             'overflow-hidden rounded-md border border-border bg-background',
@@ -46,7 +59,7 @@ export function BrowserCard({ call }: { call: BrowserCallView }) {
           )}
         >
           <img
-            src={`data:${frame.mimeType};base64,${frame.data}`}
+            src={frameUrl}
             alt={
               title === null
                 ? 'The page as the browser saw it'

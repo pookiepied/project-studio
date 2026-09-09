@@ -24,6 +24,14 @@ export { resolveHarnessAddress, startHarness, harnessFailureReason } from './con
 export { harnessTransport } from './transport'
 
 export {
+  attachmentDataUrl,
+  isAttachmentReference,
+  setAttachmentBytesTransport,
+  type AttachmentBytes,
+  type AttachmentReference,
+} from './attachments'
+
+export {
   createConversationClient,
   seamFailure,
   turnSettingsToWire,

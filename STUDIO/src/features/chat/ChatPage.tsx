@@ -335,6 +335,7 @@ export function ChatPage({
               pending={live.pending}
               phase={live.phase}
               viewport={viewport}
+              conversationId={conversation.id}
               onBranch={onBranch}
             />
           )}

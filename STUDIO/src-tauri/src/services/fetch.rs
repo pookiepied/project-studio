@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::harness::supervisor::HarnessSupervisor;
+use crate::harness::supervisor::{HarnessSupervisor, redact};
 
 use super::error::request_failure;
 use super::{apply_init, method_from_init, seam_client, validate_path, ServiceError, ServiceId, ServiceRequestInit};
@@ -96,6 +96,76 @@ pub async fn service_fetch(
 ) -> Result<SerializedResponse, ServiceError> {
     match service {
         ServiceId::Harness => harness_fetch(supervisor, &path, init).await,
+    }
+}
+
+/// Reads one attachment's bytes through the same seam [`service_fetch`]
+/// walks.
+///
+/// The attachment route answers with the raw bytes of a screenshot frame, and
+/// [`harness_fetch`]'s `response.text()` would decode them as lossy UTF-8 —
+/// corruption no far side can undo. So this command exists beside it: a plain
+/// GET (an attachment read carries no body and no caller headers worth
+/// keeping), the same path validation and supervisor-held bearer, and the
+/// body crossing the invoke boundary as raw bytes rather than text.
+///
+/// Success is a `tauri::ipc::Response`, which the webview's `invoke` resolves
+/// to an `ArrayBuffer`. A refusal is `ServiceError::Refused`, so the reader
+/// keeps one vocabulary — bytes or a reason — and can tell a stale credential
+/// (401) from an attachment the conversation does not hold (404).
+pub async fn service_fetch_bytes(
+    supervisor: &HarnessSupervisor,
+    service: ServiceId,
+    path: String,
+) -> Result<tauri::ipc::Response, ServiceError> {
+    match service {
+        ServiceId::Harness => {
+            validate_path(&path)?;
+            let endpoint = supervisor.get_endpoint().ok_or(ServiceError::NotRunning)?;
+            let client = seam_client()
+                .timeout(REQUEST_TIMEOUT)
+                .build()
+                .map_err(|error| request_failure(&endpoint.token, error))?;
+            let request = client
+                .get(format!("{}{}", endpoint.url, path))
+                .bearer_auth(&endpoint.token)
+                .build()
+                .map_err(|error| ServiceError::InvalidRequest {
+                    message: error.to_string(),
+                })?;
+            let response = client
+                .execute(request)
+                .await
+                .map_err(|error| request_failure(&endpoint.token, error))?;
+
+            let status = response.status();
+            if !status.is_success() {
+                // The harness writes its refusals as JSON with an `error`
+                // sentence; that sentence is better than any this side could
+                // compose, so it is read and carried, redacted like every
+                // other string that could in principle echo the bearer.
+                let body = response.text().await.unwrap_or_default();
+                let message = serde_json::from_str::<serde_json::Value>(&body)
+                    .ok()
+                    .and_then(|value| {
+                        value
+                            .get("error")?
+                            .as_str()
+                            .map(str::to_owned)
+                    })
+                    .unwrap_or_else(|| format!("the harness answered {status} with no explanation."));
+                return Err(ServiceError::Refused {
+                    status: status.as_u16(),
+                    message: redact(&message, &endpoint.token),
+                });
+            }
+
+            let bytes = response
+                .bytes()
+                .await
+                .map_err(|error| request_failure(&endpoint.token, error))?;
+            Ok(tauri::ipc::Response::new(bytes.to_vec()))
+        }
     }
 }
 
@@ -195,6 +265,49 @@ mod tests {
         .unwrap_err();
         let text = serde_json::to_string(&not_running).expect("errors serialize");
         assert!(text.contains("not-running"), "{text}");
+        assert!(!text.contains(&token), "the bearer appeared in an error: {text}");
+    }
+
+    /// A refusal on the byte seam is the `Refused` error, carrying the
+    /// harness's own sentence, with the bearer in nothing.
+    ///
+    /// The success path needs a conversation holding a real attachment, which
+    /// only a run can create; the refusal path needs only a harness, and it
+    /// exercises everything the success path shares — validation, the
+    /// endpoint, the bearer, the status branch. The bytes themselves cross
+    /// Tauri's raw IPC response and touch no decode on either side, which is
+    /// the property the command exists for.
+    #[tokio::test]
+    async fn a_byte_refusal_carries_the_harness_sentence_and_not_the_token() {
+        let _serial = ONE_HARNESS_AT_A_TIME.lock().await;
+        let supervisor = HarnessSupervisor::new();
+        let endpoint = match supervisor.start() {
+            Ok(endpoint) => endpoint,
+            Err(error) => panic!("the harness did not start: {error}"),
+        };
+        let _stop = StopOnDrop(supervisor.clone());
+        let token = endpoint.token.clone();
+
+        let outcome = service_fetch_bytes(
+            &supervisor,
+            ServiceId::Harness,
+            "/agents/studio/no-such-conversation/attachments/att_none".to_owned(),
+        )
+        .await;
+        // `unwrap_err` needs the Ok side to be `Debug`, and a raw IPC response
+        // is not; the match reads the same refusal without asking it to print.
+        let error = match outcome {
+            Err(error) => error,
+            Ok(_) => panic!("an attachment nobody stored answered success"),
+        };
+
+        let ServiceError::Refused { status, message } = error else {
+            panic!("expected a Refused error");
+        };
+        assert_eq!(status, 404, "a conversation nobody spoke into does not exist");
+        assert!(!message.is_empty(), "the harness's sentence should have been read");
+        let text = serde_json::to_string(&ServiceError::Refused { status, message })
+            .expect("errors serialize");
         assert!(!text.contains(&token), "the bearer appeared in an error: {text}");
     }
 }

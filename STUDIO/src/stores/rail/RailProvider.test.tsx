@@ -7,6 +7,7 @@ import type { ReactNode } from 'react'
 
 import { RailProvider, planEntryId, useRail } from './RailProvider'
 import type { Artifact } from '@/domain/artifacts/types'
+import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
 
 /**
  * The rail's rules, as the plan entry meets them.
@@ -151,5 +152,111 @@ describe('the background commands entry', () => {
     act(() => result.current.openJobs('cnv_2', 'Two'))
 
     expect(result.current.entries.filter((entry) => entry.kind === 'jobs')).toHaveLength(2)
+  })
+})
+
+/**
+ * The browser entry: a report of one, replaced wholesale.
+ *
+ * The caller derives the whole report from the transcript - every step, the
+ * latest place and picture - so what `showBrowser` receives is the complete
+ * truth for the conversation, and the provider's only judgements are where
+ * the entry sits and whether the rail may focus itself. A model browsing in
+ * the background must not seize a panel somebody is reading.
+ */
+
+function stepOf(id: string, overrides: Partial<BrowserStep> = {}): BrowserStep {
+  return {
+    id,
+    action: 'click',
+    verb: 'Clicked',
+    subject: 'ref_1',
+    url: 'https://example.com',
+    title: 'Example',
+    failed: false,
+    frame: { kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' },
+    ...overrides,
+  }
+}
+
+describe('the browser entry', () => {
+  it('opens with the whole report and focuses nothing', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+
+    act(() => {
+      result.current.showBrowser('cnv_1', 'Conversation', {
+        url: 'https://example.com',
+        title: 'Example',
+        frame: { kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' },
+        steps: [stepOf('call_1')],
+      })
+    })
+
+    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
+    expect(browser).toBeDefined()
+    expect(browser?.kind === 'browser' && browser.steps).toHaveLength(1)
+    // The transcript row is where the work announces itself; the preview
+    // opening itself would be the model seizing the rail.
+    expect(result.current.activeId).toBeNull()
+  })
+
+  it('replaces the report in place, and stays where the reader left it', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+
+    act(() => {
+      result.current.openArtifact(artifact('art_early'), 'cnv_1', 'Conversation')
+    })
+    act(() => {
+      result.current.showBrowser('cnv_1', 'Conversation', {
+        url: null,
+        title: null,
+        frame: null,
+        steps: [stepOf('call_1')],
+      })
+    })
+    const before = result.current.entries.findIndex((entry) => entry.id === 'browser:cnv_1')
+
+    act(() => {
+      result.current.showBrowser('cnv_1', 'Conversation', {
+        url: 'https://example.com/pricing',
+        title: 'Pricing',
+        frame: { kind: 'attachment', id: 'att_msg_1_0', mimeType: 'image/jpeg' },
+        steps: [stepOf('call_1', { frame: null }), stepOf('call_2', { verb: 'Took a picture' })],
+      })
+    })
+
+    const at = result.current.entries.findIndex((entry) => entry.id === 'browser:cnv_1')
+    expect(at).toBe(before)
+    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
+    if (browser?.kind !== 'browser') throw new Error('the browser entry went missing')
+    // Replaced, not merged: the derived report is the whole truth, and a
+    // merged half-derivation is how two readings of one log drift apart.
+    expect(browser.steps.map((step) => step.id)).toEqual(['call_1', 'call_2'])
+    expect(browser.frame).toEqual({ kind: 'attachment', id: 'att_msg_1_0', mimeType: 'image/jpeg' })
+    expect(browser.url).toBe('https://example.com/pricing')
+  })
+
+  it('keeps each conversation a browser of its own', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+
+    act(() => {
+      result.current.showBrowser('cnv_1', 'One', {
+        url: 'https://one.example',
+        title: null,
+        frame: null,
+        steps: [],
+      })
+    })
+    act(() => {
+      result.current.showBrowser('cnv_2', 'Two', {
+        url: 'https://two.example',
+        title: null,
+        frame: null,
+        steps: [],
+      })
+    })
+
+    const browsers = result.current.entries.filter((entry) => entry.kind === 'browser')
+    expect(browsers).toHaveLength(2)
   })
 })
