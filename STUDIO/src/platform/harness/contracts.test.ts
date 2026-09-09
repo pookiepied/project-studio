@@ -7,6 +7,7 @@ import {
   parseBackgroundJobs,
   parseHarnessErrorBody,
   parseMcpServer,
+  parseMcpServers,
   parseModelCapability,
   parsePendingApprovals,
   parseProbeResult,
@@ -850,6 +851,25 @@ describe('parseMcpServer', () => {
     expect(record).toEqual({ ...MCP_SERVER })
     expect(record?.project).toBeUndefined()
     expect(record?.conversation).toBeUndefined()
+  })
+
+  it('reads a server nobody has described, which is what the harness sends', () => {
+    // The harness stores an undescribed server as the empty string and sends
+    // the empty string back. Refusing it here refused the whole row, and
+    // because one bad row fails the whole list, a single undescribed server
+    // made the MCP screen unreadable and every save of one report failure
+    // after the harness had already written it.
+    const record = parseMcpServer({ ...MCP_SERVER, description: '' })
+    expect(record).not.toBeNull()
+    expect(record?.description).toBe('')
+  })
+
+  it('reads a whole list containing an undescribed server', () => {
+    const rows = parseMcpServers([
+      { ...MCP_SERVER, description: 'Img and video' },
+      { ...MCP_SERVER, id: 'memory-test', description: '' },
+    ])
+    expect(rows).toHaveLength(2)
   })
 
   it('reads inherit as null, and says where the wider answer came from', () => {

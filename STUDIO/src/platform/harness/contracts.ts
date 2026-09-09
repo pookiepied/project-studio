@@ -1822,7 +1822,15 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
   // Absent reads as empty rather than as a parse failure: a harness that
   // predates the column is a harness this app still has to talk to, and a
   // missing sentence is exactly "nobody has written one".
-  const description = optionalText(value['description'])
+  //
+  // The empty string is that same answer, and must be read the same way. The
+  // harness stores an undescribed server as `""` and sends `""` back, so
+  // treating empty as malformed refused every server nobody had written a
+  // sentence for - and because one bad row fails the whole list, a single
+  // undescribed server made the entire MCP screen unreadable and every save
+  // of one look like a failure while it had in fact been written.
+  const described = value['description'] === '' ? undefined : value['description']
+  const description = optionalText(described)
   // Absent reads as `user`, matching the harness's own default and the column
   // default behind it. Anything unrecognised also reads as `user`, which is
   // the side that withholds - a value nobody understood must not be the thing

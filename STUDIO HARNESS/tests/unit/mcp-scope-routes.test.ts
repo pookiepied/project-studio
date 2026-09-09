@@ -320,4 +320,44 @@ describe("MCP enablement, through the routes", () => {
     expect(listed.conversation).toBeUndefined();
     expect(listed.project).toBeUndefined();
   });
+  it("keeps the network switch the form sent, instead of granting one anyway", async () => {
+    // The route used to drop needsNetwork, so the registry's default of true
+    // applied to every save and a server the user had denied a network was
+    // given one. The screen showed the boundary; the harness was not applying
+    // it.
+    const saved = await built.app.request("http://harness.test/api/mcp/servers", {
+      method: "POST",
+      headers: { authorization, "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "offline-server",
+        title: "Offline server",
+        transport: "stdio",
+        command: COMMAND,
+        args: [],
+        env: {},
+        auth: "none",
+        needsNetwork: false,
+      }),
+    });
+    expect(saved.status).toBe(201);
+    expect(((await saved.json()) as { needsNetwork: boolean }).needsNetwork).toBe(false);
+  });
+
+  it("refuses a network switch that is not a switch", async () => {
+    const saved = await built.app.request("http://harness.test/api/mcp/servers", {
+      method: "POST",
+      headers: { authorization, "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "bad-server",
+        title: "Bad server",
+        transport: "stdio",
+        command: COMMAND,
+        args: [],
+        env: {},
+        auth: "none",
+        needsNetwork: "no",
+      }),
+    });
+    expect(saved.status).toBe(400);
+  });
 });

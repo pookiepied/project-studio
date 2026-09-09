@@ -98,6 +98,17 @@ function serverInput(value: unknown, idOverride?: string): McpServerInput {
     });
   }
 
+  // Read rather than defaulted, because the registry's default is `true` and
+  // this field is the one that withholds a network. Dropping it here meant
+  // every server was saved with a network however the form's switch was set,
+  // which is a boundary the screen showed and the harness was not applying.
+  const needsNetwork = value["needsNetwork"];
+  if (needsNetwork !== undefined && typeof needsNetwork !== "boolean") {
+    throw new ExtendError("internal", {
+      message: "needsNetwork must be true or false.",
+    });
+  }
+
   const command = optionalString(value["command"], "command");
   const url = optionalString(value["url"], "url");
   const authHeader = optionalString(value["authHeader"], "authHeader");
@@ -115,6 +126,7 @@ function serverInput(value: unknown, idOverride?: string): McpServerInput {
     auth,
     ...(authHeader === undefined ? {} : { authHeader }),
     ...(authEnvVar === undefined ? {} : { authEnvVar }),
+    ...(needsNetwork === undefined ? {} : { needsNetwork }),
   };
 }
 
