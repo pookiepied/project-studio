@@ -69,6 +69,34 @@ export type RailEntry =
       readonly conversationTitle: string
       readonly openedAt: number
     }
+  | {
+      /**
+       * The browser, as a report of one.
+       *
+       * One entry per conversation, like the plan and the jobs, and for the
+       * same reason: a conversation drives one browser through many calls, and
+       * a tab per call would open and close the rail under somebody who was
+       * reading something else in it. The entry is replaced in place as the
+       * model works, so the rail always holds the latest frame.
+       *
+       * It is a preview and not a browser (ADR 0049 §7). There is no address
+       * bar and no way to navigate by hand - that needs history, cookies,
+       * profiles, a download policy and a clear-data control, which is a
+       * second product inside this one, for a person who has a real browser
+       * one keystroke away.
+       */
+      readonly kind: 'browser'
+      /** `browser:<conversation id>` - one per conversation, keyed by it. */
+      readonly id: string
+      readonly conversationId: string
+      readonly conversationTitle: string
+      readonly openedAt: number
+      readonly url: string | null
+      readonly title: string | null
+      readonly frame: { readonly data: string; readonly mimeType: string } | null
+      /** What the model has done in the browser, newest last. */
+      readonly steps: readonly string[]
+    }
 
 /** The id of a conversation's plan entry. One plan per conversation, so the conversation keys it. */
 export function planEntryId(conversationId: string): string {
@@ -78,6 +106,11 @@ export function planEntryId(conversationId: string): string {
 /** The id of a conversation's background-commands entry. Keyed the same way. */
 export function jobsEntryId(conversationId: string): string {
   return `jobs:${conversationId}`
+}
+
+/** The id of a conversation's browser preview. Keyed the same way. */
+export function browserEntryId(conversationId: string): string {
+  return `browser:${conversationId}`
 }
 
 /**
@@ -144,6 +177,28 @@ interface RailValue {
   openPlan: (conversationId: string, conversationTitle: string) => void
   /** Opens - or focuses - the conversation's background commands. Idempotent too. */
   openJobs: (conversationId: string, conversationTitle: string) => void
+  /**
+   * Shows the browser's latest frame, replacing what the entry held.
+   *
+   * Not idempotent in the way the other three are: each acting call carries a
+   * newer picture and a newer place, and the entry takes them. What stays put
+   * is the tab itself, so a person reading the preview keeps reading it while
+   * the model works rather than watching tabs open behind them.
+   *
+   * It does NOT focus the rail. A model browsing in the background must not
+   * seize the panel somebody is reading - the transcript row is where the
+   * work announces itself, and opening the preview is the person's move.
+   */
+  showBrowser: (
+    conversationId: string,
+    conversationTitle: string,
+    frame: {
+      readonly url: string | null
+      readonly title: string | null
+      readonly frame: { readonly data: string; readonly mimeType: string } | null
+      readonly step: string | null
+    },
+  ) => void
   focus: (id: string) => void
   close: (id: string) => void
   closeAll: () => void
@@ -238,6 +293,51 @@ export function RailProvider({ children }: { children: ReactNode }) {
     setCollapsed(false)
   }, [])
 
+  const showBrowser = useCallback<RailValue['showBrowser']>(
+    (conversationId, conversationTitle, next) => {
+      const id = browserEntryId(conversationId)
+      setEntries((current) => {
+        const existing = current.find((entry) => entry.id === id)
+        if (existing !== undefined && existing.kind === 'browser') {
+          return current.map((entry) =>
+            entry.id === id && entry.kind === 'browser'
+              ? {
+                  ...entry,
+                  conversationTitle,
+                  // Kept rather than overwritten when a call had nothing new
+                  // to say. A read that returns no picture must not blank the
+                  // last one: the page has not changed, and an empty panel
+                  // would read as though the browser had gone.
+                  url: next.url ?? entry.url,
+                  title: next.title ?? entry.title,
+                  frame: next.frame ?? entry.frame,
+                  steps:
+                    next.step === null
+                      ? entry.steps
+                      : [...entry.steps, next.step].slice(-40),
+                }
+              : entry,
+          )
+        }
+        return capped([
+          ...current,
+          {
+            kind: 'browser',
+            id,
+            conversationId,
+            conversationTitle,
+            openedAt: Date.now(),
+            url: next.url,
+            title: next.title,
+            frame: next.frame,
+            steps: next.step === null ? [] : [next.step],
+          },
+        ])
+      })
+    },
+    [],
+  )
+
   const close = useCallback((id: string) => {
     setEntries((current) => {
       const index = current.findIndex((entry) => entry.id === id)
@@ -276,6 +376,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
       openArtifact,
       openPlan,
       openJobs,
+      showBrowser,
       focus: setActiveId,
       close,
       closeAll,
@@ -291,6 +392,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
       openArtifact,
       openPlan,
       openJobs,
+      showBrowser,
       close,
       closeAll,
       setWidth,

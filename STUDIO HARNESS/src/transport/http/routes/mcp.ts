@@ -86,15 +86,25 @@ function serverInput(value: unknown, idOverride?: string): McpServerInput {
   // missing key that the registry's default would then fill back in.
   const description = optionalString(value["description"], "description");
 
-  // Refused rather than coerced. `provenance` decides whether a server's tools
-  // load eagerly, so a value nobody recognised must stop the write instead of
-  // quietly resolving to one of the two answers - a typo that silently means
-  // "user" is a server that stopped working, and one that silently means
-  // "system" is a capability loaded on every turn that nobody asked for.
+  // `provenance` says who wrote a server, and nothing outside this process may
+  // claim to have written one. It is refused here rather than coerced, and
+  // "system" is refused outright rather than accepted, because that word now
+  // decides a boundary: a system server is Studio's own code and is launched
+  // without containment (see `extend/mcp/launcher.ts`), on the reasoning that
+  // containment answers "whose program is this". A route that let a caller
+  // answer that question for itself would hand any program on the machine an
+  // uncontained launch for the price of one extra field.
+  //
+  // The only writer of "system" is `registerBuiltInServers`, which runs inside
+  // the harness with a path it computed itself. Everything that arrives over
+  // HTTP is somebody's installation, which is exactly what "user" means.
   const provenance = value["provenance"];
-  if (provenance !== undefined && provenance !== "system" && provenance !== "user") {
+  if (provenance !== undefined && provenance !== "user") {
     throw new ExtendError("internal", {
-      message: "provenance must be system or user.",
+      message:
+        provenance === "system"
+          ? "Only Studio's own capabilities are system servers, and they are not installed this way."
+          : "provenance must be user.",
     });
   }
 

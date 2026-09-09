@@ -24,6 +24,7 @@ import {
 } from "../context/capability-inventory.js";
 import { McpCapabilityCatalog } from "../extend/mcp/capabilities.js";
 import type { McpTool } from "../extend/mcp/capabilities.js";
+import { registerBuiltInServers } from "../extend/mcp/builtin.js";
 import { createMcpLauncher } from "../extend/mcp/launcher.js";
 import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
@@ -561,6 +562,11 @@ export class StudioRuntime implements AgentHost {
     this.#inventory = new ExtensionInventory(this.#selection);
     this.#extensions = new ExtensionReconciler(this.#inventory);
     this.#registry = new McpServerRegistry(this.#db);
+    // Studio's own capabilities become rows before anything reads the
+    // registry, so they are ordinary servers to everything downstream: the
+    // settings screen, the inventory, the reconciler and the three scopes all
+    // treat the browser exactly as they treat one somebody installed.
+    registerBuiltInServers(this.#registry, this.#selection);
     this.#catalog = new McpCapabilityCatalog({
       diagnostic: (message, serverId) =>
         this.#logger?.warn(message, { server_id: serverId }),
@@ -1076,6 +1082,24 @@ export class StudioRuntime implements AgentHost {
    * why nothing here needs evicting (#72).
    */
   async prepareModelTurn(): Promise<void> {
+    // The startup pass first, and awaited rather than raced.
+    //
+    // `start()` is kicked off at boot with `void`, so a turn arriving in the
+    // first moments of a harness would otherwise open a *second* reconcile
+    // beside the one already in flight. The second pass returns as soon as its
+    // own plan is empty - the server is already being started by the first -
+    // so it returns before any catalog has been read, and the turn renders
+    // believing an enabled server has no tools.
+    //
+    // That was invisible while nothing was enabled by default. A built-in
+    // capability makes it the ordinary case: Studio restarts often, and the
+    // first turn after a restart would freeze a "still being read" note, then
+    // replace it at the next submission - moving the system block and
+    // re-billing the whole prefix behind it, on the second turn of every
+    // conversation. `start()` memoises, so awaiting it here costs nothing
+    // after the first call and makes the first turn wait for the work it was
+    // already depending on.
+    await this.start();
     await this.reconcile();
     await this.#catalog.refreshDirty(this.#registry.list());
     for (const snapshots of this.#turnSnapshots.values()) snapshots.beginTurn();
@@ -1321,22 +1345,24 @@ export class StudioRuntime implements AgentHost {
       const active = this.#enabledMcpServers(enablement);
       const enabledIds = new Set(active.map((record) => record.id));
 
-      // The withhold (ADR 0048 §3, as 0049 §5 corrected it): of the MCP
-      // servers, only the system-provenance ones load eagerly, because
-      // eagerness follows how often a capability might be used, not who wrote
-      // it. A user extension's schemas wait for discovery, so a conversation
-      // that never touches one of its project's servers never pays for them.
-      // Nothing here removes anything: a tool already in the registration
-      // keeps its place, because withholding applies at registration - this
-      // function only declines to add. What was already adopted is
-      // re-adopted below, and the array grows; that is 0029's rule, kept.
-      for (const tool of this.#catalog.tools(
-        active.filter((record) => record.provenance === "system").map((record) => record.id),
-      )) {
-        registerMcpTool(tool);
-      }
+      // The withhold, and it is now total for MCP. ADR 0048 §3 first said
+      // system-provenance servers load eagerly; ADR 0049 §5 corrected that,
+      // because it conflated **who owns a capability** with **how expensive it
+      // is to load**. A Studio-owned browser is still twenty-four schemas, and
+      // ownership does not make a schema cheap. The rule that replaced it:
+      // eager loading is for capabilities small enough and general enough that
+      // most turns might use them - which means the natives, registered above.
+      // Everything reached over MCP is discovered, whoever wrote it.
+      //
+      // Kept as a loop over nothing rather than deleted, because what it
+      // leaves behind is the important part: this function's *only* eager
+      // contribution is the natives, and every MCP tool below is here because
+      // this conversation asked for it. Nothing removes anything either - a
+      // tool already registered keeps its place, since withholding applies at
+      // registration and this function only ever declines to add. That is ADR
+      // 0029's rule, kept.
 
-      // Then this conversation's own adoptions, at the definitions the
+      // This conversation's own adoptions, at the definitions the
       // catalog holds now. Reading the catalog instead of remembering the
       // definition is what lets 0029 §5's replacement happen at this turn
       // boundary when a connection refreshed, and it is what keeps the

@@ -39,6 +39,7 @@
     "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "hono": "^4.12.31",
+    "playwright-core": "^1.63.0",
     "valibot": "^1.1.0"
   },
   "devDependencies": {

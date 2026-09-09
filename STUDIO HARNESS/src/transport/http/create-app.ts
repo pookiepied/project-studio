@@ -42,7 +42,7 @@ export interface CreateHttpAppOptions {
    * it leaves a pending note pending for the conversation's whole life -
    * the bug the settled-ness exception exists to prevent.
    */
-  readonly reopenCapabilityNote?: (conversationId: string) => void;
+  readonly reopenCapabilityNote?: (conversationId: string) => void | Promise<void>;
   /** The provider administration surface — a port of the same shape. */
   readonly providers: ProviderAdministration;
   /**

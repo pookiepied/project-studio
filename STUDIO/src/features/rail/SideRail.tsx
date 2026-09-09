@@ -5,6 +5,7 @@ import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
 import { JobsPanel } from '@/features/jobs/JobsPanel'
+import { BrowserPanel } from '@/features/rail/BrowserPanel'
 import { PlanPanel } from '@/features/plans/PlanPanel'
 import { RailTabs } from '@/features/rail/RailTabs'
 import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, type RailEntry } from '@/stores/rail'
@@ -23,7 +24,8 @@ const MIN_PAGE_WIDTH = 520
 /** What the header calls the active entry, per kind. */
 function entryTitle(entry: RailEntry): string {
   if (entry.kind === 'artifact') return entry.artifact.title
-  return entry.kind === 'jobs' ? 'Background commands' : 'Plan'
+  if (entry.kind === 'jobs') return 'Background commands'
+  return entry.kind === 'browser' ? 'Browser' : 'Plan'
 }
 
 
@@ -160,6 +162,8 @@ export function SideRail() {
                     renderArtifact(active.artifact)
                   ) : active.kind === 'jobs' ? (
                     <JobsPanel conversationId={active.conversationId} />
+                  ) : active.kind === 'browser' ? (
+                    <BrowserPanel entry={active} />
                   ) : (
                     <PlanPanel conversationId={active.conversationId} />
                   )}

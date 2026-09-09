@@ -130,6 +130,38 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
     // would be a filesystem server pointed at the harness.
     const cwd = projectRoot();
 
+    // **A server Studio wrote is not a third party's program, and containment
+    // is the answer to exactly that question.** `isolation/kinds.ts` sets out
+    // the taxonomy and it is provenance, not behaviour: a `tool` is ours and
+    // runs in-process, a `shell` is the model's and an `mcp-server` is a third
+    // party's, and both of those are contained. A built-in server is the first
+    // case wearing the third one's clothes — its program, its arguments and
+    // its call site were all written and reviewed here, so containing it buys
+    // nothing it does not already have.
+    //
+    // It buys nothing and it costs the capability. A contained child is
+    // refused loopback under every capability Windows offers (see
+    // `isolation/backend.ts`, measured), and the single most common thing to
+    // ask a browser is to look at a dev server on `localhost:3000`. Containing
+    // it would ship a browser that cannot see the thing it exists to see.
+    //
+    // What still holds the line: the kernel approves every tool call, the
+    // network policy still judges every destination host and port, and this
+    // exemption is decided by a column no user-installed server can set —
+    // `provenance` is written by `registerBuiltInServers` and the save route
+    // refuses it from outside (see `routes/mcp.ts`).
+    if (record.provenance === "system") {
+      return StdioChannel.start({
+        command: record.command,
+        args: record.args,
+        cwd,
+        env,
+        ...(options.startupTimeoutMs === undefined
+          ? {}
+          : { startupTimeoutMs: options.startupTimeoutMs }),
+      });
+    }
+
     // **The one place a third party's program is handed to the OS.** It goes
     // through the same verdict `shell` gets — `containCommand` — rather than a
     // second rule written here, because this is the kind with the *strongest*

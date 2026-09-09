@@ -4,6 +4,8 @@ import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 
+import { BrowserCard } from './BrowserCard'
+import { browserAction, browserSubject, browserVerb, readBrowserCall } from './browserCall'
 import { netOf } from './groupNet'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
@@ -303,8 +305,15 @@ function GroupCallRow({
 
 function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const [open, setOpen] = useState(false)
-  const action = ACTIONS[call.toolName]
-  const subject = subjectOf(call)
+  // Studio's own browser is a capability with a face, not a row of JSON. It
+  // arrives through MCP like anything else, so it is recognised by name here
+  // rather than by a flag the wire does not carry - and every other MCP tool
+  // keeps the ordinary row, which is the point: the browser is special
+  // because we wrote its result shape, not because it came over MCP.
+  const browser = browserAction(call.toolName)
+  const action = browser === null ? ACTIONS[call.toolName] : ACTIONS.browserUse
+  const subject =
+    browser === null ? subjectOf(call) : browserSubject(browser, call.input?.value)
   const file = FILE_TOOLS.has(call.toolName) ? subject : null
   const outcome = outcomeOf(call)
   const rawDiff = diffOf(call)
@@ -317,7 +326,14 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       : rawDiff
   const answered = answeredOf(call)
   const running = call.errorText === null && !answered
-  const verb = action === undefined ? call.toolName : running ? action.running : action.done
+  const verb =
+    browser !== null
+      ? browserVerb(browser, running)
+      : action === undefined
+        ? call.toolName
+        : running
+          ? action.running
+          : action.done
 
   return (
     <DisclosureRow
@@ -395,6 +411,26 @@ function CallWorkingOut({
   outcome: FileToolOutcome | null
 }) {
   const diffed = diff !== null && file !== null
+  // Our own browser answers in a shape we designed, so it is drawn rather
+  // than pretty-printed. Read once here, and only when the answer has landed:
+  // a running call has nothing to show and gets the ordinary input echo,
+  // which is the honest picture of a page still loading.
+  const browser =
+    call.output !== null && call.output.present
+      ? readBrowserCall(call.toolName, call.output.value, call.errorText)
+      : null
+  if (browser !== null) {
+    return (
+      <div className="flex flex-col gap-2">
+        <BrowserCard call={browser} />
+        {call.errorText === null ? null : (
+          <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-danger">
+            {call.errorText}
+          </pre>
+        )}
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-1">
       {diffed ? (

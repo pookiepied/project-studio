@@ -435,25 +435,33 @@ describe("MCP application runtime", () => {
     }
   }, 30_000);
 
-  itContained("loads a system extension's schemas with no discovery call at all", async () => {
+  itContained("withholds a system extension's schemas until they are discovered", async () => {
+    // **This test asserted the opposite until 2026-09-09, and the rule it
+    // asserted was wrong.** ADR 0048 §3 said system-provenance servers load
+    // eagerly; ADR 0049 §5 corrected that, because it conflated two
+    // independent things - **who owns a capability** and **how expensive it
+    // is to load**. Studio's own browser is twenty-four schemas, and owning
+    // it does not make them cheap.
+    //
+    // So eagerness follows size and generality, not authorship: eager is for
+    // capabilities small enough that most turns might use them, which means
+    // the natives. Everything reached over MCP is discovered, whoever wrote
+    // it. That is what this now pins, from both sides - absent before, and
+    // present after, so a regression in either direction is caught.
     const { runtime, database } = await startedRuntime("system");
     try {
       const sandbox = runtime.createAgentSandbox({ agentId: "agent", conversationId: "agent" });
       const env = await sandbox.createSandbox({ id: "agent" });
 
-      // The first array, before anyone asked. The provenance column decides
-      // this, and nothing in the harness's own client writes it - so this
-      // test, writing the row with `system` through the rig, is what keeps
-      // the eager path from being dead code.
       const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
-      expect(tools.map((tool) => tool.name)).toContain("mcp__11_echo-server__4_echo");
+      expect(tools.map((tool) => tool.name)).not.toContain("mcp__11_echo-server__4_echo");
+      // The natives are still there, which is what makes the assertion above
+      // a statement about MCP rather than about an empty array.
+      expect(tools.map((tool) => tool.name)).toContain("read");
 
-      // Discovering an already-eager tool is the existing no-op: the same
-      // key, the same registration. What the count pins is subtler than a
-      // lack of a throw - the gate refuses a second registration outright,
-      // so the discovery either went through the one registration door
-      // (which deduplicates) or the next listing shows it twice. One, below,
-      // means the door was used.
+      // And discovery is how it arrives - once, through the one registration
+      // door. The gate refuses a second registration outright, so a count of
+      // one means the door was used rather than bypassed.
       const discovery = tools.find((tool) => tool.name === "discover");
       expect(discovery).toBeDefined();
       await discovery?.execute("discover-1", { scope: "mcp:echo-server/echo" });

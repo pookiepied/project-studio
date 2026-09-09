@@ -301,8 +301,15 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     bootLog("step 11: createHttpApp entering");
     const app = createHttpApp({
       servers: runtime.servers,
-      reopenCapabilityNote: (conversationId) =>
-        runtime.reopenCapabilityInventory(conversationId),
+      // Awaited before the run renders. `start()` memoises, so this costs one
+      // wait on the first submission after a harness starts and nothing at
+      // all afterwards - and it is what lets a capability Studio ships be
+      // described truthfully on a conversation's very first turn instead of
+      // announced as "still being read" and corrected on its second.
+      reopenCapabilityNote: async (conversationId) => {
+        await runtime.start();
+        runtime.reopenCapabilityInventory(conversationId);
+      },
       providers,
       retrieval,
       media,

@@ -1,6 +1,6 @@
 # The browser capability — the plan
 
-**Status:** Not started · **Opened:** 2026-09-07
+**Status:** Steps 1-6 landed · **Opened:** 2026-09-07 · **Last worked:** 2026-09-09
 **Decision:** [ADR 0049](../decisions/0049-the-browser-is-ours-the-engine-is-the-machine-s.md)
 **Blocked on:** [the capability-discovery plan](capability-discovery-plan.md) steps 1–3.
 The browser is 0048's first real consumer and cannot ship eagerly, so discovery
@@ -188,3 +188,103 @@ rail shows the latest frame; there is no control that navigates by hand.
 5. **Downloads initiated by a page.** A browser that can download is a browser
    that can write outside the workspace. Simplest first answer is to refuse
    downloads entirely; that has not been decided.
+
+---
+
+## 5. What was actually built, and the four open questions it answered
+
+Landed 2026-09-09. The shape above survived; what follows is the part the code
+decided, recorded here because each one was a real choice and none of them is
+visible from the file tree.
+
+### Q1 — Where the server lives: inside the harness build, as a second entry
+
+Not a new top-level directory. `src/browser/` builds to `dist/browser.mjs`
+through a second input in the harness's existing Vite config, with
+`playwright-core` left external because it resolves its own driver files by
+path and cannot survive bundling.
+
+The separation ADR 0049 §3 asked for is a separate **process**, and that is
+exactly what this is — spawned as `node.exe <harness>/dist/browser.mjs`, with
+its own memory and its own way of dying. A third pnpm project would have added
+an install, a lockfile and a third staleness check in `start.ps1`, and bought
+none of the isolation that mattered. `start.ps1` needed no change at all: its
+staleness check already watches every `.ts` under the harness's `src`.
+
+### Q2 — Whose job the browser process is: the server's, and it is not contained
+
+The browser runs inside the MCP server process, and **that process is launched
+without containment**. This is the one decision here worth arguing with, so the
+whole argument is written down.
+
+`sandbox/isolation/kinds.ts` already classifies children by *who chose the
+program*: a `tool` is ours and runs in-process, a `shell` is the model's, an
+`mcp-server` is a third party's, and the last two are contained. A built-in
+server is the first case wearing the third one's clothes. Its program, its
+arguments and its call site were written and reviewed here, so containment
+answers a question that has no force against it.
+
+And containment would take the capability with it. A contained child is refused
+loopback under every capability Windows offers — measured, and written up in
+`isolation/backend.ts` — while the single most common thing anyone will ask a
+browser to do is look at a dev server on `localhost:3000`. Containing it ships
+a browser that cannot see the thing it exists to see.
+
+So the exemption is `provenance === "system"`, and the cost is that the word
+now decides a boundary. Three things hold that line:
+
+- **No route may write it.** `POST /servers` refuses `provenance: "system"`
+  outright rather than accepting it, because a route that let a caller answer
+  "whose program is this" would hand any program on the machine an uncontained
+  launch for the price of one extra field. The only writer is
+  `registerBuiltInServers`, running in-process with a path it computed itself.
+- **No route may edit or remove one.** `McpManagementService` refuses both,
+  and says what the person actually wants instead — switching it off, which
+  always works and is a different question.
+- **Nothing else changed.** The kernel still approves every call, the network
+  policy still judges every host and port, and the tools still arrive through
+  discovery like anyone else's.
+
+### Q3 — Live frames: still one frame per acting call
+
+Unchanged from ADR 0049 §7, and now with a measurement behind it. The frame is
+a 960-pixel JPEG at quality 45, which is enough to answer "does this look
+right" and a fraction of what a full-resolution PNG costs to carry. A real
+screenshot is its own tool, for when the look of the page *is* the point.
+
+### Q5 — Downloads: refused
+
+`acceptDownloads: false` on the context. A browser that can download is a
+browser that can write outside the workspace, and the simplest first answer is
+the one that cannot be wrong. Reversible later; a download policy is a
+conversation about where files land, and nobody has needed to have it yet.
+
+### One deviation worth naming: conversation identity travels in `_meta`
+
+ADR 0049 says one browser per conversation. MCP has no conversation identity —
+a call is a name and some arguments — so a single stdio connection serves every
+conversation, and without something extra they would share a browser, and with
+it one conversation's signed-in session and half-filled forms.
+
+So `tools/call` carries `_meta: { "studio/conversation": <id> }`, and the server
+keys its sessions on it. **Only for system-provenance servers**: a conversation
+id is the person's to know, no third-party server has any use for it, and one
+that started keying behaviour on it would be tracking somebody across their own
+work.
+
+A caller that sends nothing gets one shared session, which is what any other
+MCP client would get and is the honest fallback rather than a pretence.
+
+### What is not built
+
+- **A visible Stop.** The browser closes on idle and when the connection ends,
+  and `studio_browser_quit` ends it on request — but it does not yet appear in
+  the rail's background-commands panel, which is what ADR 0049 §4 asks for. It
+  is a process a person cannot currently see.
+
+The rail preview *is* built: a fourth entry kind beside artifacts, the plan and
+background commands, holding the latest frame, the place, and the sequence of
+what the model did. It is kept current as the model works and **never focuses
+itself** - a model browsing in the background must not seize a panel somebody
+is reading, so the transcript row is where the work announces itself and
+opening the preview stays the person's move.

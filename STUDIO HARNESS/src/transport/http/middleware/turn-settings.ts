@@ -102,7 +102,19 @@ export interface TurnSettingsMiddlewareOptions {
    * it is called unconditionally and the distinction lives in the
    * inventory.
    */
-  readonly reopenCapabilityNote?: (conversationId: string) => void;
+  /**
+   * Settles this conversation's capability note before the run renders.
+   *
+   * Awaited, and that is the whole point of it being here rather than at the
+   * turn boundary. Flue's boundary fires before the MODEL call, and the
+   * instruction document - capability note included - is composed by the
+   * agent RENDER, which happens earlier. So a startup that had not finished
+   * was still unfinished when the note was first asked, and the note froze
+   * "their tools are still being read" into the first turn and replaced it on
+   * the second: a moved system block, and the whole prefix re-billed behind
+   * it. This middleware is the one seam that is genuinely before everything.
+   */
+  readonly reopenCapabilityNote?: (conversationId: string) => void | Promise<void>;
 }
 
 const AGENT_SUBMISSION_PATH = /^\/agents\/studio\/([^/]+)$/;
@@ -176,7 +188,7 @@ export function createTurnSettingsMiddleware(
       // Before the run: the settings are settled, and this is the one place
       // a pending capability note may be re-asked ahead of the render that
       // composes the run's instruction document.
-      options.reopenCapabilityNote?.(conversationId);
+      await options.reopenCapabilityNote?.(conversationId);
       await next();
       if (context.res.status >= 400) {
         // The send was refused: the row this request created leaves with it.
@@ -202,7 +214,7 @@ export function createTurnSettingsMiddleware(
     }
     // Before the run, exactly as the first-turn branch does: the same
     // between-submissions boundary, reached for every later turn.
-    options.reopenCapabilityNote?.(conversationId);
+    await options.reopenCapabilityNote?.(conversationId);
     await next();
   };
 }

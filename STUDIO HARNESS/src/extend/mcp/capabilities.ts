@@ -188,7 +188,10 @@ function descriptor(
     provenance: {
       origin: "mcp",
       sourceId: record.id,
-      author: "third-party",
+      // Whose words the model is about to read. A built-in capability is
+      // Studio's own and says so; everything installed over HTTP is somebody
+      // else's, whatever it calls itself.
+      author: record.provenance === "system" ? "studio" : "third-party",
     },
     idempotent: false,
   };
@@ -215,7 +218,25 @@ function createTool(
       return normalizeCallResult(
         await connection.request(
           "tools/call",
-          { name: entry.name, arguments: input },
+          {
+            name: entry.name,
+            arguments: input,
+            // Which conversation is asking, for servers Studio wrote.
+            //
+            // MCP carries no conversation identity - a call is a name and some
+            // arguments - and a capability like the browser needs one, because
+            // one conversation's pages must not appear in another's. `_meta`
+            // is the protocol's own place for exactly this.
+            //
+            // **Only for our own servers.** A conversation id is the person's
+            // to know, and handing it to a third party's process is a small,
+            // permanent leak in return for nothing: no third-party server has
+            // any use for it, and one that started keying behaviour on it
+            // would be tracking a person across their work.
+            ...(record.provenance === "system"
+              ? { _meta: { "studio/conversation": context.scope.conversationId } }
+              : {}),
+          },
           context.signal,
         ),
       );

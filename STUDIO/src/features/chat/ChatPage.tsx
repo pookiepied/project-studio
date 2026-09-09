@@ -19,6 +19,7 @@ import { usePlan } from '@/features/plans/usePlan'
 import { JobsPill } from '@/features/jobs/JobsPill'
 import { useBackgroundJobs } from '@/features/jobs/useBackgroundJobs'
 import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
+import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { contextReport } from '@/domain/session/context'
 import {
@@ -295,6 +296,10 @@ export function ChatPage({
     }
     openJobs(conversation.id, conversation.title ?? 'Conversation')
   }, [jobsEntryVisible, closeRailEntry, openJobs, conversation.id, conversation.title])
+
+  // The rail's browser preview follows the conversation without ever taking it
+  // over: the entry is kept current, and opening it stays the person's move.
+  useBrowserPreview(conversation.id, conversation.title ?? 'Conversation', live.items)
 
   return (
     <div className="relative flex h-full flex-col">

@@ -46,7 +46,9 @@ export function RailTabs() {
                 ? entry.artifact.title
                 : entry.kind === 'jobs'
                   ? 'Background commands'
-                  : 'Plan'
+                  : entry.kind === 'browser'
+                    ? 'Browser'
+                    : 'Plan'
             return (
               <div
                 key={entry.id}
@@ -67,6 +69,8 @@ export function RailTabs() {
                       <Icons.artifact />
                     ) : entry.kind === 'jobs' ? (
                       <Icons.backgroundJobs />
+                    ) : entry.kind === 'browser' ? (
+                      <Icons.browserUse />
                     ) : (
                       <Icons.plan />
                     )}

@@ -69,8 +69,18 @@ function studioServerEntry(): PluginOption {
       build: {
         rolldownOptions: {
           input: {
-            server: "src/server.ts"
-          }
+            server: "src/server.ts",
+            // The browser capability, bundled beside the harness rather than
+            // as a third package. It is a separate *process* (ADR 0049 §3),
+            // which is what the isolation is for, and a separate build would
+            // buy nothing but a third `pnpm install` and a third staleness
+            // check in `start.ps1`.
+            browser: "src/browser/server.ts"
+          },
+          // Playwright resolves its own driver files by path at runtime and
+          // cannot survive being bundled. It stays a real dependency, resolved
+          // from the harness's node_modules by the process that needs it.
+          external: ["playwright-core"]
         }
       }
     })

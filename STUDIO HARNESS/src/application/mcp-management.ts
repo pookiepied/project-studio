@@ -257,6 +257,7 @@ export class McpManagementService implements McpAdministration {
 
   save(input: McpServerInput, _auth: AuthContext): McpServerView {
     const before = this.#registry.get(input.id);
+    this.#refuseIfOurs(before, "edited");
     const after = this.#registry.save(input);
 
     if (before !== undefined && McpServerRegistry.reachChanged(before, after)) {
@@ -267,9 +268,33 @@ export class McpManagementService implements McpAdministration {
     return this.#view(after);
   }
 
+  /**
+   * Studio's own capabilities are not editable or removable from outside.
+   *
+   * Switching one off is a person's decision and always works — that is the
+   * selection store, and nothing here touches it. What is refused is changing
+   * *what the server is*: its command, its arguments, whether it exists at
+   * all. Those are the fields that decide what gets launched, and a system
+   * server is launched without containment because Studio wrote it. An edit
+   * would make that sentence untrue while the row still claimed it.
+   *
+   * The refusal names the thing a person actually wants, because someone who
+   * reaches for Delete on the browser wants it to stop running, and there is a
+   * switch for exactly that one screen away.
+   */
+  #refuseIfOurs(record: McpServerRecord | undefined, verb: string): void {
+    if (record?.provenance !== "system") return;
+    throw new ExtendError("internal", {
+      message:
+        `${record.title} is one of Studio's own capabilities, so it cannot be ${verb}. ` +
+        "Switch it off instead - globally, for a project, or for one conversation.",
+    });
+  }
+
   async remove(id: string, _auth: AuthContext): Promise<boolean> {
     const server = this.#registry.get(id);
     if (server === undefined) return false;
+    this.#refuseIfOurs(server, "removed");
 
     // Delete the keychain entry before the durable row. If the secure store
     // refuses, the configuration remains retryable instead of orphaning a key.

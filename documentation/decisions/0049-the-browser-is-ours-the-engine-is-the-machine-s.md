@@ -251,3 +251,49 @@ on the others.
 - Every port the server binds is registered as an own-port.
 - The browser's tools contribute nothing to the tools array until discovered.
 - An acting tool returns a frame, and the artifact shows it.
+
+---
+
+## Amendment, 2026-09-09 — a server Studio wrote is not a third party's
+
+Written after building it, because one thing this ADR assumed turned out to be
+wrong in a way that would have shipped a browser that could not do its job.
+
+**§6 is right about the network policy and wrong about the sandbox.** It records
+at length that `C-17` allows loopback for a model, so a browser aimed at
+`localhost:3000` fights nothing — and that is true of the *policy*. It is not
+true of *containment*. A contained child is refused `127.0.0.1` under every
+capability Windows offers; `isolation/backend.ts` says so, measured, and the
+refusal is deliberate. So an MCP server launched the ordinary way could never
+have seen a dev server, whatever `C-17` said.
+
+The fix is not to relax containment. It is that **containment was answering a
+question this server does not raise.** `isolation/kinds.ts` already classifies
+children by who chose the program — ours, the model's, or a third party's — and
+a capability Studio wrote and ships is the first of those wearing the third
+one's clothes. Its program, arguments and call site were all written here.
+
+So a `provenance: "system"` server launches uncontained, and the word now
+carries a boundary it did not carry before. What holds that line:
+
+- `POST /servers` refuses `provenance: "system"` outright. A route that let a
+  caller answer "whose program is this" would hand any program on the machine
+  an uncontained launch for one extra field.
+- The management service refuses to edit or remove a system server, because an
+  edit changes what gets launched while the row still claims Studio wrote it.
+  Switching one off is a different question and always works.
+- The kernel still approves every call, and the network policy still judges
+  every host and port. Nothing about dispatch changed.
+
+**And §7's "one browser per conversation" needed a mechanism.** MCP carries no
+conversation identity, so one stdio connection serves every conversation and
+would otherwise share one browser between them — one conversation's signed-in
+session visible in the next. `tools/call` now carries
+`_meta: { "studio/conversation": <id> }`, for system-provenance servers only: a
+conversation id is the person's, no third-party server has a use for it, and one
+that began keying behaviour on it would be tracking somebody across their work.
+
+**§5's correction of ADR 0048 is now implemented as written.** `refreshTools`
+used `provenance === "system"` as its eager predicate, which is exactly the
+conflation §5 identified — ownership standing in for cost. No MCP server loads
+eagerly now, whoever wrote it. Eager is the natives.

@@ -117,7 +117,7 @@ export function splitArgs(text: string): readonly string[] {
     const quoted =
       trimmed.length >= 2 &&
       (trimmed.startsWith('"') || trimmed.startsWith("'")) &&
-      trimmed.endsWith(trimmed[0] as string)
+      trimmed.endsWith(trimmed[0])
     out.push(quoted ? trimmed.slice(1, -1) : trimmed)
   }
   return out

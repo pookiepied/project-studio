@@ -89,6 +89,16 @@ export type StudioErrorDomain =
    * different answers.
    */
   | "host"
+  /**
+   * Driving a web page: finding a browser to run, the tabs, and the elements
+   * a call points at. Separate from `extend` - which is what MAY be added and
+   * whether it is switched on - and from `process`, which supervises the
+   * child. "No browser is installed on this machine" is fixed by installing
+   * Edge and has nothing to do with a settings screen; "that element is not
+   * on the page any more" is answered by the model on its next step and by no
+   * person at all.
+   */
+  | "browser"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */
