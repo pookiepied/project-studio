@@ -307,14 +307,12 @@ function FormView({
             />
           </Field>
 
-          <Field
-            label="Arguments"
-            hint="Separated by spaces. Quote anything containing a space."
-          >
-            <TextField
+          <Field label="Arguments" hint="One argument per line. Spaces in a path are fine.">
+            <TextArea
               value={form.args}
               onChange={(args) => onChange({ args })}
-              placeholder="-y @modelcontextprotocol/server-memory"
+              rows={3}
+              placeholder={'--root\nC:\\Program Files\\example\\server.js'}
             />
           </Field>
 

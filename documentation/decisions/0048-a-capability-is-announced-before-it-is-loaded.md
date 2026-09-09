@@ -162,6 +162,31 @@ and a connected server that genuinely exposes nothing settles on its true
 `0 tools`, because the condition reads the supervisor and the catalog, never
 the emptiness of the tool list.*
 
+*A second narrow exception, found the same way (2026-09-09): the block also
+re-asks when the person has changed **which capabilities are switched on**.*
+Enabling a server for a project and returning to a conversation that was
+already open did nothing the model could see. The tools array picked the
+server up and discovery could reach it, but the note the model reads *before
+it knows to ask* had settled without it — so the model was never told the
+server existed, and the setting appeared to do nothing for the rest of that
+conversation's life. The only remedy was to start a new conversation.
+
+That is not the stale sentence the rule above weighed and accepted. A stale
+sentence describes a reachable server slightly wrongly; this note was wrong
+about **what is reachable at all**, which is the one question this surface
+exists to answer. ADR 0036 settles it — a user's decision is durable, and a
+decision a conversation may ignore for the rest of its life is not durable,
+it is discarded.
+
+The comparison is the **set of announced identities**, and nothing else.
+A reconnect, a `list_changed` refresh, a server whose tool names changed, a
+renamed title: none of these are a person's decision and none of them move the
+block, so everything §1 pinned stays pinned — including the byte-identical
+empty block, whose empty set matches its empty set. The price is the same
+price the first exception pays and is paid only when someone has just changed
+something and is already expecting an effect: one re-billed prefix, on that
+conversation's next turn.
+
 ### 2. One discovery tool, taking a scope
 
 ```

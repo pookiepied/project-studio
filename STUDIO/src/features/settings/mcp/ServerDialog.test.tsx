@@ -67,7 +67,7 @@ describe('adding a server', () => {
     type('Name', 'Memory')
     type('Id', 'memory')
     type('Command', 'node')
-    type('Arguments', '--root "D:\\My Projects\\site" -y')
+    type('Arguments', '--root\nD:\\My Projects\\site\n-y')
 
     fireEvent.click(screen.getByRole('button', { name: 'Add server' }))
 
@@ -148,7 +148,7 @@ describe('the JSON view', () => {
     type('Name', 'Memory')
     type('Id', 'memory')
     type('Command', 'node')
-    type('Arguments', '-y server-memory')
+    type('Arguments', '-y\nserver-memory')
     fireEvent.click(screen.getByRole('radio', { name: 'JSON' }))
 
     const text = valueOf(screen.getByRole('textbox'))
@@ -183,7 +183,7 @@ describe('the JSON view', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Form' }))
 
     expect(valueOf(screen.getByLabelText('Id'))).toBe('pasted')
-    expect(valueOf(screen.getByLabelText('Arguments'))).toBe('-y server-memory')
+    expect(valueOf(screen.getByLabelText('Arguments'))).toBe('-y\nserver-memory')
   })
 })
 

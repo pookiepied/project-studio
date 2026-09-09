@@ -19,30 +19,30 @@ const STDIO: ServerForm = {
   title: 'Memory',
   transport: 'stdio',
   command: 'C:\\Program Files\\nodejs\\node.exe',
-  args: '-y @modelcontextprotocol/server-memory',
+  args: '-y\n@modelcontextprotocol/server-memory',
 }
 
 describe('argument splitting', () => {
-  it('splits on spaces', () => {
-    expect(splitArgs('-y @modelcontextprotocol/server-memory')).toEqual([
+  it('reads one argument per line', () => {
+    expect(splitArgs('-y\n@modelcontextprotocol/server-memory')).toEqual([
       '-y',
       '@modelcontextprotocol/server-memory',
     ])
   })
 
-  it('keeps a quoted path in one piece', () => {
-    // The case this exists for: a Windows path with a space is one argument,
-    // and splitting it would hand the server two paths that are both wrong.
-    expect(splitArgs('--root "D:\\My Projects\\site" --verbose')).toEqual([
-      '--root',
-      'D:\\My Projects\\site',
-      '--verbose',
-    ])
+  it('keeps a path with spaces in one piece, unquoted', () => {
+    // The case the whole change exists for. Written on a line of its own, a
+    // Windows path needs no quoting and cannot be mis-split - which is what
+    // sent a real server the two halves of "C:\Program Files" as two
+    // arguments and made it look broken.
+    expect(
+      splitArgs('--root\nD:\\My Projects\\site\n--verbose'),
+    ).toEqual(['--root', 'D:\\My Projects\\site', '--verbose'])
   })
 
   it('treats a metacharacter as a character', () => {
     // No shell is ever involved, so these are text rather than syntax.
-    expect(splitArgs('--filter a&&b --path $HOME')).toEqual([
+    expect(splitArgs('--filter\na&&b\n--path\n$HOME')).toEqual([
       '--filter',
       'a&&b',
       '--path',
@@ -50,17 +50,18 @@ describe('argument splitting', () => {
     ])
   })
 
-  it('keeps an empty quoted argument', () => {
-    expect(splitArgs('--prefix "" --x')).toEqual(['--prefix', '', '--x'])
+  it('keeps an empty argument, and one that is deliberately padded', () => {
+    expect(splitArgs('--prefix\n""\n--x')).toEqual(['--prefix', '', '--x'])
+    expect(splitArgs('" pad "')).toEqual([' pad '])
   })
 
-  it('collapses runs of whitespace and ignores the edges', () => {
-    expect(splitArgs('   -a    -b   ')).toEqual(['-a', '-b'])
+  it('ignores blank lines and trims a pasted line', () => {
+    expect(splitArgs('\n  -a  \n\n -b \n')).toEqual(['-a', '-b'])
     expect(splitArgs('')).toEqual([])
   })
 
-  it('survives a round trip through the line it is shown on', () => {
-    const args = ['--root', 'D:\\My Projects\\site', '-y', '']
+  it('survives a round trip through the field it is shown in', () => {
+    const args = ['--root', 'D:\\My Projects\\site', '-y', '', ' padded ']
     expect(splitArgs(joinArgs(args))).toEqual(args)
   })
 })
@@ -224,7 +225,7 @@ describe('editing an installed server', () => {
       // for the server at all.
       description: 'Remembers things between conversations.',
       command: 'node',
-      args: '-y server-memory',
+      args: '-y\nserver-memory',
       env: 'LOG=info',
       needsNetwork: false,
     })

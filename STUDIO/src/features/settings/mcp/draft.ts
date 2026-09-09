@@ -43,7 +43,7 @@ export interface ServerForm {
   readonly description: string
   readonly transport: McpTransport
   readonly command: string
-  /** Space separated, quotes respected. See `splitArgs`. */
+  /** One argument per line. See `splitArgs`. */
   readonly args: string
   /** One `NAME=value` per line. */
   readonly env: string
@@ -89,56 +89,53 @@ export function formFrom(record: McpServerRecord): ServerForm {
 }
 
 /**
- * Splits an argument line into a vector.
+ * Reads an argument list: one argument per line.
  *
- * Quotes are respected because paths have spaces in them and a Windows user
- * typing `"C:\Program Files\node\node.exe"` means one argument. This is the
- * ONLY place a string becomes a vector: the harness stores the vector and
- * never re-splits it, and no shell is ever involved, so a metacharacter in an
- * argument is a character rather than syntax.
+ * It used to split on spaces, with quoting for the cases that needed it, and
+ * that was the wrong default for the platform this runs on. Almost every real
+ * Windows path contains a space, so the common case was the one that needed
+ * the escape hatch, and forgetting it did not fail loudly: the stored server
+ * simply held `["C:\Program", "Files\..."]` and exited with "cannot find
+ * module C:\Program", which reads like the server is broken rather than like
+ * the form mis-parsed the line. One argument per line has no such trap,
+ * because there is nothing to remember to do.
+ *
+ * A line wrapped in matching quotes keeps its contents exactly, which is the
+ * only way to write an argument with leading or trailing spaces. Every other
+ * line is trimmed, because a stray space at the end of a pasted path is a
+ * typing accident every time and never an intention.
+ *
+ * This is still the ONLY place a string becomes a vector: the harness stores
+ * the vector and never re-splits it, and no shell is ever involved, so a
+ * metacharacter in an argument is a character rather than syntax.
  */
-export function splitArgs(line: string): readonly string[] {
+export function splitArgs(text: string): readonly string[] {
   const out: string[] = []
-  let current = ''
-  let quote: '"' | "'" | null = null
-  let started = false
-
-  for (const character of line) {
-    if (quote !== null) {
-      if (character === quote) quote = null
-      else current += character
-      continue
-    }
-    if (character === '"' || character === "'") {
-      quote = character
-      started = true
-      continue
-    }
-    if (character === ' ' || character === '\t' || character === '\n') {
-      if (started) out.push(current)
-      current = ''
-      started = false
-      continue
-    }
-    current += character
-    started = true
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    const quoted =
+      trimmed.length >= 2 &&
+      (trimmed.startsWith('"') || trimmed.startsWith("'")) &&
+      trimmed.endsWith(trimmed[0] as string)
+    out.push(quoted ? trimmed.slice(1, -1) : trimmed)
   }
-  if (started) out.push(current)
   return out
 }
 
 /**
- * The inverse, for showing a stored vector in one line.
+ * The inverse, for showing a stored vector for editing.
  *
- * An EMPTY argument is quoted too, and that is not a nicety: written bare it
- * becomes a run of spaces, which `splitArgs` discards, so an argument the
- * server was configured with would disappear the moment someone opened the
- * edit dialog and saved it again.
+ * An argument that is empty, or that carries leading or trailing space, is
+ * written quoted, and that is not a nicety: bare, it would be a blank or
+ * loosely-typed line, and `splitArgs` would drop it or trim it — so an
+ * argument the server was configured with would change the moment someone
+ * opened the edit dialog and saved it again.
  */
 export function joinArgs(args: readonly string[]): string {
   return args
-    .map((arg) => (arg === '' || /[\s"']/.test(arg) ? `"${arg}"` : arg))
-    .join(' ')
+    .map((arg) => (arg === '' || arg !== arg.trim() ? `"${arg}"` : arg))
+    .join('\n')
 }
 
 /**
@@ -148,6 +145,12 @@ export function joinArgs(args: readonly string[]): string {
  * a base64 blob survives. Blank lines and lines with no `=` are skipped rather
  * than refused: someone mid-edit should not be shown an error for a line they
  * have not finished typing.
+ *
+ * The value is trimmed. A shell would not trim it, but a shell is not what
+ * this is: someone typing `PATH= C:\tools` in a form means the path, and the
+ * space they typed after the `=` for legibility becomes part of the value and
+ * breaks it silently. An argument that genuinely needs surrounding space is
+ * not expressible here, and has never been asked for.
  */
 export function parseEnv(text: string): Readonly<Record<string, string>> {
   const out: Record<string, string> = {}
@@ -156,7 +159,7 @@ export function parseEnv(text: string): Readonly<Record<string, string>> {
     if (trimmed === '' || trimmed.startsWith('#')) continue
     const at = trimmed.indexOf('=')
     if (at <= 0) continue
-    out[trimmed.slice(0, at).trim()] = trimmed.slice(at + 1)
+    out[trimmed.slice(0, at).trim()] = trimmed.slice(at + 1).trim()
   }
   return out
 }

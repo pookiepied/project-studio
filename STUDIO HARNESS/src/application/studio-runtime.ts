@@ -895,10 +895,12 @@ export class StudioRuntime implements AgentHost {
    * Re-asks this conversation's capability note, before a run renders.
    *
    * The HTTP middleware calls this between submissions, which is the one
-   * boundary a note may move: a *pending* note - an enabled server that had
-   * not answered - is rebuilt and re-memoized here, so the next run's first
-   * render composes the current truth; a settled note is refused untouched,
-   * for the conversation's life. Nothing inside a run calls this, because
+   * boundary a note may move. Two notes are rebuilt and re-memoized here, so
+   * the next run's first render composes the current truth: a *pending* note
+   * - an enabled server that had not answered - and a note written about a
+   * different set of capabilities than the person has switched on now. Every
+   * other settled note is refused untouched, for the conversation's life.
+   * Nothing inside a run calls this, because
    * Flue digests the composed instruction document per render and a note
    * that moved between the renders of one submission would be narrated as an
    * instructions signal and re-bill the prefix mid-turn - the ruinous

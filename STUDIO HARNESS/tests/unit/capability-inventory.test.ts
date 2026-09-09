@@ -424,3 +424,95 @@ describe("the inventory does not freeze an answer that was not an answer yet", (
     expect(inventory.blockFor("cnv")).toBe("");
   });
 });
+
+/**
+ * The second settled-ness exception: a person changed what is switched on.
+ *
+ * Found by hand on 2026-09-09, the same way the first one was. Switching a
+ * server on for a project and returning to a conversation that was already
+ * open did nothing the model could see: the tools array picked the server up
+ * and discovery could reach it, but the note the model reads before it knows
+ * to ask had settled without it, and settled notes never move. The setting
+ * appeared to have no effect for the rest of that conversation's life.
+ *
+ * So the boundary re-asks when the *set of announced identities* has changed,
+ * and only then. Everything else stays still, which is what the tests below
+ * pin from both sides: a changed set moves, a changed anything-else does not.
+ */
+describe("the inventory follows a person's decision about what is switched on", () => {
+  it("re-asks at the next boundary when a server was switched on", () => {
+    let enabled = [entry()];
+    const inventory = new CapabilityInventory(() => enabled, () => true);
+
+    const first = inventory.blockFor("cnv");
+    expect(first).toContain("mcp:blender");
+    expect(first).not.toContain("mcp:deepwiki");
+
+    enabled = [entry(), entry({ id: "mcp:deepwiki", toolNames: ["ask_question"] })];
+    // Still still, within the run: only the boundary may move a block.
+    expect(inventory.blockFor("cnv")).toBe(first);
+
+    inventory.reopen("cnv");
+    expect(inventory.blockFor("cnv")).toContain("mcp:deepwiki");
+  });
+
+  it("re-asks when a server was switched off, so the note stays honest", () => {
+    let enabled = [entry(), entry({ id: "mcp:deepwiki" })];
+    const inventory = new CapabilityInventory(() => enabled, () => true);
+
+    expect(inventory.blockFor("cnv")).toContain("mcp:deepwiki");
+    enabled = [entry()];
+    inventory.reopen("cnv");
+    expect(inventory.blockFor("cnv")).not.toContain("mcp:deepwiki");
+  });
+
+  it("gains a whole section for a conversation that had nothing enabled", () => {
+    // The empty block is settled and byte-identical, and it still yields to a
+    // person switching something on - which is the case that reads as most
+    // broken when it does not, because the person watched themselves do it.
+    let enabled: CapabilityInventoryEntry[] = [];
+    const inventory = new CapabilityInventory(() => enabled, () => true);
+
+    expect(inventory.blockFor("cnv")).toBe("");
+    enabled = [entry()];
+    inventory.reopen("cnv");
+    expect(inventory.blockFor("cnv")).toContain("mcp:blender");
+  });
+
+  it("does not move for a refresh that changed only what a server holds", () => {
+    // The rule ADR 0048 §1 states, kept whole. A `list_changed` refresh, a
+    // reconnect, a renamed tool - none of these are a person's decision, and
+    // none of them may re-bill the history behind the block.
+    let names = ["add_camera"];
+    const inventory = new CapabilityInventory(
+      () => [entry({ toolNames: names })],
+      () => true,
+    );
+
+    const first = inventory.blockFor("cnv");
+    names = ["add_camera", "add_light", "apply_material"];
+    inventory.reopen("cnv");
+    expect(inventory.blockFor("cnv")).toBe(first);
+  });
+
+  it("does not move because the same servers came back in another order", () => {
+    let enabled = [entry(), entry({ id: "mcp:deepwiki" })];
+    const inventory = new CapabilityInventory(() => enabled, () => true);
+
+    const first = inventory.blockFor("cnv");
+    enabled = [entry({ id: "mcp:deepwiki" }), entry()];
+    inventory.reopen("cnv");
+    expect(inventory.blockFor("cnv")).toBe(first);
+  });
+
+  it("asks about the conversation being reopened and no other", () => {
+    const inventory = new CapabilityInventory(
+      (conversationId) => (conversationId === "one" ? [entry()] : []),
+      () => true,
+    );
+
+    const one = inventory.blockFor("one");
+    inventory.reopen("two");
+    expect(inventory.blockFor("one")).toBe(one);
+  });
+});

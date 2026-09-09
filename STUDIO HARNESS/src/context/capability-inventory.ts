@@ -244,15 +244,26 @@ export class CapabilityInventory {
   /**
    * The conversations currently holding a pending answer.
    *
-   * A pending answer is the only one a submission boundary may re-ask, so it
-   * is the one fact this class records beside the string. A settled answer
-   * never re-asks - not at a boundary, not anywhere - because that is ADR
+   * A pending answer is one of the two a submission boundary may re-ask, so
+   * it is recorded beside the string. It is the answer that had nothing true
+   * to say yet; the other is an answer about a set of capabilities the person
+   * has since changed, which `#announced` holds. Everything else keeps ADR
    * 0048 §1's rule whole: once settled, the block does not move for the
-   * conversation's life, and a reopen that forgot a settled note would let a
-   * settings toggle re-bill the whole history behind it, which the ordinary
-   * rule (and an integration test) both forbid.
+   * conversation's life.
    */
   readonly #pending = new Set<string>();
+
+  /**
+   * Which capabilities each conversation's block was written about.
+   *
+   * The identities only - not their tool names, not their counts. What this
+   * exists to notice is a person switching a server on or off, which is the
+   * one thing that can make a settled note *wrong about what is reachable*
+   * rather than merely out of date about what a reachable server contains.
+   * A `list_changed` refresh moves tool names and no identity, so it still
+   * moves nothing, which is the rule §1 states and this keeps.
+   */
+  readonly #announced = new Map<string, string>();
 
   /**
    * @param settled Whether one build's answer is one worth keeping. Read
@@ -282,17 +293,67 @@ export class CapabilityInventory {
    * between two steps of one submission, narrated as an instructions signal,
    * re-running the model, and re-billing the prefix inside a single turn.
    *
-   * This forgets only a *pending* answer: the one boundary a block may move
-   * is the one where the previous turn had nothing true to say, which is the
-   * single re-bill the settled-ness exception is priced at. A settled answer
-   * is left untouched, whatever has changed behind it since; and an unknown
-   * conversation has nothing to forget, which makes the boundary caller
-   * unconditional and this method the one place the distinction lives.
+   * Two answers may be forgotten here, and only two. An unknown conversation
+   * has nothing to forget, which makes the boundary caller unconditional and
+   * this method the one place the distinction lives.
+   *
+   * **A pending answer**, which is the one where the previous turn had
+   * nothing true to say — the single re-bill the settled-ness exception is
+   * priced at.
+   *
+   * **An answer about a different set of capabilities than the person has
+   * now.** This is the second exception and it was found the way the first
+   * one was, by using the software: switching a server on for a project and
+   * going back to a conversation that was already open. The tools array
+   * picked the server up, discovery could reach it — and the model was never
+   * told it existed, because the note it reads before it knows to ask had
+   * settled before the server did. It stayed that way for the conversation's
+   * life, so the setting appeared to do nothing at all, forever, and the only
+   * remedy was to start a new conversation. That is not the stale sentence
+   * §1 weighed and accepted; it is a note that is wrong about what can be
+   * reached, which is the one thing this surface exists to be right about.
+   *
+   * The price is honest and it is the same price: one re-billed prefix on
+   * that conversation's next turn. It is paid only when a person has changed
+   * something, which is rare, deliberate, and already the moment they expect
+   * an effect. ADR 0036 — a user's decision is durable — is the rule that
+   * settles it: a decision that a conversation may ignore for the rest of its
+   * life is not durable, it is discarded.
+   *
+   * What still moves nothing: a reconnect, a `list_changed` refresh, a server
+   * whose tool names changed, a title edit. Only the *set of announced
+   * identities* is compared, so everything §1 pinned stays pinned — including
+   * the conversation with nothing enabled, whose empty set matches its empty
+   * set and whose block stays byte-identical.
    */
   reopen(conversationId: string): void {
-    if (!this.#pending.has(conversationId)) return;
-    this.#pending.delete(conversationId);
+    if (!this.#blocks.has(conversationId)) return;
+    if (this.#pending.has(conversationId)) {
+      this.#pending.delete(conversationId);
+      this.#blocks.delete(conversationId);
+      this.#announced.delete(conversationId);
+      return;
+    }
+    // Built rather than remembered, because the question is what is enabled
+    // *now*. This is the one place per submission that asks, so the cost is
+    // one registry-and-selection read at a boundary that already does more
+    // than that.
+    if (this.#signature(this.#build(conversationId)) === this.#announced.get(conversationId)) {
+      return;
+    }
     this.#blocks.delete(conversationId);
+    this.#announced.delete(conversationId);
+  }
+
+  /**
+   * The identities one block was written about, in a stable order.
+   *
+   * Sorted, so that two reads of the same set are the same string whatever
+   * order the registry happened to list them in — otherwise a harmless
+   * reordering would re-bill a prefix for nothing.
+   */
+  #signature(entries: readonly CapabilityInventoryEntry[]): string {
+    return [...entries.map((entry) => entry.id)].sort().join("\n");
   }
 
   blockFor(conversationId: string): string {
@@ -311,6 +372,10 @@ export class CapabilityInventory {
     if (settled) this.#pending.delete(conversationId);
     else this.#pending.add(conversationId);
     this.#blocks.set(conversationId, block);
+    // Recorded beside the block, from the same build, so the next boundary
+    // compares this note against what it was actually written about rather
+    // than against a set read at some other moment.
+    this.#announced.set(conversationId, this.#signature(entries));
     return block;
   }
 
