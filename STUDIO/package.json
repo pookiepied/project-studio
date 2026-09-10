@@ -29,6 +29,7 @@
     "katex": "^0.16.47",
     "lucide-react": "^1.31.0",
     "media-chrome": "^4.19.2",
+    "qrcode-generator": "1.4.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",

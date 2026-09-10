@@ -1,6 +1,6 @@
 # Open Studio on another device — the plan
 
-**Status:** Proposed, nothing built · **Opened:** 2026-09-10
+**Status:** Steps 1–8 built on `task/open-on-other-devices`; ADR 0050 still to be written · **Opened:** 2026-09-10
 **Decision to record:** ADR 0050 (draft in §3 below; write it before step 1)
 **Depends on:** [ADR 0028](../decisions/0028-harness-client-admission-and-local-access.md) (the loopback rule),
 [ADR 0044](../decisions/0044-the-host-supervises-and-holds-the-credential.md)

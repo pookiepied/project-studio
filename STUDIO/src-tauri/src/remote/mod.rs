@@ -46,6 +46,7 @@
 //! mid-read included — so the next thing that device does is fail, not the
 //! next thing after that.
 
+mod addresses;
 mod assets;
 mod body;
 mod devices;
@@ -70,6 +71,7 @@ use tokio::sync::watch;
 
 use crate::harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
 
+pub(crate) use addresses::Addresses;
 pub(crate) use body::RemoteBody;
 pub(crate) use devices::{DeviceView, Devices};
 pub(crate) use pairing::PairingState;
@@ -131,6 +133,22 @@ impl RemoteAccess {
             .lock()
             .ok()
             .and_then(|running| running.as_ref().map(|running| running.address))
+    }
+
+    /// The addresses the settings screen prints, for the port being served.
+    ///
+    /// `None` while the listener is off: there is nothing to reach, so
+    /// nothing to print. The name is reported only while it is published,
+    /// which is the publisher's own knowledge and not a guess from the
+    /// listener being on.
+    pub async fn addresses(&self) -> Option<Addresses> {
+        let port = self.address()?.port();
+        let published = self
+            .mdns
+            .lock()
+            .map(|publisher| publisher.is_published())
+            .unwrap_or(false);
+        Some(addresses::read(port, published).await)
     }
 
     /// Starts the listener, or reports the one already running.

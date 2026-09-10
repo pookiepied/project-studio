@@ -44,11 +44,20 @@ const STORE_FILE = 'preferences.json'
 
 let storePromise: Promise<Awaited<ReturnType<typeof load>> | null> | null = null
 
-async function openStore() {
+/**
+ * The preferences file, opened once.
+ *
+ * Shared with the other-devices preference (`remote-access.ts`), which lives
+ * in the same file under its own key: native code reads that file directly
+ * at launch, so one file is one place for it to look.
+ */
+export async function openPreferencesStore() {
   if (!isTauri()) return null
   storePromise ??= load(STORE_FILE, { autoSave: false }).catch(() => null)
   return storePromise
 }
+
+const openStore = openPreferencesStore
 
 /**
  * Reads the stored window preferences.

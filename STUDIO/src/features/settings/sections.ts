@@ -54,6 +54,9 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     sections: [
       { id: 'general', name: 'General', icon: Icons.general },
       { id: 'appearance', name: 'Appearance', icon: Icons.appearance },
+      // Under Application because it is about the program's reach, not about
+      // an extension or a model: the same Studio, rendered on another screen.
+      { id: 'devices', name: 'Other devices', icon: Icons.devices },
       { id: 'shortcuts', name: 'Keyboard shortcuts', icon: Icons.shortcuts },
     ],
   },

@@ -28,7 +28,7 @@
 import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
-  GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor,
+  GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquarePen, SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
@@ -216,6 +216,9 @@ const REGISTRY = {
   // — Settings sections ---------------------------------------------------
   general: { mark: SlidersHorizontal },
   appearance: { mark: Palette },
+  // The same Studio on a phone beside the PC: two screens, one state. Not
+  // `themeSystem`, which is one monitor and means "follow the OS".
+  devices: { mark: MonitorSmartphone },
   personalization: { mark: UserCog },
   shortcuts: { mark: Keyboard },
   account: { mark: CircleUser },

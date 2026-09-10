@@ -74,7 +74,9 @@ os_pipe = "1.2"
 # and the tests drive both commands (`#[tokio::test]`). Tauri already
 # compiles tokio with rt/sync; `time` and `macros` add no crate the tests
 # did not already pull in, and none of them link anything new.
-tokio = { version = "1", features = ["rt", "macros", "sync", "time", "net", "io-util"] }
+# `process` is for one thing: asking the `tailscale` tool for the machine's
+# MagicDNS name (`remote/addresses.rs`), under a deadline.
+tokio = { version = "1", features = ["rt", "macros", "sync", "time", "net", "io-util", "process"] }
 
 # The listener behind "Open on other devices" (`remote/`). Built straight on
 # hyper rather than on a routing framework, because the routing this needs is

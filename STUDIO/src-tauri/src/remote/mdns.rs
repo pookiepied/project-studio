@@ -68,6 +68,10 @@ const SERVICE_INSTANCE: &str = "Studio";
 /// The name a person types. This record is the reason the module exists.
 const HOST_NAME: &str = "studio.local.";
 
+/// The name as a person types it: `HOST_NAME` without the trailing dot the
+/// record needs and a browser would not want.
+pub(super) const HOME_NAME: &str = "studio.local";
+
 /// The responder, as Studio talks to it.
 ///
 /// A seam rather than an abstraction for its own sake: the real one wraps
@@ -182,6 +186,11 @@ impl Mdns {
         self.published = Some(fullname);
     }
 
+    /// Whether the name is out right now.
+    pub(super) fn is_published(&self) -> bool {
+        self.published.is_some()
+    }
+
     /// Withdraws the name and ends the responder. Idempotent.
     ///
     /// The goodbye matters more than a failed stop does: a withdrawn name is
@@ -256,7 +265,7 @@ pub(super) fn home_addresses() -> Vec<Ipv4Addr> {
 /// The home rule, applied: the private addresses, deduplicated and sorted,
 /// so what is announced does not depend on the order the OS enumerated the
 /// interfaces in.
-fn home_addresses_of<I>(addresses: I) -> Vec<Ipv4Addr>
+pub(super) fn home_addresses_of<I>(addresses: I) -> Vec<Ipv4Addr>
 where
     I: IntoIterator<Item = Ipv4Addr>,
 {

@@ -33,35 +33,7 @@ const WINDOW_PREFERENCES_KEY: &str = "studio.window";
 /// effect the moment it is flipped instead of at the next launch. A close
 /// happens once in a while and this is a small JSON file.
 fn close_hides_to_tray(app: &AppHandle) -> bool {
-  // The file is read directly rather than through the store plugin.
-  //
-  // `StoreExt::store()` does not hand native code the instance the webview
-  // loaded: it answers with a fresh, empty one, so every read here came back
-  // as `None` and every close silently took the default. Measured, not
-  // assumed - the empty key list was logged from a running build.
-  //
-  // Reading the file is also the more honest dependency. This is a small
-  // JSON document the frontend owns and saves immediately on every change;
-  // native code only needs to look at it, and going through a plugin whose
-  // caching rules differ by caller is how the bug above happened.
-  //
-  // Any failure - no config directory, no file yet, unreadable, malformed -
-  // means the same thing as an absent preference. A file that cannot be read
-  // is not a reason to start destroying someone's work.
-  let Ok(directory) = app.path().app_config_dir() else {
-    return CLOSE_TO_TRAY_DEFAULT;
-  };
-  let Ok(text) = std::fs::read_to_string(directory.join(PREFERENCES_FILE)) else {
-    return CLOSE_TO_TRAY_DEFAULT;
-  };
-  // A byte order mark is stripped before parsing. `serde_json` rejects one
-  // outright, and this file is meant to be hand-editable -- the appearance
-  // module chose a real file over browser storage precisely so a person could
-  // open it. On Windows, opening and saving it is very often how a BOM gets
-  // there, and a preference silently reverting because an editor added three
-  // invisible bytes is the worst kind of bug to be on the wrong end of.
-  serde_json::from_str::<serde_json::Value>(text.trim_start_matches('\u{feff}'))
-    .ok()
+  read_preferences(app)
     .and_then(|document| {
       document
         .get(WINDOW_PREFERENCES_KEY)?
@@ -69,6 +41,55 @@ fn close_hides_to_tray(app: &AppHandle) -> bool {
         .as_bool()
     })
     .unwrap_or(CLOSE_TO_TRAY_DEFAULT)
+}
+
+/// The preferences document the frontend writes, as native code reads it.
+///
+/// The file is read directly rather than through the store plugin.
+///
+/// `StoreExt::store()` does not hand native code the instance the webview
+/// loaded: it answers with a fresh, empty one, so every read here came back
+/// as `None` and every close silently took the default. Measured, not
+/// assumed - the empty key list was logged from a running build.
+///
+/// Reading the file is also the more honest dependency. This is a small
+/// JSON document the frontend owns and saves immediately on every change;
+/// native code only needs to look at it, and going through a plugin whose
+/// caching rules differ by caller is how the bug above happened.
+///
+/// Any failure - no config directory, no file yet, unreadable, malformed -
+/// is `None`, and every reader treats that as an absent preference. A file
+/// that cannot be read is not a reason to start destroying someone's work,
+/// or to open their machine to the network.
+fn read_preferences(app: &AppHandle) -> Option<serde_json::Value> {
+  let directory = app.path().app_config_dir().ok()?;
+  let text = std::fs::read_to_string(directory.join(PREFERENCES_FILE)).ok()?;
+  // A byte order mark is stripped before parsing. `serde_json` rejects one
+  // outright, and this file is meant to be hand-editable -- the appearance
+  // module chose a real file over browser storage precisely so a person could
+  // open it. On Windows, opening and saving it is very often how a BOM gets
+  // there, and a preference silently reverting because an editor added three
+  // invisible bytes is the worst kind of bug to be on the wrong end of.
+  serde_json::from_str::<serde_json::Value>(text.trim_start_matches('\u{feff}')).ok()
+}
+
+/// The key under which the frontend records that other devices may open
+/// Studio. **Must stay in step with `STORAGE_KEY` in
+/// `src/platform/remote-access.ts`**, which is the copy that writes it.
+const REMOTE_PREFERENCES_KEY: &str = "studio.remote";
+
+/// Whether the person left "open on other devices" on.
+///
+/// ADR 0050 §6 asked whether the setting should survive a restart, and the
+/// answer is yes: someone turned it on because they want to reach their
+/// machine, and having to be *at* the machine to re-enable reaching it is a
+/// joke at their expense. What keeps that honest is that the state is
+/// visible - the tray line, the settings strip - and never a default: an
+/// absent or unreadable preference is off.
+fn remote_access_enabled_at_launch(app: &AppHandle) -> bool {
+  read_preferences(app)
+    .and_then(|document| document.get(REMOTE_PREFERENCES_KEY)?.get("enabled")?.as_bool())
+    .unwrap_or(false)
 }
 
 const CLOSE_TO_TRAY_DEFAULT: bool = true;
@@ -293,20 +314,38 @@ async fn remote_access_start(
 ) -> Result<String, String> {
   let address = remote
     .start(
-      app,
+      app.clone(),
       (*supervisor).clone(),
       (*devices).clone(),
       (*pairing).clone(),
     )
     .await?;
+  tray::reflect_remote(&app, Some(address));
   Ok(address.to_string())
 }
 
 /// Switches it off, closing the port and dropping every connection.
 #[tauri::command]
-fn remote_access_stop(remote: tauri::State<'_, remote::RemoteAccess>) -> Result<(), String> {
+fn remote_access_stop(
+  app: AppHandle,
+  remote: tauri::State<'_, remote::RemoteAccess>,
+) -> Result<(), String> {
   remote.stop();
+  tray::reflect_remote(&app, None);
   Ok(())
+}
+
+/// The addresses the settings screen prints and the QR code carries, or
+/// `null` while the listener is off.
+///
+/// Read fresh on every call: the machine's interfaces and Tailscale's state
+/// change underneath a running app, and the screen polls this slowly rather
+/// than trusting a reading from when it opened.
+#[tauri::command]
+async fn remote_addresses(
+  remote: tauri::State<'_, remote::RemoteAccess>,
+) -> Result<Option<remote::Addresses>, String> {
+  Ok(remote.addresses().await)
 }
 
 /// The address being served, or `null` when the listener is off.
@@ -461,6 +500,31 @@ fn service_stream_cancel(
     Ok(())
 }
 
+/// Reopens the machine to other devices at launch, because it was open when
+/// the app last ran (`remote_access_enabled_at_launch`).
+///
+/// Spawned rather than awaited: the bind is quick, but the first pairing
+/// code is minted and the credential store is consulted on the way, and
+/// none of that should hold the window. A failure - the port taken by
+/// something that started in the meantime - is a log line and a tray that
+/// says "not open"; the settings screen will show the sentence the moment
+/// it is opened, because it reads the status rather than the preference.
+fn start_remote_access_at_launch(app: AppHandle) {
+  tauri::async_runtime::spawn(async move {
+    let supervisor = app.state::<HarnessSupervisor>().inner().clone();
+    let devices = app.state::<std::sync::Arc<remote::Devices>>().inner().clone();
+    let pairing = app.state::<std::sync::Arc<remote::PairingState>>().inner().clone();
+    let started = app
+      .state::<remote::RemoteAccess>()
+      .start(app.clone(), supervisor, devices, pairing)
+      .await;
+    match started {
+      Ok(address) => tray::reflect_remote(&app, Some(address)),
+      Err(error) => log::warn!("Remote access: not reopened at launch: {error}"),
+    }
+  });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let supervisor = HarnessSupervisor::new();
@@ -547,6 +611,9 @@ pub fn run() {
       }
       lifecycle_supervisor.attach_lifecycle_emitter(app.handle().clone());
       tray::install(app)?;
+      if remote_access_enabled_at_launch(app.handle()) {
+        start_remote_access_at_launch(app.handle().clone());
+      }
       if let Some(main_window) = app.get_webview_window("main") {
         window::apply_rounded_corners(&main_window);
       }
@@ -608,7 +675,8 @@ pub fn run() {
       remote_devices,
       remote_device_rename,
       remote_device_revoke,
-      remote_device_revoke_all
+      remote_device_revoke_all,
+      remote_addresses
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
