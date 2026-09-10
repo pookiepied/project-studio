@@ -116,6 +116,7 @@ describe('what the card is given', () => {
       title: 'Pricing',
       failed: false,
       frame: view?.frame ?? null,
+      settled: true,
     })
   })
 
@@ -140,6 +141,10 @@ describe('what the card is given', () => {
       title: null,
       failed: false,
       frame: null,
+      // Not settled, which is the field the rail reads to know the call is
+      // still going. It cannot be inferred from the other four: a read-only
+      // call answers with no place and no picture either.
+      settled: false,
     })
   })
 
@@ -153,6 +158,9 @@ describe('what the card is given', () => {
     })
     expect(step?.failed).toBe(true)
     expect(step?.frame).toBeNull()
+    // Over, the other way. A call that failed is finished, and the rail has to
+    // stop reporting it as still happening.
+    expect(step?.settled).toBe(true)
   })
 
   it('is no step at all for a tool that is not ours', () => {
