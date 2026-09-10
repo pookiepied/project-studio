@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
-import { DURATION, EASE_OUT } from '@/design/tokens'
 
 /**
  * The labelled button.
@@ -30,6 +29,18 @@ import { DURATION, EASE_OUT } from '@/design/tokens'
  * settings page daring you to click it. Filled red belongs on the confirmation
  * step, where the choice has already been narrowed to yes or no.
  *
+ * ---- The shape ------------------------------------------------------------
+ *
+ * One pill at every size. The scale used to mix radii — `rounded-md` at sm,
+ * `rounded-lg` at md and lg, a pill only at xs — so stepping a button up or
+ * down read as changing controls rather than changing sizes, and the md/lg
+ * corner was the difference between these buttons and the polished pills the
+ * person held them against. A pill is also the honest shape for a press
+ * target: the corner radius and the height agree, so the eye reads one object
+ * instead of a rectangle with softened accidents. The horizontal padding is
+ * half the height at every step, which is what makes a pill read as a pill
+ * rather than as a lozenge with room to spare.
+ *
  * Icon-only controls are not this component — they are round, they are
  * tooltip-labelled, and they are `IconButton`.
  */
@@ -44,12 +55,20 @@ type Size = 'xs' | 'sm' | 'md' | 'lg'
  * four the same height to the pixel: a 1px border is 2px of box, and a row
  * mixing a bordered button with an unbordered one is 2px out of alignment for
  * a reason nobody ever finds.
+ *
+ * The states follow RULES §1 with one channel each. Hover raises the tint
+ * (`/90` on the filled ink is its tint — white showing through); press
+ * deepens the chip and settles the resting shadow, so the control sinks into
+ * the page exactly where it was aimed. Nothing scales, translates, or
+ * brightens under the pointer.
  */
 const VARIANT: Record<Variant, string> = {
   primary:
-    'border border-transparent bg-primary text-primary-foreground shadow-chip hover:bg-primary/90 active:bg-primary/80',
-  secondary: 'border bg-surface text-foreground shadow-chip hover:bg-tint active:bg-tint',
-  ghost: 'border border-transparent text-muted-foreground hover:bg-tint hover:text-foreground',
+    'border border-transparent bg-primary text-primary-foreground shadow-chip hover:bg-primary/90 active:bg-primary active:shadow-none',
+  secondary:
+    'border bg-surface text-foreground shadow-chip hover:bg-tint active:bg-selected active:shadow-none',
+  ghost:
+    'border border-transparent text-muted-foreground hover:bg-tint hover:text-foreground active:bg-selected',
   danger: 'border border-danger/35 text-danger hover:bg-danger/10 active:bg-danger/15',
 }
 
@@ -60,13 +79,15 @@ const VARIANT: Record<Variant, string> = {
  * `xs` is the card step: the compact pill a stopped-run card offers its
  * verdicts in. At the `sm` height a card carrying four of them spends more
  * pixels on its buttons than on the question they answer, which is the
- * specific complaint that put this step on the scale.
+ * specific complaint that put this step on the scale. Its padding stays a
+ * half-step under the height's half, because a card pill is allowed to be
+ * denser than a page pill.
  */
 const SIZE: Record<Size, string> = {
   xs: 'h-6 gap-1 rounded-full px-2.5 text-caption',
-  sm: 'h-7 gap-1.5 rounded-md px-2.5 text-caption',
-  md: 'h-8 gap-2 rounded-lg px-3 text-ui',
-  lg: 'h-10 gap-2 rounded-lg px-4 text-ui',
+  sm: 'h-7 gap-1.5 rounded-full px-3.5 text-caption',
+  md: 'h-8 gap-2 rounded-full px-4 text-ui',
+  lg: 'h-10 gap-2 rounded-full px-5 text-ui',
 }
 
 export function Button({
@@ -97,20 +118,18 @@ export function Button({
   const inert = disabled || busy
 
   return (
-    <motion.button
+    <button
       type={type}
       onClick={onClick}
       disabled={inert}
       aria-busy={busy || undefined}
-      // The press is a scale, not a translate. A control that moves down under
-      // the pointer moves *out from under it*, so a slip becomes a miss; a
-      // control that compresses stays exactly where it was aimed.
-      whileTap={inert ? undefined : { scale: 0.97 }}
-      transition={{ duration: DURATION.fast, ease: EASE_OUT }}
       className={cn(
         'relative inline-flex shrink-0 items-center justify-center',
         'font-medium leading-none whitespace-nowrap select-none',
-        'transition-colors duration-fast',
+        // Color and shadow together: the press deepens the chip and settles
+        // the resting shadow in the same 120ms, which is what makes it read
+        // as one gesture — the control sinking — rather than two effects.
+        'transition-[color,background-color,border-color,box-shadow] duration-fast',
         // Focus is a ring on the button, offset from it, and only for the
         // keyboard. Drawn inside the border it reads as a second border and
         // shifts the label; shown on click it is the halo everyone complains
@@ -137,7 +156,7 @@ export function Button({
           <Spinner />
         </span>
       ) : null}
-    </motion.button>
+    </button>
   )
 }
 
