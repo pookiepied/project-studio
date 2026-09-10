@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
+import { Dialog } from '@/components/primitives/Dialog/Dialog'
+import { ENTER } from '@/design/tokens'
 import { cn } from '@/lib/cn'
-import { DisclosureRow } from './DisclosureRow'
 
 /**
  * The reasoning trace.
@@ -16,6 +18,31 @@ import { DisclosureRow } from './DisclosureRow'
  * "Thought for 4s" is the one fact about the trace that is worth a glance
  * without opening it, and while the run is live the same number counts up, so
  * a long silence is legible as work rather than as a stall.
+ *
+ * ---- Where the trace lives now ---------------------------------------------
+ *
+ * It used to disclose inline: expanding hung the working-out in the reading
+ * column behind a rule, and a long run made that column unbounded — the reply
+ * reflowed around a wall of notes, the answer fell below the fold, and reading
+ * the trace meant scrolling inside the transcript to reach text nobody is
+ * here for. The trace now opens into the sheet instead: the house modal, a
+ * bounded surface with its own scroll, drawn over the conversation and closed
+ * without moving anything beneath it. The reply keeps its shape; the
+ * working-out gets a room of its own, which is also where a trace this long
+ * always wanted to be read — top to bottom in one place, not interleaved with
+ * the answer it was separate from.
+ *
+ * The row is therefore no longer a disclosure. A disclosure promises a region
+ * beneath the row, and there is none; promising one would rotate a chevron
+ * over an expansion that never comes. The row keeps the geometry every
+ * secondary row of a reply shares — the mark flush at the content boundary,
+ * the same paddings, see `DisclosureRow` — and the chevron rests pointing at
+ * the sheet it opens, which is the Apple reading of that mark: it navigates
+ * rather than expands. `aria-haspopup` names what the press produces.
+ *
+ * Opened while the run is still producing, the sheet follows the stream —
+ * pinned to the newest line until the reader scrolls up, following again when
+ * they return. A trace read after the fact opens at its first line instead.
  *
  * ---- This row exists only when the reasoning does ---------------------------
  *
@@ -45,10 +72,6 @@ import { DisclosureRow } from './DisclosureRow'
  * says only "Thought", because this window did not watch it and cannot report
  * its length.
  *
- * The row is a `DisclosureRow` — the shape every secondary row of a reply
- * shares — so the trace opens at the same content boundary the prose does,
- * and the geometry lives there rather than here.
- *
  * The mark is the thinking concept's own glyph, a lightbulb: an idea
  * arriving, which is what a reasoning run is. It is deliberately still. While
  * the run is live the label shimmers — a valley of lower opacity sweeping
@@ -73,7 +96,7 @@ export function ThinkingBlock({
   live: boolean
 }) {
   const trace = text.trim() === '' ? null : text
-  const [open, setOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   useTick(live && span.kind === 'measured')
   const seconds = spanSeconds(span, live)
 
@@ -91,20 +114,108 @@ export function ThinkingBlock({
   )
 
   return (
-    <DisclosureRow
+    // The row wrapper carries the house entrance itself: `DisclosureRow` used
+    // to own it, and the row it drew was this row — the entrance moves with
+    // the row, not with the surface the row opens.
+    <motion.div
       className="mb-2.5"
-      leading={<Icons.thinking />}
-      open={open}
-      onToggle={() => setOpen((value) => !value)}
-      disabled={trace === null}
-      chevron="hover"
-      entering={live}
-      label={shown}
+      initial={live ? ENTER.initial : false}
+      animate={ENTER.animate}
+      transition={ENTER.transition}
     >
-      <div className="studio-selectable text-caption whitespace-pre-wrap text-muted-foreground">
-        {trace}
+      <button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        disabled={trace === null}
+        {...(trace === null ? {} : { 'aria-haspopup': 'dialog' })}
+        className={cn(
+          // The geometry is DisclosureRow's row: first painted element flush at
+          // the content boundary, padding on the right only extending the press
+          // target. Two shapes of secondary row that disagree by four pixels
+          // read as an indent nobody chose.
+          'group/thinking inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-left',
+          'text-caption text-muted-foreground transition-colors duration-fast',
+          trace === null ? 'cursor-default' : 'hover:text-foreground',
+        )}
+      >
+        <Icons.thinking />
+        {shown}
+        {trace === null ? null : (
+          <Icons.disclosure
+            // `hover` affordance: the row's job at rest is to be read past, so
+            // the mark that promises a surface appears over the row and on
+            // keyboard focus. It never turns — nothing expands beneath it.
+            className="opacity-0 transition-opacity duration-fast group-hover/thinking:opacity-100 group-focus-visible/thinking:opacity-100"
+          />
+        )}
+      </button>
+
+      <TraceSheet open={sheetOpen} onClose={() => setSheetOpen(false)} trace={trace} live={live} />
+    </motion.div>
+  )
+}
+
+/**
+ * The trace's own surface, and the two scroll behaviours it owes.
+ *
+ * Opened at the end of a run it opens at the first line, like any document.
+ * Opened mid-run it opens at the newest line — the reader pressed it to watch
+ * the model work, and the bottom of the trace is where the work is — and it
+ * follows the stream until the reader scrolls away from the end. That last
+ * rule is the whole art of a following pane: text arriving must not drag a
+ * reader who has scrolled back to check an earlier step, and a reader who
+ * returns to the bottom gets the live view back. The threshold is a line's
+ * height, not zero, so a half-pixel rounding does not read as intent.
+ */
+function TraceSheet({
+  open,
+  onClose,
+  trace,
+  live,
+}: {
+  open: boolean
+  onClose: () => void
+  trace: string | null
+  live: boolean
+}) {
+  const scroller = useRef<HTMLDivElement>(null)
+  const pinned = useRef(false)
+
+  useEffect(() => {
+    if (!open) {
+      pinned.current = false
+      return
+    }
+    const el = scroller.current
+    if (live && el !== null) el.scrollTop = el.scrollHeight
+  }, [open, live])
+
+  useEffect(() => {
+    const el = scroller.current
+    if (!open || !pinned.current || el === null) return
+    el.scrollTop = el.scrollHeight
+  }, [trace, open])
+
+  if (trace === null) return null
+
+  return (
+    <Dialog open={open} onClose={onClose} title="Reasoning" width="30rem">
+      <div
+        ref={scroller}
+        onScroll={() => {
+          const el = scroller.current
+          if (el === null) return
+          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+        }}
+        className="max-h-[60vh] overflow-y-auto"
+      >
+        {/* The trace is prose-grade plain text at the caption register — the
+            same treatment the inline body wore, moved rather than redrawn. */}
+        <div className="studio-selectable text-caption whitespace-pre-wrap text-muted-foreground">
+          {trace}
+        </div>
       </div>
-    </DisclosureRow>
+    </Dialog>
   )
 }
 

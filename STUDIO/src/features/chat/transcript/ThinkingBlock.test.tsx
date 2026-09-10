@@ -142,22 +142,49 @@ describe('the clock while a run is live', () => {
   })
 })
 
-describe('the disclosure control', () => {
-  it('is not drawn at rest', () => {
+/**
+ * The row no longer expands anything in place — the trace opens into the
+ * sheet, the house modal, so this control is a launch, not a disclosure.
+ * What changed with that: the chevron never turns (nothing beneath the row
+ * expands for it to rotate over), the row names what a press produces with
+ * `aria-haspopup`, and the working-out itself renders nowhere in the
+ * transcript — it is portalled over the conversation and closed without
+ * moving anything beneath it.
+ */
+describe('the row and the sheet it opens', () => {
+  it('keeps its affordance hidden at rest, which is when it means nothing', () => {
     const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
     expect(disclosureClasses(container)).toContain('opacity-0')
   })
 
-  it('is drawn while the trace is open, which is when it means something', () => {
+  it('opens the reasoning sheet rather than expanding beneath the row', () => {
     const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
     fireEvent.click(screen.getByRole('button'))
 
-    expect(disclosureClasses(container)).toContain('opacity-100')
-    expect(screen.getByText('working it out')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Reasoning' }).textContent).toContain('working it out')
+    // The trace is portalled, so the transcript's own container never holds
+    // it: the reply keeps its shape while the working-out is read.
+    expect(container.textContent).not.toContain('working it out')
+  })
+
+  it('claims no collapsed region, because nothing expands in place', () => {
+    const { container } = render(
+      <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
+    )
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(container.querySelector('[aria-expanded]')).toBeNull()
+  })
+
+  it('names what the press produces', () => {
+    render(
+      <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
+    )
+    expect(screen.getByRole('button').getAttribute('aria-haspopup')).toBe('dialog')
   })
 })
 
@@ -185,6 +212,8 @@ describe('a run that has opened but delivered nothing', () => {
     // that no keystroke can open. This asserted `'false'` while the row was
     // still advertising itself as a closed disclosure.
     expect(row.getAttribute('aria-expanded')).toBeNull()
+    // Nor the sheet: there is no trace to show in one.
+    expect(row.getAttribute('aria-haspopup')).toBeNull()
   })
 
   it('says only that the model is thinking when there is no start to count from', () => {
