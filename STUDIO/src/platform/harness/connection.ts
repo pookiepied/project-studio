@@ -49,6 +49,21 @@
  * no network calls at all. Callers must treat `null` as the normal case, not
  * an error.
  *
+ * ---- A browser Studio itself served ----------------------------------------
+ *
+ * There is a third way a browser meets this bundle: Studio's own listener
+ * (ADR 0050) serves the built frontend to paired devices, from the same
+ * origin the page runs on. That page has no env vars and no supervisor — what
+ * it has is the listener, and the listener answers `GET /api/pairing/state`
+ * on its origin and nowhere else. A 200 from that route is identity, not
+ * data: only the listener serves the path, so an answer says this page was
+ * served by Studio. The address is then this page's own origin — an empty
+ * base URL, which `join` turns into the relative paths the conversation
+ * client already uses in a browser — and the credential is the same
+ * host-attached marker as inside Tauri, because the proxy in Rust replaces it
+ * with the per-launch bearer on the way through, exactly as `service_fetch`
+ * does.
+ *
  * Two things this module must never become. It must never write either value
  * anywhere — not the Tauri store, not localStorage — because a credential
  * that outlives the launch that minted it is a credential someone can steal
@@ -111,10 +126,43 @@ function harnessBaseUrl(value: string): string | null {
 }
 
 /**
+ * Asks this page's own origin whether the request carrying its cookies is
+ * paired with Studio.
+ *
+ * `true` or `false` when Studio's listener answered; `null` when nothing
+ * answered with the listener's one shape — a different host (`vite dev`, a
+ * static server) 404s the route or refuses the request, and `null` is how
+ * this module says "nobody here is Studio's listener". Only Studio's listener
+ * serves the path, so an answer is identity, not data; the pairing screen and
+ * the address resolution below both read the same route for that reason, and
+ * each at its own moment rather than through a shared cache that could drift
+ * from the truth by one pairing.
+ */
+export async function readPairingState(): Promise<boolean | null> {
+  let response: Response
+  try {
+    response = await fetch('/api/pairing/state')
+  } catch {
+    return null
+  }
+  if (!response.ok) return null
+
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    return null
+  }
+  if (typeof body !== 'object' || body === null) return null
+  const paired: unknown = (body as { paired?: unknown }).paired
+  return typeof paired === 'boolean' ? paired : null
+}
+
+/**
  * Resolves the harness address, or `null` when there is none.
  *
- * Async because the Tauri branch awaits a command; the browser branch is
- * along for the signature.
+ * Async because the Tauri branch awaits a command; the browser branches each
+ * await an answer of their own.
  */
 export async function resolveHarnessAddress(): Promise<HarnessAddress | null> {
   if (isTauri()) {
@@ -131,19 +179,30 @@ export async function resolveHarnessAddress(): Promise<HarnessAddress | null> {
     return baseUrl === null ? null : { baseUrl, credential: HOST_ATTACHED_CREDENTIAL }
   }
 
-  if (!import.meta.env.DEV) return null
+  // A harness started by hand is configuration, and stays a dev-only read:
+  // `import.meta.env` is inlined at build time, so the gate is what keeps the
+  // read dead code in every shipped bundle.
+  if (import.meta.env.DEV) {
+    const rawBaseUrl: unknown = import.meta.env.VITE_HARNESS_BASE_URL
+    const rawCredential: unknown = import.meta.env.VITE_HARNESS_TOKEN
 
-  const rawBaseUrl: unknown = import.meta.env.VITE_HARNESS_BASE_URL
-  const rawCredential: unknown = import.meta.env.VITE_HARNESS_TOKEN
+    const configuredBaseUrl = envValue(rawBaseUrl)
+    const credential = envValue(rawCredential)
+    if (configuredBaseUrl !== null && credential !== null) {
+      const baseUrl = harnessBaseUrl(configuredBaseUrl)
+      if (baseUrl !== null) return { baseUrl, credential }
+    }
+  }
 
-  const configuredBaseUrl = envValue(rawBaseUrl)
-  const credential = envValue(rawCredential)
-  if (configuredBaseUrl === null || credential === null) return null
+  // Then the listener-served case: the same route the pairing gate reads.
+  // Whether the answer says paired or not, the page came from Studio and the
+  // address is its own origin — while it is unpaired the app is behind the
+  // pairing gate and never mounts the provider stack that would use it.
+  if ((await readPairingState()) !== null) {
+    return { baseUrl: '', credential: HOST_ATTACHED_CREDENTIAL }
+  }
 
-  const baseUrl = harnessBaseUrl(configuredBaseUrl)
-  if (baseUrl === null) return null
-
-  return { baseUrl, credential }
+  return null
 }
 
 /**

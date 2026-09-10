@@ -33,6 +33,7 @@ use http_body_util::{BodyExt, Limited};
 use hyper::header::{HeaderMap, HeaderName, HeaderValue};
 use hyper::{Request, Response, StatusCode};
 use tokio::sync::mpsc;
+use tokio::sync::watch;
 
 use crate::harness::supervisor::redact;
 use crate::services::validate_path;
@@ -147,7 +148,16 @@ pub(crate) fn refusal(status: StatusCode, message: &str) -> Response<RemoteBody>
 /// Never returns an error: every failure becomes a response, because this is
 /// the outermost layer a device talks to and a device deserves a status and a
 /// sentence rather than a dropped connection.
-pub(crate) async fn forward<B>(upstream: &Upstream, request: Request<B>) -> Response<RemoteBody>
+///
+/// `revoked` is the device's revocation signal from the gate. The pump selects
+/// on it, so removing a device ends its connections — a stream mid-read
+/// included — instead of leaving a removed device's open request running
+/// until it happens to finish.
+pub(crate) async fn forward<B>(
+    upstream: &Upstream,
+    request: Request<B>,
+    revoked: watch::Receiver<bool>,
+) -> Response<RemoteBody>
 where
     B: hyper::body::Body<Data = bytes::Bytes> + Send + 'static,
     B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
@@ -246,7 +256,7 @@ where
     // `#[tokio::test]`, where the body then waits for chunks nothing is
     // sending. A hang is the worst way to learn that.
     tokio::spawn(async move {
-        pump(upstream_response, sender, token).await;
+        pump(upstream_response, sender, token, revoked).await;
     });
 
     let mut response = Response::new(RemoteBody::streaming(receiver));
@@ -282,16 +292,68 @@ fn forwarded_headers(upstream: &reqwest::header::HeaderMap) -> HeaderMap {
 ///
 /// A transport failure part-way is sent as an error rather than dropped: the
 /// body then ends in a way the client can see, instead of looking like a
-/// response that simply finished.
-async fn pump(mut upstream: reqwest::Response, sender: mpsc::Sender<super::body::Chunk>, token: String) {
+/// response that simply finished. Revocation stops the pump the same way —
+/// [`end_revoked`] — because a removed device's stream must read as a
+/// failure, not as a turn that completed.
+///
+/// The revocation signal is selected against both the waits this pump can
+/// sit in: waiting for the next chunk, and waiting for the device to take a
+/// chunk it has stopped reading. A device removed while it is mid-stream ends
+/// now, whichever of those it was doing.
+async fn pump(
+    mut upstream: reqwest::Response,
+    sender: mpsc::Sender<super::body::Chunk>,
+    token: String,
+    mut revoked: watch::Receiver<bool>,
+) {
+    // Removed between the gate's validation and this spawn: the response
+    // headers are already on their way, so the body is made to fail rather
+    // than to carry on.
+    if *revoked.borrow_and_update() {
+        end_revoked(&sender).await;
+        return;
+    }
     loop {
-        match upstream.chunk().await {
+        let chunk = tokio::select! {
+            // `biased` puts revocation first when both arms are ready: a
+            // removed device's next chunk is not delivered on a coin flip.
+            changed = revoked.changed() => {
+                if changed.is_err() {
+                    // Every sender is gone — the device store itself is being
+                    // torn down, which happens as the process ends.
+                    return;
+                }
+                // The channel is one-way (`devices.rs` sends only `true`),
+                // so an observed change is a revocation.
+                end_revoked(&sender).await;
+                return;
+            }
+            chunk = upstream.chunk() => chunk,
+        };
+        match chunk {
             Ok(Some(bytes)) => {
                 // A send failure means the device hung up. Stopping here also
                 // drops the upstream response, which closes the connection to
                 // the harness — so a reader that goes away does not leave a
                 // stream running behind it.
-                if sender.send(Ok(bytes)).await.is_err() {
+                let sent = tokio::select! {
+                    // The send is inside the select too, so a device that
+                    // stops reading cannot hold its upstream open past its
+                    // own removal either. A cancelled send drops that chunk;
+                    // the body is failing immediately after, so nothing
+                    // downstream ever counts on it.
+                    changed = revoked.changed() => {
+                        // One-way channel: an observed change is a
+                        // revocation; an error is the store being torn down
+                        // with the process.
+                        if changed.is_ok() {
+                            end_revoked(&sender).await;
+                        }
+                        return;
+                    }
+                    sent = sender.send(Ok(bytes)) => sent,
+                };
+                if sent.is_err() {
                     return;
                 }
             }
@@ -304,6 +366,17 @@ async fn pump(mut upstream: reqwest::Response, sender: mpsc::Sender<super::body:
             }
         }
     }
+}
+
+/// Ends a revoked device's body the way a transport failure ends it: with an
+/// error the reader can see. Returning without this would let the channel
+/// close quietly and hyper write a normal terminating chunk — the device
+/// would read its own removal as a turn that simply finished, and would have
+/// no reason to ask again and learn it is no longer paired.
+async fn end_revoked(sender: &mpsc::Sender<super::body::Chunk>) {
+    let _ = sender
+        .send(Err(std::io::Error::other("This device was removed from Studio.")))
+        .await;
 }
 
 /// Whether a path is one the harness owns rather than one the frontend does.
@@ -490,6 +563,14 @@ mod tests {
         builder.body(http_body_util::Empty::new()).unwrap()
     }
 
+    /// A revocation signal that never fires, for the tests whose device stays
+    /// paired. The sender half is kept alive by the test: a dropped sender
+    /// reads to the pump as the device store being torn down, which would end
+    /// every body immediately.
+    fn live_device() -> (watch::Sender<bool>, watch::Receiver<bool>) {
+        tokio::sync::watch::channel(false)
+    }
+
     #[tokio::test]
     async fn the_harness_bearer_is_attached_and_the_device_never_supplies_one() {
         let harness = stand_in(false).await;
@@ -497,11 +578,17 @@ mod tests {
             url: harness.url.clone(),
             token: "the-per-launch-bearer".to_owned(),
         };
+        let (_revoke, revoked) = live_device();
 
         // The device sends a credential of its own. It must not reach the
         // harness: this seam owns `Authorization`, and letting a device's
         // value through would send it in place of the bearer.
-        let response = forward(&upstream, get("/api/conversations", Some("Bearer i-made-this-up"))).await;
+        let response = forward(
+            &upstream,
+            get("/api/conversations", Some("Bearer i-made-this-up")),
+            revoked,
+        )
+        .await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
         let seen = harness.seen.lock().unwrap().clone();
@@ -522,11 +609,13 @@ mod tests {
             url: harness.url.clone(),
             token: "bearer".to_owned(),
         };
+        let (_revoke, revoked) = live_device();
 
         let started = std::time::Instant::now();
         let response = forward(
             &upstream,
             get("/agents/studio/cnv_1?offset=0&live=sse", None),
+            revoked,
         )
         .await;
         assert_eq!(response.status(), StatusCode::OK);
@@ -568,14 +657,52 @@ mod tests {
             url: "http://127.0.0.1:1".to_owned(),
             token: "bearer".to_owned(),
         };
+        let (_revoke, revoked) = live_device();
         for path in ["/api/shutdown", "/api/x/../shutdown", "/api/%73hutdown"] {
-            let response = forward(&upstream, get(path, None)).await;
+            let response = forward(&upstream, get(path, None), revoked.clone()).await;
             assert_eq!(
                 response.status(),
                 StatusCode::BAD_REQUEST,
                 "{path} should have been refused before it was sent anywhere"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn removing_the_device_ends_its_stream_as_a_failure_mid_read() {
+        use http_body_util::BodyExt;
+
+        let harness = stand_in(true).await;
+        let upstream = Upstream {
+            url: harness.url.clone(),
+            token: "bearer".to_owned(),
+        };
+        let (revoke, revoked) = live_device();
+
+        let response = forward(
+            &upstream,
+            get("/agents/studio/cnv_1?offset=0&live=sse", None),
+            revoked,
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let mut body = response.into_body();
+        assert_eq!(next_chunk(&mut body).await, bytes::Bytes::from("first"));
+
+        // The device is removed while it is mid-read — the stand-in's second
+        // chunk is still 150ms away, so revocation is what the pump sees.
+        let _ = revoke.send(true);
+
+        // The body ends as a failure, not as a stream that quietly finished:
+        // a removed device must learn that something happened, and its next
+        // request is where it finds out it is no longer paired.
+        let frame = tokio::time::timeout(CHUNK_DEADLINE, body.frame())
+            .await
+            .expect("the body never ended after revocation");
+        let error = frame
+            .expect("the body ended without reporting the removal")
+            .unwrap_err();
+        assert!(error.to_string().contains("removed from Studio"));
     }
 
     #[test]

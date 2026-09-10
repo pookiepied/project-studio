@@ -279,14 +279,26 @@ fn get_harness_status(
 ///
 /// Idempotent: asking twice while it runs returns the same address rather than
 /// binding a second port. The failure that actually happens is the port being
-/// taken, and it comes back as a sentence the settings screen can show.
+/// taken, and it comes back as a sentence the settings screen can show. The
+/// paired-device store and the pairing state are managed state shared with the
+/// commands below; `start` checks that the credential store is usable before
+/// anything is opened to the network, because pairing cannot work without it.
 #[tauri::command]
 async fn remote_access_start(
   app: AppHandle,
   supervisor: tauri::State<'_, HarnessSupervisor>,
   remote: tauri::State<'_, remote::RemoteAccess>,
+  devices: tauri::State<'_, std::sync::Arc<remote::Devices>>,
+  pairing: tauri::State<'_, std::sync::Arc<remote::PairingState>>,
 ) -> Result<String, String> {
-  let address = remote.start(app, (*supervisor).clone()).await?;
+  let address = remote
+    .start(
+      app,
+      (*supervisor).clone(),
+      (*devices).clone(),
+      (*pairing).clone(),
+    )
+    .await?;
   Ok(address.to_string())
 }
 
@@ -307,6 +319,63 @@ fn remote_access_status(
   remote: tauri::State<'_, remote::RemoteAccess>,
 ) -> Result<Option<String>, String> {
   Ok(remote.address().map(|address| address.to_string()))
+}
+
+/// The pairing code the settings screen shows.
+///
+/// Minting on view, when no code is active, is what keeps the screen honest:
+/// it always shows a code that works. Replacing a still-valid one costs
+/// nothing — codes are single-use and expire in minutes — and a person who
+/// asks again has lost the first one or waited past it. Refused while the
+/// feature is off: a code for a listener that is not running would send
+/// someone to a screen that can never accept it.
+#[tauri::command]
+fn remote_pairing_code(
+  remote: tauri::State<'_, remote::RemoteAccess>,
+  pairing: tauri::State<'_, std::sync::Arc<remote::PairingState>>,
+) -> Result<String, String> {
+  if remote.address().is_none() {
+    return Err("Remote access is off, so there is no pairing code.".to_owned());
+  }
+  let now = std::time::Instant::now();
+  Ok(pairing.active(now).unwrap_or_else(|| pairing.mint(now)))
+}
+
+/// Every paired device, for the settings screen's list.
+#[tauri::command]
+fn remote_devices(
+  devices: tauri::State<'_, std::sync::Arc<remote::Devices>>,
+) -> Result<Vec<remote::DeviceView>, String> {
+  Ok(devices.list())
+}
+
+/// Renames one device. The name is display text and nothing else.
+#[tauri::command]
+fn remote_device_rename(
+  devices: tauri::State<'_, std::sync::Arc<remote::Devices>>,
+  id: String,
+  name: String,
+) -> Result<(), String> {
+  devices.rename(&id, &name)
+}
+
+/// Removes one device. Its open connections end immediately and its next
+/// request is refused; the list is refreshed by the caller.
+#[tauri::command]
+fn remote_device_revoke(
+  devices: tauri::State<'_, std::sync::Arc<remote::Devices>>,
+  id: String,
+) -> Result<(), String> {
+  devices.revoke(&id).map(|_| ())
+}
+
+/// Removes every device at once.
+#[tauri::command]
+fn remote_device_revoke_all(
+  devices: tauri::State<'_, std::sync::Arc<remote::Devices>>,
+) -> Result<(), String> {
+  devices.revoke_all();
+  Ok(())
 }
 
 /// One seam for side systems: the webview names a service and a path, and
@@ -429,6 +498,15 @@ pub fn run() {
   tauri::Builder::default()
     .manage(supervisor)
     .manage(stream_registry)
+    // The paired-device store, loaded from the OS credential store once at
+    // launch and shared between the listener and the commands above it.
+    // `open` is tolerant of a store it cannot read: devices degrade to
+    // unpaired rather than failing the launch, and `remote_access_start`
+    // still checks `available()` before binding anything to the network.
+    .manage(std::sync::Arc::new(remote::Devices::open(Box::new(
+      remote::secret_store::KeyringStore::default(),
+    ))))
+    .manage(std::sync::Arc::new(remote::PairingState::default()))
     .manage(remote::RemoteAccess::default())
     // Remembers size and position across launches. A desktop app that reopens
     // at a fixed size every time is one the user has to re-arrange every time,
@@ -525,7 +603,12 @@ pub fn run() {
       service_stream_cancel,
       remote_access_start,
       remote_access_stop,
-      remote_access_status
+      remote_access_status,
+      remote_pairing_code,
+      remote_devices,
+      remote_device_rename,
+      remote_device_revoke,
+      remote_device_revoke_all
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")

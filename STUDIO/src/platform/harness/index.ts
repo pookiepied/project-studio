@@ -19,7 +19,12 @@ export {
   type ModelFilter,
 } from './client'
 
-export { resolveHarnessAddress, startHarness, harnessFailureReason } from './connection'
+export {
+  readPairingState,
+  resolveHarnessAddress,
+  startHarness,
+  harnessFailureReason,
+} from './connection'
 
 export { harnessTransport } from './transport'
 

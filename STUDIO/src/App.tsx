@@ -11,6 +11,7 @@ import {
 import { AppShell } from '@/shell/AppShell'
 import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { DetachedShell } from '@/shell/DetachedShell'
+import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
@@ -54,7 +55,9 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
     return (
       <MotionConfig reducedMotion="user">
         <AppearanceProvider initial={initialAppearance}>
-          <DiagnosticWindow />
+          <PairingGate>
+            <DiagnosticWindow />
+          </PairingGate>
         </AppearanceProvider>
       </MotionConfig>
     )
@@ -70,13 +73,19 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
     */
     <MotionConfig reducedMotion="user">
       <AppearanceProvider initial={initialAppearance}>
-        <WorkspaceProvider>
-        <RailProvider>
-          <NavigationProvider>
-            {detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
-          </NavigationProvider>
-        </RailProvider>
-      </WorkspaceProvider>
+        {/* The pairing gate wraps every window a browser can render, above
+            the provider stack: an unpaired device gets the pairing screen and
+            none of the stores, and inside Tauri it is a pass-through that
+            never asks. See `PairingGate`. */}
+        <PairingGate>
+          <WorkspaceProvider>
+          <RailProvider>
+            <NavigationProvider>
+              {detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
+            </NavigationProvider>
+          </RailProvider>
+        </WorkspaceProvider>
+        </PairingGate>
       </AppearanceProvider>
     </MotionConfig>
   )

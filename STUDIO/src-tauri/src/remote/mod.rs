@@ -28,22 +28,35 @@
 //! only while Studio is running on the PC. The feature exists to check on work
 //! you left running there, so that is the correct behaviour.
 //!
-//! ---- What this step does and does not do -------------------------------
+//! ---- The bind and its guard arrive together ----------------------------
 //!
-//! This is step 1 of the plan. The listener binds **loopback only**. There is
-//! no pairing yet, and until there is, binding to the network would put an
-//! unauthenticated Studio on the home network — so the address it binds is not
-//! configurable to anything else. The network bind arrives in the same change
-//! as the pairing that guards it, deliberately, so that neither can be shipped
-//! without the other.
+//! The listener binds the machine's interfaces, not loopback: that is the
+//! point of the feature. It may do so only because every path that reaches
+//! the harness now carries the pairing gate (`gate.rs`), and the bind and the
+//! gate are deliberately in the same change — there is no build in which the
+//! machine is reachable without a paired device being the only way in. An
+//! unpaired device gets the frontend shell, whose pairing screen is part of
+//! the shell, and nothing else: every harness path refuses it.
+//!
+//! Two consequences are stated rather than left implied. First, the credential
+//! store must be usable: pairing cannot work without it, so `start` refuses
+//! to serve on a machine where it cannot, rather than binding a listener that
+//! is either useless or tempting to weaken. Second, revocation is immediate:
+//! removing a device fires a signal that ends its open connections — a stream
+//! mid-read included — so the next thing that device does is fail, not the
+//! next thing after that.
 
 mod assets;
 mod body;
+mod devices;
+mod gate;
+mod pairing;
 mod proxy;
+pub(crate) mod secret_store;
 
 use std::convert::Infallible;
-use std::net::{Ipv4Addr, SocketAddr};
-use std::sync::Mutex;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::{Arc, Mutex};
 
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -55,7 +68,10 @@ use tokio::sync::watch;
 
 use crate::harness::supervisor::HarnessSupervisor;
 
-use body::RemoteBody;
+pub(crate) use body::RemoteBody;
+pub(crate) use devices::{DeviceView, Devices};
+pub(crate) use pairing::PairingState;
+
 use proxy::Upstream;
 
 /// The port the listener prefers.
@@ -116,22 +132,51 @@ impl RemoteAccess {
     ///
     /// The bind happens before anything is recorded, so a failure — the port
     /// taken, above all — leaves the state exactly as it was and can be shown
-    /// to the person as the sentence it is.
+    /// to the person as the sentence it is. Before the bind, two guards run:
+    /// the credential store must be usable (pairing cannot work without it),
+    /// and the first pairing code is minted, so the screen that follows the
+    /// switch has something to show.
     pub async fn start<R: Runtime>(
         &self,
         app: AppHandle<R>,
         supervisor: HarnessSupervisor,
+        devices: Arc<Devices>,
+        pairing: Arc<PairingState>,
     ) -> Result<SocketAddr, String> {
         if let Some(address) = self.address() {
             return Ok(address);
         }
 
+        if !devices.available() {
+            return Err(
+                "Studio cannot reach this machine's credential store, so it cannot pair other \
+                 devices; nothing has been opened to them."
+                    .to_owned(),
+            );
+        }
+
+        // The code the settings screen shows (ADR 0050 §3.4): switching the
+        // feature on makes Studio show a pairing code.
+        pairing.mint(std::time::Instant::now());
+
         let port = configured_port();
-        // Loopback, deliberately and not configurably. See the module note.
-        let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-        let listener = TcpListener::bind(address).await.map_err(|error| {
-            format!("Studio could not open port {port} for other devices: {error}")
-        })?;
+        // Network-facing, deliberately, and only in the same change that
+        // carries the gate. See the module note.
+        let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
+        let listener = match TcpListener::bind(address).await {
+            Ok(listener) => listener,
+            Err(error) => {
+                // The port being taken and a second starter are the same
+                // symptom: a starter that lost a race to an existing listener
+                // is answered with that listener, not an error.
+                if let Some(address) = self.address() {
+                    return Ok(address);
+                }
+                return Err(format!(
+                    "Studio could not open port {port} for other devices: {error}"
+                ));
+            }
+        };
         let address = listener.local_addr().unwrap_or(address);
 
         let (stop, mut stopped) = watch::channel(false);
@@ -149,13 +194,21 @@ impl RemoteAccess {
             *running = Some(Running { address, stop });
         }
 
+        // The frontend assets. The closure exists so that the routing below
+        // is testable without an app handle: the tests hand a stub in the
+        // same place, and the gate's ordering is what the tests pin.
+        let assets = {
+            let app = app.clone();
+            move |path: &str| assets::serve(&app, path)
+        };
+
         tauri::async_runtime::spawn(async move {
             loop {
                 let accepted = tokio::select! {
                     _ = stopped.changed() => break,
                     accepted = listener.accept() => accepted,
                 };
-                let Ok((stream, _peer)) = accepted else {
+                let Ok((stream, peer)) = accepted else {
                     // One failed accept is not a reason to stop serving; the
                     // listener is still bound and the next one may be fine.
                     continue;
@@ -168,12 +221,33 @@ impl RemoteAccess {
                 // phone". A failure to set it is not worth refusing the
                 // connection over.
                 let _ = stream.set_nodelay(true);
-                let app = app.clone();
                 let supervisor = supervisor.clone();
+                let devices = devices.clone();
+                let pairing = pairing.clone();
+                let assets = assets.clone();
+                let peer = peer.ip();
                 tauri::async_runtime::spawn(async move {
                     let io = TokioIo::new(stream);
+                    // The clones happen per request, and the async block owns
+                    // them: a future that borrowed from this closure would
+                    // not satisfy hyper's `Service` (the same shape the
+                    // listener first shipped with).
                     let service = service_fn(move |request| {
-                        handle(app.clone(), supervisor.clone(), request)
+                        let assets = assets.clone();
+                        let supervisor = supervisor.clone();
+                        let devices = devices.clone();
+                        let pairing = pairing.clone();
+                        async move {
+                            handle(
+                                &assets,
+                                &supervisor,
+                                &devices,
+                                &pairing,
+                                peer,
+                                request,
+                            )
+                            .await
+                        }
                     });
                     if let Err(error) = http1::Builder::new().serve_connection(io, service).await
                     {
@@ -184,7 +258,7 @@ impl RemoteAccess {
             log::info!("Remote access: stopped serving {address}");
         });
 
-        log::info!("Remote access: serving {address}");
+        log::info!("Remote access: serving {address} (devices gate on)");
         Ok(address)
     }
 
@@ -212,15 +286,45 @@ fn configured_port() -> u16 {
         .unwrap_or(DEFAULT_PORT)
 }
 
-/// One request from a device: either the harness's, or the frontend's.
-async fn handle<R: Runtime>(
-    app: AppHandle<R>,
-    supervisor: HarnessSupervisor,
-    request: Request<hyper::body::Incoming>,
-) -> Result<Response<RemoteBody>, Infallible> {
+/// One request from a device.
+///
+/// The routing order is the security property, and it is stated once, here,
+/// where the order is decided: the pairing routes are served before the gate
+/// (they are how a device becomes paired at all), the harness paths are gated
+/// before they are forwarded, and everything else is the public shell.
+///
+/// Generic over the request body for the same reason `proxy::forward` and
+/// `gate::serve_pairing` are: hyper's `Incoming` has no public constructor, so
+/// a test that needed one could not be written at all.
+async fn handle<A, B>(
+    assets: &A,
+    supervisor: &HarnessSupervisor,
+    devices: &Devices,
+    pairing: &PairingState,
+    peer: IpAddr,
+    request: Request<B>,
+) -> Result<Response<RemoteBody>, Infallible>
+where
+    A: Fn(&str) -> Response<RemoteBody>,
+    B: hyper::body::Body<Data = bytes::Bytes> + Send + 'static,
+    B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
     let path = request.uri().path().to_owned();
 
+    // The pairing routes, served here rather than forwarded: they are how a
+    // browser becomes paired at all, so they are reachable without a cookie,
+    // and they are the only harness-prefixed paths that are.
+    if let Some(route) = gate::pairing_route(&path, request.method()) {
+        let response = gate::serve_pairing(devices, pairing, route, peer, request).await;
+        return Ok(response);
+    }
+
     if proxy::is_harness_path(&path) {
+        // The gate: a request without a current device cookie goes no further.
+        let revoked = match gate::authorize_request(request.headers(), devices) {
+            Ok(revoked) => revoked,
+            Err(refused) => return Ok(refused),
+        };
         let Some(endpoint) = supervisor.get_endpoint() else {
             return Ok(proxy::refusal(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -231,37 +335,229 @@ async fn handle<R: Runtime>(
             url: endpoint.url.clone(),
             token: endpoint.token.clone(),
         };
-        return Ok(proxy::forward(&upstream, request).await);
+        return Ok(proxy::forward(&upstream, request, revoked).await);
     }
 
-    Ok(assets::serve(&app, &path))
+    Ok(assets(&path))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::remote::secret_store::MemorySecretStore;
+    use bytes::Bytes;
 
-    /// The variable is process-wide, so the two cases that read it share one
-    /// test rather than racing each other from separate ones.
+    /// Serves the harness nothing, so every forwarded request answers 503;
+    /// the tests below read the gate's behaviour off the refusal they get.
+    fn fresh_supervisor() -> HarnessSupervisor {
+        HarnessSupervisor::new()
+    }
+
+    /// A stand-in for the frontend: every path is "an asset".
+    fn asset(path: &str) -> Response<RemoteBody> {
+        let mut response = Response::new(RemoteBody::full(format!("asset:{path}")));
+        *response.status_mut() = StatusCode::OK;
+        response
+    }
+
+    fn devices() -> Devices {
+        Devices::open(MemorySecretStore::new().handle())
+    }
+
+    /// Reads a response body to the end. Bounded: a bug that never finishes
+    /// fails the test instead of hanging it.
+    async fn body_text(response: Response<RemoteBody>) -> String {
+        let bytes = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            http_body_util::BodyExt::collect(response.into_body()),
+        )
+        .await
+        .expect("the body never finished")
+        .expect("the body failed")
+        .to_bytes();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    /// The routing through `handle` itself, since the order — pairing before
+    /// the gate, the gate before the harness — is the security property.
+    async fn route(
+        supervisor: &HarnessSupervisor,
+        devices: &Devices,
+        pairing: &PairingState,
+        request: Request<http_body_util::Full<Bytes>>,
+    ) -> Response<RemoteBody> {
+        let peer: IpAddr = "192.168.1.50".parse().unwrap();
+        handle(&asset, supervisor, devices, pairing, peer, request)
+            .await
+            .unwrap_or_else(|infallible| match infallible {})
+    }
+
+    #[tokio::test]
+    async fn an_unpaired_device_is_refused_before_the_harness_is_even_consulted() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+
+        // The harness is not running at all: an unpaired request must be
+        // refused by the gate (401), never answered by the harness-down
+        // response (503). The gate comes first, or an attacker would learn
+        // the machine's state without a credential.
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/api/conversations")
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn a_paired_device_reaches_the_harness_path() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+        let paired = devices.pair("Phone", 0).unwrap();
+
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/api/conversations")
+                .header(hyper::header::COOKIE, format!("studio_device={}", paired.cookie))
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        // The gate let it through; the harness being absent is the next
+        // answer, and a different one.
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn the_pairing_routes_are_reachable_without_a_cookie() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/api/pairing/state")
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(body_text(response).await, r#"{"paired":false}"#);
+    }
+
+    #[tokio::test]
+    async fn pairing_through_the_listener_then_reaching_the_harness() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+        let code = pairing_state.mint(std::time::Instant::now());
+
+        // Pair, exactly as a phone would.
+        let body = serde_json::json!({ "code": code }).to_string();
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .method("POST")
+                .uri("/api/pairing")
+                .body(http_body_util::Full::new(Bytes::from(body)))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let cookie = response
+            .headers()
+            .get(hyper::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_owned();
+
+        // The very same credential reaches the harness path.
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/api/conversations")
+                .header(hyper::header::COOKIE, cookie)
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn a_frontend_asset_is_public_but_the_gate_is_not() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+
+        // The shell is public: the pairing screen is part of it.
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/")
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // And the harness path right next to it is not.
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/agents/studio/cnv_1")
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// The variable is process-wide, so every case that reads it shares one
+    /// test rather than racing each other from separate ones. No other test
+    /// in the crate touches this name.
     #[test]
     fn the_port_is_the_default_unless_a_usable_override_says_otherwise() {
-        // SAFETY: single-threaded within this test, and the variable is
-        // removed again before it returns.
-        unsafe { std::env::remove_var(PORT_VARIABLE) };
+        std::env::remove_var(PORT_VARIABLE);
         assert_eq!(configured_port(), DEFAULT_PORT);
 
-        unsafe { std::env::set_var(PORT_VARIABLE, "9123") };
+        std::env::set_var(PORT_VARIABLE, "9123");
         assert_eq!(configured_port(), 9123);
 
         // Port 0 means "any free port" to the OS, which would produce an
         // address nobody could have been told in advance.
-        unsafe { std::env::set_var(PORT_VARIABLE, "0") };
+        std::env::set_var(PORT_VARIABLE, "0");
         assert_eq!(configured_port(), DEFAULT_PORT);
 
-        unsafe { std::env::set_var(PORT_VARIABLE, "not a port") };
+        std::env::set_var(PORT_VARIABLE, "not a port");
         assert_eq!(configured_port(), DEFAULT_PORT);
 
-        unsafe { std::env::remove_var(PORT_VARIABLE) };
+        std::env::remove_var(PORT_VARIABLE);
     }
 
     #[test]

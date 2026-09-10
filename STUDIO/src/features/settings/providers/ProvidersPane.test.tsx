@@ -41,6 +41,11 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 /** The harness answering the way its route module says it does. */
 function defaultRoute(url: string, method: string): Response {
+  // The pairing state route is not a harness route: with no harness configured
+  // the resolver still asks whether this page was served by Studio's listener,
+  // and this stub is not the listener. 404 is what a host that is not Studio
+  // answers, and it keeps the resolver on the no-harness path.
+  if (url.includes('/api/pairing/state')) return new Response(null, { status: 404 })
   if (url.includes('/library')) return jsonResponse([])
   if (url.includes('/defaults')) return jsonResponse({})
   if (url.includes('/models')) return jsonResponse([modelFor(KNOWN_VENDOR.id, 'claude-opus-5')])
@@ -155,7 +160,13 @@ describe('with no harness', () => {
     render(<ProvidersPane />)
 
     await screen.findByText(/No harness is connected/)
-    expect(calls).toHaveLength(0)
+
+    // The pairing state route is the one exception, and it is identity, not a
+    // harness call: the resolver asks whether this page was served by Studio's
+    // listener before it concludes there is no harness. Everything a harness
+    // would have been asked must still be absent.
+    const harness = calls.filter((call) => call.url !== '/api/pairing/state')
+    expect(harness).toHaveLength(0)
   })
 })
 

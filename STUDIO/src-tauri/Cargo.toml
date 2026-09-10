@@ -94,6 +94,25 @@ hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
 http-body-util = "0.1"
 bytes = "1"
 
+# Paired-device credentials for the same listener (`remote/devices.rs`): the
+# secret that each paired browser presents as its cookie never touches disk in
+# plain text -- it goes to the OS credential store, the same place the
+# harness's own keyring store (`STUDIO HARNESS/src/credentials/keyring-store.ts`)
+# puts the session and provider keys, under the same service name. The Rust
+# crate is a separate implementation of the same facility, because the
+# listener lives here and the Node one cannot be reached from it.
+#
+# Only the platform backends Studio actually ships are enabled; the Linux
+# Secret Service backend is left out deliberately (it would drag in D-Bus for
+# a target this app does not build for), and on such a target pairing will
+# fail loudly rather than silently degrade to a file.
+keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native"] }
+
+# The pairing cookie's secret is stored only as its SHA-256, so a copy of the
+# credential store does not admit anything. Already compiled into the tree
+# transitively; this declares it for direct use.
+sha2 = "0.10"
+
 # POSIX-only, and previously declared as if they were not -- which is why the
 # Host crate had never compiled on Windows (meta-task #87). `command-fds` maps
 # descriptors with `dup2` inside a `pre_exec` hook and fails inside its own

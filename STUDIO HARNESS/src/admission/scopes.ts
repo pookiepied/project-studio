@@ -69,6 +69,15 @@ export const DEFAULT_SCOPES_BY_CLIENT_TYPE: Readonly<
   // The harness's own suites speak the full operational surface and get it
   // without per-test ceremony.
   test: OPERATIONAL_ADMISSION_SCOPES,
+  // A paired browser on another device (ADR 0050 §3.5): the same person, the
+  // same work, from a phone or a laptop, so the same operational surface as
+  // standalone. The boundary is which devices are paired, not what a paired
+  // device may do. No session of this type is minted yet — the desktop's
+  // listener forwards remote requests under the host's credential — but the
+  // entry is here now so that a future view-only or approve-only device plugs
+  // into this table instead of redesigning it, and so a session minted as
+  // `remote` cannot exist without someone having chosen its scopes.
+  remote: OPERATIONAL_ADMISSION_SCOPES,
 });
 
 export function hasAdmissionScope(

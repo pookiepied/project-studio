@@ -108,7 +108,12 @@ export const DEFAULT_TIMEOUT_MS = 12_000
 
 /** Where the harness is and what proves we may talk to it. */
 export interface HarnessAddress {
-  /** Origin, optionally with a path prefix. A trailing slash is tolerated. */
+  /**
+   * Origin, optionally with a path prefix. A trailing slash is tolerated. The
+   * empty string means this page's own origin — the listener-served browser
+   * (ADR 0050), whose every request is relative and gated by its device
+   * cookie before it is forwarded.
+   */
   readonly baseUrl: string
   /**
    * The bearer credential minted by whoever launched the harness. Held for

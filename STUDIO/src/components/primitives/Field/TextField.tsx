@@ -66,6 +66,12 @@ export const TextField = forwardRef<
      * is for — it is submitted once and forgotten, never read back.
      */
     autoComplete?: string
+    /**
+     * The mobile keyboard's capitalisation hint, forwarded verbatim. The one
+     * user is the pairing code, which a phone should stop lower-casing before
+     * the person has noticed they are typing it wrong.
+     */
+    autoCapitalize?: 'off' | 'characters'
     ariaLabel?: string
     onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void
     className?: string
@@ -78,6 +84,7 @@ export const TextField = forwardRef<
     autoFocus,
     type = 'text',
     autoComplete = 'off',
+    autoCapitalize,
     ariaLabel,
     onKeyDown,
     className,
@@ -90,6 +97,7 @@ export const TextField = forwardRef<
       value={value}
       type={type}
       autoComplete={autoComplete}
+      autoCapitalize={autoCapitalize}
       aria-label={ariaLabel}
       autoFocus={autoFocus}
       placeholder={placeholder}

@@ -119,6 +119,13 @@ describe("default scopes by client type", () => {
     expect(
       createAdmissionSession({ clientType: "test" }).context.scopes,
     ).toEqual(operational);
+    // A paired browser on another device is the same person doing the same
+    // work (ADR 0050 §3.5), so the same operational surface. If that ever
+    // narrows — a view-only or approve-only device — this is the test that
+    // says so out loud rather than a silent change of posture.
+    expect(
+      createAdmissionSession({ clientType: "remote" }).context.scopes,
+    ).toEqual(operational);
   });
 
   it("declares a scope set for every client type, not just the ones used today", () => {

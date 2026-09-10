@@ -5,6 +5,7 @@ export const CLIENT_TYPES = [
   "studio-host",
   "standalone",
   "test",
+  "remote",
 ] as const;
 
 export type ClientType = (typeof CLIENT_TYPES)[number];
