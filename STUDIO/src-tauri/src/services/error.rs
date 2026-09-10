@@ -59,6 +59,29 @@ pub enum ServiceError {
     StreamBroken { message: String },
 }
 
+impl ServiceError {
+    /// The sentence inside the failure, whatever shape it took.
+    ///
+    /// Every variant either carries a message or is the one variant that
+    /// needs none, so this is a total function rather than an `Option` the
+    /// caller has to invent words for. It exists because the remote listener
+    /// answers a device with a status and a sentence, and the sentence it
+    /// wants is the one already written here - a second vocabulary for the
+    /// same refusals is how two surfaces start explaining the same thing
+    /// differently.
+    pub(crate) fn message(&self) -> String {
+        match self {
+            Self::NotRunning => "Studio's harness is not running.".to_owned(),
+            Self::InvalidPath { message }
+            | Self::InvalidRequest { message }
+            | Self::Request { message }
+            | Self::StreamBroken { message }
+            | Self::StreamRefused { message, .. }
+            | Self::Refused { message, .. } => message.clone(),
+        }
+    }
+}
+
 /// The one shape a transport failure takes, so the bearer can be scrubbed in
 /// exactly one place.
 ///

@@ -74,7 +74,25 @@ os_pipe = "1.2"
 # and the tests drive both commands (`#[tokio::test]`). Tauri already
 # compiles tokio with rt/sync; `time` and `macros` add no crate the tests
 # did not already pull in, and none of them link anything new.
-tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time", "net", "io-util"] }
+
+# The listener behind "Open on other devices" (`remote/`). Built straight on
+# hyper rather than on a routing framework, because the routing this needs is
+# one prefix test: `/api` and `/agents` are forwarded to the harness, and
+# everything else is the frontend Tauri already embedded in the binary. All
+# four of these were compiled into the tree already as reqwest's and Tauri's
+# own dependencies, so the server costs no new crate -- which is the same
+# reason `reqwest` is here with its defaults off. An HTTP router would have
+# been one more thing to keep current in exchange for a `match` on a string.
+#
+# `server` and `http1` only: the listener speaks plain HTTP to devices on the
+# home network or through Tailscale, and a scheme it cannot speak is one more
+# place it cannot be steered into. HTTP/2 buys nothing here and TLS is
+# Tailscale's job (ADR 0050 3.7).
+hyper = { version = "1", default-features = false, features = ["server", "http1"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
 
 # POSIX-only, and previously declared as if they were not -- which is why the
 # Host crate had never compiled on Windows (meta-task #87). `command-fds` maps

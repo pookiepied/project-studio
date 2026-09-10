@@ -1,4 +1,5 @@
 mod harness;
+mod remote;
 mod services;
 mod tray;
 mod window;
@@ -274,6 +275,40 @@ fn get_harness_status(
   Ok(supervisor.status())
 }
 
+/// Switches "Open on other devices" on, and answers with the address serving.
+///
+/// Idempotent: asking twice while it runs returns the same address rather than
+/// binding a second port. The failure that actually happens is the port being
+/// taken, and it comes back as a sentence the settings screen can show.
+#[tauri::command]
+async fn remote_access_start(
+  app: AppHandle,
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+  remote: tauri::State<'_, remote::RemoteAccess>,
+) -> Result<String, String> {
+  let address = remote.start(app, (*supervisor).clone()).await?;
+  Ok(address.to_string())
+}
+
+/// Switches it off, closing the port and dropping every connection.
+#[tauri::command]
+fn remote_access_stop(remote: tauri::State<'_, remote::RemoteAccess>) -> Result<(), String> {
+  remote.stop();
+  Ok(())
+}
+
+/// The address being served, or `null` when the listener is off.
+///
+/// The state has to be visible rather than merely remembered: a person who
+/// cannot see that their machine is reachable has no way to decide whether
+/// they still want it to be.
+#[tauri::command]
+fn remote_access_status(
+  remote: tauri::State<'_, remote::RemoteAccess>,
+) -> Result<Option<String>, String> {
+  Ok(remote.address().map(|address| address.to_string()))
+}
+
 /// One seam for side systems: the webview names a service and a path, and
 /// Rust decides everything else — above all the credential, which the
 /// supervisor holds and this attaches. See `services.rs` for why that is an
@@ -394,6 +429,7 @@ pub fn run() {
   tauri::Builder::default()
     .manage(supervisor)
     .manage(stream_registry)
+    .manage(remote::RemoteAccess::default())
     // Remembers size and position across launches. A desktop app that reopens
     // at a fixed size every time is one the user has to re-arrange every time,
     // and on a second monitor that is the difference between usable and not.
@@ -463,6 +499,13 @@ pub fn run() {
         }
       }
       if matches!(event, WindowEvent::Destroyed) && window.label() == "main" {
+        // The listener goes with the app. It serves the harness and the
+        // harness is about to stop, so leaving the port open would answer
+        // devices with nothing but "not running" - and would keep a port
+        // bound after the process the person closed appears to be gone.
+        if let Some(remote) = window.try_state::<remote::RemoteAccess>() {
+          remote.stop();
+        }
         if let Some(sup) = window.try_state::<HarnessSupervisor>() {
           sup.shutdown_all();
         }
@@ -479,12 +522,18 @@ pub fn run() {
       service_fetch,
       service_fetch_bytes,
       service_stream,
-      service_stream_cancel
+      service_stream_cancel,
+      remote_access_start,
+      remote_access_stop,
+      remote_access_status
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
     .run(move |app_handle, event| {
       if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
+        if let Some(remote) = app_handle.try_state::<remote::RemoteAccess>() {
+          remote.stop();
+        }
         if let Some(sup) = app_handle.try_state::<HarnessSupervisor>() {
           sup.shutdown_all();
         }
