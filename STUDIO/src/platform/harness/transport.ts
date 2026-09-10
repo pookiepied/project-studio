@@ -105,9 +105,10 @@ function toError(value: unknown): Error {
 /**
  * Strips the origin the client added, leaving the path Rust re-addresses.
  *
- * The client builds `baseUrl + path` because its seam is `fetch`, which takes
- * a URL; this takes the path back out because the other side of the seam
- * refuses URLs on purpose. The origin here is advisory only — if the harness
+ * The workspace client builds `baseUrl + path` because its seam is `fetch`,
+ * which takes a URL; this takes the path back out because the other side of
+ * the seam refuses URLs on purpose. The conversation client sends the path
+ * alone, and that is passed through as it is. The origin here is advisory only — if the harness
  * restarted since the address was resolved, Rust sends this path to the new
  * endpoint with the new credential, which is the correct request.
  *
@@ -118,6 +119,12 @@ function toError(value: unknown): Error {
  */
 function servicePath(input: RequestInfo | URL): string {
   if (typeof input === 'string') {
+    // A bare path is already what Rust wants. The conversation client sends
+    // exactly these - `/agents/studio/<id>` with no origin, because it has
+    // no origin to add - and `new URL` on one throws `Invalid URL`, which
+    // read at the composer as "the harness stopped answering while the
+    // message was being sent" for a harness that was never asked.
+    if (input.startsWith('/')) return input
     const url = new URL(input)
     return `${url.pathname}${url.search}`
   }

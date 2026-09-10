@@ -537,6 +537,120 @@ mod tests {
         StandInHarness { url, seen }
     }
 
+    /// A stand-in that reads a whole request, body included, and answers
+    /// with what it saw: the body's length in the response body, and its
+    /// headers recorded like `stand_in`'s.
+    ///
+    /// Every message a device sends is a POST with a JSON body, and nothing
+    /// above exercised that path: the two stand-ins read up to the header
+    /// end and stop. A body that never reached the harness, or reached it
+    /// re-framed wrongly, would have been invisible to this file.
+    async fn stand_in_reading_bodies() -> StandInHarness {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 1024];
+            let header_end = loop {
+                let read = socket.read(&mut buffer).await.unwrap();
+                request.extend_from_slice(&buffer[..read]);
+                if let Some(at) = request.windows(4).position(|window| window == HEADER_END) {
+                    break at + 4;
+                }
+                if read == 0 {
+                    break request.len();
+                }
+            };
+            let head = String::from_utf8_lossy(&request[..header_end]).into_owned();
+            let mut headers = Vec::new();
+            let mut length = 0_usize;
+            for line in head.lines().skip(1) {
+                if line.is_empty() {
+                    break;
+                }
+                if let Some((name, value)) = line.split_once(':') {
+                    let name = name.trim().to_lowercase();
+                    let value = value.trim().to_owned();
+                    if name == "content-length" {
+                        length = value.parse().unwrap_or(0);
+                    }
+                    headers.push((name, value));
+                }
+            }
+            while request.len() < header_end + length {
+                let read = socket.read(&mut buffer).await.unwrap();
+                if read == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buffer[..read]);
+            }
+            let body = String::from_utf8_lossy(&request[header_end..]).into_owned();
+            headers.push(("<body>".to_owned(), body));
+            *recorded.lock().unwrap() = headers;
+
+            let answer = format!("{{\"received\":{length}}}");
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: {}
+
+{answer}",
+                        answer.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            let _ = socket.flush().await;
+        });
+
+        StandInHarness { url, seen }
+    }
+
+    #[tokio::test]
+    async fn a_message_body_reaches_the_harness_whole_with_its_content_type() {
+        use http_body_util::BodyExt;
+
+        let harness = stand_in_reading_bodies().await;
+        let upstream = Upstream {
+            url: harness.url.clone(),
+            token: "bearer".to_owned(),
+        };
+        let (_revoke, revoked) = live_device();
+
+        let json = r#"{"kind":"user","body":"hello from a phone","reasoningLevel":null}"#;
+        let request = Request::builder()
+            .method("POST")
+            .uri("/agents/studio/cnv_1")
+            .header(hyper::header::ACCEPT, "application/json")
+            .header(hyper::header::CONTENT_TYPE, "application/json")
+            .body(http_body_util::Full::new(bytes::Bytes::from(json)))
+            .unwrap();
+
+        let response = forward(&upstream, request, revoked).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let answered = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(answered, bytes::Bytes::from(format!("{{\"received\":{}}}", json.len())));
+
+        let seen = harness.seen.lock().unwrap().clone();
+        let find = |name: &str| {
+            seen.iter()
+                .find(|(seen_name, _)| seen_name == name)
+                .map(|(_, value)| value.clone())
+        };
+        assert_eq!(find("content-type").as_deref(), Some("application/json"));
+        assert_eq!(find("content-length").as_deref(), Some(json.len().to_string().as_str()));
+        assert_eq!(find("<body>").as_deref(), Some(json));
+    }
+
     /// How long a chunk may take before the test calls it a hang.
     ///
     /// Comfortably longer than the stand-in's own 150ms pause and far shorter

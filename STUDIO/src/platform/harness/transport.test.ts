@@ -122,6 +122,31 @@ describe('inside Tauri', () => {
     expect(payload.init.body).toBeUndefined()
   })
 
+  it('takes a bare path as it is, which is what the conversation client sends', async () => {
+    enterTauri()
+    invoke.mockResolvedValueOnce({
+      status: 202,
+      headers: [['content-type', 'application/json']],
+      body: '{"messageId":"m1","offset":"7"}',
+    })
+
+    // No origin: the conversation client has none to add. This threw
+    // `Invalid URL` before it was passed through, and the composer showed
+    // "the harness stopped answering while the message was being sent" for
+    // a harness that was never asked.
+    const response = await harnessTransport('/agents/studio/cnv_1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"kind":"user","body":"hello"}',
+    })
+
+    expect(response.status).toBe(202)
+    const [, payload] = invoke.mock.calls[0]
+    expect(payload.path).toBe('/agents/studio/cnv_1')
+    expect(payload.init.method).toBe('POST')
+    expect(payload.init.body).toBe('{"kind":"user","body":"hello"}')
+  })
+
   it('rebuilds a 204 without a body, which the Response constructor refuses to take', async () => {
     enterTauri()
     invoke.mockResolvedValueOnce({ status: 204, headers: [], body: '' })
