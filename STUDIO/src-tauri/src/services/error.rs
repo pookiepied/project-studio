@@ -42,6 +42,14 @@ pub enum ServiceError {
     /// `text/event-stream` body: the stream never began, which is what makes
     /// this unrecoverable-by-reattach rather than retry-shaped.
     StreamRefused { status: u16, message: String },
+    /// The server answered a byte request, and the answer was no.
+    ///
+    /// The text seam returns refusals as responses — status and body ride
+    /// together, and the webview reads both. The byte seam's success is raw
+    /// bytes with no container, so a refusal has to be the error: the status
+    /// tells a stale credential (401) from an attachment the conversation
+    /// does not hold (404), and the message is the harness's own sentence.
+    Refused { status: u16, message: String },
     /// The stream began and then failed mid-flight: transport error, read
     /// idle past the harness heartbeat cadence, or content that is not the
     /// protocol it promised.

@@ -65,7 +65,7 @@ function runOf(file: string, ...calls: readonly ToolCallView[]): ToolGroupView {
 describe('the chip is the default', () => {
   it('renders every call as its own row, with no count line in front', () => {
     const { container } = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf(
           {
             toolName: 'edit',
@@ -85,7 +85,7 @@ describe('the chip is the default', () => {
 
   it('renders an unknown tool under its raw name', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'mystery', calls: [call({ toolName: 'mystery' })] })}
       />,
     )
@@ -100,7 +100,7 @@ describe('the chip is the default', () => {
     // pins the two that shipped after the map was written, because the way
     // this breaks is silent: the row still renders, it just reads like a leak.
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf(
           { toolName: 'discover', calls: [call({ toolName: 'discover', output: present('found') })] },
           { toolName: 'jobs', calls: [call({ toolName: 'jobs', toolCallId: 'call-9', output: present('none') })] },
@@ -118,7 +118,7 @@ describe('the chip is the default', () => {
 describe('the verb', () => {
   it('runs while the answer has not arrived, on a live turn', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} live />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} live />,
     )
     expect(screen.getByText('Editing')).toBeTruthy()
     expect(container.querySelector('.studio-shimmer')).not.toBeNull()
@@ -126,7 +126,7 @@ describe('the verb', () => {
 
   it('never moves on a turn that is not being written', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
     )
     expect(screen.getByText('Editing')).toBeTruthy()
     expect(container.querySelector('.studio-shimmer')).toBeNull()
@@ -134,7 +134,7 @@ describe('the verb', () => {
 
   it('settles to the past tense once the answer arrives', () => {
     const { container } = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'edit', calls: [call({ output: present('done') })] })}
         live
       />,
@@ -146,14 +146,14 @@ describe('the verb', () => {
 
 describe('the chip', () => {
   it('names the file, then the way to it', () => {
-    render(<ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} />)
+    render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} />)
     expect(screen.getByText('x.ts')).toBeTruthy()
     expect(screen.getByText('STUDIO/src/features')).toBeTruthy()
   })
 
   it('carries the count of lines the edit adds and removes', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
     )
     // The count is a live element -- the digits are their own spans -- so it
     // is read as text, not as one node.
@@ -163,7 +163,7 @@ describe('the chip', () => {
 
   it('shows no count for a call whose input carries no diff', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'read',
           calls: [call({ toolName: 'read', input: present({ file_path: 'a.ts' }) })],
@@ -176,7 +176,7 @@ describe('the chip', () => {
 
   it('does not give a command a file mark', () => {
     const { container } = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'shell',
           calls: [call({ toolName: 'shell', input: present({ command: 'pnpm build' }) })],
@@ -191,7 +191,7 @@ describe('the chip', () => {
 
   it('gives a file the language glyph its extension names', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
     )
     expect(container.querySelectorAll('svg[fill="currentColor"]')).toHaveLength(1)
   })
@@ -200,7 +200,7 @@ describe('the chip', () => {
 describe('expanding a call', () => {
   it('opens the diff an edit sent, in place of its raw input', () => {
     const { container } = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'edit', calls: [call({ output: present('done') })] })}
       />,
     )
@@ -213,7 +213,7 @@ describe('expanding a call', () => {
 
   it('falls back to the raw input for a call with no diff', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'read',
           calls: [
@@ -233,7 +233,7 @@ describe('expanding a call', () => {
 
   it('keeps the error beside the working-out', () => {
     render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call({ errorText: 'boom' })] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call({ errorText: 'boom' })] })} />,
     )
     // A failed call is not a running one: the verb is past tense even here.
     fireEvent.click(screen.getByText('Edited'))
@@ -244,7 +244,7 @@ describe('expanding a call', () => {
     // The diff is its own framed card: a rule beside it would draw a second
     // edge. The raw input of a call with no diff keeps the ruled body.
     const diffed = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'edit', calls: [call({ output: present('done') })] })}
       />,
     )
@@ -253,7 +253,7 @@ describe('expanding a call', () => {
     expect(diffBody?.className).not.toContain('border-l-2')
 
     const plain = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'read',
           calls: [call({ toolName: 'read', input: present({ file_path: 'a.ts' }) })],
@@ -271,7 +271,7 @@ describe('the edit diff', () => {
     // The harness's edit schema is `oldString`/`newString`; the extractor
     // once knew only snake_case, and edits showed no diff at all.
     const { container } = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'edit',
           calls: [
@@ -295,14 +295,14 @@ describe('the edit diff', () => {
 describe('the entrance', () => {
   it('fades in when the chip arrives with a live turn', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} live />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} live />,
     )
     expect(container.querySelector('button')?.parentElement?.style.opacity).toBe('0')
   })
 
   it('is already on the page for a chip the reader did not watch arrive', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
     )
     expect(container.querySelector('button')?.parentElement?.style.opacity).not.toBe('0')
   })
@@ -337,14 +337,14 @@ describe('the question and its answer', () => {
 
   it('names the first question on the chip, with the count beside it', () => {
     render(
-      <ToolGroups groups={groupsOf({ toolName: 'ask_user_question', calls: [askCall()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'ask_user_question', calls: [askCall()] })} />,
     )
     expect(screen.getByText('Auth +1')).toBeTruthy()
   })
 
   it('shows each question and the exact answer given, including custom words', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'ask_user_question',
           calls: [
@@ -381,7 +381,7 @@ describe('the question and its answer', () => {
 
   it('says what happened instead of a choice', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'ask_user_question',
           calls: [
@@ -404,7 +404,7 @@ describe('the question and its answer', () => {
 
   it('shows only the questions while the call is still parked', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'ask_user_question', calls: [askCall()] })}
       />,
     )
@@ -415,7 +415,7 @@ describe('the question and its answer', () => {
 
   it('leaves no raw JSON behind for a question call', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'ask_user_question',
           calls: [
@@ -439,7 +439,7 @@ describe('the question and its answer', () => {
 describe('failure and pending', () => {
   it('marks a failed call in the danger colour', () => {
     render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call({ errorText: 'boom' })] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call({ errorText: 'boom' })] })} />,
     )
     const failed = screen.getByText('failed')
     expect(failed.className).toContain('text-danger')
@@ -447,7 +447,7 @@ describe('failure and pending', () => {
 
   it('says pending, not running, once the turn it belonged to is over', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call()] })} />,
     )
     expect(screen.getByText('pending')).toBeTruthy()
     expect(container.querySelector('.studio-shimmer')).toBeNull()
@@ -468,7 +468,7 @@ describe('a write with nothing to say', () => {
     // content was "", and the honest card is a head with no rows under it --
     // not a fall-back to raw JSON that pretends no diff was claimed.
     const { container } = render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'write',
           calls: [
@@ -496,7 +496,7 @@ describe('the count arriving', () => {
   it('counts up on a live chip and rests on the fact', () => {
     vi.useFakeTimers()
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'write', calls: [writeCall()] })} live />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'write', calls: [writeCall()] })} live />,
     )
     expect(screen.getByText('Writing')).toBeTruthy()
     expect(container.textContent).toContain('+0 -0')
@@ -508,7 +508,7 @@ describe('the count arriving', () => {
 
   it('renders the settled count for history', () => {
     const { container } = render(
-      <ToolGroups groups={groupsOf({ toolName: 'write', calls: [writeCall()] })} />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'write', calls: [writeCall()] })} />,
     )
     expect(container.textContent).toContain('+4 -0')
   })
@@ -516,11 +516,11 @@ describe('the count arriving', () => {
   it('settles the moment the call is answered, whatever the ramp was doing', () => {
     vi.useFakeTimers()
     const view = render(
-      <ToolGroups groups={groupsOf({ toolName: 'write', calls: [writeCall()] })} live />,
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'write', calls: [writeCall()] })} live />,
     )
     expect(view.container.textContent).toContain('+0 -0')
     view.rerender(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'write', calls: [writeCall({ output: present('Replaced snake.html') })] })}
         live
       />,
@@ -539,7 +539,7 @@ describe('the count arriving', () => {
 describe('the answer', () => {
   it('speaks the status of a diffed call under the card, verbatim', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'write',
           calls: [writeCall({ output: present('Replaced snake.html') })],
@@ -553,7 +553,7 @@ describe('the answer', () => {
 
   it('renders a string answer as itself, not as quoted JSON', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'read',
           calls: [
@@ -573,7 +573,7 @@ describe('the answer', () => {
 
   it('prints a structured answer as JSON', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'shell',
           calls: [
@@ -632,7 +632,7 @@ describe('the edit answer echo', () => {
   }
 
   it('lifts the echo\'s real line numbers into the card\'s gutters', () => {
-    render(<ToolGroups groups={groupsOf({ toolName: 'edit', calls: [snakeEdit()] })} />)
+    render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [snakeEdit()] })} />)
     fireEvent.click(screen.getByText('Edited'))
     // The removed line stood at 200, exactly where the echo says the span
     // begins; the five additions take 200 through 204.
@@ -652,7 +652,7 @@ describe('the edit answer echo', () => {
       }),
       snakeEdit(),
     )
-    const view = render(<ToolGroups groups={[run]} />)
+    const view = render(<ToolGroups conversationId="conv" groups={[run]} />)
     fireEvent.click(screen.getByText('Edited'))
     // Opening the run shows the children; the second child is the snake
     // edit, and its card only exists once the child itself is opened.
@@ -664,7 +664,7 @@ describe('the edit answer echo', () => {
   })
 
   it('does not print the echoed span again under the card', () => {
-    render(<ToolGroups groups={groupsOf({ toolName: 'edit', calls: [snakeEdit()] })} />)
+    render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [snakeEdit()] })} />)
     fireEvent.click(screen.getByText('Edited'))
     // `function drawFood` exists only in the echo -- the strings the model
     // sent never mention it -- so finding it would mean the slab is back.
@@ -675,7 +675,7 @@ describe('the edit answer echo', () => {
 
   it('keeps the write sentence, whose second line carries a fact the card does not', () => {
     render(
-      <ToolGroups
+      <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'write',
           calls: [
@@ -727,7 +727,7 @@ describe('the file run', () => {
       editCall('e2', 'mid', 'mid\nmid2'),
       editCall('e3', 'mid2', 'final'),
     )
-    const { container } = render(<ToolGroups groups={[run]} />)
+    const { container } = render(<ToolGroups conversationId="conv" groups={[run]} />)
     expect(screen.getByText('Edited')).toBeTruthy()
     expect(screen.getByText('3 edits')).toBeTruthy()
     const stat = screen.getByTitle('net lines changed')
@@ -742,7 +742,7 @@ describe('the file run', () => {
       editCall('e1', 'one', '1'),
       editCall('e2', 'unrelated', '2'),
     )
-    render(<ToolGroups groups={[run]} />)
+    render(<ToolGroups conversationId="conv" groups={[run]} />)
     const stat = screen.getByTitle('lines touched')
     // Two edits, two sides: the churn counts both directions.
     expect(stat.textContent).toBe('+2 -2')
@@ -754,7 +754,7 @@ describe('the file run', () => {
       editCall('e1', 'start', 'start\nmid'),
       editCall('e2', 'mid', 'mid\nend'),
     )
-    const { container } = render(<ToolGroups groups={[run]} />)
+    const { container } = render(<ToolGroups conversationId="conv" groups={[run]} />)
     fireEvent.click(screen.getByText('Edited'))
     expect(screen.getByText(/net -- the file as the run's first call found it/)).toBeTruthy()
     // The group button plus one button per child.
@@ -768,14 +768,14 @@ describe('the file run', () => {
       editCall('e1', 'a', 'a\nb'),
       editCall('e2', 'zzz', 'yy', { errorText: 'anchor not found' }),
     )
-    render(<ToolGroups groups={[run]} />)
+    render(<ToolGroups conversationId="conv" groups={[run]} />)
     fireEvent.click(screen.getByText('Edited'))
     expect(screen.getByText('failed')).toBeTruthy()
   })
 
   it('keeps a single mutating call a chip, never a run of one', () => {
     const single = runOf('snake/script.js', editCall('e1', 'a', 'a\nb'))
-    const { container } = render(<ToolGroups groups={[single]} />)
+    const { container } = render(<ToolGroups conversationId="conv" groups={[single]} />)
     // One call is one chip: no count line, no net header, nothing to expand
     // into. The run row exists for calls that arrive together, and a run of
     // one is a chip wearing a group's clothes.
@@ -796,14 +796,14 @@ describe('the file run', () => {
         output: present('Edited other.ts'),
       }),
     )
-    const view = render(<ToolGroups groups={[run, trailing]} live />)
+    const view = render(<ToolGroups conversationId="conv" groups={[run, trailing]} live />)
     // The first disclosure button in document order is the run's.
     expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('is open while receiving, closed by the next run, and the hand wins over both', () => {
     const run = runOf('snake/script.js', editCall('e1', 'a', 'a\nb'), editCall('e2', 'b', 'b\nc'))
-    const view = render(<ToolGroups groups={[run]} live />)
+    const view = render(<ToolGroups conversationId="conv" groups={[run]} live />)
     // The segment's last file run is the one receiving: open, children in view.
     expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
     // A different file's mutation lands after it: the run closes by itself.
@@ -820,12 +820,12 @@ describe('the file run', () => {
         output: present('Edited other.ts'),
       }),
     )
-    view.rerender(<ToolGroups groups={[run, interruption]} live />)
+    view.rerender(<ToolGroups conversationId="conv" groups={[run, interruption]} live />)
     expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
     // The reader opens it; no auto-state may close it again.
     fireEvent.click(view.container.querySelector('button[aria-expanded]') ?? view.container)
     expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
-    view.rerender(<ToolGroups groups={[run]} live />)
+    view.rerender(<ToolGroups conversationId="conv" groups={[run]} live />)
     expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
     // And the hand can shut a receiving run, which stays shut.
     fireEvent.click(view.container.querySelector('button[aria-expanded]') ?? view.container)

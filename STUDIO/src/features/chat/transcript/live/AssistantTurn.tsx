@@ -43,6 +43,7 @@ import type {
 export const AssistantTurn = memo(function AssistantTurn({
   item,
   live,
+  conversationId,
   turnInFlight = false,
   onBranch,
 }: {
@@ -54,6 +55,8 @@ export const AssistantTurn = memo(function AssistantTurn({
    * the caret and the ending below both depend on the narrower reading.
    */
   live: boolean
+  /** The conversation the tool calls ran in, which keys their attachments. */
+  conversationId: string
   /**
    * The submission this message belongs to is still in flight. A message can
    * be complete while its run is not — parked on a question the person has
@@ -87,6 +90,7 @@ export const AssistantTurn = memo(function AssistantTurn({
           segment={segment}
           growing={live && index === lastIndex && segment.kind === 'text'}
           live={live}
+          conversationId={conversationId}
         />
       ))}
       {/* An ending is reported once there is one to report.
@@ -128,10 +132,12 @@ function Segment({
   segment,
   growing,
   live,
+  conversationId,
 }: {
   segment: AssistantSegment
   growing: boolean
   live: boolean
+  conversationId: string
 }) {
   switch (segment.kind) {
     case 'thinking':
@@ -152,7 +158,9 @@ function Segment({
     case 'text':
       return <TextSegment segment={segment} growing={growing} />
     case 'tools':
-      return <ToolGroups groups={segment.groups} live={live} />
+      return (
+        <ToolGroups groups={segment.groups} live={live} conversationId={conversationId} />
+      )
   }
 }
 

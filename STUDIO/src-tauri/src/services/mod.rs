@@ -30,7 +30,7 @@ mod stream;
 mod stream_control;
 
 pub use error::ServiceError;
-pub use fetch::{service_fetch, SerializedResponse};
+pub use fetch::{service_fetch, service_fetch_bytes, SerializedResponse};
 pub use stream::service_stream;
 pub use stream::StreamEvent;
 pub(crate) use stream_control::StreamRegistry;

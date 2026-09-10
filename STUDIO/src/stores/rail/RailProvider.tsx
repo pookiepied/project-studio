@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { Artifact } from '@/domain/artifacts/types'
+import type { BrowserFrame, BrowserStep } from '@/features/chat/transcript/live/browserCall'
 
 /**
  * The side rail's state.
@@ -93,9 +94,15 @@ export type RailEntry =
       readonly openedAt: number
       readonly url: string | null
       readonly title: string | null
-      readonly frame: { readonly data: string; readonly mimeType: string } | null
-      /** What the model has done in the browser, newest last. */
-      readonly steps: readonly string[]
+      /**
+       * The newest picture the browser produced, in whatever spelling the log
+       * carries it - an attachment reference most of the time, which the panel
+       * resolves through the same seam the transcript uses. Nothing here is a
+       * finished `data:` URL: resolving is rendering's job, not storage's.
+       */
+      readonly frame: BrowserFrame | null
+      /** What the model has done in the browser, oldest first. */
+      readonly steps: readonly BrowserStep[]
     }
 
 /** The id of a conversation's plan entry. One plan per conversation, so the conversation keys it. */
@@ -178,11 +185,14 @@ interface RailValue {
   /** Opens - or focuses - the conversation's background commands. Idempotent too. */
   openJobs: (conversationId: string, conversationTitle: string) => void
   /**
-   * Shows the browser's latest frame, replacing what the entry held.
+   * Takes the browser's whole derived report and replaces what the entry
+   * holds.
    *
-   * Not idempotent in the way the other three are: each acting call carries a
-   * newer picture and a newer place, and the entry takes them. What stays put
-   * is the tab itself, so a person reading the preview keeps reading it while
+   * The caller reads the report off the transcript - every step, the latest
+   * place and picture - so what arrives here is the complete truth for the
+   * conversation, and nothing merges: merging a derived report with a stored
+   * one is how two readings of the same log drift apart. What stays put is
+   * the tab itself, so a person reading the preview keeps reading it while
    * the model works rather than watching tabs open behind them.
    *
    * It does NOT focus the rail. A model browsing in the background must not
@@ -192,11 +202,11 @@ interface RailValue {
   showBrowser: (
     conversationId: string,
     conversationTitle: string,
-    frame: {
+    report: {
       readonly url: string | null
       readonly title: string | null
-      readonly frame: { readonly data: string; readonly mimeType: string } | null
-      readonly step: string | null
+      readonly frame: BrowserFrame | null
+      readonly steps: readonly BrowserStep[]
     },
   ) => void
   focus: (id: string) => void
@@ -294,45 +304,28 @@ export function RailProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const showBrowser = useCallback<RailValue['showBrowser']>(
-    (conversationId, conversationTitle, next) => {
+    (conversationId, conversationTitle, report) => {
       const id = browserEntryId(conversationId)
       setEntries((current) => {
         const existing = current.find((entry) => entry.id === id)
-        if (existing !== undefined && existing.kind === 'browser') {
-          return current.map((entry) =>
-            entry.id === id && entry.kind === 'browser'
-              ? {
-                  ...entry,
-                  conversationTitle,
-                  // Kept rather than overwritten when a call had nothing new
-                  // to say. A read that returns no picture must not blank the
-                  // last one: the page has not changed, and an empty panel
-                  // would read as though the browser had gone.
-                  url: next.url ?? entry.url,
-                  title: next.title ?? entry.title,
-                  frame: next.frame ?? entry.frame,
-                  steps:
-                    next.step === null
-                      ? entry.steps
-                      : [...entry.steps, next.step].slice(-40),
-                }
-              : entry,
-          )
+        const next: RailEntry = {
+          kind: 'browser',
+          id,
+          conversationId,
+          conversationTitle,
+          openedAt: existing?.openedAt ?? Date.now(),
+          url: report.url,
+          title: report.title,
+          frame: report.frame,
+          steps: report.steps,
         }
-        return capped([
-          ...current,
-          {
-            kind: 'browser',
-            id,
-            conversationId,
-            conversationTitle,
-            openedAt: Date.now(),
-            url: next.url,
-            title: next.title,
-            frame: next.frame,
-            steps: next.step === null ? [] : [next.step],
-          },
-        ])
+        // Kept in place, not moved to the end of the strip: the reader who is
+        // watching has the tab where they left it, and a model working in the
+        // background must not shuffle the furniture.
+        if (existing !== undefined) {
+          return current.map((entry) => (entry.id === id ? next : entry))
+        }
+        return capped([...current, next])
       })
     },
     [],

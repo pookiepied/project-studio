@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { present } from '@/platform/harness/conversation-chunks'
 import {
   browserAction,
+  browserStepOf,
   browserSubject,
   browserVerb,
   readBrowserCall,
@@ -61,9 +63,106 @@ describe('what the card is given', () => {
     expect(view?.said).not.toContain('URL:')
   })
 
-  it('finds the frame an acting call returned', () => {
+  it('finds the frame an acting call returned, as an inline picture', () => {
     const view = readBrowserCall('studio_browser_click', RESULT, null)
-    expect(view?.frame).toEqual({ data: 'AAAA', mimeType: 'image/jpeg' })
+    expect(view?.frame).toEqual({ kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' })
+  })
+
+  it('reads an attachment reference as the frame it usually is', () => {
+    // The persistence layer stores every tool-result image in the attachment
+    // store and leaves the transcript holding the address, not the bytes. Two
+    // spellings carry that address - the raw attachment block a live chunk
+    // forwards, and the image block whose data the history projection mapped
+    // to the attachment's id - and both must read as the same frame, or one
+    // path shows a picture and the other shows nothing.
+    const live: unknown = {
+      content: [
+        {
+          type: 'attachment',
+          attachment: { id: 'att_msg_1_0', mimeType: 'image/jpeg' },
+        },
+      ],
+    }
+    const history: unknown = {
+      content: [{ type: 'image', data: 'att_msg_1_0', mimeType: 'image/jpeg' }],
+    }
+    const fromLive = readBrowserCall('studio_browser_screenshot', live, null)
+    const fromHistory = readBrowserCall('studio_browser_screenshot', history, null)
+    expect(fromLive?.frame).toEqual({ kind: 'attachment', id: 'att_msg_1_0', mimeType: 'image/jpeg' })
+    expect(fromHistory?.frame).toEqual(fromLive?.frame)
+    // Base64 never begins with the attachment id's prefix, so an ordinary
+    // inline picture cannot be mistaken for an address.
+    expect(readBrowserCall('studio_browser_screenshot', RESULT, null)?.frame?.kind).toBe('inline')
+  })
+
+  it('turns one answered call into the step both report renderers share', () => {
+    // `browserStepOf` is the mapping the transcript's report row and the
+    // rail's step list both render from; pinning it here is what keeps the
+    // two sizes of the report from drifting into two readings of the log.
+    const view = readBrowserCall('studio_browser_click', RESULT, null)
+    const step = browserStepOf({
+      toolCallId: 'call_9',
+      toolName: 'mcp__14_studio-browser__19_studio_browser_click',
+      input: present({ ref: 'ref_12' }),
+      output: present(RESULT),
+      errorText: null,
+    })
+    expect(step).toEqual({
+      id: 'call_9',
+      action: 'click',
+      verb: 'Clicked',
+      subject: 'ref_12',
+      url: view?.url ?? null,
+      title: 'Pricing',
+      failed: false,
+      frame: view?.frame ?? null,
+    })
+  })
+
+  it('keeps a running call a step in the present tense, with no picture', () => {
+    // A call the model has made but the harness has not answered is an event
+    // happening now: the verb reads as ongoing and the subject comes from the
+    // input, because that is all the log knows. Nothing is claimed about the
+    // place or the picture the answer has not brought.
+    const step = browserStepOf({
+      toolCallId: 'call_10',
+      toolName: 'studio_browser_open',
+      input: present({ url: 'https://example.com' }),
+      output: null,
+      errorText: null,
+    })
+    expect(step).toMatchObject({
+      id: 'call_10',
+      action: 'open',
+      verb: 'Opening',
+      subject: 'https://example.com',
+      url: null,
+      title: null,
+      failed: false,
+      frame: null,
+    })
+  })
+
+  it('marks a failed call failed, and gives it no picture', () => {
+    const step = browserStepOf({
+      toolCallId: 'call_11',
+      toolName: 'studio_browser_click',
+      input: present({ ref: 'ref_3' }),
+      output: present('Clicked.\n\nTab: tab_1\nURL: https://example.com'),
+      errorText: 'the element was not there',
+    })
+    expect(step?.failed).toBe(true)
+    expect(step?.frame).toBeNull()
+  })
+
+  it('is no step at all for a tool that is not ours', () => {
+    expect(browserStepOf({
+      toolCallId: 'call_12',
+      toolName: 'read',
+      input: present({ file_path: 'a.ts' }),
+      output: present('ok'),
+      errorText: null,
+    })).toBeNull()
   })
 
   it('shows no frame for a call that failed', () => {
