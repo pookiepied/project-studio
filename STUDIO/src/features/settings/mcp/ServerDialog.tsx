@@ -142,18 +142,18 @@ export function ServerDialog({
       title={editing === null ? 'Add MCP server' : `Edit ${editing.title}`}
       width="30rem"
       footer={
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={onClose}>
+        <>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            size="sm"
+            variant="primary"
             onClick={() => void submit()}
             disabled={saving || (mode === 'form' && problem !== null)}
           >
             {editing === null ? 'Add server' : 'Save'}
           </Button>
-        </div>
+        </>
       }
     >
       <div className="flex flex-col gap-3.5">

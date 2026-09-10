@@ -420,19 +420,16 @@
   --muted-foreground: oklch(0.553 0 0);
   --border: var(--hairline);
 
-  /* Two registers of focus, because one token was doing two jobs with
-     opposite intensity requirements. `--ring` is the keyboard outline's
-     token: it appears only on Tab, it is drawn outside the control where it
-     cannot crowd anything, and loud is correct there. `--field-ring` is the
-     fields' own bloom: it fires on every click, sits flush against the
-     border, and must stay a whisper. While the fields consumed `--ring` they
-     inherited the outline's 45% and every click read as an error state --
-     the exact regression the field docblock was written against. Dark takes
-     a lower alpha rather than an equal one: white blooming over a dark
-     surface reads brighter against its ground than black over white does,
-     so the same number is not the same contrast in both directions. */
+  /* Focus is one token here, and it is the keyboard outline's. `--ring`
+     appears only on Tab, is drawn outside the control where it cannot crowd
+     anything, and loud is correct there. Fields do not consume it: while they
+     did, they inherited the outline's 45% and every click read as an error
+     state -- the exact regression the field docblock was written against. A
+     field answers focus with its own border deepened instead, drawn by the
+     component; the whisper bloom that once confirmed the edge is gone on the
+     person's word, because two greys stacked on one edge read as thickness,
+     not as focus. */
   --ring: oklch(0.145 0 0 / 45%);
-  --field-ring: oklch(0.145 0 0 / 14%);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
 
@@ -552,9 +549,6 @@
   --muted-foreground: oklch(0.706 0 0);
   --border: var(--hairline);
   --ring: oklch(1 0 0 / 45%);
-  /* Below the light value, not equal to it -- see the token comment in
-     :root. A white bloom on a dark ground reads louder than its alpha. */
-  --field-ring: oklch(1 0 0 / 12%);
   --primary: oklch(0.94 0 0);
   --primary-foreground: oklch(0.205 0 0);
 
