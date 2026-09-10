@@ -166,6 +166,11 @@ where
 /// The gate for harness paths: a valid device cookie in, a revocation signal
 /// out. The signal is what ends the device's connections the moment it is
 /// removed, including a stream that is mid-read.
+///
+/// The large `Err` is the design, not an accident: the refusal is a full
+/// HTTP response because the caller's answer to it is `return Ok(refused)`,
+/// one line, and boxing it would add a layer for nothing.
+#[allow(clippy::result_large_err)]
 pub(crate) fn authorize_request(
     headers: &HeaderMap,
     devices: &Devices,

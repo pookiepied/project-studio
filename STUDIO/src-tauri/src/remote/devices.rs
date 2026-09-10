@@ -277,7 +277,7 @@ impl Devices {
                 last_seen_ms: record.last_seen_ms,
             })
             .collect();
-        devices.sort_by(|a, b| a.paired_at_ms.cmp(&b.paired_at_ms));
+        devices.sort_by_key(|device| device.paired_at_ms);
         devices
     }
 
@@ -530,7 +530,7 @@ mod tests {
         devices.revoke(&id).unwrap();
 
         // The live request is told, not just the next one.
-        assert_eq!(*revoked.borrow(), true);
+        assert!(*revoked.borrow());
 
         assert!(devices.authorize(&paired.cookie, 1_200).is_err());
         assert!(devices.list().is_empty());
@@ -546,8 +546,8 @@ mod tests {
         let signal_b = devices.authorize(&b.cookie, 2_100).unwrap();
 
         assert_eq!(devices.revoke_all(), 2);
-        assert_eq!(*signal_a.borrow(), true);
-        assert_eq!(*signal_b.borrow(), true);
+        assert!(*signal_a.borrow());
+        assert!(*signal_b.borrow());
         assert!(devices.list().is_empty());
         assert!(devices.authorize(&a.cookie, 3_000).is_err());
         assert!(devices.authorize(&b.cookie, 3_000).is_err());

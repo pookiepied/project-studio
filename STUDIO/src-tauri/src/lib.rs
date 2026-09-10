@@ -504,7 +504,7 @@ pub fn run() {
     // unpaired rather than failing the launch, and `remote_access_start`
     // still checks `available()` before binding anything to the network.
     .manage(std::sync::Arc::new(remote::Devices::open(Box::new(
-      remote::secret_store::KeyringStore::default(),
+      remote::secret_store::KeyringStore,
     ))))
     .manage(std::sync::Arc::new(remote::PairingState::default()))
     .manage(remote::RemoteAccess::default())

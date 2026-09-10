@@ -50,6 +50,7 @@ mod assets;
 mod body;
 mod devices;
 mod gate;
+mod mdns;
 mod pairing;
 mod proxy;
 pub(crate) mod secret_store;
@@ -111,6 +112,9 @@ const PORT_VARIABLE: &str = "PROJECT_STUDIO_REMOTE_PORT";
 #[derive(Default)]
 pub struct RemoteAccess {
     running: Mutex<Option<Running>>,
+    /// The name the home network can type (`mdns.rs`): published when the
+    /// listener starts, withdrawn when it stops, never a failure of either.
+    mdns: Mutex<mdns::Mdns>,
 }
 
 struct Running {
@@ -259,20 +263,55 @@ impl RemoteAccess {
             log::info!("Remote access: stopped serving {address}");
         });
 
+        // The name the home network can type, published only now - the port
+        // is bound and being served - because a name published for a port
+        // that refuses would be a name that lies.
+        self.publish_name(address.port());
+
         log::info!("Remote access: serving {address} (devices gate on)");
         Ok(address)
     }
 
-    /// Stops the listener and drops every connection. Idempotent.
-    pub fn stop(&self) {
-        let Ok(mut running) = self.running.lock() else {
+    /// Publishes `studio.local` for `port` over the machine's home addresses.
+    ///
+    /// Every failure is a log line, never a failed start: mDNS is the
+    /// friendly name, and the QR code and the raw address answer without it.
+    fn publish_name(&self, port: u16) {
+        let Ok(mut publisher) = self.mdns.lock() else {
+            log::warn!(
+                "Remote access: lost track of the name publisher, so studio.local is not published."
+            );
             return;
         };
-        if let Some(running) = running.take() {
-            // The accept loop sees this and breaks, which drops the listener
-            // and closes the port. Connections already open end with it.
-            let _ = running.stop.send(true);
+        publisher.publish(port, &mdns::home_addresses());
+    }
+
+    /// Withdraws the name. Never fails its caller, and safe to call when
+    /// nothing was ever published.
+    fn withdraw_name(&self) {
+        let Ok(mut publisher) = self.mdns.lock() else {
+            return;
+        };
+        publisher.withdraw();
+    }
+
+    /// Stops the listener, drops every connection, and withdraws the name.
+    /// Idempotent.
+    pub fn stop(&self) {
+        {
+            let Ok(mut running) = self.running.lock() else {
+                return;
+            };
+            if let Some(running) = running.take() {
+                // The accept loop sees this and breaks, which drops the
+                // listener and closes the port. Connections already open end
+                // with it.
+                let _ = running.stop.send(true);
+            }
         }
+        // The name goes with the port: a published name for a port that no
+        // longer answers is a name that lies.
+        self.withdraw_name();
     }
 }
 

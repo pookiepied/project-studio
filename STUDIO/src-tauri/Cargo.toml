@@ -113,6 +113,19 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 # transitively; this declares it for direct use.
 sha2 = "0.10"
 
+# The name the home network can type while "Open on other devices" is on
+# (`remote/mdns.rs`): `studio.local`, published over mDNS when the listener
+# starts and withdrawn when it stops. Pure Rust with no system daemon, one
+# thread while it runs and none when it does not. Everything about remote
+# access works without it -- the QR code and the raw address are the paths
+# that always answer -- which is why the plan put this step last.
+mdns-sd = "0.21"
+
+# The machine's interfaces, read to choose which addresses the name should
+# resolve to (`remote/mdns.rs`). Already in the tree as mdns-sd's own
+# dependency, so declaring it costs no new crate.
+if-addrs = "0.15"
+
 # POSIX-only, and previously declared as if they were not -- which is why the
 # Host crate had never compiled on Windows (meta-task #87). `command-fds` maps
 # descriptors with `dup2` inside a `pre_exec` hook and fails inside its own
