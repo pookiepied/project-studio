@@ -58,6 +58,18 @@ export interface BrowserStep {
   readonly title: string | null
   readonly failed: boolean
   readonly frame: BrowserFrame | null
+  /**
+   * Whether this call is over, either way.
+   *
+   * Read by the rail to decide whether its report changed, and it has to be
+   * stated rather than inferred from the other fields. The obvious inference -
+   * "it has a frame or it failed" - is wrong for the eight tools that only
+   * read: `read_text`, `console`, `tabs` and the rest answer with words and no
+   * picture, so a call of theirs going from running to answered changes none
+   * of the fields a signature could otherwise notice. The rail would keep
+   * showing "reading the page" after the page had been read.
+   */
+  readonly settled: boolean
 }
 
 export interface BrowserCallView {
@@ -274,5 +286,6 @@ export function browserStepOf(call: {
     title: view?.title ?? null,
     failed: call.errorText !== null,
     frame: view?.frame ?? null,
+    settled: answered || call.errorText !== null,
   }
 }

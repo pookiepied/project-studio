@@ -175,6 +175,7 @@ function stepOf(id: string, overrides: Partial<BrowserStep> = {}): BrowserStep {
     title: 'Example',
     failed: false,
     frame: { kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' },
+    settled: true,
     ...overrides,
   }
 }

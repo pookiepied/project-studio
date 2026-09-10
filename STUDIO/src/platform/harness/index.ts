@@ -26,6 +26,7 @@ export { harnessTransport } from './transport'
 export {
   attachmentDataUrl,
   isAttachmentReference,
+  pictureMime,
   setAttachmentBytesTransport,
   type AttachmentBytes,
   type AttachmentReference,

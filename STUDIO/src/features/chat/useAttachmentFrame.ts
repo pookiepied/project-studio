@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { attachmentDataUrl } from '@/platform/harness'
+import { attachmentDataUrl, pictureMime } from '@/platform/harness'
 import type { BrowserFrame } from '@/features/chat/transcript/live/browserCall'
 
 /**
@@ -23,7 +23,12 @@ export function useAttachmentFrame(
   frame: BrowserFrame | null,
 ): string | null {
   const inlineUrl = useMemo(
-    () => (frame?.kind === 'inline' ? `data:${frame.mimeType};base64,${frame.data}` : null),
+    // Clamped for the same reason the fetched path is: the mime rides in from
+    // a tool result, which an MCP server we did not write also produces.
+    () =>
+      frame?.kind === 'inline'
+        ? `data:${pictureMime(frame.mimeType)};base64,${frame.data}`
+        : null,
     [frame],
   )
   const [resolved, setResolved] = useState<string | null>(null)

@@ -44,7 +44,11 @@ export function useBrowserPreview(
   // update that re-renders the rail. The signature is content, not identity:
   // the count of settled steps, because a call going from running to answered
   // changes its own step without changing the list's length, and the last
-  // call's id, because nothing after it can be new. The conversation's own id
+  // call's id, because nothing after it can be new. Settled is the step's own
+  // word for it rather than "has a frame or failed": a read-only call answers
+  // with words and no picture, and inferring settlement from the picture left
+  // the rail reporting that it was still reading a page it had finished
+  // reading. The conversation's own id
   // prefixes it, which is what makes a switch away and back report again
   // rather than deciding it was already shown - a different conversation is a
   // different browser.
@@ -58,7 +62,7 @@ export function useBrowserPreview(
     }
     const last = steps[steps.length - 1]
     if (last === undefined) return
-    const settled = steps.filter((step) => step.frame !== null || step.failed).length
+    const settled = steps.filter((step) => step.settled).length
     const signature = `${conversationId}:${steps.length}:${settled}:${last.id}`
     if (signature === reported.current) return
     reported.current = signature

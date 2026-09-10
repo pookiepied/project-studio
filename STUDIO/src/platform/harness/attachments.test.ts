@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   attachmentDataUrl,
   isAttachmentReference,
+  pictureMime,
   setAttachmentBytesTransport,
   type AttachmentBytes,
 } from './attachments'
@@ -132,5 +133,38 @@ describe('resolving one attachment', () => {
     await attachmentDataUrl('conv_5', { id: 'att_msg_5_0', mimeType: 'image/jpeg' })
     await attachmentDataUrl('conv_6', { id: 'att_msg_5_0', mimeType: 'image/jpeg' })
     expect(transport).toHaveBeenCalledTimes(2)
+  })
+  it('shows a frame as a picture whatever the tool result claimed it was', () => {
+    // The mime rides in from a tool result, and a tool result can come from an
+    // MCP server we did not write. It ends up inside a `data:` URL, so a value
+    // that does not name a picture is not carried into one.
+    expect(pictureMime('image/jpeg')).toBe('image/jpeg')
+    expect(pictureMime('image/png')).toBe('image/png')
+    expect(pictureMime('image/svg+xml')).toBe('image/svg+xml')
+    expect(pictureMime('text/html')).toBe('image/jpeg')
+    expect(pictureMime('image/jpeg;base64,x"onerror="alert(1)')).toBe('image/jpeg')
+    expect(pictureMime('')).toBe('image/jpeg')
+  })
+
+  it('keeps a bounded number of frames, so a long session does not grow forever', async () => {
+    // Correctness never needed the bound - the route is immutable - but a
+    // window left open for days does: one base64 frame per acting call, held
+    // for the life of the process, is tens of megabytes nobody is looking at.
+    const transport: AttachmentBytes = vi.fn(async () => bytesOf('frame-bytes'))
+    setAttachmentBytesTransport(transport)
+
+    // The limit is 120; asking for more evicts the oldest first.
+    for (let index = 0; index < 121; index += 1) {
+      await attachmentDataUrl('conv_cap', { id: `att_msg_${index}_0`, mimeType: 'image/jpeg' })
+    }
+    expect(transport).toHaveBeenCalledTimes(121)
+
+    // The newest is still cached, and asking again costs nothing.
+    await attachmentDataUrl('conv_cap', { id: 'att_msg_120_0', mimeType: 'image/jpeg' })
+    expect(transport).toHaveBeenCalledTimes(121)
+
+    // The oldest was evicted, so scrolling back to it asks the route again.
+    await attachmentDataUrl('conv_cap', { id: 'att_msg_0_0', mimeType: 'image/jpeg' })
+    expect(transport).toHaveBeenCalledTimes(122)
   })
 })

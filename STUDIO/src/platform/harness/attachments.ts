@@ -30,6 +30,10 @@
  * are shared, because one transcript can name the same frame in the card,
  * the report and the rail at once.
  *
+ * Successes are also bounded in number rather than kept for the life of the
+ * window: see `CACHE_LIMIT`. Correctness does not need the bound - the route
+ * is immutable - but a window left open for days does.
+ *
  * Failures are remembered briefly, not forever. A 404 is as immutable as a
  * success, but the reader cannot tell a 404 from a harness that was still
  * booting, and "forever" would freeze one unlucky early render into the
@@ -84,12 +88,42 @@ function attachmentPath(conversationId: string, attachmentId: string): string {
   return `/agents/studio/${encodeURIComponent(conversationId)}/attachments/${encodeURIComponent(attachmentId)}`
 }
 
+/**
+ * The bytes as they cross the invoke boundary, in every shape they can.
+ *
+ * The ordinary answer is an `ArrayBuffer`: a raw `tauri::ipc::Response` is
+ * served as `application/octet-stream`, and Tauri's injected IPC script sends
+ * exactly that content type down `response.arrayBuffer()`. That is the path
+ * on this platform and it is the one to expect.
+ *
+ * The other two shapes are the fallback. When the custom-protocol IPC is
+ * blocked, Tauri says so on the console and reverts to the postMessage
+ * interface, where the same bytes arrive serialised - a view, or a plain
+ * array of numbers. Insisting on `ArrayBuffer` there would turn a working
+ * harness into every frame silently missing, with nothing on screen to say
+ * why. Reading all three costs four lines and removes that failure entirely.
+ */
+function bufferOf(value: unknown): ArrayBuffer | null {
+  if (value instanceof ArrayBuffer) return value
+  if (ArrayBuffer.isView(value)) {
+    const view = new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+    // Copied rather than handing back the underlying buffer, which may be
+    // larger than the view and would carry bytes that are not the frame's.
+    return view.slice().buffer
+  }
+  if (Array.isArray(value) && value.every((entry) => typeof entry === 'number')) {
+    return Uint8Array.from(value).buffer
+  }
+  return null
+}
+
 async function throughTauri(path: string): Promise<ArrayBuffer> {
-  const bytes = await invoke<ArrayBuffer>('service_fetch_bytes', {
+  const answer: unknown = await invoke('service_fetch_bytes', {
     service: 'harness',
     path,
   })
-  if (!(bytes instanceof ArrayBuffer)) {
+  const bytes = bufferOf(answer)
+  if (bytes === null) {
     throw new Error('The attachment did not arrive as bytes.')
   }
   return bytes
@@ -120,6 +154,50 @@ const pending = new Map<string, Promise<string | null>>()
 const RETRY_AFTER_MS = 60_000
 
 /**
+ * How many resolved frames are kept.
+ *
+ * The cache was unbounded, which is right for correctness - the route is
+ * immutable, so a resolved reference never needs asking again - and wrong for
+ * a window that stays open for days. Each frame is a base64 `data:` URL of a
+ * 960-pixel JPEG, on the order of a hundred kilobytes once encoded, and a long
+ * browsing conversation produces one per acting call. A few hundred of those
+ * is tens of megabytes held for a picture nobody has scrolled back to in
+ * hours.
+ *
+ * Evicted oldest-first, which is the right order here rather than a guess:
+ * the surfaces that show frames all look at the newest, and the older ones are
+ * reachable only by deliberately scrolling back - a moment where paying for
+ * the fetch again is fine. The number is generous enough that ordinary reading
+ * never evicts anything.
+ */
+const CACHE_LIMIT = 120
+
+/**
+ * The mime type a frame may claim, narrowed to what it is.
+ *
+ * The value travels from the tool result through the attachment store, and a
+ * tool result is not ours - an MCP server we did not write can put any string
+ * there. It ends up inside a `data:` URL, and while an `<img>` will not
+ * execute `text/html` no matter what the header says, a URL built from
+ * unvalidated input is the kind of thing that is safe until the day someone
+ * renders it somewhere else. These are pictures; anything that does not say
+ * so is shown as the JPEG the browser capability actually produces.
+ */
+export function pictureMime(mimeType: string): string {
+  return /^image\/[a-z0-9.+-]+$/i.test(mimeType) ? mimeType : 'image/jpeg'
+}
+
+/** Remembers one resolution, evicting the oldest when the cache is full. */
+function remember(key: string, url: string): void {
+  // Insertion order is Map's own, so the first key is the oldest.
+  if (resolved.size >= CACHE_LIMIT) {
+    const oldest = resolved.keys().next()
+    if (!oldest.done) resolved.delete(oldest.value)
+  }
+  resolved.set(key, url)
+}
+
+/**
  * The `data:` URL for one attachment, or `null` while it cannot be shown.
  *
  * `null` is the answer for every failure — the harness not running, a
@@ -148,8 +226,8 @@ export function attachmentDataUrl(
     try {
       const transport = bytesTransport ?? throughTauri
       const bytes = await transport(attachmentPath(conversationId, attachment.id))
-      const url = `data:${attachment.mimeType};base64,${base64Of(bytes)}`
-      resolved.set(key, url)
+      const url = `data:${pictureMime(attachment.mimeType)};base64,${base64Of(bytes)}`
+      remember(key, url)
       return url
     } catch {
       // Remembered, not forever: see the caching note. The null is the

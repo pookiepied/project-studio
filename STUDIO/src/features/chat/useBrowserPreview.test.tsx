@@ -190,4 +190,50 @@ describe('deriving the browser report from the transcript', () => {
     expect(after.steps[0]?.verb).toBe('Opened')
     expect(after.frame).not.toBeNull()
   })
+  it('reports a read-only call once it answers, though it brought no picture', () => {
+    // The regression this pins: settlement used to be inferred from the step
+    // having a frame or having failed, and the eight read-only tools have
+    // neither. A `read_text` that finished still read as "Reading" in the
+    // rail, because nothing in the signature had changed when it answered.
+    const running = [
+      assistantWithTools('msg_1', [
+        browserCall('call_1', {
+          toolName: 'mcp__14_studio-browser__19_studio_browser_read_text',
+          input: present({}),
+        }),
+      ]),
+    ]
+    const answered = [
+      assistantWithTools('msg_1', [
+        browserCall('call_1', {
+          toolName: 'mcp__14_studio-browser__19_studio_browser_read_text',
+          input: present({}),
+          output: present({
+            content: [
+              {
+                type: 'text',
+                text: 'Tab: tab_1\nURL: https://first.example\nTitle: Page\n\nThe words on the page.',
+              },
+            ],
+          }),
+        }),
+      ]),
+    ]
+    const { result, rerender } = renderHook(({ list }) => usePreview(list), {
+      wrapper,
+      initialProps: { list: running },
+    })
+
+    const before = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
+    if (before?.kind !== 'browser') throw new Error('no browser entry')
+    expect(before.steps[0]?.verb).toBe('Reading')
+
+    rerender({ list: answered })
+    const after = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
+    if (after?.kind !== 'browser') throw new Error('no browser entry')
+    expect(after.steps[0]?.verb).toBe('Read')
+    // The place it read at is the report's place now, picture or no picture.
+    expect(after.url).toBe('https://first.example')
+    expect(after.frame).toBeNull()
+  })
 })
