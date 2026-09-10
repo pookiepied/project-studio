@@ -1,13 +1,22 @@
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash'
+import c from 'react-syntax-highlighter/dist/esm/languages/hljs/c'
+import cpp from 'react-syntax-highlighter/dist/esm/languages/hljs/cpp'
+import csharp from 'react-syntax-highlighter/dist/esm/languages/hljs/csharp'
 import css from 'react-syntax-highlighter/dist/esm/languages/hljs/css'
 import diff from 'react-syntax-highlighter/dist/esm/languages/hljs/diff'
 import go from 'react-syntax-highlighter/dist/esm/languages/hljs/go'
+import java from 'react-syntax-highlighter/dist/esm/languages/hljs/java'
 import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
+import kotlin from 'react-syntax-highlighter/dist/esm/languages/hljs/kotlin'
 import markdown from 'react-syntax-highlighter/dist/esm/languages/hljs/markdown'
+import php from 'react-syntax-highlighter/dist/esm/languages/hljs/php'
 import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python'
+import ruby from 'react-syntax-highlighter/dist/esm/languages/hljs/ruby'
 import rust from 'react-syntax-highlighter/dist/esm/languages/hljs/rust'
+import scala from 'react-syntax-highlighter/dist/esm/languages/hljs/scala'
 import sql from 'react-syntax-highlighter/dist/esm/languages/hljs/sql'
+import swift from 'react-syntax-highlighter/dist/esm/languages/hljs/swift'
 import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript'
 import xml from 'react-syntax-highlighter/dist/esm/languages/hljs/xml'
 import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
@@ -22,17 +31,33 @@ import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
  *
  * Adding one is an import and a register line. Anything unregistered still
  * renders — it just renders unhighlighted, which is the correct failure.
+ *
+ * The bar for entry is demand, not fame: a language the model is actually
+ * asked to write. The nine mainstream ones joined when a reader who asked for
+ * Java got a block wearing the Java mark and no color — an economy
+ * indistinguishable from breakage. Perl, Haskell, Lua, Objective-C, MATLAB
+ * and Fortran stay out: rare here, and plain text under the right mark is the
+ * honest state for them.
  */
 const GRAMMARS: Record<string, unknown> = {
   bash,
+  c,
+  cpp,
+  csharp,
   css,
   diff,
   go,
+  java,
   json,
+  kotlin,
   markdown,
+  php,
   python,
+  ruby,
   rust,
+  scala,
   sql,
+  swift,
   typescript,
   xml,
   yaml,
@@ -64,19 +89,33 @@ const ALIASES: Record<string, string> = {
   yml: 'yaml',
   md: 'markdown',
   patch: 'diff',
+  'c++': 'cpp',
+  'c#': 'csharp',
+  cs: 'csharp',
+  kt: 'kotlin',
+  rb: 'ruby',
 }
 
 /** The label shown in a block's header. */
 const DISPLAY: Record<string, string> = {
   bash: 'Shell',
+  c: 'C',
+  cpp: 'C++',
+  csharp: 'C#',
   css: 'CSS',
   diff: 'Diff',
   go: 'Go',
+  java: 'Java',
   json: 'JSON',
+  kotlin: 'Kotlin',
   markdown: 'Markdown',
+  php: 'PHP',
   python: 'Python',
+  ruby: 'Ruby',
   rust: 'Rust',
+  scala: 'Scala',
   sql: 'SQL',
+  swift: 'Swift',
   typescript: 'TypeScript',
   xml: 'HTML',
   yaml: 'YAML',

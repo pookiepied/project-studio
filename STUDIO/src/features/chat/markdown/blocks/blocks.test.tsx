@@ -52,12 +52,23 @@ describe('CodeBlock', () => {
   })
 
   it('marks languages the highlighter does not parse, by the fence\'s word', () => {
-    // `java` is not a registered grammar -- the code renders unhighlighted --
-    // but the fence names a language with a published mark, so the header
+    // `haskell` is not a registered grammar -- the code renders unhighlighted
+    // -- but the fence names a language with a published mark, so the header
     // carries it instead of the generic coding mark.
-    const { container } = render(<CodeBlock code={'class A {}'} fence="java" />)
+    const { container } = render(<CodeBlock code={'main = putStrLn "hi"'} fence="haskell" />)
     expect(container.querySelector('svg[fill="currentColor"]')).not.toBeNull()
     expect(container.querySelector('svg.lucide-code')).toBeNull()
+  })
+
+  it('colors the languages the set commits to, including through an alias', () => {
+    // The nine mainstream grammars joined after a reader who asked for Java
+    // got a block wearing the Java mark and no color. This pins one of the
+    // nine and one fence spelling that resolves through the alias table.
+    const { container } = render(<CodeBlock code={'public class A {}'} fence="java" />)
+    expect(container.querySelector('.hljs-keyword')).not.toBeNull()
+
+    const aliased = render(<CodeBlock code={'void f() { return; }'} fence="c++" />)
+    expect(aliased.container.querySelector('.hljs-keyword')).not.toBeNull()
   })
 
   it('hides nothing: no fade mask, and the body scrolls inside the frame', () => {
