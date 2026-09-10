@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { SHELL } from '@/design/tokens'
+import { cn } from '@/lib/cn'
+import { windowFrame } from '@/shell/chrome/windowFrame'
 import { copyText } from '@/lib/clipboard'
 import { harnessFailureReason } from '@/platform/harness'
 import { describeHarnessFailure } from '@/shell/harness-failure'
@@ -73,11 +75,12 @@ export function DiagnosticWindow() {
   }, [])
 
   const failure = describeHarnessFailure(reason)
+  const frame = windowFrame()
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden border border-hairline bg-surface"
-      style={{ borderRadius: SHELL.windowRadius }}
+      className={cn('flex h-full w-full flex-col overflow-hidden bg-surface', frame.className)}
+      style={frame.style}
     >
       <header
         data-tauri-drag-region

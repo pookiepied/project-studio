@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, RADIUS, SHELL, surfaceVariants } from '@/design/tokens'
+import { DURATION, EASE_OUT, RADIUS, surfaceVariants } from '@/design/tokens'
+import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
 import { CommandPalette } from '@/features/palette'
@@ -153,6 +154,8 @@ export function AppShell() {
     return <HarnessDownPage />
   }
 
+  const frame = windowFrame()
+
   return (
     <div
       // Sunken, not `surface`. The page's rounded corner cuts away to whatever
@@ -161,8 +164,8 @@ export function AppShell() {
       // the sunken tone the sidebar uses, which is what makes the corner read
       // as the page lifting off it. With the sidebar closed the page covers
       // this completely, so nothing shows through.
-      className="relative flex h-full w-full overflow-hidden border border-hairline bg-surface-sunken"
-      style={{ borderRadius: SHELL.windowRadius }}
+      className={cn('relative flex h-full w-full overflow-hidden bg-surface-sunken', frame.className)}
+      style={frame.style}
     >
       {/* Voice mode mounts inside the rounded root, not at the app root, so
           the stage is clipped by the same window corner everything else is

@@ -39,6 +39,11 @@ export interface AwayAddress {
  */
 export interface RemoteAddresses {
   readonly port: number
+  /**
+   * The port the name answers on: 80 when the desktop could take it, so the
+   * name is printed bare, otherwise the same as `port`.
+   */
+  readonly namePort: number
   readonly home: readonly string[]
   readonly homeName: string | null
   readonly away: AwayAddress | null

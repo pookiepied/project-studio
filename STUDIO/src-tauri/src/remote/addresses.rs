@@ -24,8 +24,11 @@ use super::mdns;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Addresses {
-    /// The port every address below is served on.
+    /// The port every raw address below is served on.
     pub(crate) port: u16,
+    /// The port the name answers on: 80 when Studio could take it, so the
+    /// name is printed bare; otherwise `port`, and the name carries it.
+    pub(crate) name_port: u16,
     /// The private-range addresses of this machine: the ones a phone on the
     /// same network can reach. Sorted and deduplicated, the same list the
     /// name is published for.
@@ -57,7 +60,7 @@ pub(crate) struct Away {
 /// the publisher's lock. The Tailscale name is asked of the `tailscale`
 /// tool with a short deadline: a machine without it answers "no such
 /// program" at once, and one where the tool hangs must not hang the screen.
-pub(crate) async fn read(port: u16, home_name_published: bool) -> Addresses {
+pub(crate) async fn read(port: u16, name_port: u16, home_name_published: bool) -> Addresses {
     let (home, tailscale) = interfaces();
     let away = match tailscale {
         Some(address) => Some(Away {
@@ -68,6 +71,7 @@ pub(crate) async fn read(port: u16, home_name_published: bool) -> Addresses {
     };
     Addresses {
         port,
+        name_port,
         home: home.iter().map(ToString::to_string).collect(),
         home_name: home_name_published.then(|| mdns::HOME_NAME.to_owned()),
         away,

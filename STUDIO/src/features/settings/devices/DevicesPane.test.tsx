@@ -18,6 +18,7 @@ const desktop = vi.hoisted(() => ({
   refusal: null as string | null,
   addresses: {
     port: 4747,
+    namePort: 4747,
     home: ['192.168.1.47'],
     homeName: 'studio.local',
     away: null as { address: string; name: string | null } | null,
@@ -68,6 +69,7 @@ beforeEach(() => {
   desktop.refusal = null
   desktop.addresses = {
     port: 4747,
+    namePort: 4747,
     home: ['192.168.1.47'],
     homeName: 'studio.local',
     away: null,
@@ -121,10 +123,24 @@ describe('DevicesPane', () => {
     expect(
       screen.getByRole('img', { name: 'QR code for http://192.168.1.47:4747' }),
     ).not.toBeNull()
-    expect(screen.getByText(/Tailscale is not running on this PC/)).not.toBeNull()
+    // No Tailscale on this machine: no away group, and one quiet line
+    // instead of an advertisement.
+    expect(screen.queryByText('Away from home')).toBeNull()
+    expect(screen.getByText(/if Tailscale is running here/)).not.toBeNull()
     expect(screen.getByLabelText('Pairing code').textContent).toBe('ABC234')
     // The switch took, so the preference is remembered for the next launch.
     expect(desktop.preference).toBe(true)
+  })
+
+  it('prints the name bare when the desktop took port 80 for it', async () => {
+    onDesktop()
+    desktop.addresses.namePort = 80
+    render(<DevicesPane />)
+    await turnOn()
+
+    expect(await screen.findByText('http://studio.local')).not.toBeNull()
+    // The raw address keeps its port: it is the listener, not the name.
+    expect(screen.getByText('http://192.168.1.47:4747')).not.toBeNull()
   })
 
   it('shows the Tailscale name as the away address when the machine has one', async () => {
@@ -135,6 +151,7 @@ describe('DevicesPane', () => {
 
     expect(await screen.findByText('http://desk.tail1234.ts.net:4747')).not.toBeNull()
     expect(screen.getByText('http://100.101.102.103:4747')).not.toBeNull()
+    expect(screen.getByText('Away from home')).not.toBeNull()
   })
 
   it('a refused start is shown as the desktop wrote it, and the preference stays off', async () => {

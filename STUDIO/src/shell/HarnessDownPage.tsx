@@ -4,6 +4,8 @@ import { StudioMark } from '@/components/brand'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
 import { SHELL } from '@/design/tokens'
+import { cn } from '@/lib/cn'
+import { windowFrame } from '@/shell/chrome/windowFrame'
 import { harnessFailureReason } from '@/platform/harness'
 import { isTauri, openDiagnosticWindow, quitApp } from '@/platform/tauri'
 import { describeHarnessFailure } from '@/shell/harness-failure'
@@ -91,11 +93,12 @@ export function HarnessDownPage() {
   }
 
   const failure = describeHarnessFailure(reason)
+  const frame = windowFrame()
 
   return (
     <div
-      className="relative flex h-full w-full flex-col overflow-hidden border border-hairline bg-surface"
-      style={{ borderRadius: SHELL.windowRadius }}
+      className={cn('relative flex h-full w-full flex-col overflow-hidden bg-surface', frame.className)}
+      style={frame.style}
     >
       {/* The window, and only the window: controls and the drag they sit in.
           Nothing else in the strip — a sidebar toggle over a page with no

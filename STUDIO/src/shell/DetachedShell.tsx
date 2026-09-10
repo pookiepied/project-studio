@@ -1,4 +1,6 @@
 import { SHELL } from '@/design/tokens'
+import { cn } from '@/lib/cn'
+import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
 import { VoiceModeProvider } from '@/features/voice'
 import { startWindowDrag } from '@/platform/tauri'
@@ -45,10 +47,12 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
     detach(forkId, forked?.title ?? 'Untitled')
   }
 
+  const frame = windowFrame()
+
   return (
     <div
-      className="relative flex h-full w-full overflow-hidden border border-hairline bg-surface"
-      style={{ borderRadius: SHELL.windowRadius }}
+      className={cn('relative flex h-full w-full overflow-hidden bg-surface', frame.className)}
+      style={frame.style}
     >
       {/* Same stage, same place, as the studio window: over everything this
           window holds, clipped by its rounded frame. See `AppShell`. */}
@@ -95,10 +99,11 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
  * would read as a loading state that never resolves.
  */
 function Missing() {
+  const frame = windowFrame()
   return (
     <div
-      className="flex h-full w-full items-center justify-center border border-hairline bg-surface"
-      style={{ borderRadius: SHELL.windowRadius }}
+      className={cn('flex h-full w-full items-center justify-center bg-surface', frame.className)}
+      style={frame.style}
     >
       <p className="text-ui text-muted-foreground">This conversation is no longer available.</p>
     </div>

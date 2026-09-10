@@ -162,26 +162,31 @@ function AddressSection({ addresses }: { addresses: RemoteAddresses | null }) {
             title="At home"
             note="On the same network as this PC."
             addresses={[
-              ...(addresses.homeName !== null ? [url(addresses.homeName, addresses.port)] : []),
+              ...(addresses.homeName !== null
+                ? [url(addresses.homeName, addresses.namePort)]
+                : []),
               ...home,
             ]}
             empty="This PC is not on a home network right now."
           />
-          <AddressGroup
-            title="Away from home"
-            note="Through Tailscale, with it running on both devices."
-            addresses={
-              addresses.away === null
-                ? []
-                : [
-                    ...(addresses.away.name !== null
-                      ? [url(addresses.away.name, addresses.port)]
-                      : []),
-                    url(addresses.away.address, addresses.port),
-                  ]
-            }
-            empty="Tailscale is not running on this PC, so there is no away address."
-          />
+          {addresses.away !== null ? (
+            <AddressGroup
+              title="Away from home"
+              note="Through Tailscale, with it running on both devices."
+              addresses={[
+                ...(addresses.away.name !== null
+                  ? [url(addresses.away.name, addresses.port)]
+                  : []),
+                url(addresses.away.address, addresses.port),
+              ]}
+              empty=""
+            />
+          ) : (
+            <p className="text-caption text-muted-foreground/80">
+              Away from home, reach this PC through a private network of your own; if Tailscale
+              is running here, its address appears in this list.
+            </p>
+          )}
         </div>
       </div>
     </Section>
@@ -201,8 +206,9 @@ function scannedUrl(addresses: RemoteAddresses): string | null {
   return null
 }
 
+/** A bare name when the port is the one a browser assumes; the port otherwise. */
 function url(host: string, port: number): string {
-  return `http://${host}:${port}`
+  return port === 80 ? `http://${host}` : `http://${host}:${port}`
 }
 
 function AddressGroup({

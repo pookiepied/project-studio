@@ -106,6 +106,20 @@ pub(crate) const DEFAULT_PORT: u16 = 4747;
 /// An override, for the case where the default is genuinely occupied.
 const PORT_VARIABLE: &str = "PROJECT_STUDIO_REMOTE_PORT";
 
+/// The port a browser goes to when a person types a name and nothing else.
+///
+/// `studio.local:4747` is an address; `studio.local` is a name, and the
+/// difference is the whole of what makes the feature read as an application
+/// rather than as a tool. A browser given a bare name goes to port 80, and
+/// nothing in mDNS or anywhere else can steer it to another port - the SRV
+/// record carries one, and no browser reads it. So while the feature is on,
+/// this port is bound as well when the machine allows it, and the name is
+/// printed bare only when that bind took. When it did not - something else
+/// already on 80, or a system that reserves it - the name is printed with the
+/// port, which is the truth and still works. Never a failed start: the fixed
+/// port is the listener, and this one is the pleasant address for it.
+const NAME_PORT: u16 = 80;
+
 /// The listener as the rest of the app holds it.
 ///
 /// One at a time: starting while one runs is answered with the address that is
@@ -121,8 +135,11 @@ pub struct RemoteAccess {
 
 struct Running {
     address: SocketAddr,
-    /// Dropping or setting this ends the accept loop. A `watch` rather than a
-    /// `oneshot` because the loop selects on it repeatedly.
+    /// The port the name answers on: `NAME_PORT` when that bind took, else
+    /// the same as `address`'s.
+    name_port: u16,
+    /// Dropping or setting this ends every accept loop. A `watch` rather than
+    /// a `oneshot` because the loops select on it repeatedly.
     stop: watch::Sender<bool>,
 }
 
@@ -135,6 +152,14 @@ impl RemoteAccess {
             .and_then(|running| running.as_ref().map(|running| running.address))
     }
 
+    /// The port the name answers on, if the listener is on.
+    fn name_port(&self) -> Option<u16> {
+        self.running
+            .lock()
+            .ok()
+            .and_then(|running| running.as_ref().map(|running| running.name_port))
+    }
+
     /// The addresses the settings screen prints, for the port being served.
     ///
     /// `None` while the listener is off: there is nothing to reach, so
@@ -143,12 +168,13 @@ impl RemoteAccess {
     /// listener being on.
     pub async fn addresses(&self) -> Option<Addresses> {
         let port = self.address()?.port();
+        let name_port = self.name_port().unwrap_or(port);
         let published = self
             .mdns
             .lock()
             .map(|publisher| publisher.is_published())
             .unwrap_or(false);
-        Some(addresses::read(port, published).await)
+        Some(addresses::read(port, name_port, published).await)
     }
 
     /// Starts the listener, or reports the one already running.
@@ -202,7 +228,27 @@ impl RemoteAccess {
         };
         let address = listener.local_addr().unwrap_or(address);
 
-        let (stop, mut stopped) = watch::channel(false);
+        // The pleasant address, when the machine allows it. Tried only after
+        // the real port took, so a machine where 80 is free but 4747 is not
+        // still gets the honest sentence about 4747 rather than a listener
+        // on a port nobody was told about.
+        let named = if port == NAME_PORT {
+            None
+        } else {
+            match TcpListener::bind(SocketAddr::from((Ipv4Addr::UNSPECIFIED, NAME_PORT))).await {
+                Ok(named) => Some(named),
+                Err(error) => {
+                    log::info!(
+                        "Remote access: port {NAME_PORT} is not available ({error}); the name \
+                         is served with the port."
+                    );
+                    None
+                }
+            }
+        };
+        let name_port = if named.is_some() { NAME_PORT } else { port };
+
+        let (stop, stopped) = watch::channel(false);
 
         {
             let mut running = self
@@ -214,7 +260,11 @@ impl RemoteAccess {
                 // Their listener is the real one; this one is dropped unbound.
                 return Ok(existing.address);
             }
-            *running = Some(Running { address, stop });
+            *running = Some(Running {
+                address,
+                name_port,
+                stop,
+            });
         }
 
         // The frontend assets. The closure exists so that the routing below
@@ -225,66 +275,21 @@ impl RemoteAccess {
             move |path: &str| assets::serve(&app, path)
         };
 
-        tauri::async_runtime::spawn(async move {
-            loop {
-                let accepted = tokio::select! {
-                    _ = stopped.changed() => break,
-                    accepted = listener.accept() => accepted,
-                };
-                let Ok((stream, peer)) = accepted else {
-                    // One failed accept is not a reason to stop serving; the
-                    // listener is still bound and the next one may be fine.
-                    continue;
-                };
-                // A conversation stream is written a chunk at a time and each
-                // chunk has to leave immediately. Nagle's algorithm holds a
-                // small write back waiting for company, which turns a live
-                // turn into a stuttering one - so it is turned off here rather
-                // than diagnosed later as "streaming feels laggy on the
-                // phone". A failure to set it is not worth refusing the
-                // connection over.
-                let _ = stream.set_nodelay(true);
-                let supervisor = supervisor.clone();
-                let devices = devices.clone();
-                let pairing = pairing.clone();
-                let assets = assets.clone();
-                let peer = peer.ip();
-                tauri::async_runtime::spawn(async move {
-                    let io = TokioIo::new(stream);
-                    // The clones happen per request, and the async block owns
-                    // them: a future that borrowed from this closure would
-                    // not satisfy hyper's `Service` (the same shape the
-                    // listener first shipped with).
-                    let service = service_fn(move |request| {
-                        let assets = assets.clone();
-                        let supervisor = supervisor.clone();
-                        let devices = devices.clone();
-                        let pairing = pairing.clone();
-                        async move {
-                            handle(
-                                &assets,
-                                &supervisor,
-                                &devices,
-                                &pairing,
-                                peer,
-                                request,
-                            )
-                            .await
-                        }
-                    });
-                    if let Err(error) = http1::Builder::new().serve_connection(io, service).await
-                    {
-                        log::debug!("Remote access: connection ended: {error}");
-                    }
-                });
-            }
-            log::info!("Remote access: stopped serving {address}");
-        });
+        let shared = Shared {
+            supervisor,
+            devices,
+            pairing,
+            assets: Arc::new(assets),
+        };
+        tauri::async_runtime::spawn(accept_loop(listener, stopped.clone(), shared.clone()));
+        if let Some(named) = named {
+            tauri::async_runtime::spawn(accept_loop(named, stopped, shared));
+        }
 
         // The name the home network can type, published only now - the port
         // is bound and being served - because a name published for a port
         // that refuses would be a name that lies.
-        self.publish_name(address.port());
+        self.publish_name(name_port);
 
         log::info!("Remote access: serving {address} (devices gate on)");
         Ok(address)
@@ -331,6 +336,74 @@ impl RemoteAccess {
         // longer answers is a name that lies.
         self.withdraw_name();
     }
+}
+
+/// What every connection is served with, cloned per listener and per request.
+#[derive(Clone)]
+struct Shared {
+    supervisor: HarnessSupervisor,
+    devices: Arc<Devices>,
+    pairing: Arc<PairingState>,
+    assets: Arc<dyn Fn(&str) -> Response<RemoteBody> + Send + Sync>,
+}
+
+/// Accepts on one bound port until `stopped` says otherwise.
+///
+/// One function for both listeners, so the port a person types and the port
+/// the name answers on cannot drift into serving different things: every
+/// connection, whichever port it arrived on, goes through the same gate and
+/// the same routes.
+async fn accept_loop(listener: TcpListener, mut stopped: watch::Receiver<bool>, shared: Shared) {
+    let address = listener
+        .local_addr()
+        .map(|address| address.to_string())
+        .unwrap_or_else(|_| "?".to_owned());
+    loop {
+        let accepted = tokio::select! {
+            _ = stopped.changed() => break,
+            accepted = listener.accept() => accepted,
+        };
+        let Ok((stream, peer)) = accepted else {
+            // One failed accept is not a reason to stop serving; the
+            // listener is still bound and the next one may be fine.
+            continue;
+        };
+        // A conversation stream is written a chunk at a time and each
+        // chunk has to leave immediately. Nagle's algorithm holds a
+        // small write back waiting for company, which turns a live
+        // turn into a stuttering one - so it is turned off here rather
+        // than diagnosed later as "streaming feels laggy on the
+        // phone". A failure to set it is not worth refusing the
+        // connection over.
+        let _ = stream.set_nodelay(true);
+        let shared = shared.clone();
+        let peer = peer.ip();
+        tauri::async_runtime::spawn(async move {
+            let io = TokioIo::new(stream);
+            // The clones happen per request, and the async block owns
+            // them: a future that borrowed from this closure would
+            // not satisfy hyper's `Service` (the same shape the
+            // listener first shipped with).
+            let service = service_fn(move |request| {
+                let shared = shared.clone();
+                async move {
+                    handle(
+                        &*shared.assets,
+                        &shared.supervisor,
+                        &shared.devices,
+                        &shared.pairing,
+                        peer,
+                        request,
+                    )
+                    .await
+                }
+            });
+            if let Err(error) = http1::Builder::new().serve_connection(io, service).await {
+                log::debug!("Remote access: connection ended: {error}");
+            }
+        });
+    }
+    log::info!("Remote access: stopped serving {address}");
 }
 
 /// The port to bind: the fixed default, or the override when it is set to
@@ -459,7 +532,7 @@ async fn handle<A, B>(
     request: Request<B>,
 ) -> Result<Response<RemoteBody>, Infallible>
 where
-    A: Fn(&str) -> Response<RemoteBody>,
+    A: Fn(&str) -> Response<RemoteBody> + ?Sized,
     B: hyper::body::Body<Data = bytes::Bytes> + Send + 'static,
     B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
