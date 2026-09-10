@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useWorkspace } from '@/stores/workspace'
-import type { PendingQuestionRecord } from '@/platform/harness'
+import type { HarnessFailure, PendingQuestionRecord } from '@/platform/harness'
 
 /**
  * How often the pending list is read while the answer matters this second:
@@ -19,6 +19,27 @@ const ACTIVE_POLL_MS = 1_000
  * reads while a run is live would never show an inherited question at all.
  */
 const IDLE_POLL_MS = 10_000
+
+/**
+ * How long the "answered elsewhere" sentence stays after the card it explains.
+ *
+ * The sentence exists for the moment the card vanishes - the second in which
+ * a person who was reading it needs to know it did not simply glitch away.
+ * After a few seconds the moment has passed and a notice about a question
+ * that left the screen long ago is noise, so the sentence clears itself.
+ */
+const ANSWERED_ELSEWHERE_MS = 6_000
+
+/**
+ * The harness's answer to losing the race: the row is gone because someone
+ * else's answer got there first. A 404 from the answer route is exactly that
+ * fact and nothing else - every other refusal of this route is a 400 - so the
+ * status alone discriminates the race from every other failure the POST can
+ * meet.
+ */
+function isAnsweredElsewhere(failure: HarnessFailure): boolean {
+  return failure.kind === 'harness-error' && failure.status === 404
+}
 
 /**
  * The questions this conversation's runs are asking, and the answers a
@@ -43,6 +64,13 @@ export function usePendingQuestions(
   readonly rows: readonly PendingQuestionRecord[]
   /** While an answer is in flight; the card's controls are disabled. */
   readonly answeringId: string | null
+  /**
+   * The harness's own sentence for a question that was answered from somewhere
+   * else while this window was showing it, or null. Carried the way a refusal
+   * never is: the sentence explains the vanishing instead of leaving a card
+   * that simply never comes back.
+   */
+  readonly answeredElsewhere: string | null
   answer: (
     id: string,
     answer: { optionIds?: readonly string[]; text?: string; deferred?: boolean },
@@ -60,11 +88,14 @@ export function usePendingQuestions(
   // same poll without re-reading.
   const [records, setRecords] = useState<readonly PendingQuestionRecord[]>([])
   const [answeringId, setAnsweringId] = useState<string | null>(null)
+  const [answeredElsewhere, setAnsweredElsewhere] = useState<string | null>(null)
   const liveRef = useRef(true)
+  const elsewhereTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     liveRef.current = true
     return () => {
       liveRef.current = false
+      if (elsewhereTimer.current !== null) clearTimeout(elsewhereTimer.current)
     }
   }, [])
 
@@ -107,12 +138,30 @@ export function usePendingQuestions(
       setAnsweringId(id)
       try {
         const result = await questions.answer(id, answer)
-        // Only an accepted answer removes the row locally; a refusal stays
-        // for the next poll to reconcile, which also catches the race where
-        // another window answered first.
-        if (result.ok && liveRef.current) {
+        if (!liveRef.current) return
+        if (result.ok) {
           setRecords((current) => current.filter((record) => record.id !== id))
+          return
         }
+        // Losing the race is not a failure to ride out until the next poll
+        // reconciles it: the harness has said the row is gone because another
+        // window's answer got there first, so the row leaves the screen at
+        // once and the harness's own sentence says where it went. A card that
+        // simply vanishes reads as a glitch; the same event with a sentence
+        // reads as what it was - someone answered it already.
+        if (isAnsweredElsewhere(result.error)) {
+          setRecords((current) => current.filter((record) => record.id !== id))
+          setAnsweredElsewhere(result.error.message)
+          if (elsewhereTimer.current !== null) clearTimeout(elsewhereTimer.current)
+          elsewhereTimer.current = setTimeout(() => {
+            elsewhereTimer.current = null
+            if (liveRef.current) setAnsweredElsewhere(null)
+          }, ANSWERED_ELSEWHERE_MS)
+          return
+        }
+        // Any other refusal stays for the next poll to reconcile: the queue
+        // is durable state, and "the answer did not land" is not yet the fact
+        // "nothing is asked".
       } finally {
         if (liveRef.current) setAnsweringId(null)
       }
@@ -150,5 +199,5 @@ export function usePendingQuestions(
     return own
   }, [records, conversationId])
 
-  return { rows, answeringId, answer, stop, cancelAll }
+  return { rows, answeringId, answeredElsewhere, answer, stop, cancelAll }
 }

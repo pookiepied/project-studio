@@ -5,7 +5,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { usePendingApprovals } from './usePendingApprovals'
-import type { PendingApprovalRecord } from '@/platform/harness'
+import type { HarnessResult, PendingApprovalRecord } from '@/platform/harness'
 
 /**
  * Which questions belong to this conversation.
@@ -29,10 +29,14 @@ import type { PendingApprovalRecord } from '@/platform/harness'
 const listPending = vi.fn<() => Promise<{ ok: true; value: readonly PendingApprovalRecord[] }>>()
 // Typed with the arguments they actually receive: declared bare, the call
 // tuple is empty and `toHaveBeenCalledWith` cannot be typed against them.
-const answerApproval = vi.fn(async (_id: string, _answer: unknown) => ({
-  ok: true as const,
-  value: undefined,
-}))
+// The result is the full union, not just the success half, because the race
+// tests below answer with the harness's 404.
+const answerApproval = vi.fn(
+  async (_id: string, _answer: unknown): Promise<HarnessResult<void>> => ({
+    ok: true,
+    value: undefined,
+  }),
+)
 const cancelApproval = vi.fn(async (_id: string) => ({ ok: true as const, value: undefined }))
 
 vi.mock('@/stores/workspace', () => ({
@@ -66,6 +70,7 @@ const answered = (records: readonly PendingApprovalRecord[]) =>
 
 afterEach(() => {
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('the questions one conversation owns', () => {
@@ -113,5 +118,85 @@ describe('the questions one conversation owns', () => {
     // would be a request every ten seconds answering nobody's question.
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(listPending).not.toHaveBeenCalled()
+  })
+})
+
+describe('answered elsewhere (ADR 0050 §3.3)', () => {
+  it('removes a prompt the harness says is already answered, and says so', async () => {
+    vi.useFakeTimers()
+    answered([record('cnv_x')])
+
+    const { result } = renderHook(() => usePendingApprovals('cnv_x'))
+    await act(async () => {})
+    expect(result.current.questions).toHaveLength(1)
+
+    // Losing the race: this window's POST finds the row already answered.
+    // The queue the mock serves after this moment is the reconciled one -
+    // the row the other window settled no longer comes back on a read.
+    answerApproval.mockResolvedValueOnce({
+      ok: false as const,
+      error: {
+        kind: 'harness-error' as const,
+        status: 404,
+        message: 'That approval is no longer pending.',
+      },
+    })
+    listPending.mockResolvedValue({ ok: true, value: [] })
+
+    await act(async () => {
+      await result.current.answer('ask_1', { verdict: 'allow', duration: 'once' })
+    })
+
+    // Gone now, not one poll from now - and the harness's own sentence,
+    // verbatim, stands where the card was.
+    expect(result.current.questions).toHaveLength(0)
+    expect(result.current.answeringId).toBeNull()
+    expect(result.current.answeredElsewhere).toBe('That approval is no longer pending.')
+  })
+
+  it('clears the sentence a few seconds later, when the moment has passed', async () => {
+    vi.useFakeTimers()
+    answered([record('cnv_x')])
+
+    const { result } = renderHook(() => usePendingApprovals('cnv_x'))
+    await act(async () => {})
+
+    answerApproval.mockResolvedValueOnce({
+      ok: false as const,
+      error: { kind: 'harness-error' as const, status: 404, message: 'Gone.' },
+    })
+    listPending.mockResolvedValue({ ok: true, value: [] })
+    await act(async () => {
+      await result.current.answer('ask_1', { verdict: 'deny', duration: 'once' })
+    })
+    expect(result.current.answeredElsewhere).toBe('Gone.')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000)
+    })
+    expect(result.current.answeredElsewhere).toBeNull()
+    // The reconciled queue stays reconciled: no read brought the row back.
+    expect(result.current.questions).toHaveLength(0)
+  })
+
+  it('keeps a real refusal for the next poll, and says nothing about elsewhere', async () => {
+    vi.useFakeTimers()
+    answered([record('cnv_x')])
+
+    const { result } = renderHook(() => usePendingApprovals('cnv_x'))
+    await act(async () => {})
+
+    // Any refusal that is not the 404 is a failure, not a race - the row
+    // stays on screen for the next poll to reconcile, exactly as before.
+    answerApproval.mockResolvedValueOnce({
+      ok: false as const,
+      error: { kind: 'harness-error' as const, status: 400, message: 'Bad answer.' },
+    })
+    await act(async () => {
+      await result.current.answer('ask_1', { verdict: 'allow', duration: 'once' })
+    })
+
+    expect(result.current.questions).toHaveLength(1)
+    expect(result.current.answeredElsewhere).toBeNull()
   })
 })

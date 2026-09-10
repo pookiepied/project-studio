@@ -74,6 +74,54 @@ describe("permission approval broker", () => {
   });
 });
 
+describe("an approval settles once (ADR 0050 §3.3)", () => {
+  it("refuses a second answer to an approval already answered, and the first stands", async () => {
+    const database = openDatabase({ path: ":memory:" });
+    const store = new PendingApprovalStore(database);
+    const broker = new PermissionApprovalBroker({ store });
+
+    const pending = broker.request(REQUEST, DECISION);
+    const id = broker.list(AUTH_CONTEXT)[0]?.id ?? "";
+
+    // Two windows racing on one prompt: the answer that arrives first wins,
+    // and the loser is told there is nothing left to settle.
+    expect(broker.answer(id, { verdict: "allow", duration: "always" }, AUTH_CONTEXT)).toBe(true);
+    expect(broker.answer(id, { verdict: "deny", duration: "once" }, AUTH_CONTEXT)).toBe(false);
+
+    await expect(pending).resolves.toEqual({ verdict: "allow", duration: "always" });
+    expect(broker.list(AUTH_CONTEXT)).toEqual([]);
+
+    // The loser's refusal is not a politeness - it is the durable row being
+    // already gone. The settle is a DELETE guarded by the row existing: had
+    // the row survived, the inherited-row branch below would have taken the
+    // second answer too and both windows would have been told theirs landed.
+    expect(store.list()).toEqual([]);
+
+    database.close();
+  });
+
+  it("lets only the first of two windows answer an inherited row", () => {
+    const database = openDatabase({ path: ":memory:" });
+    const before = new PermissionApprovalBroker({
+      store: new PendingApprovalStore(database),
+    });
+    void before.request(REQUEST, DECISION);
+
+    // Two processes over one durable queue - the restart shape, and the
+    // shape two devices are in. Each sees the row; exactly one answer can
+    // remove it, because removing it IS the guard the second answer fails.
+    const left = new PermissionApprovalBroker({ store: new PendingApprovalStore(database) });
+    const right = new PermissionApprovalBroker({ store: new PendingApprovalStore(database) });
+    const id = left.list(AUTH_CONTEXT)[0]?.id ?? "";
+
+    expect(left.answer(id, { verdict: "deny", duration: "once" }, AUTH_CONTEXT)).toBe(true);
+    expect(right.answer(id, { verdict: "allow", duration: "always" }, AUTH_CONTEXT)).toBe(false);
+    expect(left.list(AUTH_CONTEXT)).toEqual([]);
+
+    database.close();
+  });
+});
+
 describe("permission approval durability (ADR 0036)", () => {
   function freshDatabase(): StudioDatabase {
     return openDatabase({ path: ":memory:" });

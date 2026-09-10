@@ -158,7 +158,9 @@ describe('PairingGate', () => {
     renderGate()
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Pair' })).toBeTruthy())
-    expect(screen.getByRole('button', { name: 'Pair' }).disabled).toBe(true)
+    // `getByRole` typed at the call: the disabled flag belongs to the button
+    // element, and an `as` cast here is what lint would call unnecessary.
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Pair' }).disabled).toBe(true)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

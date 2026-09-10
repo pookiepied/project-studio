@@ -4,6 +4,7 @@ import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer'
+import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
 import { useForkConversation } from '@/features/chat/fork'
 import { Transcript, useAutoScroll } from '@/features/chat/transcript'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
@@ -496,6 +497,12 @@ export function ChatPage({
                     onStop={questions.stop}
                   />
                 </div>
+              ) : null}
+              {approvals.answeredElsewhere !== null ? (
+                <AnsweredElsewhere sentence={approvals.answeredElsewhere} />
+              ) : null}
+              {questions.answeredElsewhere !== null ? (
+                <AnsweredElsewhere sentence={questions.answeredElsewhere} />
               ) : null}
             </>
           ) : null}

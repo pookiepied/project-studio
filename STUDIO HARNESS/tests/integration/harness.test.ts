@@ -384,16 +384,19 @@ async function readUpdateChunks(running: RunningHarness, run: AcceptedRun): Prom
 
 /**
  * Long-polls the updates view until the predicate holds — how a client waits
- * during a live run without the SDK's typed stream in the way.
+ * during a live run without the SDK's typed stream in the way. `startOffset`
+ * is where the reader resumes from: the default reads the whole journal, and
+ * a client reattaching mid-run passes the offset it saw last (ADR 0045).
  */
 async function collectUntil(
   running: RunningHarness,
   run: AcceptedRun,
   predicate: (chunks: readonly unknown[]) => boolean,
   timeoutMs = 20_000,
+  startOffset = "-1",
 ): Promise<readonly unknown[]> {
   const collected: unknown[] = [];
-  let offset = "-1";
+  let offset = startOffset;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const url = updatesUrl(run, offset);
@@ -1148,6 +1151,79 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(settlement?.outcome).toBe("failed");
       expect(JSON.stringify(settlement)).toContain("The upstream planet is misaligned");
       expect(attemptCount(history, "[fail: The upstream planet")).toBe(1);
+    },
+    30_000,
+  );
+
+  it(
+    "feeds two live readers at different offsets without one consuming from the other",
+    async () => {
+      // ADR 0045 §Decision: the conversation stream is a durable journal with
+      // opaque offsets, so two readers at two offsets was always in scope.
+      // This is the first time it has actually been done. Two windows - or,
+      // since the listener, two devices - read one conversation at once: the
+      // second one attaching mid-run from the offset a first read handed it.
+      // The property the durable read promises is that reading does not
+      // consume: both readers see the same events, each from its own offset,
+      // and neither's progress moves the other's.
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // A turn still running while both readers attach. The first read takes
+      // the journal's early chunks and comes back with the offset to resume
+      // from - exactly what a second device's first read does.
+      const run = await client.send("two-readers", "[slow] read me twice");
+      const firstRead = await fetch(updatesUrl(run, "-1"), {
+        headers: { authorization: `Bearer ${running.token}` },
+      });
+      if (!firstRead.ok) {
+        throw new Error(`The first read answered ${String(firstRead.status)}.`);
+      }
+      await firstRead.json();
+      const midRunOffset = firstRead.headers.get("Stream-Next-Offset") ?? "";
+      expect(midRunOffset).not.toBe("");
+
+      const settledHere = (chunks: readonly unknown[]): boolean =>
+        chunks.some(
+          (chunk) => isSettledChunk(chunk) && chunk["submissionId"] === run.submissionId,
+        );
+
+      const [fromStart, fromMidRun] = await Promise.all([
+        collectUntil(running, run, settledHere),
+        collectUntil(running, run, settledHere, 20_000, midRunOffset),
+      ]);
+
+      // Both readers were fed the settlement, live, from their own offsets.
+      // Narrowed after the find rather than by a cast: the predicate's type
+      // guard cannot flow through a `find` that also compares fields.
+      const settledForThisRun = (chunks: readonly unknown[]): Record<string, unknown> | undefined => {
+        const found = chunks.find(
+          (chunk) => isSettledChunk(chunk) && chunk["submissionId"] === run.submissionId,
+        );
+        return isSettledChunk(found) ? found : undefined;
+      };
+      const firstSettled = settledForThisRun(fromStart);
+      const midSettled = settledForThisRun(fromMidRun);
+      expect(firstSettled).toBeDefined();
+      expect(midSettled).toBeDefined();
+
+      // The mid-run reader started later and missed the early chunks - the
+      // offsets are honoured, not normalized back to the beginning.
+      expect(fromStart.length).toBeGreaterThan(fromMidRun.length);
+
+      // And what the mid-run reader saw, event for event, is what the
+      // from-the-start reader saw from the same point on: one journal, two
+      // readers, no interference. The deliveries are not compared raw,
+      // because the view frames each live read with reader-relative markers -
+      // a `conversation-reset` carrying the snapshot at attach, and a
+      // `stream-checkpoint` stamped with the reader's own incarnation - which
+      // are the framing of a read, not events of the conversation.
+      const isReaderFraming = (chunk: unknown): boolean =>
+        isRecordValue(chunk) &&
+        (chunk["type"] === "conversation-reset" || chunk["type"] === "stream-checkpoint");
+      const substantiveStart = fromStart.filter((chunk) => !isReaderFraming(chunk));
+      const substantiveMidRun = fromMidRun.filter((chunk) => !isReaderFraming(chunk));
+      expect(substantiveStart.slice(-substantiveMidRun.length)).toEqual(substantiveMidRun);
     },
     30_000,
   );
