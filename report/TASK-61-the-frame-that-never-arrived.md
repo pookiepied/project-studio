@@ -240,8 +240,9 @@ uses, so a picture is either truly present or truly absent.
 
 ## Outcome
 
-Tests: client 905 → 926 (85 → 87 files), Rust lib 65 → 66. `pnpm typecheck`
-and `pnpm test` green; `cargo test --lib` green (66 passed).
+Tests: client 905 → 929 (85 → 87 files), Rust lib 65 → 66. `pnpm check`
+(typecheck, lint, tests) green; the harness suite green at 1895 passed
+across 123 files; `cargo test --lib` green (66 passed).
 
 Break-verification, each break confirmed to fail the named test and then
 reverted:
