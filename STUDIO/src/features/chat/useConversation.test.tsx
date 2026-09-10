@@ -514,6 +514,23 @@ describe('interruption and its answer', () => {
     const resolvers = new Map<string, () => void>()
     const invoke: ServiceInvoke = async (command, args) => {
       calls.push({ command, args: args ?? {} })
+      if (command === 'service_fetch') {
+        // The cold start reads history before it opens updates, and the read
+        // is what creates the channel - so this has to answer for the channel
+        // to exist at all. It used to be counted as a read, which worked only
+        // while the channel was built eagerly whether a stream opened or not.
+        return {
+          status: 200,
+          headers: [],
+          body: JSON.stringify({
+            v: 1,
+            conversationId: 'conv_1',
+            offset: '-1',
+            messages: [],
+            settlements: [],
+          }),
+        }
+      }
       if (command === 'service_stream_cancel') {
         resolvers.get(String(args?.['streamId']))?.()
         return undefined

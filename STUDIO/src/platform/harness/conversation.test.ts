@@ -870,3 +870,79 @@ describe('a consumer that throws on a chunk batch', () => {
     expect(kinds).toEqual(['chunks'])
   })
 })
+
+/**
+ * The same client, in a browser on another device.
+ *
+ * Nothing about the conversation changes here - the offsets, the two views,
+ * the cold-start order are all the same rules. What changes is only how the
+ * calls leave the page: no Tauri command, no channel, no credential. They go
+ * out as ordinary requests to relative paths, and Studio's own listener on the
+ * PC attaches the bearer on the way to loopback.
+ *
+ * Pinned because the failure it prevents is quiet. If a browser client fell
+ * back to the command seam, every call would reject with something about Tauri
+ * being unavailable, and the phone would show "the harness is not running"
+ * about a harness that was running perfectly well.
+ */
+describe('the conversation client in a browser', () => {
+  /** Installs a fetch for the duration of one call and reports what it saw. */
+  async function withFetch<T>(
+    answer: (path: string, init: RequestInit | undefined) => Response,
+    run: () => Promise<T>,
+  ): Promise<{ result: T; seen: { path: string; init: RequestInit | undefined }[] }> {
+    const seen: { path: string; init: RequestInit | undefined }[] = []
+    const original = globalThis.fetch
+    globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      seen.push({ path, init })
+      return Promise.resolve(answer(path, init))
+    }
+    try {
+      return { result: await run(), seen }
+    } finally {
+      globalThis.fetch = original
+    }
+  }
+
+  it('submits a turn over HTTP, to a relative path and with no credential of its own', async () => {
+    const client = createConversationClient({ conversationId: 'cnv_1' })
+    const { result, seen } = await withFetch(
+      () =>
+        new Response(JSON.stringify({ submissionId: 'sub_1', offset: '3_0' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      () => client.submitTurn('hello'),
+    )
+
+    expect(result).toEqual({ ok: true, value: { submissionId: 'sub_1', offset: '3_0' } })
+    expect(seen).toHaveLength(1)
+    // Relative: the device asks the address it loaded Studio from, which is
+    // the listener, which is the only thing that knows where the harness is.
+    expect(seen[0]?.path).toBe('/agents/studio/cnv_1')
+    expect(seen[0]?.init?.method).toBe('POST')
+    // The page has no bearer and must never appear to: the listener attaches
+    // one the device is never told.
+    const headers = seen[0]?.init?.headers as Record<string, string> | undefined
+    expect(headers === undefined ? undefined : headers['authorization']).toBeUndefined()
+  })
+
+  it('reads history over HTTP too, so a cold start works with no Tauri at all', async () => {
+    const client = createConversationClient({ conversationId: 'cnv_1' })
+    const { seen } = await withFetch(
+      () => new Response('{"error":"No such conversation"}', { status: 404 }),
+      async () => {
+        const events: string[] = []
+        const handle = client.attach({ onEvent: (event) => events.push(event.kind) })
+        const settlement = await handle.settled
+        // A conversation nobody has spoken into is absent, not broken - the
+        // same reading the desktop window makes of the same 404.
+        expect(settlement.outcome).toBe('absent')
+        expect(events).toEqual(['absent'])
+      },
+    )
+
+    expect(seen[0]?.path).toBe('/agents/studio/cnv_1?view=history')
+  })
+})

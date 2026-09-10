@@ -38,14 +38,17 @@
  *
  * ---- What crosses which seam ----------------------------------------------
  *
- * Submitting and aborting are ordinary requests through `service_fetch`.
- * Reading is `service_stream`: Rust holds the credential, reads the SSE
- * body, and forwards classified events over a Tauri channel. Cancelling a
- * read is `service_stream_cancel`, and the distinction it rests on is ADR
- * 0045 section 5: cancelling a stream stops READING a run; aborting stops
- * the RUN. Closing a pane does the first and must never do the second —
- * which is why `attach()`'s handle exposes cancel and nothing else touches
- * the abort route except an explicit caller decision.
+ * Submitting and aborting are ordinary requests through `transport.ts`, which
+ * already knows both surfaces. Reading goes through `stream.ts` — Rust's
+ * `service_stream` in the desktop window, a `fetch` against Studio's own
+ * listener in a browser — and either way the credential is attached outside
+ * this page and never in it.
+ *
+ * The distinction cancelling rests on is ADR 0045 section 5, and it does not
+ * change with the surface: cancelling a stream stops READING a run; aborting
+ * stops the RUN. Closing a pane does the first and must never do the second —
+ * which is why `attach()`'s handle exposes cancel and nothing else touches the
+ * abort route except an explicit caller decision.
  *
  * ---- Injectable seams ------------------------------------------------------
  *
@@ -53,20 +56,30 @@
  * constructor are options, so tests script whole conversations with no
  * Tauri runtime, no harness, and no module patching.
  *
- * There is deliberately no browser fallback for reading: outside Tauri there
- * is no seam, no supervisor and no channel, and a second SSE path in the
- * webview would be two credential stories for one process. The factory still
- * constructs outside Tauri; its reads simply fail through the same result
- * shapes instead of pretending.
+ * Reading has two seams rather than one, and `stream.ts` holds both behind a
+ * single shape: the command seam for the desktop window, where Rust holds the
+ * credential, and an HTTP seam for a browser on another device, where Studio's
+ * own listener attaches it instead. This file has one control flow over that
+ * shape and no branch of its own — two branches here is how the window and the
+ * phone would start disagreeing about what the log said.
  */
 
-import { Channel, invoke as tauriInvoke } from '@tauri-apps/api/core'
+import { invoke as tauriInvoke } from '@tauri-apps/api/core'
 
 import { newId } from '@/lib/id'
+import { isTauri } from '@/platform/tauri'
+import { harnessTransport } from './transport'
+import {
+  defaultStream,
+  type ChannelFactory,
+  type OpenStream,
+  type ServiceInvoke,
+  type StreamChannel,
+  type StreamHandle,
+} from './stream'
 import {
   executionModeToWire,
   parseHarnessErrorBody,
-  parseWireStreamEvent,
   readChunkFacts,
   readConversationSnapshot,
   type ExecutionModeWire,
@@ -76,24 +89,10 @@ import {
 } from './contracts'
 import type { PermissionMode } from '@/domain/permissions/modes'
 
-/**
- * How a command leaves the process. Narrower than `typeof invoke` on
- * purpose: nothing here needs invoke options, and a test satisfies this
- * with a plain async function over a recorded call list.
- */
-export type ServiceInvoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>
-
-/** What a stream channel must look like to be handed into an invoke. */
-export interface StreamChannel {
-  readonly id: number
-}
-
-/** Builds the channel a stream's events arrive over; injectable for tests. */
-export type ChannelFactory = (onMessage: (message: WireStreamEvent) => void) => StreamChannel
-
-function defaultChannelFactory(onMessage: (message: WireStreamEvent) => void): StreamChannel {
-  return new Channel<WireStreamEvent>(onMessage)
-}
+// The seam types live in `stream.ts` beside the two implementations that
+// satisfy them, and are re-exported here because this module's own options
+// are where callers meet them.
+export type { ChannelFactory, OpenStream, ServiceInvoke, StreamChannel }
 
 /* -------------------------------------------------------------------------- */
 /* Failures and results                                                        */
@@ -361,6 +360,12 @@ export interface ConversationClientOptions {
   readonly agentName?: string
   readonly invoke?: ServiceInvoke
   readonly createChannel?: ChannelFactory
+  /**
+   * How a read reaches the harness. Chosen by `defaultStream` when absent:
+   * the command seam in the desktop window, HTTP in a browser on another
+   * device. Named here so a caller can be explicit and a test can be either.
+   */
+  readonly openStream?: OpenStream
 }
 
 export interface ConversationClient {
@@ -411,7 +416,8 @@ export function createConversationClient(options: ConversationClientOptions): Co
   const conversationId = options.conversationId
   const agentName = options.agentName ?? 'studio'
   const invoke: ServiceInvoke = options.invoke ?? ((command, args) => tauriInvoke(command, args))
-  const createChannel: ChannelFactory = options.createChannel ?? defaultChannelFactory
+  const openStream: OpenStream =
+    options.openStream ?? defaultStream(options.invoke, options.createChannel, isTauri())
 
   let trackedOffset: string | null = null
   let active: AttachHandle | null = null
@@ -422,38 +428,56 @@ export function createConversationClient(options: ConversationClientOptions): Co
   const updatesPath = (): string => `${agentsPath()}?view=updates`
 
   /**
-   * One round trip through `service_fetch`, judged the way `client.ts`
-   * judges one: non-2xx takes the harness's own sentence out of the body,
-   * and the response shape the command actually returns is checked before
-   * use because TypeScript describing it proves nothing.
+   * One round trip, judged the way `client.ts` judges one: non-2xx takes the
+   * harness's own sentence out of the body, and the shape that comes back is
+   * checked before use because TypeScript describing it proves nothing.
+   *
+   * Two ways out of the process, chosen once. A client handed an `invoke`
+   * spends it — that is the desktop window and every test that scripts one.
+   * Otherwise the call goes through `harnessTransport`, which is itself the
+   * seam in Tauri and a plain `fetch` in a browser, where Studio's own
+   * listener attaches the credential this page does not have.
+   *
+   * Submitting had to move too, not only reading. A phone that could watch a
+   * turn but not start one would be a viewer, and the whole point is that a
+   * paired device is a full device.
    */
   async function request(
     method: string,
     path: string,
     body: string | undefined,
   ): Promise<{ status: number; bodyText: string } | { failure: SeamFailure }> {
+    const headers: readonly (readonly [string, string])[] = [
+      ['accept', 'application/json'],
+      ...(body === undefined ? [] : ([['content-type', 'application/json']] as const)),
+    ]
     try {
-      const raw: unknown = await invoke('service_fetch', {
-        service: 'harness',
-        path,
-        init: {
-          method,
-          headers: [
-            ['accept', 'application/json'],
-            ...(body === undefined ? [] : [['content-type', 'application/json']]),
-          ],
-          ...(body === undefined ? {} : { body }),
-        },
-      })
-      if (!isRecord(raw) || typeof raw['status'] !== 'number' || typeof raw['body'] !== 'string') {
-        return {
-          failure: {
-            kind: 'malformed',
-            message: 'The service seam answered in a shape no response could be read from.',
+      if (options.invoke !== undefined) {
+        const raw: unknown = await invoke('service_fetch', {
+          service: 'harness',
+          path,
+          init: {
+            method,
+            headers: headers.map(([name, value]) => [name, value]),
+            ...(body === undefined ? {} : { body }),
           },
+        })
+        if (!isRecord(raw) || typeof raw['status'] !== 'number' || typeof raw['body'] !== 'string') {
+          return {
+            failure: {
+              kind: 'malformed',
+              message: 'The service seam answered in a shape no response could be read from.',
+            },
+          }
         }
+        return { status: raw['status'], bodyText: raw['body'] }
       }
-      return { status: raw['status'], bodyText: raw['body'] }
+      const response = await harnessTransport(path, {
+        method,
+        headers: Object.fromEntries(headers.map(([name, value]) => [name, value])),
+        ...(body === undefined ? {} : { body }),
+      })
+      return { status: response.status, bodyText: await response.text() }
     } catch (error) {
       return { failure: seamFailure(error) }
     }
@@ -592,9 +616,11 @@ export function createConversationClient(options: ConversationClientOptions): Co
         }
       })
 
-      const channel = createChannel((raw) => {
-        const event = parseWireStreamEvent(raw)
-        if (event === null || done) return
+      /** The read in progress, once one has been opened. */
+      let handle: StreamHandle | null = null
+
+      const onWireEvent = (event: WireStreamEvent) => {
+        if (done) return
         // Every variant carries the resume point; none is exempt.
         trackedOffset = event.offset
         switch (event.kind) {
@@ -651,23 +677,21 @@ export function createConversationClient(options: ConversationClientOptions): Co
             handlers.onEvent(event)
             return
         }
-      })
+      }
 
       /**
-       * Opens the updates view strictly after `from`. Rust appends the
+       * Opens the updates view strictly after `from`. The seam appends the
        * offset and the live mode itself, so the path names only the view.
        */
       const openUpdates = (from: string) => {
         opened = true
-        const pending = invoke('service_stream', {
-          service: 'harness',
+        handle = openStream({
           path: updatesPath(),
-          init: {},
           offset: from,
+          onEvent: onWireEvent,
           streamId,
-          channel,
         })
-        pending.then(
+        handle.settled.then(
           () => resolveSettled({ outcome: 'cancelled' }),
           (error: unknown) => {
             const failure = seamFailure(error)
@@ -753,7 +777,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
           // opened case to the registry, whose Ok is the honest signal that
           // the reader really has gone.
           if (!opened) resolveSettled({ outcome: 'cancelled' })
-          return invoke('service_stream_cancel', { streamId }).then(
+          return (handle?.cancel() ?? Promise.resolve()).then(
             () => undefined,
             () => undefined,
           )
