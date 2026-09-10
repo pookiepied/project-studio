@@ -5,6 +5,7 @@ import {
   executionModeToWire,
   parseBackgroundJob,
   parseBackgroundJobs,
+  parseFolderListing,
   parseHarnessErrorBody,
   parseMcpServer,
   parseMcpServers,
@@ -241,6 +242,44 @@ describe('parseProbeResult', () => {
 
   it('refuses an optional field of the wrong type instead of dropping it', () => {
     expect(parseProbeResult({ ok: true, reachedAt: 12, modelCount: 'many' })).toBeNull()
+  })
+})
+
+/**
+ * The folder browser's answer (plan step 6). The shape is small, but the null
+ * parent is a real state - a volume root's way back out - and a parser that
+ * read a missing parent as absent rather than as null would turn the top of
+ * the walk into a malformed body.
+ */
+describe('parseFolderListing', () => {
+  it('reads a listing with its directories and its parent', () => {
+    expect(
+      parseFolderListing({
+        path: 'C:\\Users\\pooki',
+        parent: 'C:\\Users',
+        directories: [{ name: 'Dev Workspace', path: 'C:\\Users\\pooki\\Dev Workspace' }],
+      }),
+    ).toEqual({
+      path: 'C:\\Users\\pooki',
+      parent: 'C:\\Users',
+      directories: [{ name: 'Dev Workspace', path: 'C:\\Users\\pooki\\Dev Workspace' }],
+    })
+  })
+
+  it('reads a null parent as null, not as a missing field', () => {
+    expect(parseFolderListing({ path: 'C:\\', parent: null, directories: [] })).toEqual({
+      path: 'C:\\',
+      parent: null,
+      directories: [],
+    })
+  })
+
+  it('refuses a listing whose directories are not entries', () => {
+    expect(parseFolderListing({ path: 'C:\\', parent: null, directories: ['Dev Workspace'] })).toBeNull()
+  })
+
+  it('refuses a listing with no position', () => {
+    expect(parseFolderListing({ parent: null, directories: [] })).toBeNull()
   })
 })
 

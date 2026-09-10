@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 
 import {
   createConversationClient,
+  httpHarnessStatus,
   type ChunkFacts,
   type ChunkPosition,
   type ConversationClient,
@@ -209,6 +210,14 @@ const LIFECYCLE_EVENTS = [
  * start disagreeing.
  */
 export const defaultListen: LifecycleListen = (handler) => {
+  if (!isTauri()) {
+    // A browser has no event bus to subscribe to: the supervisor emits these
+    // into the desktop webview, not over HTTP. An empty subscription that
+    // resolves with a no-op unsubscriber keeps the caller's shape; a browser
+    // notices a stopped or restarted harness when its next contact or request
+    // fails, which is how it notices everything.
+    return Promise.resolve(() => undefined)
+  }
   const subscriptions = LIFECYCLE_EVENTS.map((name) =>
     listen<unknown>(name, (event) => handler({ name, payload: event.payload })),
   )
@@ -234,15 +243,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * A per-conversation factory rather than a shared function because the id is
  * a property of the call: ids are caller-chosen (ADR 0045), and the client
- * built here is one per conversation by construction. Outside Tauri there is
- * no supervisor to ask, and the shipped no-harness behaviour applies.
+ * built here is one per conversation by construction. Outside Tauri the ask
+ * goes to the listener that served the page, which answers for its own
+ * supervisor; a page with no Studio behind it gets no answer, and the shipped
+ * no-harness behaviour applies there as it always did.
  *
  * Whatever comes back must be stable across renders — it is an effect
  * dependency, like the settings pane's connect seam.
  */
 export function defaultContactFor(conversationId: string): ContactHarness {
   return async () => {
-    if (!isTauri()) return { kind: 'absent' }
+    if (!isTauri()) {
+      const report = await httpHarnessStatus()
+      if (report === null) return { kind: 'absent' }
+      if (report.state === 'starting') return { kind: 'starting' }
+      if (report.state !== 'running') return { kind: 'absent' }
+      return { kind: 'ready', client: createConversationClient({ conversationId }) }
+    }
     let state: unknown
     try {
       const report: unknown = await invoke('get_harness_status')

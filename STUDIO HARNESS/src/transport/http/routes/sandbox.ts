@@ -7,6 +7,7 @@ import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
 import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
 import type { WorkspaceTrustStore } from "../../../permissions/trust.js";
 import type { ProjectStore } from "../../../projects/store.js";
+import { browseFolders } from "../../../sandbox/browse.js";
 import { detectPresets } from "../../../sandbox/presets.js";
 import type { SandboxScopeStore } from "../../../sandbox/scope-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
@@ -20,6 +21,13 @@ export interface SandboxRoutesOptions {
    * no decisions, and production must wire it.
    */
   readonly trust?: WorkspaceTrustStore;
+  /**
+   * Where the folder browser opens when no path is named. The person's home
+   * in production; a test's temporary directory here. Optional only so tests
+   * can name it - production must not be the composition that answers a
+   * browse with the harness process's own working directory.
+   */
+  readonly browseHome?: string;
 }
 
 const grantSchema = v.object({
@@ -180,6 +188,30 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
   routes.get("/presets", (context) => {
     try {
       return context.json(detectPresets());
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  /**
+   * The PC's directories, for the folder picker a browser tab needs.
+   *
+   * A folder is chosen on the machine it lives on, and a paired tab has no
+   * native dialog to reach for - the file system being chosen is the PC's,
+   * not the phone's (plan step 6). So the harness lists, and the choosing
+   * surface walks the answer. Reading is wider than choosing on purpose:
+   * nothing here refuses a volume root or a system directory, because those
+   * are positions a person must be able to walk through, and the wall stays
+   * where the choice is made - the folder write, whose
+   * `validateFolderPath` refusal the surface carries verbatim. Opens at the
+   * configured home when no path is named.
+   */
+  routes.get("/browse", (context) => {
+    try {
+      const path = context.req.query("path");
+      return context.json(
+        browseFolders(path === undefined || path === "" ? undefined : path, options.browseHome),
+      );
     } catch (error) {
       return context.json(failure(error), statusOf(error));
     }

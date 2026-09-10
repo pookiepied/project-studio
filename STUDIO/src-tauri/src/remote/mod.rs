@@ -58,15 +58,16 @@ use std::convert::Infallible;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
+use hyper::header::HeaderValue;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::{Request, Response, StatusCode};
+use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use tauri::{AppHandle, Runtime};
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 
-use crate::harness::supervisor::HarnessSupervisor;
+use crate::harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
 
 pub(crate) use body::RemoteBody;
 pub(crate) use devices::{DeviceView, Devices};
@@ -286,6 +287,102 @@ fn configured_port() -> u16 {
         .unwrap_or(DEFAULT_PORT)
 }
 
+/// The two supervisor questions a paired device is served by this process
+/// rather than by the harness.
+///
+/// On the desktop the webview asks them as Tauri commands (`get_harness_status`,
+/// `restart_harness`); a browser has no command channel, and without an answer
+/// it cannot even attach to a conversation - the contact that opens every read
+/// begins by asking whether the harness is running. These two routes are that
+/// ask, over HTTP, at paths the harness itself does not own (nothing under
+/// `/api/harness` exists on the harness side), so there is no question of which
+/// server a path belongs to.
+enum SupervisorRoute {
+    Status,
+    Restart,
+}
+
+fn supervisor_route(path: &str, method: &Method) -> Option<SupervisorRoute> {
+    match (method, path) {
+        (&Method::GET, "/api/harness/status") => Some(SupervisorRoute::Status),
+        (&Method::POST, "/api/harness/restart") => Some(SupervisorRoute::Restart),
+        _ => None,
+    }
+}
+
+/// Answers one supervisor route.
+///
+/// Status is a read and answers immediately. Restart runs the same polite
+/// stop-and-start the desktop command does, which can hold for the whole
+/// readiness window, so it goes to the blocking pool: a restart must make the
+/// device that asked wait, not the runtime that is serving everyone else.
+///
+/// Both are answered after the gate and before the harness endpoint lookup -
+/// after, because they are supervisor questions and a paired device is exactly
+/// who may ask them; before, because the status route exists to answer while
+/// the harness is *down*, which the endpoint check would turn into the 503 that
+/// says nothing about why.
+async fn supervisor_answer(
+    supervisor: &HarnessSupervisor,
+    route: SupervisorRoute,
+) -> Response<RemoteBody> {
+    match route {
+        SupervisorRoute::Status => status_answered(supervisor.status()),
+        SupervisorRoute::Restart => {
+            let owned = supervisor.clone();
+            // Mapped to the view inside the blocking task, where the endpoint
+            // type is nameable: the bearer never crosses into an answer, and
+            // what the mapping below works on is already the view.
+            let restarted =
+                tauri::async_runtime::spawn_blocking(move || {
+                    owned.restart().map(HarnessEndpointView::from)
+                })
+                .await;
+            match restarted {
+                Ok(restarted) => restart_answered(restarted),
+                Err(_) => proxy::refusal(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "The restart was asked of Studio's supervisor and did not come back.",
+                ),
+            }
+        }
+    }
+}
+
+/// A status read, as an answer. The shape is the supervisor command's own -
+/// `state`, the endpoint view or nothing, the failure sentence or nothing - so
+/// a page reads one status vocabulary wherever the answer came from.
+fn status_answered(status: HarnessStatus) -> Response<RemoteBody> {
+    let body = serde_json::to_string(&status)
+        .unwrap_or_else(|_| r#"{"error":"The harness status could not be written."}"#.to_owned());
+    let mut response = Response::new(RemoteBody::full(body));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        hyper::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    response
+}
+
+/// A restart's outcome, as an answer.
+///
+/// A landed restart answers with the status that now holds - running, with the
+/// endpoint view - and a refused one carries the supervisor's own sentence on
+/// a 500: the sentence is redacted at its source, the same one a status read
+/// hands back, and 500 is the honest code for "the thing you asked could not
+/// be done", a harness being down being this hop's normal and answerable
+/// state, not an error in it.
+fn restart_answered(restarted: Result<HarnessEndpointView, String>) -> Response<RemoteBody> {
+    match restarted {
+        Ok(endpoint) => status_answered(HarnessStatus {
+            state: "running",
+            endpoint: Some(endpoint),
+            error: None,
+        }),
+        Err(error) => proxy::refusal(StatusCode::INTERNAL_SERVER_ERROR, &error),
+    }
+}
+
 /// One request from a device.
 ///
 /// The routing order is the security property, and it is stated once, here,
@@ -325,6 +422,13 @@ where
             Ok(revoked) => revoked,
             Err(refused) => return Ok(refused),
         };
+        // The supervisor's own routes, answered here rather than forwarded -
+        // and after the gate, before the endpoint check, for the reasons on
+        // `supervisor_answer`. The method is matched before `forward` moves
+        // the request.
+        if let Some(route) = supervisor_route(&path, request.method()) {
+            return Ok(supervisor_answer(supervisor, route).await);
+        }
         let Some(endpoint) = supervisor.get_endpoint() else {
             return Ok(proxy::refusal(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -536,6 +640,106 @@ mod tests {
         )
         .await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// The two supervisor routes a paired device is served by this process.
+    #[test]
+    fn the_supervisor_routes_are_the_two_exact_methods_and_paths() {
+        assert!(matches!(
+            supervisor_route("/api/harness/status", &Method::GET),
+            Some(SupervisorRoute::Status)
+        ));
+        assert!(matches!(
+            supervisor_route("/api/harness/restart", &Method::POST),
+            Some(SupervisorRoute::Restart)
+        ));
+        // Wrong method, wrong path, near misses: none of them is intercepted,
+        // and each would be forwarded (or refused) by the rules that were
+        // already true.
+        assert!(supervisor_route("/api/harness/status", &Method::POST).is_none());
+        assert!(supervisor_route("/api/harness/restart", &Method::GET).is_none());
+        assert!(supervisor_route("/api/harness/statuses", &Method::GET).is_none());
+        assert!(supervisor_route("/api/harness", &Method::GET).is_none());
+        assert!(supervisor_route("/api/shutdown", &Method::GET).is_none());
+    }
+
+    #[tokio::test]
+    async fn the_status_route_answers_while_the_harness_is_down() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+        let paired = devices.pair("Phone", 0).unwrap();
+
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/api/harness/status")
+                .header(
+                    hyper::header::COOKIE,
+                    format!("studio_device={}", paired.cookie),
+                )
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_text(response).await;
+        // A fresh supervisor has not tried anything, so `stopped` is the truth
+        // - and this is the route's whole reason to exist: the endpoint check
+        // below it would have answered 503 and said nothing about why.
+        assert_eq!(body, r#"{"state":"stopped","endpoint":null,"error":null}"#);
+    }
+
+    #[tokio::test]
+    async fn the_status_route_is_refused_before_the_harness_is_consulted() {
+        let supervisor = fresh_supervisor();
+        let devices = devices();
+        let pairing_state = PairingState::default();
+
+        // Same ordering property as every other harness path: without the
+        // cookie, 401 - not the status, not the 503.
+        let response = route(
+            &supervisor,
+            &devices,
+            &pairing_state,
+            Request::builder()
+                .uri("/api/harness/status")
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn a_refused_restart_and_a_landed_one_map_to_the_answers_a_client_can_read() {
+        // The mapping is the whole restart contract on this hop: the endpoint
+        // view rides a status answer, the supervisor's own sentence rides the
+        // refusal. Both are stated here without running a restart, which in
+        // this crate's tests would spawn a real harness - the route's matching
+        // is pinned above, and `restart` itself is the same call the desktop
+        // command makes.
+        let landed = restart_answered(Ok(HarnessEndpointView {
+            host: "127.0.0.1".to_owned(),
+            port: 4319,
+            pid: 123,
+            url: "http://127.0.0.1:4319".to_owned(),
+            client_id: "studio-host".to_owned(),
+            session_id: "session".to_owned(),
+        }));
+        assert_eq!(landed.status(), StatusCode::OK);
+        let body = body_text(landed).await;
+        assert!(
+            body.contains(r#""url":"http://127.0.0.1:4319""#),
+            "the endpoint view is what a device gets: {body}"
+        );
+
+        let refused = restart_answered(Err("no harness to start".to_owned()));
+        assert_eq!(refused.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = body_text(refused).await;
+        assert_eq!(body, r#"{"error":"no harness to start"}"#);
     }
 
     /// The variable is process-wide, so every case that reads it shares one

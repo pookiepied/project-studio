@@ -21,6 +21,7 @@ import {
 afterEach(() => {
   setAttachmentBytesTransport(null)
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   vi.useRealTimers()
 })
 
@@ -166,5 +167,43 @@ describe('resolving one attachment', () => {
     // The oldest was evicted, so scrolling back to it asks the route again.
     await attachmentDataUrl('conv_cap', { id: 'att_msg_0_0', mimeType: 'image/jpeg' })
     expect(transport).toHaveBeenCalledTimes(122)
+  })
+})
+
+/**
+ * The browser's own path (step 6): no command seam exists there, so the
+ * default transport is a fetch against the page's origin, which only
+ * Studio's listener answers with attachment bytes.
+ */
+describe('resolving one attachment, in a browser', () => {
+  it('fetches the route against this page’s own origin', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: () => Promise.resolve(bytesOf('frame-bytes')),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const url = await attachmentDataUrl('conv_web_1', {
+      id: 'att_msg_1_0',
+      mimeType: 'image/jpeg',
+    })
+    expect(url).toBe(`data:image/jpeg;base64,${btoa('frame-bytes')}`)
+    expect(fetchMock).toHaveBeenCalledWith('/agents/studio/conv_web_1/attachments/att_msg_1_0')
+  })
+
+  it('reads a refusal as a missing frame, not a broken page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      })),
+    )
+
+    await expect(
+      attachmentDataUrl('conv_web_2', { id: 'att_msg_2_0', mimeType: 'image/jpeg' }),
+    ).resolves.toBeNull()
   })
 })

@@ -34,6 +34,7 @@ import {
   type BackgroundJob,
   parseConversationRecords,
   parseDetectedPresets,
+  parseFolderListing,
   parseLibraryProviders,
   parseMcpServer,
   parseMcpServers,
@@ -61,6 +62,7 @@ import {
   type ConversationRecord,
   type DefaultSelection,
   type DetectedPreset,
+  type FolderListing,
   type LibraryProvider,
   type McpServerDraft,
   type McpServerRecord,
@@ -417,6 +419,15 @@ export interface HarnessClient {
   revokeScope(projectId: string, path: string): Promise<HarnessResult<void>>
   /** The toolchains actually on this machine, with the paths found. */
   listPresets(): Promise<HarnessResult<readonly DetectedPreset[]>>
+  /**
+   * One directory of the PC, listed by the harness: the folder picker a
+   * browser tab needs, since the file system being chosen is the PC's, not
+   * the phone's (ADR 0050, step 6). No path names the person's home, where
+   * the walk starts. Reading is wider than choosing on purpose - the listing
+   * reaches roots and system directories, and refusing them stays the folder
+   * write's job, whose sentence this client carries back as a harness-error.
+   */
+  browseFolders(path?: string): Promise<HarnessResult<FolderListing>>
   /** Sets whether one project is contained at all. */
   setSandboxLevel(projectId: string, level: SandboxLevel): Promise<HarnessResult<void>>
   /**
@@ -1034,6 +1045,14 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     listPresets() {
       return json('GET', `${SANDBOX_PATH}/presets`, undefined, parseDetectedPresets)
+    },
+
+    browseFolders(path) {
+      // No path is the picker's first ask: the harness answers with the
+      // person's home, so this side never has to know where home is.
+      const search =
+        path === undefined || path === '' ? '' : `?path=${encodeURIComponent(path)}`
+      return json('GET', `${SANDBOX_PATH}/browse${search}`, undefined, parseFolderListing)
     },
 
     setSandboxLevel(projectId, level) {

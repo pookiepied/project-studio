@@ -5,7 +5,7 @@ import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
 import { SHELL } from '@/design/tokens'
 import { harnessFailureReason } from '@/platform/harness'
-import { openDiagnosticWindow, quitApp } from '@/platform/tauri'
+import { isTauri, openDiagnosticWindow, quitApp } from '@/platform/tauri'
 import { describeHarnessFailure } from '@/shell/harness-failure'
 import { useWorkspace } from '@/stores/workspace'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
@@ -155,10 +155,17 @@ export function HarnessDownPage() {
               re-reads the index. It does not restart Studio, and "Try again"
               left that open to being read either way. This is also the label
               the chat notice already uses for the same action, so the app has
-              one name for it. */}
-          <Button variant="ghost" size="sm" onClick={() => void quitApp()}>
-            Quit Studio
-          </Button>
+              one name for it.
+
+              Quit is the desktop app's life ending, and a browser tab is not
+              that life (plan step 6): a paired device pressing it would be
+              asking the PC's Studio to disappear from a room it is not
+              sitting in, so the button exists only where the app does. */}
+          {isTauri() && (
+            <Button variant="ghost" size="sm" onClick={() => void quitApp()}>
+              Quit Studio
+            </Button>
+          )}
         </div>
       </div>
     </div>

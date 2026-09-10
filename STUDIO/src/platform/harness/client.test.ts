@@ -598,3 +598,51 @@ describe('the scope writes', () => {
     expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: null })
   })
 })
+
+/**
+ * The harness-side folder browser, on the wire (plan step 6).
+ *
+ * The path rides the query, because it is the address being asked about, and
+ * a body on a GET would be a second way to spell it. No path is the picker's
+ * first ask, and it must reach the harness as no query at all - the harness
+ * owns where the walk starts.
+ */
+describe('browseFolders', () => {
+  const LISTING = {
+    path: 'C:\\Users\\pooki',
+    parent: 'C:\\Users',
+    directories: [{ name: 'Dev Workspace', path: 'C:\\Users\\pooki\\Dev Workspace' }],
+  }
+
+  it('asks the sandbox browse route with the path in the query, encoded', async () => {
+    const stub = stubFetch(() => jsonResponse(LISTING))
+
+    const result = await clientWith(stub.fetch).browseFolders('C:\\Users\\pooki\\Dev Workspace')
+
+    expect(stub.calls[0]?.method).toBe('GET')
+    expect(stub.calls[0]?.url).toBe(
+      `${BASE_URL}/api/sandbox/browse?path=${encodeURIComponent('C:\\Users\\pooki\\Dev Workspace')}`,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toEqual(LISTING)
+  })
+
+  it('asks with no query at all when the walk has not started', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...LISTING, parent: null }))
+
+    await clientWith(stub.fetch).browseFolders()
+
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/sandbox/browse`)
+  })
+
+  it('refuses a body that is not a listing rather than returning it', async () => {
+    const stub = stubFetch(() => jsonResponse({ path: 'C:\\', directories: 'none' }))
+
+    const result = await clientWith(stub.fetch).browseFolders('C:\\')
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.kind).toBe('malformed-response')
+  })
+})

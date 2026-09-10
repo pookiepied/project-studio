@@ -2,6 +2,7 @@ import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, Popover, Segmented } from '@/components/primitives'
 import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
+import { isTauri } from '@/platform/tauri'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import {
   DEFAULT_WINDOW_PREFERENCES,
@@ -20,12 +21,17 @@ import { useEffect, useState } from 'react'
  * control shows — both read `PERMISSION_MODES`, so there is one description of
  * each mode in the app and the settings copy can never drift from the picker
  * copy.
+ *
+ * Two rows are about being a desktop app — the tray and the login item — and
+ * a browser tab is not the app's life (plan step 6): they do not render off
+ * the desktop, rather than rendering as controls that change nothing.
  */
 export function GeneralPane() {
   const { settings, setSettings } = useWorkspace()
   const [open, setOpen] = useState(false)
   const mode = findPermissionMode(settings.permission)
   const Glyph = mode.icon
+  const onDesktop = isTauri()
 
   // Both desktop settings are read once when the pane opens rather than held
   // in app-wide state. Nothing else in the app renders them, and the login
@@ -105,45 +111,49 @@ export function GeneralPane() {
         </Popover>
       </Row>
 
-      <Row
-        label="Keep running when the window closes"
-        hint={
-          windowPreferences.closeToTray
-            ? 'Turns in progress carry on, and the tray icon brings the window back. Quit Studio from the tray menu.'
-            : 'Closing the window quits Studio, stopping any turn still running.'
-        }
-      >
-        <Segmented
-          layoutId="settings-close-to-tray"
-          ariaLabel="Keep running when the window closes"
-          value={windowPreferences.closeToTray ? 'on' : 'off'}
-          onChange={(value) => void updateWindow({ closeToTray: value === 'on' })}
-          options={[
-            { id: 'off', label: 'Off' },
-            { id: 'on', label: 'On' },
-          ]}
-        />
-      </Row>
+      {onDesktop && (
+        <Row
+          label="Keep running when the window closes"
+          hint={
+            windowPreferences.closeToTray
+              ? 'Turns in progress carry on, and the tray icon brings the window back. Quit Studio from the tray menu.'
+              : 'Closing the window quits Studio, stopping any turn still running.'
+          }
+        >
+          <Segmented
+            layoutId="settings-close-to-tray"
+            ariaLabel="Keep running when the window closes"
+            value={windowPreferences.closeToTray ? 'on' : 'off'}
+            onChange={(value) => void updateWindow({ closeToTray: value === 'on' })}
+            options={[
+              { id: 'off', label: 'Off' },
+              { id: 'on', label: 'On' },
+            ]}
+          />
+        </Row>
+      )}
 
-      <Row
-        label="Launch at startup"
-        hint={
-          launchAtStartup
-            ? 'Studio starts with your computer and waits in the tray, without opening a window.'
-            : 'Studio starts only when you open it.'
-        }
-      >
-        <Segmented
-          layoutId="settings-launch-at-startup"
-          ariaLabel="Launch at startup"
-          value={launchAtStartup ? 'on' : 'off'}
-          onChange={(value) => void updateStartup(value === 'on')}
-          options={[
-            { id: 'off', label: 'Off' },
-            { id: 'on', label: 'On' },
-          ]}
-        />
-      </Row>
+      {onDesktop && (
+        <Row
+          label="Launch at startup"
+          hint={
+            launchAtStartup
+              ? 'Studio starts with your computer and waits in the tray, without opening a window.'
+              : 'Studio starts only when you open it.'
+          }
+        >
+          <Segmented
+            layoutId="settings-launch-at-startup"
+            ariaLabel="Launch at startup"
+            value={launchAtStartup ? 'on' : 'off'}
+            onChange={(value) => void updateStartup(value === 'on')}
+            options={[
+              { id: 'off', label: 'Off' },
+              { id: 'on', label: 'On' },
+            ]}
+          />
+        </Row>
+      )}
 
       <Row
         label="Undo history"

@@ -7,6 +7,7 @@ import { DEFAULT_PROJECT_ICON, PROJECT_ICONS, type ProjectIcon } from '@/domain/
 import { isTauri, pickDirectory } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
+import { FolderBrowserDialog } from './FolderBrowserDialog'
 import { cn } from '@/lib/cn'
 
 /**
@@ -17,17 +18,20 @@ import { cn } from '@/lib/cn'
  * something the agent can actually work in, and the form says so by refusing to
  * submit without at least one.
  *
- * A folder is a directory the person actually picked: `Add folder` opens the
- * OS directory dialog and names the row after the directory's own last
- * segment, because the point of a picker is that they chose something.
- * Cancelling appends nothing and raises nothing, and a directory already
- * picked is refused here, before the round trip. What makes a path *valid*
- * is the harness's alone - `validateFolderPath` refuses volumes, system
- * directories and absent paths on write - so this dialog does not pre-judge
- * any of that; it only carries the refusal's sentence back verbatim when the
- * store says no. Outside the desktop app there is no picker, and the control
- * says so rather than inventing a path: a fabricated path that reaches the
- * store is the bug this dialog used to be.
+ * A folder is a directory the person actually picked: on the desktop,
+ * `Add folder` opens the OS directory dialog and names the row after the
+ * directory's own last segment, because the point of a picker is that they
+ * chose something. Cancelling appends nothing and raises nothing, and a
+ * directory already picked is refused here, before the round trip. What makes
+ * a path *valid* is the harness's alone - `validateFolderPath` refuses
+ * volumes, system directories and absent paths on write - so this dialog does
+ * not pre-judge any of that; it only carries the refusal's sentence back
+ * verbatim when the store says no. Outside the desktop app there is no native
+ * picker to open, and the file system being chosen is still the PC's, not the
+ * phone's - so the same control opens the harness-side folder browser
+ * (FolderBrowserDialog, plan step 6) instead of saying no: a fabricated path
+ * that reaches the store is the bug this dialog used to be, and a note
+ * refusing the gesture was only one degree better.
  *
  * ---- Trust ----------------------------------------------------------------
  *
@@ -75,6 +79,8 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
   const [trusted, setTrusted] = useState<'trusted' | 'not-yet' | 'unanswered'>('unanswered')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // The harness-side folder browser, open when the native one does not exist.
+  const [browsing, setBrowsing] = useState(false)
 
   // Whether the dialog is still open when the write's verdict arrives. The
   // submit button waits for the harness before closing, but Escape and the
@@ -93,16 +99,37 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
     setTrusted('unanswered')
     setNotice(null)
     setSubmitting(false)
+    setBrowsing(false)
   }
 
   const close = () => {
+    // Escape is bound at the document, so while the folder browser is open it
+    // reaches both sheets. The answer it means there is "back out of the
+    // walk", not "abandon the form" - the browser closes; the form waits.
+    if (browsing) {
+      setBrowsing(false)
+      return
+    }
     reset()
     onClose()
   }
 
+  /** The shared landing for a picked directory, from either picker. */
+  const attach = (picked: string) => {
+    if (folders.some((folder) => folder.path.toLowerCase() === picked.toLowerCase())) {
+      setNotice({ kind: 'note', text: 'A project cannot attach the same folder twice.' })
+      return
+    }
+    setNotice(null)
+    setFolders((current) => [...current, { name: nameFromPath(picked), path: picked }])
+  }
+
   const addFolder = async () => {
     if (!isTauri()) {
-      setNotice({ kind: 'note', text: 'The folder picker needs the desktop app.' })
+      // No native dialog off the desktop, but the file system being chosen is
+      // still the PC's: the harness lists it, and the browser dialog walks
+      // the listing (plan step 6).
+      setBrowsing(true)
       return
     }
     setNotice(null)
@@ -110,11 +137,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
     // Cancelled: the most common outcome of opening a picker, and not a
     // failure - nothing appended, nothing raised.
     if (picked === null) return
-    if (folders.some((folder) => folder.path.toLowerCase() === picked.toLowerCase())) {
-      setNotice({ kind: 'note', text: 'A project cannot attach the same folder twice.' })
-      return
-    }
-    setFolders((current) => [...current, { name: nameFromPath(picked), path: picked }])
+    attach(picked)
   }
 
   const submit = () => {
@@ -271,6 +294,15 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
           </div>
         ) : null}
       </div>
+
+      {/* Off the desktop the picker is this dialog's, not the OS's. It mounts
+          beside the form rather than inside it: a modal over a modal is the
+          arrangement every file dialog behind a form already uses. */}
+      <FolderBrowserDialog
+        open={browsing}
+        onClose={() => setBrowsing(false)}
+        onPick={attach}
+      />
     </Dialog>
   )
 }

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { resolveHarnessAddress } from './connection'
+import {
+  harnessFailureReason,
+  httpHarnessStatus,
+  resolveHarnessAddress,
+  startHarness,
+} from './connection'
 
 /**
  * The one module that decides where the harness is.
@@ -13,6 +18,7 @@ import { resolveHarnessAddress } from './connection'
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
 })
 
 describe('resolveHarnessAddress', () => {
@@ -152,3 +158,122 @@ function aJson(body: { ok: boolean; status: number; json: unknown }): Response {
     json: () => Promise.resolve(body.json),
   } as Response
 }
+
+/**
+ * The supervisor's answers over HTTP (step 6): the status a paired device's
+ * page reads, the restart it can ask for. None of it exists on an origin
+ * Studio does not serve — a 404 there is the same absence the Tauri command
+ * failing is inside the webview.
+ */
+describe('httpHarnessStatus', () => {
+  it('reads the supervisor route the listener answers', async () => {
+    const fetchMock = vi.fn(async () =>
+      aJson({
+        ok: true,
+        status: 200,
+        json: { state: 'running', endpoint: { url: 'http://127.0.0.1:4319' }, error: null },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(httpHarnessStatus()).resolves.toEqual({
+      state: 'running',
+      endpoint: { url: 'http://127.0.0.1:4319' },
+      error: null,
+    })
+    expect(fetchMock).toHaveBeenCalledWith('/api/harness/status')
+  })
+
+  it('is null when the route is not served here', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => aJson({ ok: false, status: 404, json: {} })))
+
+    await expect(httpHarnessStatus()).resolves.toBeNull()
+  })
+
+  it('is null when nothing answers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('failed to fetch'))))
+
+    await expect(httpHarnessStatus()).resolves.toBeNull()
+  })
+
+  it('is null when the answer is not a status', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => aJson({ ok: true, status: 200, json: { hello: 1 } })))
+
+    await expect(httpHarnessStatus()).resolves.toBeNull()
+  })
+})
+
+describe('startHarness, in a browser', () => {
+  it('asks the process that served the page, by POST', async () => {
+    const fetchMock = vi.fn(async () =>
+      aJson({
+        ok: true,
+        status: 200,
+        json: { state: 'running', endpoint: { url: 'http://127.0.0.1:4319' }, error: null },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(startHarness()).resolves.toBe(true)
+    expect(fetchMock).toHaveBeenCalledWith('/api/harness/restart', { method: 'POST' })
+  })
+
+  it('says no when the supervisor refused the start', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => aJson({ ok: false, status: 500, json: { error: 'no harness to start' } })),
+    )
+
+    await expect(startHarness()).resolves.toBe(false)
+  })
+
+  it('says no when there is no Studio behind the page', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => aJson({ ok: false, status: 404, json: {} })))
+
+    await expect(startHarness()).resolves.toBe(false)
+  })
+
+  it('says no when the network refuses the request outright', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('failed to fetch'))))
+
+    await expect(startHarness()).resolves.toBe(false)
+  })
+})
+
+describe('harnessFailureReason, in a browser', () => {
+  it('carries the supervisor’s own sentence for a failed start', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        aJson({
+          ok: true,
+          status: 200,
+          json: { state: 'failed', endpoint: null, error: 'The harness could not be started.' },
+        }),
+      ),
+    )
+
+    await expect(harnessFailureReason()).resolves.toBe('The harness could not be started.')
+  })
+
+  it('is null while the harness is fine', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        aJson({
+          ok: true,
+          status: 200,
+          json: { state: 'running', endpoint: { url: 'http://127.0.0.1:4319' }, error: null },
+        }),
+      ),
+    )
+
+    await expect(harnessFailureReason()).resolves.toBeNull()
+  })
+
+  it('is null when nobody answers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => aJson({ ok: false, status: 404, json: {} })))
+
+    await expect(harnessFailureReason()).resolves.toBeNull()
+  })
+})

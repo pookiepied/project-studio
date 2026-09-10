@@ -14,13 +14,15 @@
  * The text transport decodes every body as UTF-8 (`transport.ts`), which is
  * correct for JSON and fatal for a JPEG: a frame read through
  * `service_fetch` arrives corrupted and cannot be repaired on this side. The
- * bytes therefore cross `service_fetch_bytes`, a command beside it that hands
- * back an ArrayBuffer untouched. Inside Tauri that is the only path; outside
- * Tauri there is no seam at all — the conversation client's rule, kept here
- * rather than inventing a second credential story for a browser fetch the
- * harness's own CORS posture refuses anyway. A caller outside Tauri is
- * answered `null`, which the renderers read as "no picture", the same state
- * a picture that is still loading occupies.
+ * bytes therefore cross `service_fetch_bytes` inside Tauri, a command beside
+ * it that hands back an ArrayBuffer untouched. In a browser on another device
+ * the bytes are a plain fetch of the path against this page's own origin: the
+ * listener serves harness paths to paired devices and attaches the credential
+ * on the way through, the same arrangement the conversation client reads
+ * under, and the bytes survive because nothing on this hop decodes them as
+ * text. A page with no Studio behind it — `vite dev`, a static server — has
+ * no such route; its fetches fail into `null`, which the renderers read as
+ * "no picture", the same state a picture that is still loading occupies.
  *
  * ---- Caching ---------------------------------------------------------------
  *
@@ -72,9 +74,10 @@ export function isAttachmentReference(data: string): boolean {
 export type AttachmentBytes = (path: string) => Promise<ArrayBuffer>
 
 /**
- * The transport, overridable for tests. `null` means the real one, which is
- * the Tauri command; every production caller reads through the cache and
- * never sees this seam at all.
+ * The transport, overridable for tests. `null` means the real one, chosen per
+ * call: the command seam in the desktop window, an ordinary same-origin fetch
+ * in a browser. Every production caller reads through the cache and never
+ * sees this seam at all.
  */
 let bytesTransport: AttachmentBytes | null = null
 
@@ -127,6 +130,20 @@ async function throughTauri(path: string): Promise<ArrayBuffer> {
     throw new Error('The attachment did not arrive as bytes.')
   }
   return bytes
+}
+
+/**
+ * The browser's path to the same bytes: the listener served this page and
+ * serves the route too, same-origin, with the credential attached behind the
+ * pairing gate. A refusal is an error rather than a quiet empty buffer, so
+ * the resolver's failure cache treats it like any other miss.
+ */
+async function throughBrowser(path: string): Promise<ArrayBuffer> {
+  const response = await fetch(path)
+  if (!response.ok) {
+    throw new Error(`The attachment was refused with ${response.status}.`)
+  }
+  return response.arrayBuffer()
 }
 
 /**
@@ -222,9 +239,8 @@ export function attachmentDataUrl(
   if (inFlight !== undefined) return inFlight
 
   const request = (async (): Promise<string | null> => {
-    if (!isTauri() && bytesTransport === null) return null
     try {
-      const transport = bytesTransport ?? throughTauri
+      const transport = bytesTransport ?? (isTauri() ? throughTauri : throughBrowser)
       const bytes = await transport(attachmentPath(conversationId, attachment.id))
       const url = `data:${pictureMime(attachment.mimeType)};base64,${base64Of(bytes)}`
       remember(key, url)

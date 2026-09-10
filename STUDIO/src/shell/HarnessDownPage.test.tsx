@@ -54,10 +54,17 @@ const RAW =
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
 })
+
+/** Stands the test in the webview's shoes, where the desktop-only actions exist. */
+function onDesktop(): void {
+  Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true })
+}
 
 describe('HarnessDownPage', () => {
   it('states the absence in the voice of the app, with the actions that still exist', async () => {
+    onDesktop()
     harnessFailureReason.mockResolvedValue(null)
     render(<HarnessDownPage />)
 
@@ -158,10 +165,23 @@ describe('HarnessDownPage', () => {
   })
 
   it('quits through the platform seam rather than closing the window', async () => {
+    onDesktop()
     harnessFailureReason.mockResolvedValue(null)
     render(<HarnessDownPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Quit Studio' }))
     await waitFor(() => expect(quitApp).toHaveBeenCalledTimes(1))
+  })
+
+  it('offers no quit to a browser tab, which is not the app’s life', async () => {
+    // The button no-ops outside Tauri, and a control that does nothing is
+    // worse than no control: a paired device is a window onto the PC's
+    // Studio, not the app itself.
+    harnessFailureReason.mockResolvedValue(null)
+    render(<HarnessDownPage />)
+
+    expect(screen.queryByRole('button', { name: 'Quit Studio' })).toBeNull()
+    // The remedy it does have is unaffected.
+    expect(screen.getByRole('button', { name: 'Start the harness' })).toBeTruthy()
   })
 })

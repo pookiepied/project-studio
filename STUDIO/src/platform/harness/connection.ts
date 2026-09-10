@@ -64,6 +64,15 @@
  * with the per-launch bearer on the way through, exactly as `service_fetch`
  * does.
  *
+ * The listener does not stop at the address. The supervisor's own answers —
+ * whether the harness is running, and a restart — are served by this process
+ * on the same origin, to any request the pairing gate admits, so a paired
+ * browser can read a down harness and start it again the way the desktop
+ * window does through its commands. `httpHarnessStatus`, `startHarness` and
+ * `harnessFailureReason` below use that, and only ever from a page the
+ * listener served: a dev-configured browser keeps its env-var arrangement,
+ * where the harness has no status route to answer.
+ *
  * Two things this module must never become. It must never write either value
  * anywhere — not the Tauri store, not localStorage — because a credential
  * that outlives the launch that minted it is a credential someone can steal
@@ -206,6 +215,37 @@ export async function resolveHarnessAddress(): Promise<HarnessAddress | null> {
 }
 
 /**
+ * Reads the harness status over HTTP, the way a listener-served page sees it.
+ *
+ * The route is the proxy's own, answered by the desktop process before the
+ * forwarding: `GET /api/harness/status` reports the same shape the Tauri
+ * command does, without the pairing gate ever being crossed. `null` when
+ * nothing answered with that answer — a page not served by Studio has no
+ * such route, and a 404 or a refused request is the same absence as the
+ * Tauri command failing: no status is not an address, and here it is not a
+ * harness either.
+ */
+export async function httpHarnessStatus(): Promise<HarnessStatusReport | null> {
+  let response: Response
+  try {
+    response = await fetch('/api/harness/status')
+  } catch {
+    return null
+  }
+  if (!response.ok) return null
+
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    return null
+  }
+  if (typeof body !== 'object' || body === null) return null
+  if (typeof (body as { state?: unknown }).state !== 'string') return null
+  return body as HarnessStatusReport
+}
+
+/**
  * Asks the supervisor to start the harness, and says whether it came up.
  *
  * This exists because the app had no way to say it. `restart_harness` has been
@@ -226,11 +266,21 @@ export async function resolveHarnessAddress(): Promise<HarnessAddress | null> {
  * refused and a start that never happened are different screens, and the
  * difference is that sentence.
  *
- * Outside Tauri there is no supervisor and nothing to ask, so the answer is
- * no: a browser's harness is started by hand and configured by env var.
+ * A browser asks the process that served it — the same route, answered by the
+ * listener rather than proxied, and admitted by the same pairing gate whose
+ * cookie this page already carries. A page with no Studio behind it gets a
+ * 404 or a refusal, which is the same "no" as no supervisor: a harness
+ * started by hand is started by hand.
  */
 export async function startHarness(): Promise<boolean> {
-  if (!isTauri()) return false
+  if (!isTauri()) {
+    try {
+      const response = await fetch('/api/harness/restart', { method: 'POST' })
+      return response.ok
+    } catch {
+      return false
+    }
+  }
   try {
     const report = await invoke<{ readonly url?: unknown }>('restart_harness')
     return typeof report === 'object' && report !== null
@@ -253,12 +303,17 @@ export async function startHarness(): Promise<boolean> {
  *
  * `null` when there is nothing to say: the harness is running, coming up, or
  * was stopped on purpose — an absence with no failure behind it, which is the
- * normal case and reads as one. Outside Tauri there is no supervisor to hold
- * a sentence, so the answer is `null` too; the remedy there is configuration,
- * not a start.
+ * normal case and reads as one. A listener-served browser asks the same
+ * supervisor over HTTP; a page with no Studio behind it has nothing holding
+ * a sentence, so the answer is `null` there too, and the remedy remains
+ * configuration rather than a start.
  */
 export async function harnessFailureReason(): Promise<string | null> {
-  if (!isTauri()) return null
+  if (!isTauri()) {
+    const report = await httpHarnessStatus()
+    if (report === null || report.state !== 'failed') return null
+    return report.error ?? null
+  }
   let report: HarnessStatusReport
   try {
     report = await invoke<HarnessStatusReport>('get_harness_status')

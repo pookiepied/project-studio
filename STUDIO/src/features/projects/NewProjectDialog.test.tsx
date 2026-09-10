@@ -21,9 +21,11 @@ import type { Project, ProjectIcon } from '@/domain/projects/types'
  * 3. A directory already picked is refused in the dialog, before any request
  *    is written -- the store would refuse it too, but the person should not
  *    need a round trip to learn it.
- * 4. Outside Tauri there is no picker, and the control says so instead of
- *    appending anything -- the fabricated path this dialog once invented is
- *    the bug, so there is no fallback to test for.
+ * 4. Outside Tauri there is no native picker, and the file system being
+ *    chosen is still the PC's -- so the control opens the harness-side folder
+ *    browser and appends through it (plan step 6), rather than refusing the
+ *    gesture or inventing a path (the fabricated path this dialog once
+ *    invented is the bug).
  * 5. A store refusal renders the harness's own sentence verbatim and the
  *    dialog stays open: a refused system directory names `trusted`, and
  *    paraphrasing it would lose the remedy.
@@ -52,6 +54,12 @@ const createProject = vi.fn<
     readonly folders: readonly { readonly name: string; readonly path: string }[]
   }) => { project: Project; written: Promise<HarnessFailure | null> }
 >()
+const browseFolders = vi.fn<
+  (path?: string) => Promise<
+    | { readonly ok: true; readonly value: { readonly path: string; readonly parent: string | null; readonly directories: readonly unknown[] } }
+    | { readonly ok: false; readonly error: { readonly message: string } }
+  >
+>()
 
 vi.mock('@/platform/tauri', () => ({
   isTauri: () => state.tauri,
@@ -62,7 +70,7 @@ const trustFolders = vi.fn<(paths: readonly string[]) => Promise<HarnessFailure 
   Promise.resolve(null),
 )
 vi.mock('@/stores/workspace', () => ({
-  useWorkspace: () => ({ createProject, trustFolders }),
+  useWorkspace: () => ({ createProject, trustFolders, browseFolders }),
 }))
 
 /**
@@ -167,15 +175,30 @@ describe('the folder the person actually picked', () => {
     expect(createProject).not.toHaveBeenCalled()
   })
 
-  it('says it needs the desktop app outside Tauri and appends nothing', async () => {
+  it('opens the harness folder browser outside Tauri and appends through it', async () => {
     state.tauri = false
     renderDialog()
 
-    await pick('C:\\never-asked-for')
+    // The browser dialog's own walk: the harness answers the first ask with
+    // the position, and the person chooses it without a native picker.
+    browseFolders.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        path: 'C:\\Users\\pooki\\work',
+        parent: 'C:\\Users\\pooki',
+        directories: [],
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add folder' }))
 
-    expect(await screen.findByText('The folder picker needs the desktop app.')).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: 'Choose a folder' })).toBeTruthy()
     expect(pickDirectory).not.toHaveBeenCalled()
-    expect(screen.getByText('A project needs at least one folder to work in.')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use this folder' }))
+    expect(await screen.findByText('work')).toBeTruthy()
+    // The form's own row, proved by its control: the browser dialog is still
+    // leaving the screen at this point, so the raw path text matches twice.
+    expect(screen.getByRole('button', { name: 'Remove work' })).toBeTruthy()
     expect(createProject).not.toHaveBeenCalled()
   })
 

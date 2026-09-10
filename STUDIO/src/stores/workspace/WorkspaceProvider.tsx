@@ -26,6 +26,7 @@ import {
   type ApprovalAnswer,
   type DefaultSelection,
   type ExecutionModeWire,
+  type FolderListing,
   type HarnessClient,
   type HarnessFailure,
   type HarnessResult,
@@ -308,6 +309,14 @@ interface WorkspaceValue {
    * written.
    */
   trustFolders: (paths: readonly string[]) => Promise<HarnessFailure | null>
+  /**
+   * One directory of the PC, listed by the harness, for the folder picker a
+   * browser tab needs (plan step 6). Bound to the store's client for the same
+   * restart reason `trustFolders` is, and answered as a not-reachable failure
+   * when there is no client, so the picker renders the sentence rather than
+   * throwing.
+   */
+  browseFolders: (path?: string) => Promise<HarnessResult<FolderListing>>
   removeProject: (projectId: string) => void
   setBranch: (projectId: string, branch: string) => void
 
@@ -1186,6 +1195,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return null
   }, [])
 
+  const browseFolders = useCallback(
+    async (path?: string): Promise<HarnessResult<FolderListing>> => {
+      const client = clientRef.current
+      if (client === null) {
+        return {
+          ok: false,
+          error: {
+            kind: 'not-reachable',
+            timedOut: false,
+            message: 'The harness is not running, so the folders on this PC cannot be listed.',
+          },
+        }
+      }
+      return client.browseFolders(path)
+    },
+    [],
+  )
+
   const removeProject = useCallback(
     (projectId: string) => {
       // Detaches its conversations rather than deleting them - SET NULL at
@@ -1263,6 +1290,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       contextReports,
       markContextReport,
       trustFolders,
+      browseFolders,
       settings,
       setSettings,
       setConversationSettings,
@@ -1301,6 +1329,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       contextReports,
       markContextReport,
       trustFolders,
+      browseFolders,
       orphanTrees,
       plans,
       backgroundJobs,

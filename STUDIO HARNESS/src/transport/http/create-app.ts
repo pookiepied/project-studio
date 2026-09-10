@@ -114,6 +114,12 @@ export interface CreateHttpAppOptions {
    * otherwise.
    */
   readonly trust?: import("../../permissions/trust.js").WorkspaceTrustStore;
+  /**
+   * Where the sandbox folder browser opens when no path is named. The
+   * person's home in production; a test's temporary directory here, the same
+   * optional-for-tests shape as `titling` and `questions`.
+   */
+  readonly browseHome?: string;
   readonly admission: AdmissionVerifier;
   /**
    * Answers whether the catalog currently serves a model reference. Settling a
@@ -166,6 +172,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
         scopes: options.scopes,
         projects: options.projects,
         ...(options.trust === undefined ? {} : { trust: options.trust }),
+        ...(options.browseHome === undefined ? {} : { browseHome: options.browseHome }),
       }),
     );
   }

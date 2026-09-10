@@ -2093,6 +2093,49 @@ export function parseDetectedPresets(value: unknown): readonly DetectedPreset[] 
   return listOf(parseDetectedPreset, value)
 }
 
+/*
+ * The harness-side folder browser (ADR 0050, step 6).
+ *
+ * A folder is chosen on the machine it lives on, and a paired tab has no
+ * native dialog to reach for - the file system being chosen is the PC's, not
+ * the phone's. So the harness lists directories and the picker walks the
+ * answer. The listing is wider than a choice on purpose: it reaches volume
+ * roots and system directories, which are positions a person walks through,
+ * while the wall stays at the folder write, whose refusal arrives as a
+ * harness-error carrying `validateFolderPath`'s sentence.
+ */
+
+export interface BrowsedDirectory {
+  readonly name: string
+  readonly path: string
+}
+
+export interface FolderListing {
+  /** The directory listed, normalized absolute. */
+  readonly path: string
+  /** The way back out, or null where there is no wider directory. */
+  readonly parent: string | null
+  /** The child directories, names first; files are not positions. */
+  readonly directories: readonly BrowsedDirectory[]
+}
+
+export function parseBrowsedDirectory(value: unknown): BrowsedDirectory | null {
+  if (!isRecord(value)) return null
+  const name = text(value['name'])
+  const path = text(value['path'])
+  if (name === null || path === null) return null
+  return { name, path }
+}
+
+export function parseFolderListing(value: unknown): FolderListing | null {
+  if (!isRecord(value)) return null
+  const path = text(value['path'])
+  const parent = value['parent'] === null ? '' : text(value['parent'])
+  const directories = listOf(parseBrowsedDirectory, value['directories'])
+  if (path === null || parent === null || directories === null) return null
+  return { path, parent: parent === '' ? null : parent, directories }
+}
+
 /* -------------------------------------------------------------------------- */
 /* The measured context                                                        */
 /* -------------------------------------------------------------------------- */

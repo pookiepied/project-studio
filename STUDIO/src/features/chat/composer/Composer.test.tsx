@@ -281,3 +281,39 @@ describe('paste and drop', () => {
     expect(screen.queryByAltText('pasted.png')).toBeNull()
   })
 })
+
+/**
+ * The insecure-origin half of the parity table: microphone access is a
+ * secure-context capability, so on plain HTTP the voice controls hide and a
+ * line says why, in the slot where the voice button would be.
+ */
+describe('voice on an insecure origin', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(window, 'isSecureContext')
+  })
+
+  it('hides the voice controls and says why in their place', () => {
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true })
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    expect(screen.queryByRole('button', { name: 'Dictate' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Voice mode' })).toBeNull()
+    expect(screen.getByRole('note').textContent).toBe(
+      'Voice input needs a secure connection to Studio.',
+    )
+    // Everything else still answers: the field and its send control are not
+    // part of the degradation.
+    expect(screen.getByRole('textbox')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add context' })).toBeTruthy()
+  })
+
+  it('keeps the voice controls on a secure origin', () => {
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    expect(screen.getByRole('button', { name: 'Dictate' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Voice mode' })).toBeTruthy()
+  })
+})

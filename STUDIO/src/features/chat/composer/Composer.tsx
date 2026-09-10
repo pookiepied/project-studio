@@ -16,7 +16,7 @@ import { ComposerField, type ComposerFieldHandle } from '@/features/chat/compose
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { DictationBar, useDictation } from '@/features/voice'
-import { useVoiceModeContext } from '@/features/voice'
+import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
 import { useWorkspace } from '@/stores/workspace'
 import type { TurnImageWire } from '@/platform/harness'
 import { cn } from '@/lib/cn'
@@ -177,6 +177,10 @@ export function Composer({
   const [sending, setSending] = useState(false)
   const field = useRef<ComposerFieldHandle>(null)
   const voice = useVoiceModeContext()
+
+  // Whether the mic is ours to ask for here (plan §3.7): read per render,
+  // so the composer answers the origin it is actually on.
+  const voiceAvailable = voiceInputAvailable()
 
   const dictation = useDictation({
     // Appended, not assigned: dictation is one input among several, and a
@@ -540,18 +544,30 @@ export function Composer({
 
               The mark becomes the transport while recording: the mic gathers,
               the square stops. Same control, two states, one meaning — the
-              way send becomes stop while a reply streams. */}
-          <IconButton
-            label={dictation.stage === 'recording' ? 'Stop and transcribe' : 'Dictate'}
-            size="md"
-            active={dictation.stage === 'recording'}
-            disabled={dictation.stage === 'requesting' || dictation.stage === 'processing'}
-            onClick={() =>
-              dictation.stage === 'recording' ? void dictation.stop() : void dictation.start()
-            }
-          >
-            {dictation.stage === 'recording' ? <Icons.stop size="md" /> : <Icons.dictate size="md" />}
-          </IconButton>
+              way send becomes stop while a reply streams.
+
+              On an insecure origin the mic is not ours to ask for —
+              `getUserMedia` is a secure-context capability — so both voice
+              controls hide, and the reason takes the slot where the voice
+              button would be. A button that refuses when pressed is a worse
+              answer than a line that says so first. */}
+          {voiceAvailable && (
+            <IconButton
+              label={dictation.stage === 'recording' ? 'Stop and transcribe' : 'Dictate'}
+              size="md"
+              active={dictation.stage === 'recording'}
+              disabled={dictation.stage === 'requesting' || dictation.stage === 'processing'}
+              onClick={() =>
+                dictation.stage === 'recording' ? void dictation.stop() : void dictation.start()
+              }
+            >
+              {dictation.stage === 'recording' ? (
+                <Icons.stop size="md" />
+              ) : (
+                <Icons.dictate size="md" />
+              )}
+            </IconButton>
+          )}
 
           {/* While the microphone owns the field there is nothing to send and
               no voice mode to offer — the strip is the message in progress,
@@ -592,7 +608,7 @@ export function Composer({
                   )}
                 </IconButton>
               </motion.div>
-            ) : (
+            ) : voiceAvailable ? (
               <motion.div
                 key="voice"
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -609,6 +625,21 @@ export function Composer({
                 <IconButton label="Voice mode" size="md" onClick={voice.enter}>
                   <Icons.voice size="md" />
                 </IconButton>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="voice-reason"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              >
+                {/* The insecure-origin answer: the line says why the voice
+                    controls are not here, in their place, once — not a dialog
+                    and not a permanent rail of text. */}
+                <p className="text-caption text-muted-foreground" role="note">
+                  {VOICE_UNAVAILABLE_REASON}
+                </p>
               </motion.div>
             )}
           </AnimatePresence>

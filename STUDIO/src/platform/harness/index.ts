@@ -22,6 +22,7 @@ export {
 export {
   readPairingState,
   resolveHarnessAddress,
+  httpHarnessStatus,
   startHarness,
   harnessFailureReason,
 } from './connection'
@@ -125,6 +126,7 @@ export {
   parseOrphanTrees,
   parseDetectedPreset,
   parseDetectedPresets,
+  parseFolderListing,
   parseFolderTrust,
   parseSandboxScopeInfo,
   parseSandboxScopeRow,
@@ -185,6 +187,8 @@ export {
   type RetrievalProtocol,
   type DetectedPreset,
   type DetectedPresetPath,
+  type BrowsedDirectory,
+  type FolderListing,
   type FolderTrust,
   type TrustDecision,
   type SandboxLevel,
