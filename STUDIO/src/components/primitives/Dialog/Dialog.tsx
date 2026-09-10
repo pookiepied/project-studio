@@ -113,7 +113,13 @@ export function Dialog({
               transition: { duration: DURATION.base, ease: EASE_IN },
             }}
             transition={SPRING_SURFACE}
-            style={{ width, height }}
+            // `width` is a fixed rem a caller chose for a desktop window,
+            // and it overrides `w-full` — so on a viewport narrower than
+            // the panel, the panel overflowed and this scrim clipped it.
+            // `maxWidth` resolves against the scrim's content box, which
+            // is what the screen actually is, and the panel narrows
+            // instead of being cut off.
+            style={{ width, maxWidth: '100%', height }}
             className={cn(
               'studio-blur flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border',
               'shadow-modal',

@@ -77,7 +77,12 @@ export function ProjectPage({ project }: { project: Project }) {
               >
                 <Icons.project />
                 <span className="min-w-0 flex-1 truncate text-ui text-foreground">{folder.name}</span>
-                <span className="shrink-0 truncate text-micro text-muted-foreground">
+                {/* Capped, not shrinkable: truncate on a `shrink-0` item
+                    never engages — the item is already exactly its content's
+                    width — so a long path walked this row off the page at
+                    phone width. The cap gives the path a share of the row to
+                    ellipsize in and keeps the rest for the name. */}
+                <span className="max-w-[40%] shrink-0 truncate text-micro text-muted-foreground">
                   {folder.path}
                 </span>
               </div>

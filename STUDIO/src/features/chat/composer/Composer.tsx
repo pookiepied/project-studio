@@ -636,8 +636,14 @@ export function Composer({
               >
                 {/* The insecure-origin answer: the line says why the voice
                     controls are not here, in their place, once — not a dialog
-                    and not a permanent rail of text. */}
-                <p className="text-caption text-muted-foreground" role="note">
+                    and not a permanent rail of text. It is capped and
+                    right-aligned because it sits in the row's `auto` column:
+                    uncapped, the sentence's full width was the column's, and
+                    the field beside it was what got squeezed. */}
+                <p
+                  className="max-w-[10rem] text-right text-caption text-muted-foreground"
+                  role="note"
+                >
                   {VOICE_UNAVAILABLE_REASON}
                 </p>
               </motion.div>
