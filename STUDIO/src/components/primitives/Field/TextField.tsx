@@ -4,19 +4,21 @@ import { cn } from '@/lib/cn'
 /**
  * The field treatment used everywhere except the composer.
  *
- * Focus is a border and a 2px ring at 14% alpha. The previous shell used a 3px
- * ring at 26%, which on a white surface read as a thick grey halo — the thing
- * that made clicking a field look like an error state. A monochrome ring has to
- * stay quiet, because unlike a blue one it cannot rely on hue to say "this is
- * focus rather than a warning".
+ * Focus is the border, deepened — nothing else. The treatment this replaces
+ * was a border shift plus a 2px bloom of grey, first at 26% and then at 14%,
+ * and the person using the forms described both the same way: a thick,
+ * old-fashioned, light-grey outline that reads like an error state. The
+ * lesson was not a smaller alpha. A monochrome halo cannot do this job at
+ * any weight — a blue ring says "focus, not warning" with hue, and grey has
+ * nothing but spread to say it with, so the answer read as smudge whatever
+ * its opacity. The edge says it instead: the same one-pixel border the field
+ * always had, deepened to 45%, the weight `--ring` already established as
+ * assertive-but-polite in this app.
  *
- * The ring reads `--field-ring`, not `--ring`. `--ring` is also the keyboard
- * outline's token, at 45% — right for a ring that only appears on Tab and sits
- * outside the control, far too heavy for one that blooms on every click. This
- * field consumed `--ring` from birth while the paragraph above said 14%, so
- * the halo the paragraph was written against shipped anyway; the split token
- * is what makes the prose and the paint agree. The dark value sits below the
- * light one on purpose — see the token comment in `index.css`.
+ * The keyboard outline is a separate register and stays `--ring`: Tab-only,
+ * drawn outside the control where it cannot crowd anything. The fields never
+ * consume it directly — see the token note in `index.css` for the history of
+ * the regression that proved why.
  */
 
 const BASE = [
@@ -28,16 +30,17 @@ const BASE = [
   // default minimum.
   'w-full min-w-0 rounded-md border bg-surface px-2.5 py-1.5 text-ui text-foreground',
   'placeholder:text-muted-foreground/70',
-  'transition-[border-color,box-shadow] duration-fast outline-none',
-  'focus:border-foreground/20 focus:shadow-[0_0_0_2px_var(--field-ring)]',
+  'transition-[border-color] duration-fast outline-none',
+  'focus:border-foreground/45',
   // The app's global `:focus-visible` outline would stack on top of this
-  // field's own ring — two rings, and the outer one floats 4px off the field,
-  // where its ends bulge past the field's own shape on a short control and it
-  // is the first thing an `overflow` ancestor clips at the left and right
-  // edges. The field's ring is the focus indicator, for mouse and keyboard
-  // alike, and it is drawn inside the field's own box so no container can cut
-  // it off. The bang is load-bearing: this sheet's own rules are unlayered,
-  // and unlayered styles beat every utility layer without it.
+  // field's own border — two answers, and the outer one floats 4px off the
+  // field, where its ends bulge past the field's own shape on a short control
+  // and it is the first thing an `overflow` ancestor clips at the left and
+  // right edges. The field's border is the focus indicator, for mouse and
+  // keyboard alike, and it is drawn inside the field's own box so no
+  // container can cut it off. The bang is load-bearing: this sheet's own
+  // rules are unlayered, and unlayered styles beat every utility layer
+  // without it.
   'focus-visible:outline-none!',
 ].join(' ')
 

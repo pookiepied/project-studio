@@ -320,6 +320,7 @@ const BY_LANGUAGE: Readonly<Record<string, MarkName>> = {
   'c++': 'cplusplus',
   csharp: 'csharp',
   'c#': 'csharp',
+  cs: 'csharp',
   java: 'java',
   ruby: 'ruby',
   rb: 'ruby',

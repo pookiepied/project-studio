@@ -24,9 +24,11 @@ once is what made a hovered icon the highest-contrast pixel on screen.
 | active | the chip stays (`--selected`) | the glyph must not darken |
 
 **Focus is answered by register, not by one treatment.** A control answers
-with an edge — its border deepens and a 2px bloom at `--field-ring` confirms
-it, quiet because monochrome cannot borrow hue to say "focus rather than
-warning". A surface answers with elevation: the composer lifts one step of the
+with an edge — its border deepens, and that is all. A bloom behind the edge
+was tried at two weights and the person using the forms read both as a thick,
+old-fashioned grey outline; monochrome cannot borrow hue to say "focus rather
+than warning", so a second grey on the same edge says thickness instead of
+attention. A surface answers with elevation: the composer lifts one step of the
 shadow scale and draws nothing. The keyboard outline is the third and loudest
 register (`--ring`, 45%) and is keyboard-only — `:focus-visible` is what makes
 an assertive ring polite. One token never serves two registers; when the

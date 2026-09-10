@@ -95,7 +95,7 @@ const NOT_COLOURS: ReadonlySet<string> = new Set([
   'transparent', 'current', 'inherit', 'initial', 'unset', 'revert',
   'white', 'black',
   // Typography scale and weight, which share the `text-` prefix.
-  'title', 'body', 'caption', 'micro', 'code', 'ui', 'mono', 'sans', 'serif',
+  'title', 'display', 'body', 'caption', 'micro', 'code', 'ui', 'mono', 'sans', 'serif',
   'thin', 'light', 'normal', 'medium', 'semibold', 'bold', 'wide', 'tight',
   'snug', 'loose', 'relaxed', 'super', 'sub', 'baseline', 'middle',
   'justify', 'words', 'all', 'word', 'break', 'spaces', 'only', 'lines',

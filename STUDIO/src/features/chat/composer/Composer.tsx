@@ -383,12 +383,12 @@ export function Composer({
         // nothing left here to get out of step.
         //
         // The lift is this surface's whole focus treatment, on purpose. Fields
-        // elsewhere answer focus with a darkened border and the whisper bloom
-        // of `--field-ring`; that register belongs to controls that sit among
-        // other controls, and the docblock above is explicit about why a drawn
-        // edge would read this object as an input. Two registers, then — an
-        // edge for a field, elevation for a surface — decided once here, not
-        // two components disagreeing.
+        // elsewhere answer focus with a darkened border and nothing else; the
+        // composer is a surface, not a control among other controls, and the
+        // docblock above is explicit about why a drawn edge would read this
+        // object as an input. Two registers, then — an edge for a field,
+        // elevation for a surface — decided once here, not two components
+        // disagreeing.
         focused ? 'shadow-lifted' : 'shadow-raised',
       )}
     >

@@ -1,6 +1,15 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/inter';
+/* The optical-size build. The default entry ships the weight axis alone, so
+   every size rendered the same letterforms -- drawn for large text, rendered
+   at 10px -- and the small roles read cramped for reasons nobody could name.
+   The opsz files carry both axes; with `font-optical-sizing: auto` (the
+   browser default) letterforms widen and space out as the size drops. */
+@import '@fontsource-variable/inter/opsz.css';
 @import '@fontsource/instrument-serif';
+/* The one mono the app ever draws. The stack it joins is a fallback ladder:
+   the bundled face renders on every machine, so code reads identically here
+   and on a Mac rather than inheriting whatever the OS happened to install. */
+@import '@fontsource-variable/jetbrains-mono';
 @import 'katex/dist/katex.min.css';
 
 @custom-variant dark (&:is(.dark *));
@@ -235,7 +244,15 @@
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  /* JetBrains Mono first: bundled above, so the answer is ours rather than the
+     OS's. The ladder behind it only exists for the frame between first paint
+     and the font arriving. JetBrains was chosen for the tall x-height the
+     code size depends on -- at 11px a mono with a small body drops below
+     legibility, and the previous stack answered with whatever the machine
+     had (Cascadia here, Consolas or Menlo elsewhere), which is why code was
+     the one text in the app nobody had drawn. */
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo,
+    monospace;
 
   /* -- Radius --------------------------------------------------------------
      Absolute steps, mirroring `design/tokens/geometry.ts`.
@@ -420,19 +437,16 @@
   --muted-foreground: oklch(0.553 0 0);
   --border: var(--hairline);
 
-  /* Two registers of focus, because one token was doing two jobs with
-     opposite intensity requirements. `--ring` is the keyboard outline's
-     token: it appears only on Tab, it is drawn outside the control where it
-     cannot crowd anything, and loud is correct there. `--field-ring` is the
-     fields' own bloom: it fires on every click, sits flush against the
-     border, and must stay a whisper. While the fields consumed `--ring` they
-     inherited the outline's 45% and every click read as an error state --
-     the exact regression the field docblock was written against. Dark takes
-     a lower alpha rather than an equal one: white blooming over a dark
-     surface reads brighter against its ground than black over white does,
-     so the same number is not the same contrast in both directions. */
+  /* Focus is one token here, and it is the keyboard outline's. `--ring`
+     appears only on Tab, is drawn outside the control where it cannot crowd
+     anything, and loud is correct there. Fields do not consume it: while they
+     did, they inherited the outline's 45% and every click read as an error
+     state -- the exact regression the field docblock was written against. A
+     field answers focus with its own border deepened instead, drawn by the
+     component; the whisper bloom that once confirmed the edge is gone on the
+     person's word, because two greys stacked on one edge read as thickness,
+     not as focus. */
   --ring: oklch(0.145 0 0 / 45%);
-  --field-ring: oklch(0.145 0 0 / 14%);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
 
@@ -552,9 +566,6 @@
   --muted-foreground: oklch(0.706 0 0);
   --border: var(--hairline);
   --ring: oklch(1 0 0 / 45%);
-  /* Below the light value, not equal to it -- see the token comment in
-     :root. A white bloom on a dark ground reads louder than its alpha. */
-  --field-ring: oklch(1 0 0 / 12%);
   --primary: oklch(0.94 0 0);
   --primary-foreground: oklch(0.205 0 0);
 
