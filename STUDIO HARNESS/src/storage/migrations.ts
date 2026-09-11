@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import * as v from "valibot";
 
 import { StorageError, storageErrorFrom } from "./errors.js";
-import { majorityProtocolFor } from "../providers/library/language-catalog.js";
+import { majorityProtocolFor } from "../gateway/language/pi-catalog.js";
 import { languageProtocolSchema } from "../contracts/providers.js";
 
 /**

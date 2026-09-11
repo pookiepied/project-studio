@@ -23,8 +23,8 @@ import {
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type {
   ManualModelInput,
-} from "../../../providers/model-catalog.js";
-import type { ProviderAdministration } from "../../../providers/management.js";
+} from "../../../gateway/connections/model-catalog.js";
+import type { ProviderAdministration } from "../../../gateway/connections/management.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -5,7 +5,7 @@ import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
+import { RetrievalSettingsStore } from "../../src/gateway/retrieval/settings.js";
 import { createRetrievalRoutes } from "../../src/transport/http/routes/retrieval.js";
 import {
   createAdmissionMiddleware,

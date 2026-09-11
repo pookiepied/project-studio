@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import * as titleModule from "../../src/agents/title.js";
 import { TITLE_AGENT_ID } from "../../src/contracts/agents.js";
 import { ProviderConfigurationError, STUDIO_MODEL_ID } from "../../src/contracts/models.js";
-import { bootstrapModelProviders } from "../../src/models/bootstrap.js";
-import { refreshBackgroundLadder } from "../../src/models/background-model.js";
+import { bootstrapModelProviders } from "../../src/gateway/language/bootstrap.js";
+import { refreshBackgroundLadder } from "../../src/gateway/language/background-model.js";
 import { TITLE_PROMPT } from "../../src/context/title-prompt.js";
 
 /** One line of the fixed prompt, quoted from the module. */

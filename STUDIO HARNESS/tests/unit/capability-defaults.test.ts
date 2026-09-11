@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
 import {
   CapabilityResolver,
   MergedRetrievalResolver,
-} from "../../src/providers/capability-defaults.js";
+} from "../../src/gateway/connections/capability-defaults.js";
 
 /**
  * The seam Task 40's MCP servers read: one call names a capability slot and

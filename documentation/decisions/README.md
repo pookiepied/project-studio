@@ -84,6 +84,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0003](0003-context-optimization.md) | Context optimization |
 | [0005](0005-model-provider-composition.md) | Model-provider composition |
 | [0009](0009-local-byok-providers.md) | Local BYOK providers |
+| [0051](0051-pi-is-the-language-gateway-and-nothing-else.md) | Pi is the language gateway, and nothing else — everything that talks to a vendor lives under `src/gateway/`, and only `language/` may import Pi |
 
 ### Gateway
 | | |

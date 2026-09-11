@@ -14,7 +14,7 @@ import {
 import {
   bootstrappedModelRegistry,
   bootstrappedSupportedReasoningLevels,
-} from "../models/bootstrap.js";
+} from "../gateway/language/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";

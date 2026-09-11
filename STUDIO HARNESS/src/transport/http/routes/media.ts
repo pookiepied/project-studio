@@ -9,7 +9,7 @@ import {
 } from "../../../contracts/media.js";
 import { StudioError } from "../../../contracts/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
-import type { MediaAdministration } from "../../../media/service.js";
+import type { MediaAdministration } from "../../../gateway/media/service.js";
 
 /**
  * The media routes: dictation and read-aloud, the app's own voice features.

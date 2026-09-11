@@ -4,9 +4,9 @@ import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type { Api, Model } from "@earendil-works/pi-ai";
 
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { PiCredentialStore } from "../../src/models/local/credential-bridge.js";
-import { createLocalRuntime } from "../../src/models/local/runtime.js";
-import { languageCatalogModels } from "../../src/providers/library/language-catalog.js";
+import { PiCredentialStore } from "../../src/gateway/language/local/credential-bridge.js";
+import { createLocalRuntime } from "../../src/gateway/language/local/runtime.js";
+import { languageCatalogModels } from "../../src/gateway/language/pi-catalog.js";
 import { runThinkingLevelForChoice } from "../../src/contracts/models.js";
 
 /**

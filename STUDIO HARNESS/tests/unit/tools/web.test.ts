@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ExecutionScope } from "../../../src/contracts/capabilities.js";
 import { PermissionGrantStore } from "../../../src/permissions/grant-store.js";
 import { PermissionKernel } from "../../../src/permissions/kernel.js";
-import type { RetrievalService } from "../../../src/retrieval/service.js";
+import type { RetrievalService } from "../../../src/gateway/retrieval/service.js";
 import { LocalSandbox } from "../../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";

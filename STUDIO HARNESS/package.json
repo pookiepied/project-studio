@@ -9,7 +9,7 @@
   },
   "scripts": {
     "auth": "tsx src/auth/cli.ts",
-    "providers": "tsx src/models/local/cli.ts",
+    "providers": "tsx src/gateway/language/local/cli.ts",
     "export": "tsx src/conversations/export-cli.ts",
     "sandbox:prepare": "tsx src/sandbox/cli.ts prepare",
     "sandbox:list": "tsx src/sandbox/cli.ts list",

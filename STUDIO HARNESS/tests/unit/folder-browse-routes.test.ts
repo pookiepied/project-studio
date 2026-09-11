@@ -10,11 +10,11 @@ import type { McpAdministration } from "../../src/application/mcp-management.js"
 import { ConversationStore } from "../../src/conversations/store.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ProjectStore } from "../../src/projects/store.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
-import { ProviderManagementService } from "../../src/providers/management.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
+import { ProviderManagementService } from "../../src/gateway/connections/management.js";
 import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
-import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
+import { RetrievalSettingsStore } from "../../src/gateway/retrieval/settings.js";
 import { browseFolders } from "../../src/sandbox/browse.js";
 import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
 import { normalizeScopePath } from "../../src/sandbox/scope.js";

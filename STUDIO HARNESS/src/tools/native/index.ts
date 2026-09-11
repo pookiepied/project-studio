@@ -1,10 +1,10 @@
 import type { SecureCredentialStore } from "../../credentials/credential-store.js";
 import type { StudioDatabase } from "../../storage/database.js";
-import { RetrievalService, type MergedRetrievalLink } from "../../retrieval/service.js";
-import { RetrievalSettingsStore } from "../../retrieval/settings.js";
-import { MergedRetrievalResolver } from "../../providers/capability-defaults.js";
-import { ConnectionStore } from "../../providers/connection-store.js";
-import { ModelCatalog } from "../../providers/model-catalog.js";
+import { RetrievalService, type MergedRetrievalLink } from "../../gateway/retrieval/service.js";
+import { RetrievalSettingsStore } from "../../gateway/retrieval/settings.js";
+import { MergedRetrievalResolver } from "../../gateway/connections/capability-defaults.js";
+import { ConnectionStore } from "../../gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../gateway/connections/model-catalog.js";
 import type { CallGate } from "../gate.js";
 import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
 import type { ImageBudget } from "../filesystem/image-budget.js";

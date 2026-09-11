@@ -6,11 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { MediaService } from "../../src/media/service.js";
+import { MediaService } from "../../src/gateway/media/service.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
-import { CapabilityResolver } from "../../src/providers/capability-defaults.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
+import { CapabilityResolver } from "../../src/gateway/connections/capability-defaults.js";
 import { createMediaRoutes } from "../../src/transport/http/routes/media.js";
 import {
   createAdmissionMiddleware,

@@ -4,10 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import { MIGRATIONS, migrate } from "../../src/storage/migrations.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
-import { readStoredConnections } from "../../src/providers/connection-store.js";
-import { createProviderBootstrapCoordinator } from "../../src/models/bootstrap.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
+import { readStoredConnections } from "../../src/gateway/connections/connection-store.js";
+import { createProviderBootstrapCoordinator } from "../../src/gateway/language/bootstrap.js";
 
 let db: StudioDatabase;
 let credentials: InMemoryCredentialStore;
@@ -528,7 +528,12 @@ describe("the declared catalog", () => {
     expect(served.has("openai/gpt-5.2")).toBe(true);
   });
 
-  it("serves the image catalog to a media connection", async () => {
+  it("serves a media connection nothing from Pi, only what Studio declares", async () => {
+    // Pi is the language gateway and nothing else (ADR 0051). Its image
+    // catalog used to be read into a media connection here; that read is
+    // gone, and until the OpenRouter media adapter reads OpenRouter's own
+    // listing, a media connection to a vendor Studio has not declared draws
+    // no models at all rather than a list nothing could run.
     await connections.add({
       id: "openrouter-images",
       displayName: "OpenRouter Images",
@@ -540,14 +545,6 @@ describe("the declared catalog", () => {
     });
     const catalog = new ModelCatalog({ db, connections });
     const listed = await catalog.listModels({ connectionId: "openrouter-images" });
-
-    // The count is a snapshot of Pi's generated image catalog, which moves
-    // with the package (35 on pi-ai 0.80, 50 on 0.84); the identity and
-    // shape assertions below are the real contract.
-    expect(listed.length).toBe(50);
-    const flux = listed.find((model) => model.modelId === "black-forest-labs/flux.2-max");
-    expect(flux).toBeDefined();
-    expect(flux?.capability.imageGeneration).toBe("supported");
-    expect(flux?.shape).toBe("sync");
+    expect(listed).toEqual([]);
   });
 });

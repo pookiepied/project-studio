@@ -2,14 +2,14 @@ import type { Api, Model, MutableModels } from "@earendil-works/pi-ai";
 import { createModels, createProvider, lazyApi } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 
-import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
-import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
+import { LocalModelProviderAdapter } from "../../src/gateway/language/adapters/local-adapter.js";
+import { TestModelProviderAdapter } from "../../src/gateway/language/adapters/test-adapter.js";
 import {
   backgroundLadderSpecifier,
-} from "../../src/models/background-model.js";
-import { ModelRegistry } from "../../src/models/model-registry.js";
-import type { LocalModelConfig } from "../../src/models/local/config.js";
-import { API_LOADERS } from "../../src/models/local/apis.js";
+} from "../../src/gateway/language/background-model.js";
+import { ModelRegistry } from "../../src/gateway/language/model-registry.js";
+import type { LocalModelConfig } from "../../src/gateway/language/local/config.js";
+import { API_LOADERS } from "../../src/gateway/language/local/apis.js";
 
 const ZERO_CONTEXT = { contextWindow: 8_000, maxTokens: 1_000 };
 

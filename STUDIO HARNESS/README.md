@@ -353,17 +353,31 @@ the same alias.
 > "gateway" stays reserved in the provider contract for a possible future user-hosted source;
 > ADR 0031 records that the cancelled contract was already wrong.
 
-## Provider Administration
+## The Gateway
 
-Separate from the model source (which is one process-level choice), the provider subsystem
+Everything that talks to a model vendor lives under `src/gateway/`, one folder per kind of
+gateway, and the rule that makes it a subsystem rather than a folder is enforced by lint: the
+language gateway is the only place that may import `@earendil-works/pi-ai`.
+
+- `src/gateway/language/` — Pi, confined to text: the model registry, the local and test
+  adapters, the Pi runtime and credential bridge, the prompt trace, and `pi-catalog.ts`, which
+  answers for Pi's models in contract types so no Pi type leaves the folder.
+- `src/gateway/media/` — Studio's own drivers for speech and transcription (and, as the gateway
+  plan lands, image, image editing and video), speaking to each vendor directly.
+- `src/gateway/retrieval/` — the five web providers (Tavily, Brave, Exa for search; Jina,
+  Firecrawl for reading a page) behind `web_search` and `web_fetch`.
+- `src/gateway/catalog/` — the provider library: the declared catalog for everything beyond
+  language, joined with the language gateway's, plus the provider icons.
+- `src/gateway/connections/` — `ConnectionStore` persists connection records (keys live in the
+  OS keychain, never the database), `ModelCatalog` serves catalogs, manual models, overrides
+  and per-slot defaults, and the probe checks a connection is live.
+
+Separate from the model source (which is one process-level choice), the connection half
 administers user-declared connections to language, media, and retrieval providers and the models
 they expose:
 
 - `src/contracts/providers.ts` — `ProviderConnection` / `ProviderPort` contract: connections,
   models, capability slots, and defaults, shared by the stores and the HTTP surface.
-- `src/providers/` — `ConnectionStore` persists connection records (keys live in the OS keychain,
-  never the database) and `ModelCatalog` serves built-in catalogs, manual models, overrides, and
-  per-slot defaults.
 - `src/application/provider-management.ts` — `ProviderAdministration`, the port the HTTP surface
   takes, composed over the two stores in `app.ts`.
 - `src/transport/http/routes/providers.ts` — routes under `/api/providers`, behind the

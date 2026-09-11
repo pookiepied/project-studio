@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
-import { RetrievalError } from "../../src/retrieval/errors.js";
-import { RetrievalService } from "../../src/retrieval/service.js";
-import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
-import { runWithFallback } from "../../src/retrieval/slots.js";
-import type { SearchProvider } from "../../src/retrieval/types.js";
+import { RetrievalError } from "../../src/gateway/retrieval/errors.js";
+import { RetrievalService } from "../../src/gateway/retrieval/service.js";
+import { RetrievalSettingsStore } from "../../src/gateway/retrieval/settings.js";
+import { runWithFallback } from "../../src/gateway/retrieval/slots.js";
+import type { SearchProvider } from "../../src/gateway/retrieval/types.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 /**

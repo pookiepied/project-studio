@@ -82,6 +82,37 @@ export default tseslint.config(
        */
       "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: true }],
       "@typescript-eslint/no-misused-promises": "error",
+
+      /**
+       * Pi is the language gateway and nothing else. Every other gateway -
+       * media, retrieval - is Studio's own code speaking to a vendor, and
+       * the one time a capability reached for Pi because Pi happened to be
+       * present (the image catalog) it tied image generation to a package
+       * that was never going to serve it. The boundary is a folder, and the
+       * folder is enforced here rather than remembered.
+       */
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@earendil-works/pi-ai", "@earendil-works/pi-ai/*"],
+              message:
+                "Pi is imported only under src/gateway/language. Ask the language gateway instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/gateway/language/**/*.ts", "tests/**/*.ts"],
+    rules: {
+      /**
+       * The language gateway is where Pi lives; tests may build Pi's shapes
+       * to exercise it.
+       */
+      "no-restricted-imports": "off",
     },
   },
   {

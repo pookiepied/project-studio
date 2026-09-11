@@ -2,7 +2,7 @@ import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
 } from "../../contracts/capabilities.js";
-import type { RetrievalService } from "../../retrieval/service.js";
+import type { RetrievalService } from "../../gateway/retrieval/service.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { UNTRUSTED_CONTENT_NOTE } from "./untrusted.js";

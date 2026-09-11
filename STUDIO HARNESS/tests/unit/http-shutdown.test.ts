@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
-import type { ProviderAdministration } from "../../src/providers/management.js";
+import type { ProviderAdministration } from "../../src/gateway/connections/management.js";
 import type { ConversationStore } from "../../src/conversations/store.js";
 import type { ProjectStore } from "../../src/projects/store.js";
 import { openDatabase } from "../../src/storage/database.js";

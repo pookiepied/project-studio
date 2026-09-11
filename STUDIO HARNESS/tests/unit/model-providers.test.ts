@@ -12,16 +12,16 @@ import {
   STUDIO_MODEL_ID,
   type ModelCapability,
 } from "../../src/contracts/models.js";
-import { ModelRegistry } from "../../src/models/model-registry.js";
-import { resolveProviderConfig } from "../../src/models/provider-config.js";
-import { API_LOADERS } from "../../src/models/local/apis.js";
-import type { LocalModelConfig } from "../../src/models/local/config.js";
+import { ModelRegistry } from "../../src/gateway/language/model-registry.js";
+import { resolveProviderConfig } from "../../src/gateway/language/provider-config.js";
+import { API_LOADERS } from "../../src/gateway/language/local/apis.js";
+import type { LocalModelConfig } from "../../src/gateway/language/local/config.js";
 import {
   createModelProviderAdapter,
   createProviderBootstrapCoordinator,
-} from "../../src/models/bootstrap.js";
-import { TestModelProviderAdapter, stream } from "../../src/models/adapters/test-adapter.js";
-import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
+} from "../../src/gateway/language/bootstrap.js";
+import { TestModelProviderAdapter, stream } from "../../src/gateway/language/adapters/test-adapter.js";
+import { LocalModelProviderAdapter } from "../../src/gateway/language/adapters/local-adapter.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 

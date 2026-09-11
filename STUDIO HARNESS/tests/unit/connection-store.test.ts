@@ -15,10 +15,10 @@ import {
   type ErrorReportContext,
   type ErrorReporter,
 } from "../../src/observability/error-reporter.js";
-import { customProviderEnvVar } from "../../src/models/local/runtime.js";
+import { customProviderEnvVar } from "../../src/gateway/language/local/runtime.js";
 import {
   ConnectionStore,
-} from "../../src/providers/connection-store.js";
+} from "../../src/gateway/connections/connection-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 const ENV_PROVIDER_ID = "env-provider";

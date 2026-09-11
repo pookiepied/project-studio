@@ -5,8 +5,8 @@ import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import {
   parseModelSpecifier,
   resolveLocalModelConfig,
-} from "../../src/models/local/config.js";
-import { PiCredentialStore } from "../../src/models/local/credential-bridge.js";
+} from "../../src/gateway/language/local/config.js";
+import { PiCredentialStore } from "../../src/gateway/language/local/credential-bridge.js";
 
 describe("model specifiers", () => {
   it("splits on the first separator so model ids may contain slashes", () => {

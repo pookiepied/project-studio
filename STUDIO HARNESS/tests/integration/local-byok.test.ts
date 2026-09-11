@@ -9,15 +9,15 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
-import { resolveLocalModelConfig } from "../../src/models/local/config.js";
-import { PiCredentialStore } from "../../src/models/local/credential-bridge.js";
+import { LocalModelProviderAdapter } from "../../src/gateway/language/adapters/local-adapter.js";
+import { resolveLocalModelConfig } from "../../src/gateway/language/local/config.js";
+import { PiCredentialStore } from "../../src/gateway/language/local/credential-bridge.js";
 import {
   createLocalRuntime,
   LOCAL_PLACEHOLDER_KEY,
   type LocalRuntime,
-} from "../../src/models/local/runtime.js";
-import { LOCAL_ALIAS_API } from "../../src/models/adapters/local-adapter.js";
+} from "../../src/gateway/language/local/runtime.js";
+import { LOCAL_ALIAS_API } from "../../src/gateway/language/adapters/local-adapter.js";
 import { defaultModelReference } from "../../src/contracts/models.js";
 
 /**

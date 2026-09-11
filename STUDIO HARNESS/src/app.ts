@@ -24,9 +24,9 @@ import {
   configureStudioRuntime,
   StudioRuntime,
 } from "./application/studio-runtime.js";
-import { resolveProviderConfig } from "./models/provider-config.js";
-import { bootstrapModelProviders } from "./models/bootstrap.js";
-import { refreshBackgroundLadder } from "./models/background-model.js";
+import { resolveProviderConfig } from "./gateway/language/provider-config.js";
+import { bootstrapModelProviders } from "./gateway/language/bootstrap.js";
+import { refreshBackgroundLadder } from "./gateway/language/background-model.js";
 import {
   initializeObservability,
   registerFlueTurnBoundary,
@@ -43,15 +43,15 @@ import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
 import { Studio } from "./agents/studio.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
-import { ConnectionStore } from "./providers/connection-store.js";
-import { ModelCatalog } from "./providers/model-catalog.js";
-import { ProviderManagementService } from "./providers/management.js";
-import { createProviderIcons } from "./providers/icons/index.js";
-import { CapabilityResolver } from "./providers/capability-defaults.js";
-import { MediaService } from "./media/service.js";
+import { ConnectionStore } from "./gateway/connections/connection-store.js";
+import { ModelCatalog } from "./gateway/connections/model-catalog.js";
+import { ProviderManagementService } from "./gateway/connections/management.js";
+import { createProviderIcons } from "./gateway/catalog/icons/index.js";
+import { CapabilityResolver } from "./gateway/connections/capability-defaults.js";
+import { MediaService } from "./gateway/media/service.js";
 import { studioPath } from "./platform/paths.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
-import { RetrievalSettingsStore } from "./retrieval/settings.js";
+import { RetrievalSettingsStore } from "./gateway/retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
 import { ConversationTitler } from "./conversations/titling.js";
 import { ContextUsageTracker } from "./conversations/context-usage.js";

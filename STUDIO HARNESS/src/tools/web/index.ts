@@ -1,4 +1,4 @@
-import type { RetrievalService } from "../../retrieval/service.js";
+import type { RetrievalService } from "../../gateway/retrieval/service.js";
 import type { CallGate } from "../gate.js";
 import { createFetchTool } from "./fetch.js";
 import { createWebSearchTool } from "./search.js";

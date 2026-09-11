@@ -6,14 +6,14 @@ import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
-import { ProviderManagementService } from "../../src/providers/management.js";
+import { ProviderManagementService } from "../../src/gateway/connections/management.js";
 import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
-import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
+import { RetrievalSettingsStore } from "../../src/gateway/retrieval/settings.js";
 import { ConversationStore } from "../../src/conversations/store.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 import { createProviderRoutes } from "../../src/transport/http/routes/providers.js";
 import {

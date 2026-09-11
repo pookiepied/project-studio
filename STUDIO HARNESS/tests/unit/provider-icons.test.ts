@@ -5,11 +5,11 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { IconCache } from "../../src/providers/icons/cache.js";
-import { ProviderIconCatalog, cacheFor } from "../../src/providers/icons/catalog.js";
-import type { Fetcher } from "../../src/providers/icons/source.js";
-import { createModelsDevSource } from "../../src/providers/icons/sources/models-dev.js";
-import { createLobehubSource } from "../../src/providers/icons/sources/lobehub.js";
+import { IconCache } from "../../src/gateway/catalog/icons/cache.js";
+import { ProviderIconCatalog, cacheFor } from "../../src/gateway/catalog/icons/catalog.js";
+import type { Fetcher } from "../../src/gateway/catalog/icons/source.js";
+import { createModelsDevSource } from "../../src/gateway/catalog/icons/sources/models-dev.js";
+import { createLobehubSource } from "../../src/gateway/catalog/icons/sources/lobehub.js";
 
 /**
  * The icon catalog and its two sources, against a stubbed network.

@@ -10,15 +10,15 @@ import type {
   ProviderConnectionDraft,
   RetrievalProtocol,
 } from "../../src/contracts/providers.js";
-import { ProviderManagementService } from "../../src/providers/management.js";
+import { ProviderManagementService } from "../../src/gateway/connections/management.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import {
   PROBE_TIMEOUT_MS,
   catalogBaseUrlFor,
   probeProviderConnection,
-} from "../../src/providers/connection-probe.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
+} from "../../src/gateway/connections/connection-probe.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 /**

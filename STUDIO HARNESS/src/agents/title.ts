@@ -4,7 +4,7 @@ import { useModel, type AgentProps } from "@flue/runtime";
 
 import { TITLE_PROMPT } from "../context/title-prompt.js";
 import { ProviderConfigurationError, STUDIO_MODEL_ID } from "../contracts/models.js";
-import { backgroundLadderSpecifier } from "../models/background-model.js";
+import { backgroundLadderSpecifier } from "../gateway/language/background-model.js";
 
 /**
  * The automatic titling agent.

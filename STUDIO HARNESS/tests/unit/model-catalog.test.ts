@@ -13,8 +13,8 @@ import {
   type ErrorReportContext,
   type ErrorReporter,
 } from "../../src/observability/error-reporter.js";
-import { ConnectionStore } from "../../src/providers/connection-store.js";
-import { ModelCatalog } from "../../src/providers/model-catalog.js";
+import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
+import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 // id and catalogProvider are deliberately different: keying the catalog on the

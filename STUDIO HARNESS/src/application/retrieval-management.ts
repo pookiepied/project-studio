@@ -10,12 +10,12 @@ import {
   SEARCH_PROVIDERS,
   isReaderProviderId,
   isSearchProviderId,
-} from "../retrieval/registry.js";
+} from "../gateway/retrieval/registry.js";
 import type {
   RetrievalCapability,
   RetrievalSettingsStore,
   RetrievalSlot,
-} from "../retrieval/settings.js";
+} from "../gateway/retrieval/settings.js";
 
 /**
  * The retrieval settings surface — a sibling of `ProviderAdministration`,

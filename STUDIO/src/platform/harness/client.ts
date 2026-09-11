@@ -98,7 +98,7 @@ import { harnessTransport } from './transport'
  *
  * `POST /connections/:id/probe` calls out to the provider's own endpoint with
  * an 8 second budget of its own (`PROBE_TIMEOUT_MS` in
- * `STUDIO HARNESS/src/providers/connection-probe.ts:19`), and only then reads
+ * `STUDIO HARNESS/src/gateway/connections/connection-probe.ts:19`), and only then reads
  * the OS credential store and serializes a reply. A client timeout at or below
  * 8s would abort exactly the probes that are about to report a useful
  * timeout failure, turning a precise "the provider did not answer in 8s" into

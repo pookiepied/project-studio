@@ -9,10 +9,10 @@ import {
   ModelResolutionError,
   STUDIO_MODEL_ID,
 } from "../../src/contracts/models.js";
-import { ModelRegistry } from "../../src/models/model-registry.js";
-import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
-import { resolveProviderConfig } from "../../src/models/provider-config.js";
-import { createModelProviderAdapter } from "../../src/models/bootstrap.js";
+import { ModelRegistry } from "../../src/gateway/language/model-registry.js";
+import { TestModelProviderAdapter } from "../../src/gateway/language/adapters/test-adapter.js";
+import { resolveProviderConfig } from "../../src/gateway/language/provider-config.js";
+import { createModelProviderAdapter } from "../../src/gateway/language/bootstrap.js";
 
 describe("harness boundaries", () => {
   it("resolves model references through adapter contracts", () => {
@@ -120,7 +120,7 @@ describe("startup ordering and adapter boundaries", () => {
 
   it("keeps the deterministic provider free of network transport", async () => {
     const source = await readFile(
-      new URL("../../src/models/adapters/test-adapter.ts", import.meta.url),
+      new URL("../../src/gateway/language/adapters/test-adapter.ts", import.meta.url),
       "utf8",
     );
 
@@ -135,7 +135,7 @@ describe("startup ordering and adapter boundaries", () => {
       "../../src/credentials/credential-store.ts",
       "../../src/credentials/keyring-store.ts",
       "../../src/credentials/memory-store.ts",
-      "../../src/models/local/credential-bridge.ts",
+      "../../src/gateway/language/local/credential-bridge.ts",
     ]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).not.toMatch(/node:fs|writeFile|readFile|sqlite|\.db\b/i);
@@ -145,8 +145,8 @@ describe("startup ordering and adapter boundaries", () => {
   it("keeps credentials out of the model contract and provider config modules", async () => {
     for (const path of [
       "../../src/contracts/models.ts",
-      "../../src/models/provider-config.ts",
-      "../../src/models/model-registry.ts",
+      "../../src/gateway/language/provider-config.ts",
+      "../../src/gateway/language/model-registry.ts",
     ]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).not.toMatch(/authorization|bearer|accessToken|apiKey|secret/i);
@@ -570,7 +570,7 @@ describe("modular monolith — 008.3 gate", () => {
       // are *given* a database now rather than resolving one (ADR 0035 §3).
       const allowedRoots = new Set([
         "app.ts",
-        "models/local/cli.ts",
+        "gateway/language/local/cli.ts",
         "auth/cli.ts",
         // The conversation export is an entry point of the same kind: it opens
         // the Flue journal and the Studio index, both read-only, to write the
@@ -679,8 +679,8 @@ describe("modular monolith — 008.3 gate", () => {
     const { registerSearchTools } = await import("../../src/tools/search/index.js");
     const { registerShellTools } = await import("../../src/tools/shell/index.js");
     const { registerWebTools } = await import("../../src/tools/web/index.js");
-    const { RetrievalService } = await import("../../src/retrieval/service.js");
-    const { RetrievalSettingsStore } = await import("../../src/retrieval/settings.js");
+    const { RetrievalService } = await import("../../src/gateway/retrieval/service.js");
+    const { RetrievalSettingsStore } = await import("../../src/gateway/retrieval/settings.js");
 
     const db = openDatabase({ path: ":memory:" });
     try {
