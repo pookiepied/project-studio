@@ -8,7 +8,6 @@ import type {
   ProbeResult,
   ProviderConnectionDraft,
 } from '@/platform/harness'
-import { isLanguageProtocol, isMediaProtocol, isRetrievalProtocol } from '@/platform/harness'
 import { SLOT_LABELS } from '@/domain/models/slots'
 import { connectionIdFrom, LANGUAGE_PROTOCOL_CHOICES } from './draft'
 
@@ -136,11 +135,10 @@ export function AddConnectionDialog({
         setFailure({ kind: 'harness-error', status: 0, message: 'The display name must contain letters or digits.' })
         return null
       }
-      // The kind decides the shape, and the protocol guard proves the flat
-      // library value belongs to that kind - the same tie the connection
-      // contract itself enforces on the wire.
-      const { protocol } = entry
-      const common = {
+      // One key, entered once: the connection serves every kind the library
+      // says this vendor serves, so an OpenAI key added here reaches chat,
+      // images and audio without a second connection.
+      draft = {
         id,
         displayName: name.trim() || entry.displayName,
         source: 'local' as const,
@@ -150,21 +148,7 @@ export function AddConnectionDialog({
         // address, and the schema refuses an empty string in any case.
         ...(trimmedBaseUrl === '' ? {} : { baseUrl: trimmedBaseUrl }),
         ...(trimmedKey === '' ? {} : { apiKey: trimmedKey }),
-      }
-      if (entry.kind === 'language' && isLanguageProtocol(protocol)) {
-        draft = { ...common, kind: 'language', protocol }
-      } else if (entry.kind === 'media' && isMediaProtocol(protocol)) {
-        draft = { ...common, kind: 'media', protocol }
-      } else if (entry.kind === 'retrieval' && isRetrievalProtocol(protocol)) {
-        draft = { ...common, kind: 'retrieval', protocol }
-      } else {
-        setBusy(false)
-        setFailure({
-          kind: 'harness-error',
-          status: 0,
-          message: `${entry.displayName} does not name a protocol its kind can carry.`,
-        })
-        return null
+        serves: entry.serves,
       }
     } else {
       const id = connectionIdFrom(name.trim())
@@ -180,11 +164,10 @@ export function AddConnectionDialog({
       draft = {
         id,
         displayName: name.trim(),
-        kind: 'language',
         source: 'local',
         enabled: true,
         baseUrl: trimmedBaseUrl,
-        protocol,
+        serves: { language: protocol },
         ...(trimmedKey === '' ? {} : { apiKey: trimmedKey }),
       }
     }
@@ -255,7 +238,7 @@ export function AddConnectionDialog({
           <div className="max-h-80 overflow-y-auto">
             {filtered.map((entry) => (
               <button
-                key={`${entry.kind}:${entry.id}`}
+                key={entry.id}
                 type="button"
                 onClick={() => {
                   setMode({ kind: 'library', entry })

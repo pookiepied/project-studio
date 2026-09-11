@@ -1,17 +1,16 @@
 import * as v from "valibot";
 
 import {
+  kindOfCapability,
   languageProtocolSchema,
   mediaProtocolSchema,
   retrievalProtocolSchema,
+  servesKind,
   type CapabilitySlot,
+  type ConnectionServes,
   type InvocationShape,
-  type LanguageProtocol,
-  type MediaProtocol,
   type ModelPricing,
   type ProviderConnection,
-  type ProviderKind,
-  type RetrievalProtocol,
 } from "../../contracts/providers.js";
 import type { ModelCapability, ReasoningLevel } from "../../contracts/models.js";
 import { capabilityFromPiModel } from "../language/local/catalog.js";
@@ -48,13 +47,15 @@ export interface CatalogSourceModel {
   readonly pricing: ModelPricing;
 }
 
-export type ConnectionProtocol = LanguageProtocol | MediaProtocol | RetrievalProtocol;
-
 export interface LibraryProviderEntry {
   readonly id: string;
   readonly displayName: string;
-  readonly kind: ProviderKind;
-  readonly protocol: ConnectionProtocol;
+  /**
+   * Every kind this vendor can serve on one key, with the wire for each. A
+   * connection created from the entry serves all of them at once; that is
+   * how one OpenAI key is entered once and reaches chat, images and audio.
+   */
+  readonly serves: ConnectionServes;
   /** The provider's own endpoint, when one address serves every model. */
   readonly baseUrl: string | undefined;
   /** The slots this provider has at least one model for. */
@@ -135,19 +136,28 @@ function unknownPricing(): ModelPricing {
   };
 }
 
+/**
+ * The declared models a connection draws: the vendor's, kept to the kinds
+ * the connection serves. A model is chat, media or retrieval by what it can
+ * do, so an OpenAI connection that serves only language draws OpenAI's chat
+ * extras and not its image models, and one that also serves media draws
+ * both.
+ */
 function declaredModelsForSource(
   connection: ProviderConnection,
 ): readonly CatalogSourceModel[] {
   const provider = declaredProviderFor(connection.catalogProvider ?? "");
-  if (provider === undefined || provider.kind !== connection.kind) return [];
-  return provider.models.map((model) => ({
-    modelId: model.id,
-    displayName: model.displayName,
-    capability: capabilityFromDeclared(model),
-    reasoningLevels: model.reasoningLevels ?? [],
-    shape: model.shape,
-    pricing: unknownPricing(),
-  }));
+  if (provider === undefined) return [];
+  return provider.models
+    .map((model) => ({
+      modelId: model.id,
+      displayName: model.displayName,
+      capability: capabilityFromDeclared(model),
+      reasoningLevels: model.reasoningLevels ?? [],
+      shape: model.shape,
+      pricing: unknownPricing(),
+    }))
+    .filter((model) => servesKind(connection, kindOfCapability(model.capability)));
 }
 
 /**
@@ -166,7 +176,7 @@ export async function catalogModelsFor(
   const catalogProvider = connection.catalogProvider;
   if (catalogProvider === undefined) return [];
 
-  if (connection.kind === "language" && isLanguageCatalogProvider(catalogProvider)) {
+  if (connection.serves.language !== undefined && isLanguageCatalogProvider(catalogProvider)) {
     // Pi's language models come first; declared extras for the same vendor
     // arrive after and are deduplicated by id below.
     const pi: readonly CatalogSourceModel[] = languageCatalogModels(catalogProvider).map(
@@ -189,46 +199,46 @@ export async function catalogModelsFor(
 
 /**
  * The provider library a settings screen offers: every vendor the two
- * catalogs can name, each with the capabilities it actually serves and the
- * protocol a connection to it should speak.
+ * catalogs can name, once each, with every kind it serves on one key and
+ * the capabilities it has models for.
+ *
+ * One entry per vendor is the point. OpenAI used to appear as a language
+ * provider from Pi's catalog and, separately, as the owner of some declared
+ * media models; a person adding it had to know which to pick. Now the
+ * language gateway answers for the chat half, the declared catalog for the
+ * rest, and the two halves are joined here under the vendor's one id.
  */
 export async function listLibraryProviders(): Promise<readonly LibraryProviderEntry[]> {
   const entries: LibraryProviderEntry[] = [];
+  const seen = new Set<string>();
 
   for (const providerId of languageCatalogProviders()) {
+    const serves = libraryServesFor(providerId);
+    if (serves === undefined) continue;
     const models = languageCatalogModels(providerId);
-    const declared = DECLARED_PROVIDERS.find(
-      (provider) => provider.id === providerId && provider.kind === "language",
-    );
-    const capabilities = slotsServedBy([
-      ...models.map((model) => capabilityFromPiModel(model)),
-      ...(declared?.models.map((model) => capabilityFromDeclared(model)) ?? []),
-    ]);
-    const protocol = majorityProtocolFor(providerId);
-    if (protocol === undefined) continue;
+    const declared = declaredProviderFor(providerId);
+    seen.add(providerId);
     entries.push({
       id: providerId,
-      displayName: displayNameFor(providerId),
-      kind: "language",
-      protocol,
-      baseUrl: majorityBaseUrlFor(providerId),
-      capabilities,
+      displayName: declared?.displayName ?? displayNameFor(providerId),
+      serves,
+      baseUrl: majorityBaseUrlFor(providerId) ?? declared?.baseUrl,
+      capabilities: slotsServedBy([
+        ...models.map((model) => capabilityFromPiModel(model)),
+        ...(declared?.models.map((model) => capabilityFromDeclared(model)) ?? []),
+      ]),
       modelCount: models.length + (declared?.models.length ?? 0),
     });
   }
 
   for (const provider of DECLARED_PROVIDERS) {
-    if (provider.kind === "language" && isLanguageCatalogProvider(provider.id)) {
-      // Already listed above, with Pi's models beside the declared ones.
-      continue;
-    }
-    const protocol = parseProtocol(provider.protocol);
-    if (protocol === undefined) continue;
+    if (seen.has(provider.id)) continue;
+    const serves = libraryServesFor(provider.id);
+    if (serves === undefined) continue;
     entries.push({
       id: provider.id,
       displayName: provider.displayName,
-      kind: provider.kind,
-      protocol,
+      serves,
       baseUrl: provider.baseUrl,
       capabilities: slotsServedBy(provider.models.map((model) => capabilityFromDeclared(model))),
       modelCount: provider.models.length,
@@ -239,24 +249,32 @@ export async function listLibraryProviders(): Promise<readonly LibraryProviderEn
 }
 
 /**
- * The protocol a new connection to a library provider should speak.
- *
- * The library is the only place that knows this, which is why connection
- * creation asks here rather than letting the caller guess.
+ * Every kind a library provider can serve on one key, with the wire for
+ * each: language from the language gateway's majority protocol, the rest
+ * from the declared catalog. The library is the only place that knows this,
+ * which is why connection creation asks here rather than letting the caller
+ * guess. Undefined for a vendor neither catalog names, or one whose declared
+ * wires all fail to parse - a contract entry that was never added.
  */
-export function libraryProtocolFor(providerId: string): ConnectionProtocol | undefined {
-  const language = majorityProtocolFor(providerId);
-  if (language !== undefined) return language;
-  return parseProtocol(declaredProviderFor(providerId)?.protocol);
+export function libraryServesFor(providerId: string): ConnectionServes | undefined {
+  const declared = declaredProviderFor(providerId)?.serves ?? {};
+  const language =
+    majorityProtocolFor(providerId) ?? parseWith(languageProtocolSchema, declared.language);
+  const media = parseWith(mediaProtocolSchema, declared.media);
+  const retrieval = parseWith(retrievalProtocolSchema, declared.retrieval);
+  if (language === undefined && media === undefined && retrieval === undefined) return undefined;
+  return {
+    ...(language === undefined ? {} : { language }),
+    ...(media === undefined ? {} : { media }),
+    ...(retrieval === undefined ? {} : { retrieval }),
+  };
 }
 
-function parseProtocol(protocol: string | undefined): ConnectionProtocol | undefined {
+function parseWith<const TOptions extends readonly string[]>(
+  schema: v.PicklistSchema<TOptions, undefined>,
+  protocol: string | undefined,
+): TOptions[number] | undefined {
   if (protocol === undefined) return undefined;
-  const language = v.safeParse(languageProtocolSchema, protocol);
-  if (language.success) return language.output;
-  const media = v.safeParse(mediaProtocolSchema, protocol);
-  if (media.success) return media.output;
-  const retrieval = v.safeParse(retrievalProtocolSchema, protocol);
-  if (retrieval.success) return retrieval.output;
-  return undefined;
+  const result = v.safeParse(schema, protocol);
+  return result.success ? result.output : undefined;
 }

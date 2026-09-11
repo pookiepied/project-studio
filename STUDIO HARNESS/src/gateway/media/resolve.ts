@@ -52,13 +52,21 @@ export async function bindAudioSlot(
   }
 
   const { connection, model } = resolution;
-  if (connection.kind === "media" && connection.protocol === "elevenlabs") {
+  if (connection.serves.media === "elevenlabs") {
     throw new MediaError(
       "slot-protocol",
       "ElevenLabs cannot serve this yet; connect an OpenAI-compatible provider for it.",
     );
   }
-  if (connection.kind !== "language" || !OPENAI_AUDIO_PROTOCOLS.has(connection.protocol)) {
+  // The OpenAI drivers speak the audio endpoints of any OpenAI-shaped host:
+  // OpenAI's own media family, or a language connection on one of the
+  // OpenAI wires whose base URL also answers /audio. The second case is how
+  // an OpenAI-compatible self-hosted endpoint serves dictation.
+  const language = connection.serves.language;
+  const openaiShaped =
+    connection.serves.media === "openai" ||
+    (language !== undefined && OPENAI_AUDIO_PROTOCOLS.has(language));
+  if (!openaiShaped) {
     throw new MediaError(
       "slot-protocol",
       `The connected ${LABELS[slot]} provider speaks a protocol media cannot drive yet.`,
@@ -73,7 +81,9 @@ export async function bindAudioSlot(
 
   return {
     slot,
-    protocol: connection.protocol,
+    // The wire the driver is chosen by: the media family when the connection
+    // has one, else the language wire whose host also answers /audio.
+    protocol: connection.serves.media ?? language ?? "openai",
     baseUrl: connection.baseUrl,
     credential: resolution.credential,
     // An explicit model (a route body naming one) outranks the slot's choice,

@@ -123,9 +123,9 @@ export class ConnectionStore {
     id: string,
     patch: ProviderConnectionPatch,
   ): Promise<ProviderConnection> {
-    if (!isRecord(patch) || hasOwn(patch, "id") || hasOwn(patch, "kind")) {
+    if (!isRecord(patch) || hasOwn(patch, "id")) {
       throw new ProviderConfigurationError(
-        "A provider connection update cannot change its id or kind.",
+        "A provider connection update cannot change its id.",
       );
     }
     this.#validateApiKey(patch.apiKey);
@@ -140,7 +140,8 @@ export class ConnectionStore {
       }
 
       // Validate the non-secret patch before touching the credential store. A
-      // protocol from another kind must fail without partially updating a key.
+      // patch that leaves nothing served must fail without partially
+      // updating a key.
       this.#validate(this.#merge(current, patch, "absent"));
 
       if (patch.apiKey !== undefined) {
@@ -284,7 +285,6 @@ export class ConnectionStore {
     return {
       id: draft.id,
       displayName: draft.displayName,
-      kind: draft.kind,
       source: draft.source,
       ...(baseUrl === undefined ? {} : { baseUrl }),
       ...(draft.catalogProvider === undefined
@@ -292,7 +292,7 @@ export class ConnectionStore {
         : { catalogProvider: draft.catalogProvider }),
       enabled: draft.enabled,
       credential: status,
-      protocol: draft.protocol,
+      serves: presentOnly(draft.serves),
     };
   }
 
@@ -313,12 +313,18 @@ export class ConnectionStore {
         ? undefined
         : patch.baseUrl;
     const enabled = patch.enabled === undefined ? current.enabled : patch.enabled;
-    const protocol = patch.protocol === undefined ? current.protocol : patch.protocol;
+    // The same three-way rule as baseUrl, per kind: a protocol re-wires or
+    // adds the kind, null removes it, undefined keeps what is stored.
+    const serves: Record<string, unknown> = { ...presentOnly(current.serves) };
+    for (const [kind, protocol] of Object.entries(patch.serves ?? {})) {
+      if (protocol === undefined) continue;
+      if (protocol === null) delete serves[kind];
+      else serves[kind] = protocol;
+    }
 
     return {
       id: current.id,
       displayName,
-      kind: current.kind,
       source: current.source,
       ...(baseUrl === undefined ? {} : { baseUrl }),
       ...(current.catalogProvider === undefined
@@ -326,7 +332,7 @@ export class ConnectionStore {
         : { catalogProvider: current.catalogProvider }),
       enabled,
       credential: status,
-      protocol,
+      serves,
     };
   }
 
@@ -559,6 +565,17 @@ export function readStoredConnections(db: StudioDatabase): readonly StoredConnec
     });
   }
   return stored;
+}
+
+/**
+ * The served kinds with their absent keys dropped, so what is stored and
+ * compared is the same shape whether a caller wrote `{ media: undefined }`
+ * or left the key out.
+ */
+function presentOnly(serves: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(serves).filter(([, protocol]) => protocol !== undefined),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -104,7 +104,7 @@ function connectionKeyLookup(
     const rows = readStoredConnections(database);
     const match = rows.find(
       ({ connection }) =>
-        connection.kind === "language" &&
+        connection.serves.language !== undefined &&
         connection.enabled &&
         (connection.catalogProvider ?? connection.id) === providerId,
     );
@@ -142,12 +142,13 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
   const extras: ExtraProviderModelGroup[] = [];
 
   for (const { connection } of rows) {
-    if (connection.kind !== "language" || !connection.enabled) continue;
+    const protocol = connection.serves.language;
+    if (protocol === undefined || !connection.enabled) continue;
 
     if (connection.catalogProvider === undefined) {
       // A self-hosted endpoint: the runtime builds a provider for it, and its
       // declared models are exactly the hand-entered rows.
-      if (!loadable.has(connection.protocol) || connection.baseUrl === undefined) continue;
+      if (!loadable.has(protocol) || connection.baseUrl === undefined) continue;
       // Typed: an untyped `new Map()` is `Map<any, any>`, and the `any`
       // travelled out of this fallback into every field read off the models
       // below.
@@ -158,7 +159,7 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
         id: connection.id,
         name: connection.displayName,
         baseUrl: connection.baseUrl,
-        api: connection.protocol,
+        api: protocol,
         models: [...models.keys()],
         contextWindow,
         maxTokens,
@@ -179,7 +180,7 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
     extras.push({
       provider: connection.catalogProvider,
       baseUrl,
-      api: connection.protocol,
+      api: protocol,
       models: extra.map((model) => ({
         id: model.modelId,
         name: model.displayName,
@@ -218,7 +219,7 @@ function resolveDefaultSelectionFromSettings(
   if (row !== undefined) {
     const match = rows.find(
       ({ connection }) =>
-        connection.kind === "language" && connection.id === row.connectionId,
+        connection.serves.language !== undefined && connection.id === row.connectionId,
     );
     if (match !== undefined) {
       return {

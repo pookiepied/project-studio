@@ -4,6 +4,7 @@ import * as v from "valibot";
 
 import { StorageError, storageErrorFrom } from "./errors.js";
 import { majorityProtocolFor } from "../gateway/language/pi-catalog.js";
+import { libraryServesFor } from "../gateway/catalog/index.js";
 import { languageProtocolSchema } from "../contracts/providers.js";
 
 /**
@@ -1003,6 +1004,75 @@ export const MIGRATIONS: readonly Migration[] = [
       // inventing one.
       db.exec("ALTER TABLE mcp_server ADD COLUMN description TEXT NOT NULL DEFAULT ''");
       db.exec("ALTER TABLE mcp_server ADD COLUMN provenance TEXT NOT NULL DEFAULT 'user'");
+    },
+  },
+  {
+    version: 23,
+    name: "connection_serves_kinds",
+    up(db) {
+      // A connection is to a vendor, and serves the kinds its key can (ADR
+      // 0051's plan, step 2). The stored record used to be one `kind` and
+      // one `protocol`; it is now `serves`, a map from kind to protocol, and
+      // this rewrites every record in place. The two media protocols named
+      // for one endpoint each become their vendor's family: `openai-images`
+      // is `openai`, `openrouter-images` is `openrouter`.
+      //
+      // Widening is the part that delivers "one key, entered once" to a
+      // database that already exists: a connection whose vendor the library
+      // knows gains every kind the library says that vendor serves on one
+      // key, so an OpenAI connection made for chat now also serves images
+      // and audio. It is done only when the vendor has exactly one
+      // connection, because a person who already made a second connection
+      // for the other kind would otherwise get the same models twice, and
+      // the migration cannot know which key they meant to keep.
+      const rows: readonly Record<string, unknown>[] = db
+        .prepare(`SELECT id, record_json FROM provider_connection_record`)
+        .all();
+      const records = rows.flatMap((row) => {
+        const id = row.id;
+        const raw = row.record_json;
+        if (typeof id !== "string" || typeof raw !== "string") return [];
+        try {
+          const record: unknown = JSON.parse(raw);
+          return isRecord(record) ? [{ id, record }] : [];
+        } catch {
+          return [];
+        }
+      });
+
+      const vendorCounts = new Map<string, number>();
+      for (const { record } of records) {
+        const vendor = record.catalogProvider;
+        if (typeof vendor !== "string") continue;
+        vendorCounts.set(vendor, (vendorCounts.get(vendor) ?? 0) + 1);
+      }
+
+      const renamed: Readonly<Record<string, string>> = {
+        "openai-images": "openai",
+        "openrouter-images": "openrouter",
+      };
+      const now = Date.now();
+      const update = db.prepare(
+        `UPDATE provider_connection_record SET record_json = ?, updated_at = ? WHERE id = ?`,
+      );
+
+      for (const { id, record } of records) {
+        if (isRecord(record.serves)) continue;
+        const { kind, protocol, ...rest } = record;
+        if (typeof kind !== "string" || typeof protocol !== "string") continue;
+        const serves: Record<string, string> = { [kind]: renamed[protocol] ?? protocol };
+
+        const vendor = record.catalogProvider;
+        if (typeof vendor === "string" && vendorCounts.get(vendor) === 1) {
+          for (const [otherKind, otherProtocol] of Object.entries(libraryServesFor(vendor) ?? {})) {
+            if (serves[otherKind] === undefined && otherProtocol !== undefined) {
+              serves[otherKind] = otherProtocol;
+            }
+          }
+        }
+
+        update.run(JSON.stringify({ ...rest, serves }), now, id);
+      }
     },
   },
 ];

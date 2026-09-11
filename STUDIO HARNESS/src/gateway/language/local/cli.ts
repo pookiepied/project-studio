@@ -27,13 +27,13 @@
 import { createInterface } from "node:readline";
 
 import { ProviderConfigurationError } from "../../../contracts/models.js";
-import type { LanguageProtocol } from "../../../contracts/providers.js";
+import { connectionKinds, type LanguageProtocol } from "../../../contracts/providers.js";
 import { KeyringCredentialStore } from "../../../credentials/keyring-store.js";
 import { createDomainReporter } from "../../../observability/error-reporter.js";
 import { openDatabase, type StudioDatabase } from "../../../storage/database.js";
 import { ConnectionStore } from "../../connections/connection-store.js";
 import { ModelCatalog } from "../../connections/model-catalog.js";
-import { majorityProtocolFor } from "../pi-catalog.js";
+import { libraryServesFor } from "../../catalog/index.js";
 import { parseModelSpecifier } from "./config.js";
 
 /**
@@ -124,7 +124,7 @@ async function list(): Promise<number> {
     const count = models.filter((model) => model.connectionId === record.id).length;
     const vendor = record.catalogProvider === undefined ? "" : `  vendor: ${record.catalogProvider}`;
     process.stdout.write(
-      `  ${record.id}  (${record.kind}, ${record.credential}, ${count} model${count === 1 ? "" : "s"}, ${record.enabled ? "enabled" : "disabled"})${vendor}\n`,
+      `  ${record.id}  (${connectionKinds(record).join("+")}, ${record.credential}, ${count} model${count === 1 ? "" : "s"}, ${record.enabled ? "enabled" : "disabled"})${vendor}\n`,
     );
   }
 
@@ -191,11 +191,10 @@ async function connect(providerId: string | undefined): Promise<number> {
   await connections.add({
     id: providerId,
     displayName: providerId,
-    kind: "language",
     source: "local",
     enabled: true,
     catalogProvider: providerId,
-    protocol: majorityProtocolFor(providerId) ?? "openai-completions",
+    serves: libraryServesFor(providerId) ?? { language: "openai-completions" },
     apiKey,
   });
   process.stdout.write(
@@ -246,11 +245,10 @@ async function add(args: readonly string[]): Promise<number> {
   const created = await connections.add({
     id,
     displayName: flags.name ?? id,
-    kind: "language",
     source: "local",
     enabled: true,
     baseUrl,
-    protocol: parseCustomApi(api),
+    serves: { language: parseCustomApi(api) },
   });  for (const modelId of modelIds) {
     await catalog.addManualModel(created.id, {
       modelId,
@@ -258,7 +256,7 @@ async function add(args: readonly string[]): Promise<number> {
     });
   }
   process.stdout.write(
-    `Added ${created.id} (${created.protocol}) at ${baseUrl} with ${modelIds.length} model(s).\n`,
+    `Added ${created.id} (${created.serves.language}) at ${baseUrl} with ${modelIds.length} model(s).\n`,
   );
   return 0;
 }

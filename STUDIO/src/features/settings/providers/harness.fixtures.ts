@@ -35,13 +35,12 @@ export const CAPABILITY: ModelCapability = {
 export const KNOWN_VENDOR: ProviderConnection = {
   id: 'work-anthropic',
   displayName: 'Work Anthropic',
-  kind: 'language',
+  serves: { language: 'anthropic-messages' },
   source: 'local',
   baseUrl: 'https://api.anthropic.com',
   enabled: true,
   catalogProvider: 'anthropic',
   credential: 'set',
-  protocol: 'anthropic-messages',
 }
 
 /**
@@ -53,13 +52,12 @@ export const KNOWN_VENDOR: ProviderConnection = {
 export const UNKNOWN_VENDOR: ProviderConnection = {
   id: 'box-next-door',
   displayName: 'The box next door',
-  kind: 'language',
+  serves: { language: 'openai-completions' },
   source: 'local',
   baseUrl: 'http://192.168.1.40:8080/v1',
   enabled: false,
   catalogProvider: 'together-ai',
   credential: 'absent',
-  protocol: 'openai-completions',
 }
 
 export function modelFor(

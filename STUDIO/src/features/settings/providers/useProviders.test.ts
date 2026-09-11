@@ -164,10 +164,9 @@ describe('mutations', () => {
     const outcome = await result.current.create({
       id: 'new',
       displayName: 'New',
-      kind: 'language',
+      serves: { language: 'openai-completions' },
       source: 'local',
       enabled: true,
-      protocol: 'openai-completions',
     })
 
     expect(outcome.ok).toBe(true)

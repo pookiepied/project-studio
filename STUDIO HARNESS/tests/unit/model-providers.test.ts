@@ -353,11 +353,10 @@ describe("provider bootstrap coordinator", () => {
         JSON.stringify({
           id: "ollama",
           displayName: "Ollama",
-          kind: "language",
+          serves: { language: "openai-completions" },
           source: "local",
           baseUrl: "http://127.0.0.1:11434/v1",
           enabled: true,
-          protocol: "openai-completions",
         }),
         Date.now(),
       );

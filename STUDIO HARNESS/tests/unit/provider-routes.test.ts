@@ -26,12 +26,11 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
 const OPENAI_DRAFT = {
   id: "work-openai",
   displayName: "Work OpenAI",
-  kind: "language",
+  serves: { language: "openai-responses" },
   source: "local",
   baseUrl: "https://api.openai.com/v1",
   enabled: true,
   catalogProvider: "openai",
-  protocol: "openai-responses",
 };
 
 let db: StudioDatabase;
@@ -309,7 +308,7 @@ describe("provider routes", () => {
   it("reports a bad body as 400 and a missing connection as 404", async () => {
     const badKind = await authorized("/api/providers/connections", {
       method: "POST",
-      body: JSON.stringify({ ...OPENAI_DRAFT, kind: "database" }),
+      body: JSON.stringify({ ...OPENAI_DRAFT, serves: { language: "database" } }),
     });
     expect(badKind.status).toBe(400);
 

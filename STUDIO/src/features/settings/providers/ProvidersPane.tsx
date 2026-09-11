@@ -3,7 +3,7 @@ import { Icons, ProviderMark } from '@/components/icons'
 import { Button, MenuItem, Popover } from '@/components/primitives'
 import { Placeholder, PlaceholderMark, PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'
-import type { ProviderConnection } from '@/platform/harness'
+import { connectionKinds, type ProviderConnection, type ProviderKind } from '@/platform/harness'
 import { Pane } from '@/features/settings/panes/Pane'
 import { CredentialBadge } from './CredentialBadge'
 import { ProbeLine } from './ProbeLine'
@@ -14,6 +14,12 @@ import { ModelLibrary } from './ModelLibrary'
 import { DefaultsSection } from './DefaultsSection'
 import { useProviders, type Providers } from './useProviders'
 import { cn } from '@/lib/cn'
+
+const KIND_LABELS: Readonly<Record<ProviderKind, string>> = {
+  language: 'Language',
+  media: 'Media',
+  retrieval: 'Retrieval',
+}
 
 /**
  * Providers and models: one pane over the one provider store.
@@ -216,8 +222,11 @@ function ConnectionRow({
   const probe = providers.probes.get(record.id)
   const probing = probe?.status === 'probing'
 
-  const kindLabel =
-    record.kind === 'language' ? 'Language' : record.kind === 'media' ? 'Media' : 'Retrieval'
+  // Every kind the one key serves, in the contract's order: "Language, Media"
+  // for an OpenAI connection, "Retrieval" for Tavily.
+  const kindLabel = connectionKinds(record)
+    .map((kind) => KIND_LABELS[kind])
+    .join(', ')
 
   return (
     <div className="py-3">

@@ -119,7 +119,7 @@ export const LANGUAGE_PROTOCOLS = [
 export type LanguageProtocol = (typeof LANGUAGE_PROTOCOLS)[number]
 
 /** `mediaProtocolSchema`. */
-export const MEDIA_PROTOCOLS = ['openai-images', 'openrouter-images', 'elevenlabs'] as const
+export const MEDIA_PROTOCOLS = ['openai', 'openrouter', 'google', 'elevenlabs'] as const
 export type MediaProtocol = (typeof MEDIA_PROTOCOLS)[number]
 
 /** `retrievalProtocolSchema`. */
@@ -214,29 +214,37 @@ export const CAPABILITY_SLOTS = [
 export type CapabilitySlot = (typeof CAPABILITY_SLOTS)[number]
 
 /**
- * Every protocol, across all three kinds. Only useful in a patch, where the
- * harness itself accepts the flat union and validates it against the kind.
- */
-export type ProviderProtocol = LanguageProtocol | MediaProtocol | RetrievalProtocol
-
-/**
- * Narrowing guards from the flat union back to the per-kind unions.
+ * `connectionServesSchema` — what one connection serves, and on which wire.
  *
- * The library carries one flat protocol field; a connection draft needs the
- * kind-tied one, and these are the checked way across - a value that is not
- * of the kind's union simply fails the guard, which is the parse step the
- * connection type demands.
+ * A connection is to a vendor, and one key serves any subset of the three
+ * kinds: a kind is present when the connection serves it, and its value is
+ * the protocol spoken for that kind. Each kind keeps its own protocol union,
+ * so a retrieval wire cannot land under `language` without a type error. At
+ * least one kind is always present; the parser refuses an empty map.
  */
-export function isLanguageProtocol(value: ProviderProtocol): value is LanguageProtocol {
-  return (LANGUAGE_PROTOCOLS as readonly string[]).includes(value)
+export interface ConnectionServes {
+  readonly language?: LanguageProtocol
+  readonly media?: MediaProtocol
+  readonly retrieval?: RetrievalProtocol
 }
 
-export function isMediaProtocol(value: ProviderProtocol): value is MediaProtocol {
-  return (MEDIA_PROTOCOLS as readonly string[]).includes(value)
+/** The kinds a connection serves, in the contract's fixed order. */
+export function connectionKinds(connection: { readonly serves: ConnectionServes }): readonly ProviderKind[] {
+  return PROVIDER_KINDS.filter((kind) => connection.serves[kind] !== undefined)
 }
 
-export function isRetrievalProtocol(value: ProviderProtocol): value is RetrievalProtocol {
-  return (RETRIEVAL_PROTOCOLS as readonly string[]).includes(value)
+export function parseConnectionServes(value: unknown): ConnectionServes | null {
+  if (!isRecord(value)) return null
+  const language = value['language'] === undefined ? undefined : oneOf(LANGUAGE_PROTOCOLS, value['language'])
+  const media = value['media'] === undefined ? undefined : oneOf(MEDIA_PROTOCOLS, value['media'])
+  const retrieval = value['retrieval'] === undefined ? undefined : oneOf(RETRIEVAL_PROTOCOLS, value['retrieval'])
+  if (language === null || media === null || retrieval === null) return null
+  if (language === undefined && media === undefined && retrieval === undefined) return null
+  return {
+    ...(language === undefined ? {} : { language }),
+    ...(media === undefined ? {} : { media }),
+    ...(retrieval === undefined ? {} : { retrieval }),
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -244,13 +252,13 @@ export function isRetrievalProtocol(value: ProviderProtocol): value is Retrieval
 /* -------------------------------------------------------------------------- */
 
 /**
- * Shared by all three connection variants.
+ * `providerConnectionSchema`.
  *
  * Fields are readonly here even though the harness's inferred types are not:
  * on this side a parsed connection is a value that came off the wire, and
  * nothing in the UI has any business writing to it.
  */
-interface ProviderConnectionBase {
+export interface ProviderConnection {
   /** Slug-shaped and stable: lowercase, digits, single hyphens. */
   readonly id: string
   readonly displayName: string
@@ -266,48 +274,35 @@ interface ProviderConnectionBase {
   readonly catalogProvider?: string
   /** Whether a key exists. Never the key. */
   readonly credential: CredentialStatus
+  readonly serves: ConnectionServes
 }
-
-export interface LanguageConnection extends ProviderConnectionBase {
-  readonly kind: 'language'
-  readonly protocol: LanguageProtocol
-}
-
-export interface MediaConnection extends ProviderConnectionBase {
-  readonly kind: 'media'
-  readonly protocol: MediaProtocol
-}
-
-export interface RetrievalConnection extends ProviderConnectionBase {
-  readonly kind: 'retrieval'
-  readonly protocol: RetrievalProtocol
-}
-
-/**
- * `providerConnectionSchema` — a variant discriminated on `kind`, so the type
- * system refuses a retrieval protocol on a language connection.
- */
-export type ProviderConnection = LanguageConnection | MediaConnection | RetrievalConnection
 
 /**
  * A connection as the caller supplies it: everything but `credential`, plus an
- * optional key that exists for exactly the length of one request.
- *
- * The harness derives this with a distributive Omit so the discriminant
- * survives; here the three variants are written out for the same reason.
- * `apiKey` is the only place in this entire module where a secret appears, and
- * it appears only on the way out.
+ * optional key that exists for exactly the length of one request. `apiKey` is
+ * the only place in this entire module where a secret appears, and it appears
+ * only on the way out.
  */
-export type ProviderConnectionDraft = (
-  | Omit<LanguageConnection, 'credential'>
-  | Omit<MediaConnection, 'credential'>
-  | Omit<RetrievalConnection, 'credential'>
-) & { readonly apiKey?: string }
+export type ProviderConnectionDraft = Omit<ProviderConnection, 'credential'> & {
+  readonly apiKey?: string
+}
 
 /**
- * `ProviderConnectionPatch`. `id` and `kind` are absent on purpose: changing
- * either makes it a different connection while models, defaults and stored
- * credentials still point at the old one.
+ * What one patch may say about the kinds a connection serves: a protocol
+ * adds or re-wires the kind, `null` removes it, absent leaves it alone.
+ */
+export interface ConnectionServesPatch {
+  readonly language?: LanguageProtocol | null
+  readonly media?: MediaProtocol | null
+  readonly retrieval?: RetrievalProtocol | null
+}
+
+/**
+ * `ProviderConnectionPatch`. `id` is absent on purpose: changing it makes a
+ * different connection while models, defaults and stored credentials still
+ * point at the old one. The kinds served may change, because a key that
+ * served chat yesterday serves images today without becoming a different
+ * account.
  *
  * `baseUrl: null` clears the override; `baseUrl` absent leaves it alone. The
  * distinction is load-bearing — without the explicit clear, a base URL once
@@ -317,7 +312,7 @@ export interface ProviderConnectionPatch {
   readonly displayName?: string
   readonly baseUrl?: string | null
   readonly enabled?: boolean
-  readonly protocol?: ProviderProtocol
+  readonly serves?: ConnectionServesPatch
   readonly apiKey?: string
 }
 
@@ -414,8 +409,8 @@ export interface ProviderModel {
 export interface LibraryProvider {
   readonly id: string
   readonly displayName: string
-  readonly kind: ProviderKind
-  readonly protocol: ProviderProtocol
+  /** Every kind this vendor serves on one key; a connection made from the entry serves all of them. */
+  readonly serves: ConnectionServes
   readonly baseUrl?: string
   readonly capabilities: readonly CapabilitySlot[]
   readonly modelCount: number
@@ -542,28 +537,8 @@ export function parseProviderConnection(value: unknown): ProviderConnection | nu
       : { catalogProvider: catalogProvider.value }),
   }
 
-  const kind = oneOf(PROVIDER_KINDS, value['kind'])
-  const protocol = value['protocol']
-
-  // The switch is what ties protocol to kind. A flat union check would accept
-  // `{ kind: 'language', protocol: 'brave' }`, which is the exact mistake the
-  // harness's variant schema exists to refuse.
-  switch (kind) {
-    case 'language': {
-      const parsed = oneOf(LANGUAGE_PROTOCOLS, protocol)
-      return parsed === null ? null : { ...base, kind, protocol: parsed }
-    }
-    case 'media': {
-      const parsed = oneOf(MEDIA_PROTOCOLS, protocol)
-      return parsed === null ? null : { ...base, kind, protocol: parsed }
-    }
-    case 'retrieval': {
-      const parsed = oneOf(RETRIEVAL_PROTOCOLS, protocol)
-      return parsed === null ? null : { ...base, kind, protocol: parsed }
-    }
-    case null:
-      return null
-  }
+  const serves = parseConnectionServes(value['serves'])
+  return serves === null ? null : { ...base, serves }
 }
 
 export function parseProviderConnections(
@@ -724,11 +699,7 @@ export function parseLibraryProvider(value: unknown): LibraryProvider | null {
 
   const id = text(value['id'])
   const displayName = text(value['displayName'])
-  const kind = oneOf(PROVIDER_KINDS, value['kind'])
-  const protocol =
-    oneOf(LANGUAGE_PROTOCOLS, value['protocol']) ??
-    oneOf(MEDIA_PROTOCOLS, value['protocol']) ??
-    oneOf(RETRIEVAL_PROTOCOLS, value['protocol'])
+  const serves = parseConnectionServes(value['serves'])
   const baseUrl = optionalText(value['baseUrl'])
   const capabilities = listOf((slot: unknown) => oneOf(CAPABILITY_SLOTS, slot), value['capabilities'])
   const modelCount = typeof value['modelCount'] === 'number' ? value['modelCount'] : null
@@ -736,8 +707,7 @@ export function parseLibraryProvider(value: unknown): LibraryProvider | null {
   if (
     id === null ||
     displayName === null ||
-    kind === null ||
-    protocol === null ||
+    serves === null ||
     capabilities === null ||
     modelCount === null ||
     !baseUrl.ok
@@ -748,8 +718,7 @@ export function parseLibraryProvider(value: unknown): LibraryProvider | null {
   return {
     id,
     displayName,
-    kind,
-    protocol,
+    serves,
     capabilities,
     modelCount,
     ...(baseUrl.value === undefined ? {} : { baseUrl: baseUrl.value }),

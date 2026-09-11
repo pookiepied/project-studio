@@ -2,20 +2,22 @@ import type { InvocationShape, ProviderKind } from "../../contracts/providers.js
 import type { ModelCapability, ReasoningLevel } from "../../contracts/models.js";
 
 /**
- * The third catalog source: the models Project Studio declares itself.
+ * The declared catalog: the models Project Studio names itself.
  *
- * Pi's catalogs cover language (35 providers) and images (OpenRouter only)
- * and have nothing at all for video, speech, transcription, web search, or
- * web fetch. Rather than leave those capability slots permanently empty, this
- * file declares the models Studio knows how to name, under the provider that
- * serves them. It is a maintained data file, not a live feed: entries are
- * added from the vendor's own documented API, and a model the vendor retires
- * is removed here.
+ * The language gateway's catalog covers chat and nothing else. Everything
+ * past text - images, video, speech, transcription, embeddings, web search
+ * and web fetch - is declared here, under the vendor that serves it, from
+ * the vendor's own documented API. It is a maintained data file, not a live
+ * feed: a model the vendor retires is removed here, and the dates in the
+ * comments say when. Checked against the vendors' documentation on
+ * 2026-09-11; the gateway plan replaces the OpenRouter and FAL entries with
+ * live listings when their adapters land.
  *
- * Entries are matched to a connection by `catalogProvider` and `kind`, the
- * same keying Pi's own catalogs use - one OpenAI account is one connection,
- * and its chat models (Pi's) arrive beside its speech and image models (this
- * file's), each tagged with what it can do.
+ * Entries are matched to a connection by `catalogProvider`, and each model
+ * reaches the connection only if it serves the model's kind - one OpenAI
+ * account is one connection, and its chat models (the language gateway's)
+ * arrive beside its speech and image models (this file's), each tagged with
+ * what it can do.
  *
  * Every entry states `textGeneration: "unsupported"` on purpose: none of
  * these models answers chat, and saying so is what keeps them out of the
@@ -38,8 +40,13 @@ export interface DeclaredProvider {
   /** The `catalogProvider` value a connection carries to draw this catalog. */
   readonly id: string;
   readonly displayName: string;
-  readonly kind: ProviderKind;
-  readonly protocol: string;
+  /**
+   * The kinds one key to this vendor serves, and the wire for each, as plain
+   * strings the library parses against the contract's unions. A language
+   * wire named here is a fallback: when the language gateway's catalog
+   * knows the vendor, its majority protocol wins.
+   */
+  readonly serves: Partial<Record<ProviderKind, string>>;
   /** The provider's own endpoint, when one address serves every model. */
   readonly baseUrl: string | undefined;
   readonly models: readonly DeclaredModel[];
@@ -51,13 +58,17 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "openai",
     displayName: "OpenAI",
-    kind: "language",
-    protocol: "openai-completions",
+    serves: { language: "openai-responses", media: "openai" },
     baseUrl: "https://api.openai.com/v1",
     models: [
+      // The GPT Image family. gpt-image-1 shuts down on 2026-10-23 and
+      // gpt-image-1-mini and -1.5 on 2026-12-01, all replaced by gpt-image-2;
+      // dall-e-2 and -3 were removed on 2026-05-12. Every model returns
+      // base64 only, and every one accepts input images on the edits
+      // endpoint, which is what earns imageEditing.
       {
-        id: "gpt-image-1",
-        displayName: "GPT Image 1",
+        id: "gpt-image-2",
+        displayName: "GPT Image 2",
         capability: {
           ...NOT_CHAT,
           imageGeneration: "supported",
@@ -67,14 +78,40 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
         shape: "sync",
       },
       {
-        id: "dall-e-3",
-        displayName: "DALL-E 3",
-        capability: { ...NOT_CHAT, imageGeneration: "supported" },
+        id: "gpt-image-2.5-sunburst",
+        displayName: "GPT Image 2.5 Sunburst",
+        capability: {
+          ...NOT_CHAT,
+          imageGeneration: "supported",
+          imageEditing: "supported",
+          vision: "supported",
+        },
         shape: "sync",
       },
       {
-        id: "whisper-1",
-        displayName: "Whisper",
+        id: "gpt-image-2.5-flare",
+        displayName: "GPT Image 2.5 Flare",
+        capability: {
+          ...NOT_CHAT,
+          imageGeneration: "supported",
+          imageEditing: "supported",
+          vision: "supported",
+        },
+        shape: "sync",
+      },
+      // Transcription. whisper-1 and the gpt-4o-*-transcribe ids are
+      // deprecated for removal on 2027-02-26; gpt-transcribe is the vendor's
+      // recommended replacement and returns text without segments.
+      // gpt-4o-transcribe-diarize is the one with speaker labels.
+      {
+        id: "gpt-transcribe",
+        displayName: "GPT Transcribe",
+        capability: { ...NOT_CHAT, transcription: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "gpt-4o-transcribe-diarize",
+        displayName: "GPT-4o Transcribe (speakers)",
         capability: { ...NOT_CHAT, transcription: "supported" },
         shape: "sync",
       },
@@ -84,6 +121,14 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
         capability: { ...NOT_CHAT, transcription: "supported" },
         shape: "sync",
       },
+      {
+        id: "whisper-1",
+        displayName: "Whisper",
+        capability: { ...NOT_CHAT, transcription: "supported" },
+        shape: "sync",
+      },
+      // Speech. None of these is on the deprecation list; gpt-4o-mini-tts
+      // takes style instructions, the tts-1 pair does not.
       {
         id: "gpt-4o-mini-tts",
         displayName: "GPT-4o Mini TTS",
@@ -117,24 +162,96 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
     ],
   },
   {
+    id: "openrouter",
+    displayName: "OpenRouter",
+    // OpenRouter serves speech, transcription, images and video on the chat
+    // key. Its models are not declared here: the listing is live, moves
+    // weekly, and step 4 of the gateway plan reads it from OpenRouter's own
+    // endpoints when the adapter lands. Until then the media half of the
+    // connection exists and lists nothing, which is honest.
+    serves: { language: "openai-completions", media: "openrouter" },
+    baseUrl: "https://openrouter.ai/api/v1",
+    models: [],
+  },
+  {
     id: "google",
     displayName: "Google",
-    kind: "language",
-    protocol: "google-generative-ai",
+    serves: { language: "google-generative-ai", media: "google" },
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     models: [
+      // Images. The Imagen family shut down on 2026-08-17; the Gemini image
+      // models on the Interactions API replace it, and every one takes input
+      // images, which earns imageEditing.
       {
-        id: "veo-3.0-generate-001",
-        displayName: "Veo 3",
+        id: "gemini-3.1-flash-image",
+        displayName: "Gemini 3.1 Flash Image",
+        capability: {
+          ...NOT_CHAT,
+          imageGeneration: "supported",
+          imageEditing: "supported",
+          vision: "supported",
+        },
+        shape: "sync",
+      },
+      {
+        id: "gemini-3.1-flash-lite-image",
+        displayName: "Gemini 3.1 Flash Lite Image",
+        capability: {
+          ...NOT_CHAT,
+          imageGeneration: "supported",
+          imageEditing: "supported",
+          vision: "supported",
+        },
+        shape: "sync",
+      },
+      {
+        id: "gemini-3-pro-image",
+        displayName: "Gemini 3 Pro Image",
+        capability: {
+          ...NOT_CHAT,
+          imageGeneration: "supported",
+          imageEditing: "supported",
+          vision: "supported",
+        },
+        shape: "sync",
+      },
+      // Video. veo-3.0 is deprecated; 3.1 is current. Long-running
+      // operation: the request returns a name to poll, not a video.
+      {
+        id: "veo-3.1-generate-preview",
+        displayName: "Veo 3.1",
         capability: { ...NOT_CHAT, videoGeneration: "supported" },
-        // Long-running operation: the request returns a name to poll, not a video.
         shape: "poll",
       },
       {
-        id: "veo-3.0-fast-generate-001",
-        displayName: "Veo 3 Fast",
+        id: "veo-3.1-fast-generate-preview",
+        displayName: "Veo 3.1 Fast",
         capability: { ...NOT_CHAT, videoGeneration: "supported" },
         shape: "poll",
+      },
+      {
+        id: "veo-3.1-lite-generate-preview",
+        displayName: "Veo 3.1 Lite",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+      },
+      {
+        id: "gemini-3.1-flash-tts-preview",
+        displayName: "Gemini 3.1 Flash TTS",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "gemini-3.5-transcribe",
+        displayName: "Gemini 3.5 Transcribe",
+        capability: { ...NOT_CHAT, transcription: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "gemini-embedding-2",
+        displayName: "Gemini Embedding 2",
+        capability: { ...NOT_CHAT, embeddings: "supported" },
+        shape: "sync",
       },
       {
         id: "gemini-embedding-001",
@@ -147,10 +264,17 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "elevenlabs",
     displayName: "ElevenLabs",
-    kind: "media",
-    protocol: "elevenlabs",
+    serves: { media: "elevenlabs" },
     baseUrl: "https://api.elevenlabs.io/v1",
     models: [
+      // eleven_turbo_v2_5 is deprecated in favour of eleven_flash_v2_5;
+      // eleven_v3 is the flagship. Scribe v1 is superseded by v2.
+      {
+        id: "eleven_v3",
+        displayName: "Eleven v3",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
       {
         id: "eleven_multilingual_v2",
         displayName: "Eleven Multilingual v2",
@@ -158,14 +282,14 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
         shape: "sync",
       },
       {
-        id: "eleven_turbo_v2_5",
-        displayName: "Eleven Turbo v2.5",
+        id: "eleven_flash_v2_5",
+        displayName: "Eleven Flash v2.5",
         capability: { ...NOT_CHAT, speechGeneration: "supported" },
         shape: "sync",
       },
       {
-        id: "scribe_v1",
-        displayName: "Scribe",
+        id: "scribe_v2",
+        displayName: "Scribe v2",
         capability: { ...NOT_CHAT, transcription: "supported" },
         shape: "sync",
       },
@@ -174,8 +298,7 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "tavily",
     displayName: "Tavily",
-    kind: "retrieval",
-    protocol: "tavily",
+    serves: { retrieval: "tavily" },
     baseUrl: "https://api.tavily.com",
     models: [
       {
@@ -195,8 +318,7 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "brave",
     displayName: "Brave Search",
-    kind: "retrieval",
-    protocol: "brave",
+    serves: { retrieval: "brave" },
     baseUrl: "https://api.search.brave.com/res/v1",
     models: [
       {
@@ -210,8 +332,7 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "exa",
     displayName: "Exa",
-    kind: "retrieval",
-    protocol: "exa",
+    serves: { retrieval: "exa" },
     baseUrl: "https://api.exa.ai",
     models: [
       {
@@ -225,8 +346,7 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "jina",
     displayName: "Jina",
-    kind: "retrieval",
-    protocol: "jina",
+    serves: { retrieval: "jina" },
     baseUrl: "https://r.jina.ai",
     models: [
       {
@@ -246,8 +366,7 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "firecrawl",
     displayName: "Firecrawl",
-    kind: "retrieval",
-    protocol: "firecrawl",
+    serves: { retrieval: "firecrawl" },
     baseUrl: "https://api.firecrawl.dev/v1",
     models: [
       {

@@ -35,11 +35,10 @@ async function connectTavily(): Promise<void> {
   await connections.add({
     id: "tavily",
     displayName: "Tavily",
-    kind: "retrieval",
+    serves: { retrieval: "tavily" },
     source: "local",
     enabled: true,
     catalogProvider: "tavily",
-    protocol: "tavily",
     apiKey: "sk-tavily-typed",
   });
 }
@@ -53,7 +52,7 @@ describe("the capability selection seam", () => {
     const resolution = await resolver.resolve("webSearch");
 
     expect(resolution).toBeDefined();
-    expect(resolution?.connection.protocol).toBe("tavily");
+    expect(resolution?.connection.serves.retrieval).toBe("tavily");
     expect(resolution?.model.modelId).toBe("tavily-search");
     // The credential travels to the invoking process and nowhere else.
     expect(resolution?.credential).toBe("sk-tavily-typed");

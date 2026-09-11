@@ -1539,11 +1539,10 @@ describe.sequential("Flue harness vertical slice", () => {
       const openrouter = {
         id: "openrouter",
         displayName: "OpenRouter",
-        kind: "language",
+        serves: { language: "openai-completions" },
         source: "local",
         enabled: true,
         catalogProvider: "openrouter",
-        protocol: "openai-completions",
       };
       const created = await fetch(`${running.baseUrl}/api/providers/connections`, {
         method: "POST",

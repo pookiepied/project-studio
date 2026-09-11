@@ -22,22 +22,20 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
 const OPENAI: ProviderConnectionDraft = {
   id: "work-openai",
   displayName: "Work OpenAI",
-  kind: "language",
+  serves: { language: "openai-responses" },
   source: "local",
   baseUrl: "https://api.openai.com/v1",
   enabled: true,
   catalogProvider: "openai",
-  protocol: "openai-responses",
 };
 
 const MEDIA: ProviderConnectionDraft = {
   id: "images",
   displayName: "Images",
-  kind: "media",
+  serves: { media: "openai" },
   source: "local",
   baseUrl: "https://images.example.test/v1",
   enabled: true,
-  protocol: "openai-images",
 };
 
 function reporterFor(reports: unknown[]): ErrorReporter {
@@ -132,11 +130,10 @@ describe("provider model catalog", () => {
     const selfHosted: ProviderConnectionDraft = {
       id: "ollama",
       displayName: "Ollama",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       baseUrl: "http://127.0.0.1:11434/v1",
       enabled: true,
-      protocol: "openai-completions",
     };
     await connections.add(selfHosted);
 

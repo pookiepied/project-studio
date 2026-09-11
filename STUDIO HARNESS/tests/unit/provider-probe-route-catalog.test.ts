@@ -104,11 +104,10 @@ describe("probing a catalog connection through the route", () => {
       body: JSON.stringify({
         id: "catalog-probe",
         displayName: "Catalog Connection",
-        kind: "language",
+        serves: { language: "openai-responses" },
         source: "local",
         enabled: true,
         catalogProvider: "mock-catalog",
-        protocol: "openai-responses",
         apiKey: SECRET,
       }),
     });
@@ -135,12 +134,11 @@ describe("probing a catalog connection through the route", () => {
       body: JSON.stringify({
         id: "explicit-probe",
         displayName: "Explicit Connection",
-        kind: "language",
+        serves: { language: "openai-responses" },
         source: "local",
         enabled: true,
         catalogProvider: "mock-catalog",
         baseUrl: `http://127.0.0.1:${catalogTarget.port}/explicit`,
-        protocol: "openai-responses",
         apiKey: SECRET,
       }),
     });

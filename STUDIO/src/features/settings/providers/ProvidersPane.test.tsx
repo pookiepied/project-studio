@@ -305,7 +305,7 @@ describe('creating a connection', () => {
     expect(sent).toMatchObject({
       id: 'my-gateway',
       displayName: 'My Gateway',
-      kind: 'language',
+      serves: { language: 'openai-completions' },
       source: 'local',
       enabled: true,
       baseUrl: 'https://api.example.com/v1',
@@ -421,16 +421,14 @@ describe('creating a connection', () => {
           {
             id: 'openai',
             displayName: 'OpenAI',
-            kind: 'language',
-            protocol: 'openai-completions',
+            serves: { language: 'openai-completions' },
             capabilities: ['textGeneration', 'imageGeneration'],
             modelCount: 28,
           },
           {
             id: 'tavily',
             displayName: 'Tavily',
-            kind: 'retrieval',
-            protocol: 'tavily',
+            serves: { retrieval: 'tavily' },
             capabilities: ['webSearch'],
             modelCount: 2,
           },
@@ -464,9 +462,8 @@ describe('creating a connection', () => {
     expect(sent).toMatchObject({
       id: 'tavily',
       displayName: 'Tavily',
-      kind: 'retrieval',
+      serves: { retrieval: 'tavily' },
       catalogProvider: 'tavily',
-      protocol: 'tavily',
       apiKey: CANARY,
     })
   })

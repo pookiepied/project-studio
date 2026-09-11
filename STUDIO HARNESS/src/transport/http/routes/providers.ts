@@ -17,8 +17,12 @@ import {
   providerConnectionSchema,
   providerKindSchema,
   retrievalProtocolSchema,
+  type ConnectionServesPatch,
+  type LanguageProtocol,
+  type MediaProtocol,
   type ProviderConnectionDraft,
   type ProviderConnectionPatch,
+  type RetrievalProtocol,
 } from "../../../contracts/providers.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type {
@@ -69,15 +73,30 @@ const connectionPatchSchema = v.object({
   // is validated rather than smuggled.
   baseUrl: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
   enabled: v.optional(v.boolean()),
-  protocol: v.optional(
-    v.union([
-      languageProtocolSchema,
-      mediaProtocolSchema,
-      retrievalProtocolSchema,
-    ]),
+  // Per kind, the same three-way rule as baseUrl: a protocol adds or
+  // re-wires the kind, null removes it, an absent key leaves it alone.
+  serves: v.optional(
+    v.object({
+      language: v.optional(v.nullable(languageProtocolSchema)),
+      media: v.optional(v.nullable(mediaProtocolSchema)),
+      retrieval: v.optional(v.nullable(retrievalProtocolSchema)),
+    }),
   ),
   apiKey: v.optional(v.string()),
 });
+
+/** A serves patch with its absent keys dropped, so undefined never travels. */
+function presentKeys(serves: {
+  readonly language?: LanguageProtocol | null | undefined;
+  readonly media?: MediaProtocol | null | undefined;
+  readonly retrieval?: RetrievalProtocol | null | undefined;
+}): ConnectionServesPatch {
+  return {
+    ...(serves.language === undefined ? {} : { language: serves.language }),
+    ...(serves.media === undefined ? {} : { media: serves.media }),
+    ...(serves.retrieval === undefined ? {} : { retrieval: serves.retrieval }),
+  };
+}
 
 function connectionPatch(value: unknown): ProviderConnectionPatch {
   const result = v.safeParse(connectionPatchSchema, value);
@@ -91,7 +110,7 @@ function connectionPatch(value: unknown): ProviderConnectionPatch {
     ...(parsed.displayName === undefined ? {} : { displayName: parsed.displayName }),
     ...(parsed.baseUrl === undefined ? {} : { baseUrl: parsed.baseUrl }),
     ...(parsed.enabled === undefined ? {} : { enabled: parsed.enabled }),
-    ...(parsed.protocol === undefined ? {} : { protocol: parsed.protocol }),
+    ...(parsed.serves === undefined ? {} : { serves: presentKeys(parsed.serves) }),
     ...(parsed.apiKey === undefined ? {} : { apiKey: parsed.apiKey }),
   };
 }

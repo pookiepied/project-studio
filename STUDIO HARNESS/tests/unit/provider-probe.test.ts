@@ -74,28 +74,25 @@ function languageDraft(baseUrl: string, apiKey?: string): ProviderConnectionDraf
   return {
     id: "mock-provider",
     displayName: "Mock Provider",
-    kind: "language",
+    serves: { language: "openai-responses" },
     source: "test",
     baseUrl,
     enabled: true,
-    protocol: "openai-responses",
     ...(apiKey === undefined ? {} : { apiKey }),
   };
 }
 
-// One factory per kind rather than a helper taking kind and protocol as
-// loose unions: the connection contract is discriminated, and an object whose
-// kind and protocol vary independently is precisely the shape it refuses.
+// One factory per kind: each kind keeps its own protocol union under
+// `serves`, so a retrieval wire cannot be handed to the language factory.
 function languageConnection(baseUrl: string, protocol: LanguageProtocol): ProviderConnection {
   return {
     id: "mock-provider",
     displayName: "Mock Provider",
-    kind: "language",
     source: "test",
     baseUrl,
     enabled: true,
     credential: "set",
-    protocol,
+    serves: { language: protocol },
   };
 }
 
@@ -103,12 +100,11 @@ function retrievalConnection(baseUrl: string, protocol: RetrievalProtocol): Prov
   return {
     id: "mock-provider",
     displayName: "Mock Provider",
-    kind: "retrieval",
     source: "test",
     baseUrl,
     enabled: true,
     credential: "set",
-    protocol,
+    serves: { retrieval: protocol },
   };
 }
 

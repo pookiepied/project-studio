@@ -99,11 +99,13 @@ async function connectOpenAi(): Promise<void> {
   await connections.add({
     id: "openai-work",
     displayName: "Work OpenAI",
-    kind: "language",
+    // One key, two kinds: the audio models are the media half of the same
+    // account, and a connection that served only language would not list
+    // them.
+    serves: { language: "openai-completions", media: "openai" },
     source: "local",
     enabled: true,
     catalogProvider: "openai",
-    protocol: "openai-completions",
     baseUrl: `http://127.0.0.1:${provider.port}/v1`,
     apiKey: "sk-openai-route-secret-9f27",
   });

@@ -267,12 +267,12 @@ function probeTarget(
   const headers: Record<string, string> = { accept: "application/json" };
   const bearer = apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
 
-  switch (connection.protocol) {
+  switch (probeProtocol(connection)) {
     case "openai-completions":
     case "openai-responses":
     case "mistral-conversations":
-    case "openai-images":
-    case "openrouter-images":
+    case "openai":
+    case "openrouter":
       return { url: `${origin}/models`, base: origin, headers: { ...headers, ...bearer } };
     case "azure-openai-responses":
       // Azure authenticates with its own header, not a bearer token.
@@ -331,9 +331,22 @@ function probeTarget(
   }
 }
 
-/** Whether this protocol's probe answers with a list that carries model ids. */
+/**
+ * The one wire a probe speaks for a connection that may serve several.
+ *
+ * A connection is probed once, not once per kind: the key is the same and
+ * so is the host. Language comes first because its `/models` answer carries
+ * the ids the catalog marks availability from; media next, because its
+ * endpoints list too; retrieval last, because a retrieval probe only
+ * confirms the key is accepted.
+ */
+function probeProtocol(connection: ProviderConnection) {
+  return connection.serves.language ?? connection.serves.media ?? connection.serves.retrieval;
+}
+
+/** Whether this connection's probe answers with a list that carries model ids. */
 function listsModels(connection: ProviderConnection): boolean {
-  return connection.kind !== "retrieval";
+  return connection.serves.language !== undefined || connection.serves.media !== undefined;
 }
 
 /**
@@ -384,7 +397,7 @@ function modelListIn(body: string, connection: ProviderConnection): readonly unk
   }
   if (!isRecord(parsed)) return undefined;
 
-  const list = connection.protocol === "google-generative-ai" ? parsed.models : parsed.data;
+  const list = probeProtocol(connection) === "google-generative-ai" ? parsed.models : parsed.data;
   return Array.isArray(list) ? list : undefined;
 }
 

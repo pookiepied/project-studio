@@ -51,11 +51,10 @@ describe('parseProviderConnection', () => {
   const LANGUAGE = {
     id: 'work-openai',
     displayName: 'Work OpenAI',
-    kind: 'language',
+    serves: { language: 'openai-responses' },
     source: 'local',
     enabled: true,
     credential: 'absent',
-    protocol: 'openai-responses',
   } as const
 
   it('accepts a minimal language connection', () => {
@@ -77,13 +76,12 @@ describe('parseProviderConnection', () => {
     expect(withoutOptional).not.toHaveProperty('catalogProvider')
   })
 
-  it('accepts the media and retrieval variants with their own protocols', () => {
+  it('accepts a connection serving media, retrieval, or several kinds on one key', () => {
     expect(
       parseProviderConnection({
         ...LANGUAGE,
         id: 'images',
-        kind: 'media',
-        protocol: 'openai-images',
+        serves: { media: 'openai' },
       }),
     ).not.toBeNull()
 
@@ -91,21 +89,27 @@ describe('parseProviderConnection', () => {
       parseProviderConnection({
         ...LANGUAGE,
         id: 'search',
-        kind: 'retrieval',
-        protocol: 'brave',
+        serves: { retrieval: 'brave' },
       }),
     ).not.toBeNull()
+
+    const several = parseProviderConnection({
+      ...LANGUAGE,
+      serves: { language: 'openai-responses', media: 'openai' },
+    })
+    expect(several?.serves).toEqual({ language: 'openai-responses', media: 'openai' })
   })
 
-  it('refuses a protocol from the wrong kind', () => {
-    expect(parseProviderConnection({ ...LANGUAGE, protocol: 'brave' })).toBeNull()
+  it('refuses a protocol from the wrong kind, and a connection that serves nothing', () => {
+    expect(parseProviderConnection({ ...LANGUAGE, serves: { language: 'brave' } })).toBeNull()
     expect(
-      parseProviderConnection({ ...LANGUAGE, kind: 'media', protocol: 'anthropic-messages' }),
+      parseProviderConnection({ ...LANGUAGE, serves: { media: 'anthropic-messages' } }),
     ).toBeNull()
+    expect(parseProviderConnection({ ...LANGUAGE, serves: {} })).toBeNull()
   })
 
   it('refuses an unknown kind, an unknown source, and an unknown credential state', () => {
-    expect(parseProviderConnection({ ...LANGUAGE, kind: 'embedding' })).toBeNull()
+    expect(parseProviderConnection({ ...LANGUAGE, serves: { embedding: 'x' } })).toBeNull()
     expect(parseProviderConnection({ ...LANGUAGE, source: 'gateway' })).toBeNull()
     expect(parseProviderConnection({ ...LANGUAGE, credential: 'sk-live-abc' })).toBeNull()
   })
@@ -142,8 +146,7 @@ describe('parseProviderConnection', () => {
       'source',
       'enabled',
       'credential',
-      'kind',
-      'protocol',
+      'serves',
     ])
   })
 })

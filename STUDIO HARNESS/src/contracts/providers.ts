@@ -59,12 +59,15 @@ export type LanguageProtocol = v.InferOutput<typeof languageProtocolSchema>;
  * Kept apart from language because image and video endpoints have different
  * shape and auth requirements, and a single union would let a text model be
  * asked to render an image without a type error.
+ *
+ * Each entry names a vendor's media wire *family*, not one endpoint: OpenAI's
+ * family covers images, speech and transcription on one key, and an entry per
+ * endpoint would have multiplied connections for the same secret. Adding a
+ * family is a contract change, which is the union's purpose; the gateway
+ * plan adds `fal`, `deepgram`, `fish-audio` and `minimax` as each
+ * adapter lands.
  */
-export const mediaProtocolSchema = v.picklist([
-  "openai-images",
-  "openrouter-images",
-  "elevenlabs",
-]);
+export const mediaProtocolSchema = v.picklist(["openai", "openrouter", "google", "elevenlabs"]);
 
 export type MediaProtocol = v.InferOutput<typeof mediaProtocolSchema>;
 
@@ -119,17 +122,46 @@ export const providerConnectionIdSchema = v.pipe(
 );
 
 /**
+ * What one connection serves, and on which wire.
+ *
+ * A connection is to a vendor, and one vendor's key credibly serves several
+ * kinds: OpenAI's chat, images, speech and transcription are one key, and so
+ * are OpenRouter's. This map is the shape of that fact - a kind is present
+ * when the connection serves it, and its value is the protocol spoken for
+ * that kind. Each kind keeps its own protocol union, so a retrieval protocol
+ * still cannot be put under `language` without a type error; the variant on
+ * `kind` that used to guarantee that is gone, because it also guaranteed
+ * that the same key had to be typed once per kind.
+ *
+ * At least one kind is required: a connection that serves nothing is a
+ * secret with no purpose, and the store refuses to hold one.
+ */
+export const connectionServesSchema = v.pipe(
+  v.object({
+    language: v.optional(languageProtocolSchema),
+    media: v.optional(mediaProtocolSchema),
+    retrieval: v.optional(retrievalProtocolSchema),
+  }),
+  v.check(
+    (serves) =>
+      serves.language !== undefined ||
+      serves.media !== undefined ||
+      serves.retrieval !== undefined,
+    "A provider connection serves at least one kind.",
+  ),
+);
+
+export type ConnectionServes = v.InferOutput<typeof connectionServesSchema>;
+
+/**
  * A provider connection as the UI and the harness see it.
  *
- * Discriminated on `kind` so the type system refuses a language protocol on a
- * media connection and vice-versa. The id is slug-shaped, stable, and
- * user-visible in URLs so it can be bookmarked and logged without leaking a
- * secret or an internal row id.
+ * The id is slug-shaped, stable, and user-visible in URLs so it can be
+ * bookmarked and logged without leaking a secret or an internal row id.
  */
-const providerConnectionLanguageSchema = v.object({
+export const providerConnectionSchema = v.object({
   id: providerConnectionIdSchema,
   displayName: v.pipe(v.string(), v.minLength(1)),
-  kind: v.literal("language"),
   source: providerSourceSchema,
   baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
   enabled: v.boolean(),
@@ -139,7 +171,7 @@ const providerConnectionLanguageSchema = v.object({
    * Separate from `id` because they answer different questions. `id` is the
    * user's name for *this connection*; this is the vendor whose model list
    * applies to it. Collapsing them makes two accounts with the same vendor
-   * impossible — two OpenAI keys would both have to be called "openai" —
+   * impossible - two OpenAI keys would both have to be called "openai" -
    * and makes a connection named "work-openai" silently produce no models.
    *
    * Undefined means a provider the built-in catalog has never heard of, which
@@ -154,78 +186,51 @@ const providerConnectionLanguageSchema = v.object({
    * and a fetched connection cannot be used to write one back.
    */
   credential: credentialStatusSchema,
-  protocol: languageProtocolSchema,
+  serves: connectionServesSchema,
 });
-
-const providerConnectionMediaSchema = v.object({
-  id: providerConnectionIdSchema,
-  displayName: v.pipe(v.string(), v.minLength(1)),
-  kind: v.literal("media"),
-  source: providerSourceSchema,
-  baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
-  enabled: v.boolean(),
-  /**
-   * Which built-in catalog this connection draws its models from, if any.
-   *
-   * Separate from `id` because they answer different questions. `id` is the
-   * user's name for *this connection*; this is the vendor whose model list
-   * applies to it. Collapsing them makes two accounts with the same vendor
-   * impossible — two OpenAI keys would both have to be called "openai" —
-   * and makes a connection named "work-openai" silently produce no models.
-   *
-   * Undefined means a provider the built-in catalog has never heard of, which
-   * is the normal case for a self-hosted endpoint. Such a connection has only
-   * the models the user enters by hand.
-   */
-  catalogProvider: v.optional(v.pipe(v.string(), v.minLength(1))),
-  /**
-   * Whether a credential exists. This type NEVER carries an API key, in
-   * either direction. Only whether one exists. Keys move through the
-   * credential store alone, so a serialized connection cannot leak a secret
-   * and a fetched connection cannot be used to write one back.
-   */
-  credential: credentialStatusSchema,
-  protocol: mediaProtocolSchema,
-});
-
-const providerConnectionRetrievalSchema = v.object({
-  id: providerConnectionIdSchema,
-  displayName: v.pipe(v.string(), v.minLength(1)),
-  kind: v.literal("retrieval"),
-  source: providerSourceSchema,
-  baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
-  enabled: v.boolean(),
-  /**
-   * Which built-in catalog this connection draws its models from, if any.
-   *
-   * Separate from `id` because they answer different questions. `id` is the
-   * user's name for *this connection*; this is the vendor whose model list
-   * applies to it. Collapsing them makes two accounts with the same vendor
-   * impossible — two OpenAI keys would both have to be called "openai" —
-   * and makes a connection named "work-openai" silently produce no models.
-   *
-   * Undefined means a provider the built-in catalog has never heard of, which
-   * is the normal case for a self-hosted endpoint. Such a connection has only
-   * the models the user enters by hand.
-   */
-  catalogProvider: v.optional(v.pipe(v.string(), v.minLength(1))),
-  /**
-   * Whether a credential exists. This type NEVER carries an API key, in
-   * either direction. Only whether one exists. Keys move through the
-   * credential store alone, so a serialized connection cannot leak a secret
-   * and a fetched connection cannot be used to write one back.
-   */
-  credential: credentialStatusSchema,
-  protocol: retrievalProtocolSchema,
-});
-
-export const providerConnectionSchema = v.variant("kind", [
-  providerConnectionLanguageSchema,
-  providerConnectionMediaSchema,
-  providerConnectionRetrievalSchema,
-]);
 
 export type ProviderConnection = v.InferOutput<typeof providerConnectionSchema>;
+
+/** The kinds a connection serves, in the contract's fixed order. */
+export function connectionKinds(connection: {
+  readonly serves: ConnectionServes;
+}): readonly ProviderKind[] {
+  return providerKindSchema.options.filter((kind) => connection.serves[kind] !== undefined);
+}
+
+export function servesKind(
+  connection: { readonly serves: ConnectionServes },
+  kind: ProviderKind,
+): boolean {
+  return connection.serves[kind] !== undefined;
+}
+
+/**
+ * The kind a model belongs to, read off what it can do.
+ *
+ * A model carries no kind of its own: a connection serves kinds, and a model
+ * is chat, media or retrieval by its capability. Text generation is
+ * language; search and fetch are retrieval; everything else that generates,
+ * transcribes or embeds is media. A model that supports nothing recognisable
+ * is language, because that is the only kind a hand-entered model with an
+ * unknown capability can be run as.
+ */
+export function kindOfCapability(capability: ModelCapability): ProviderKind {
+  if (capability.textGeneration === "supported") return "language";
+  if (capability.webSearch === "supported" || capability.webFetch === "supported") {
+    return "retrieval";
+  }
+  const media: readonly (keyof ModelCapability)[] = [
+    "imageGeneration",
+    "imageEditing",
+    "videoGeneration",
+    "speechGeneration",
+    "transcription",
+    "embeddings",
+  ];
+  if (media.some((slot) => capability[slot] === "supported")) return "media";
+  return "language";
+}
 
 /**
  * Cost for one million tokens in US dollars.
@@ -376,31 +381,32 @@ export const probeResultSchema = v.object({
 
 export type ProbeResult = v.InferOutput<typeof probeResultSchema>;
 
-/**
- * Omit that survives a union.
- *
- * TypeScript's own `Omit` is not distributive: applied to ProviderConnection it
- * collapses the three variants into one object whose `kind` and `protocol` are
- * independent unions, so `{ kind: "language", protocol: "brave" }` would pass.
- * The discriminant is the whole point of the union, so it has to survive the
- * derivation too.
- */
-type DistributiveOmit<T, K extends keyof never> = T extends unknown
-  ? Omit<T, K>
-  : never;
-
 /** A connection as the caller supplies it: no credential status, but a key. */
-export type ProviderConnectionDraft = DistributiveOmit<
-  ProviderConnection,
-  "credential"
-> & { readonly apiKey?: string };
+export type ProviderConnectionDraft = Omit<ProviderConnection, "credential"> & {
+  readonly apiKey?: string;
+};
+
+/**
+ * What one patch may say about the kinds a connection serves.
+ *
+ * A kind named with a protocol is added or re-wired; `null` removes it;
+ * `undefined` leaves it alone - the same three-way rule `baseUrl` uses. The
+ * store refuses a patch that would leave nothing served.
+ */
+export type ConnectionServesPatch = {
+  readonly language?: LanguageProtocol | null;
+  readonly media?: MediaProtocol | null;
+  readonly retrieval?: RetrievalProtocol | null;
+};
 
 /**
  * What may change after creation.
  *
- * `id` and `kind` are absent on purpose. Changing either turns a connection
- * into a different connection while models, defaults, and stored credentials
- * still point at the old one; the honest operation is remove and re-add.
+ * `id` is absent on purpose. Changing it turns a connection into a different
+ * connection while models, defaults, and stored credentials still point at
+ * the old one; the honest operation is remove and re-add. The kinds served
+ * may change, because a key that served chat yesterday serves images today
+ * without becoming a different account.
  */
 export type ProviderConnectionPatch = {
   readonly displayName?: string;
@@ -409,14 +415,14 @@ export type ProviderConnectionPatch = {
    *
    * The distinction is the whole point. Without an explicit clear, a
    * connection that once had an override could only ever be reassigned, never
-   * returned to the protocol's own default — an omission, not a decision.
+   * returned to the protocol's own default - an omission, not a decision.
    * `null` rather than a magic empty string because `""` is already refused
    * by the connection schema, and a sentinel that resembles a value invites
    * exactly the typo it exists to prevent.
    */
   readonly baseUrl?: string | null;
   readonly enabled?: boolean;
-  readonly protocol?: LanguageProtocol | MediaProtocol | RetrievalProtocol;
+  readonly serves?: ConnectionServesPatch;
   readonly apiKey?: string;
 };
 

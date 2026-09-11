@@ -41,11 +41,10 @@ describe("the credential seam", () => {
     await connections.add({
       id: "work-openrouter",
       displayName: "Work OpenRouter",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
     });
     expect((await connections.get("work-openrouter"))?.credential).toBe("set");
     await connections.update("work-openrouter", { apiKey: "sk-or-typed" });
@@ -59,11 +58,10 @@ describe("the credential seam", () => {
     await connections.add({
       id: "work-openrouter",
       displayName: "Work OpenRouter",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
     });
 
     // Nothing was retyped: the carried connection reads the old key.
@@ -76,11 +74,10 @@ describe("the credential seam", () => {
     await connections.add({
       id: "homelab",
       displayName: "Homelab",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       baseUrl: "http://127.0.0.1:8080/v1",
       enabled: true,
-      protocol: "openai-completions",
     });
 
     expect(await connections.credentialFor("homelab")).toBe("sk-homelab");
@@ -90,11 +87,10 @@ describe("the credential seam", () => {
     await connections.add({
       id: "fresh",
       displayName: "Fresh",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       baseUrl: "https://api.example.com/v1",
       enabled: true,
-      protocol: "openai-completions",
     });
     expect((await connections.get("fresh"))?.credential).toBe("absent");
     expect(await connections.credentialFor("fresh")).toBeUndefined();
@@ -104,11 +100,10 @@ describe("the credential seam", () => {
     await connections.add({
       id: "keeper",
       displayName: "Keeper",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       baseUrl: "https://api.example.com/v1",
       enabled: true,
-      protocol: "openai-completions",
       apiKey: "sk-never-serialized",
     });
 
@@ -125,12 +120,11 @@ describe("the sync merged reader", () => {
     await connections.add({
       id: "reader",
       displayName: "Reader",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       baseUrl: "https://api.example.com/v1",
       enabled: true,
       catalogProvider: "openai",
-      protocol: "openai-completions",
       apiKey: "sk-sync-read",
     });
 
@@ -149,11 +143,10 @@ describe("manual models and selection", () => {
     await connections.add({
       id: "conn",
       displayName: "Conn",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       baseUrl: "https://api.example.com/v1",
       enabled: true,
-      protocol: "openai-completions",
     });
     await connections.update("conn", { apiKey: "sk-conn" });
   }
@@ -197,11 +190,10 @@ describe("probe-learned availability", () => {
     await connections.add({
       id: "openrouter",
       displayName: "OpenRouter",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
     });
     const catalog = new ModelCatalog({ db, connections });
 
@@ -237,11 +229,10 @@ describe("probe-learned availability", () => {
     await connections.add({
       id: "openrouter",
       displayName: "OpenRouter",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
     });
     const catalog = new ModelCatalog({ db, connections });
     const listed = await catalog.listModels({ connectionId: "openrouter" });
@@ -316,22 +307,24 @@ describe("migration 16 carries the old store forward", () => {
     // The custom provider: its own endpoint, its declared model as a manual row.
     const carried = byId.get("openrouter-test");
     expect(carried).toMatchObject({
-      kind: "language",
+      serves: { language: "openai-completions" },
       baseUrl: "https://openrouter.ai/api/v1",
-      protocol: "openai-completions",
       enabled: true,
     });
     expect(carried?.catalogProvider).toBeUndefined();
 
-    // The built-in connections draw their vendor's catalog, protocol and all.
+    // The built-in connections draw their vendor's catalog, protocol and all
+    // - and, since migration 23, every kind the library says the vendor
+    // serves on one key: the chat connection to OpenRouter also serves its
+    // media, and Google's serves Gemini's images, video and audio.
     expect(byId.get("openrouter")).toMatchObject({
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
+      serves: { language: "openai-completions", media: "openrouter" },
       enabled: true,
     });
     expect(byId.get("google")).toMatchObject({
       catalogProvider: "google",
-      protocol: "google-generative-ai",
+      serves: { language: "google-generative-ai", media: "google" },
     });
 
     // The declared model arrived as the user's own manual row, with the
@@ -398,16 +391,92 @@ describe("migration 16 carries the old store forward", () => {
   });
 });
 
+describe("migration 23 makes a connection serve its kinds", () => {
+  function databaseAtVersion22(): DatabaseSync {
+    const handle = new DatabaseSync(":memory:");
+    handle.exec("PRAGMA foreign_keys = ON");
+    migrate(handle, MIGRATIONS.slice(0, 22));
+    return handle;
+  }
+
+  function insert(handle: DatabaseSync, id: string, record: Record<string, unknown>): void {
+    handle
+      .prepare(`INSERT INTO provider_connection_record (id, record_json, updated_at) VALUES (?, ?, 1)`)
+      .run(id, JSON.stringify({ id, displayName: id, source: "local", enabled: true, ...record }));
+  }
+
+  function servesOf(handle: DatabaseSync, id: string): unknown {
+    const row = handle
+      .prepare(`SELECT record_json FROM provider_connection_record WHERE id = ?`)
+      .get(id) as Record<string, unknown>;
+    const record = JSON.parse(String(row.record_json)) as Record<string, unknown>;
+    expect(record).not.toHaveProperty("kind");
+    expect(record).not.toHaveProperty("protocol");
+    return record.serves;
+  }
+
+  it("rewrites kind and protocol as serves, renaming the per-endpoint media protocols", () => {
+    const handle = databaseAtVersion22();
+    insert(handle, "images", {
+      kind: "media",
+      protocol: "openrouter-images",
+      catalogProvider: "openrouter",
+    });
+    insert(handle, "voice", { kind: "media", protocol: "elevenlabs", catalogProvider: "elevenlabs" });
+    insert(handle, "search", { kind: "retrieval", protocol: "tavily", catalogProvider: "tavily" });
+    insert(handle, "self-hosted", {
+      kind: "language",
+      protocol: "openai-completions",
+      baseUrl: "http://127.0.0.1:11434/v1",
+    });
+
+    migrate(handle);
+
+    // The OpenRouter connection was made for images; its key also serves
+    // chat, and the vendor has one connection, so it gains the language
+    // half. ElevenLabs and Tavily serve one kind and stay one kind. The
+    // self-hosted endpoint names no vendor, so there is nothing to widen.
+    expect(servesOf(handle, "images")).toEqual({ language: "openai-completions", media: "openrouter" });
+    expect(servesOf(handle, "voice")).toEqual({ media: "elevenlabs" });
+    expect(servesOf(handle, "search")).toEqual({ retrieval: "tavily" });
+    expect(servesOf(handle, "self-hosted")).toEqual({ language: "openai-completions" });
+    handle.close();
+  });
+
+  it("does not widen a vendor that already has two connections, one per kind", () => {
+    // A person who typed the same OpenAI key twice, once for chat and once
+    // for images, has two connections the migration cannot merge: it does
+    // not know which key they meant to keep. Each keeps its one kind, and
+    // the duplicate is theirs to remove.
+    const handle = databaseAtVersion22();
+    insert(handle, "openai-chat", {
+      kind: "language",
+      protocol: "openai-responses",
+      catalogProvider: "openai",
+    });
+    insert(handle, "openai-images", {
+      kind: "media",
+      protocol: "openai-images",
+      catalogProvider: "openai",
+    });
+
+    migrate(handle);
+
+    expect(servesOf(handle, "openai-chat")).toEqual({ language: "openai-responses" });
+    expect(servesOf(handle, "openai-images")).toEqual({ media: "openai" });
+    handle.close();
+  });
+});
+
 describe("the runtime derives from the merged store", () => {
   it("registers a hand-entered model beside its vendor's own catalog", async () => {
     await connections.add({
       id: "openai",
       displayName: "OpenAI",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: true,
       catalogProvider: "openai",
-      protocol: "openai-completions",
     });
     const catalog = new ModelCatalog({ db, connections });
     await catalog.addManualModel("openai", {
@@ -442,11 +511,10 @@ describe("the runtime derives from the merged store", () => {
     await connections.add({
       id: "openrouter",
       displayName: "OpenRouter",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
     });
     const catalog = new ModelCatalog({ db, connections });
     const served = await catalog.servedModelReferences();
@@ -460,11 +528,10 @@ describe("the runtime derives from the merged store", () => {
     await connections.add({
       id: "openrouter",
       displayName: "OpenRouter",
-      kind: "language",
+      serves: { language: "openai-completions" },
       source: "local",
       enabled: false,
       catalogProvider: "openrouter",
-      protocol: "openai-completions",
     });
     const catalog = new ModelCatalog({ db, connections });
     expect(await catalog.servedModelReferences()).toEqual(new Set());
@@ -476,11 +543,10 @@ describe("the declared catalog", () => {
     await connections.add({
       id: "tavily",
       displayName: "Tavily",
-      kind: "retrieval",
+      serves: { retrieval: "tavily" },
       source: "local",
       enabled: true,
       catalogProvider: "tavily",
-      protocol: "tavily",
     });
     const catalog = new ModelCatalog({ db, connections });
     const listed = await catalog.listModels({ connectionId: "tavily" });
@@ -501,15 +567,14 @@ describe("the declared catalog", () => {
     expect(await catalog.servedModelReferences()).toEqual(new Set());
   });
 
-  it("gives a language connection its vendor's declared extras beside Pi's models", async () => {
+  it("gives a connection its vendor's declared models for every kind it serves, beside Pi's", async () => {
     await connections.add({
       id: "openai",
       displayName: "OpenAI",
-      kind: "language",
+      serves: { language: "openai-completions", media: "openai" },
       source: "local",
       enabled: true,
       catalogProvider: "openai",
-      protocol: "openai-completions",
     });
     const catalog = new ModelCatalog({ db, connections });
     const listed = await catalog.listModels({ connectionId: "openai" });
@@ -528,6 +593,28 @@ describe("the declared catalog", () => {
     expect(served.has("openai/gpt-5.2")).toBe(true);
   });
 
+  it("keeps a vendor's media models off a connection that serves only language", async () => {
+    // A model is chat, media or retrieval by what it can do, and a
+    // connection draws only the kinds it serves. The same OpenAI key
+    // connected for chat alone lists chat, and no image or audio model that
+    // nothing on that connection could run.
+    await connections.add({
+      id: "openai",
+      displayName: "OpenAI",
+      serves: { language: "openai-completions" },
+      source: "local",
+      enabled: true,
+      catalogProvider: "openai",
+    });
+    const catalog = new ModelCatalog({ db, connections });
+    const listed = await catalog.listModels({ connectionId: "openai" });
+
+    expect(listed.some((model) => model.modelId === "gpt-5.2")).toBe(true);
+    expect(listed.some((model) => model.modelId === "whisper-1")).toBe(false);
+    expect(listed.some((model) => model.modelId === "gpt-image-2")).toBe(false);
+    expect(await catalog.listModels({ kind: "media" })).toEqual([]);
+  });
+
   it("serves a media connection nothing from Pi, only what Studio declares", async () => {
     // Pi is the language gateway and nothing else (ADR 0051). Its image
     // catalog used to be read into a media connection here; that read is
@@ -535,16 +622,15 @@ describe("the declared catalog", () => {
     // listing, a media connection to a vendor Studio has not declared draws
     // no models at all rather than a list nothing could run.
     await connections.add({
-      id: "openrouter-images",
+      id: "openrouter",
       displayName: "OpenRouter Images",
-      kind: "media",
+      serves: { media: "openrouter" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
-      protocol: "openrouter-images",
     });
     const catalog = new ModelCatalog({ db, connections });
-    const listed = await catalog.listModels({ connectionId: "openrouter-images" });
+    const listed = await catalog.listModels({ connectionId: "openrouter" });
     expect(listed).toEqual([]);
   });
 });

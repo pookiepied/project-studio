@@ -20,13 +20,12 @@ const CREDENTIAL = 'test-credential-value'
 const CONNECTION = {
   id: 'work-openai',
   displayName: 'Work OpenAI',
-  kind: 'language',
+  serves: { language: 'openai-responses' },
   source: 'local',
   baseUrl: 'https://api.openai.com/v1',
   enabled: true,
   catalogProvider: 'openai',
   credential: 'set',
-  protocol: 'openai-responses',
 } as const
 
 const CAPABILITY = {
@@ -122,10 +121,9 @@ const METHODS: readonly {
       client.createConnection({
         id: 'work-openai',
         displayName: 'Work OpenAI',
-        kind: 'language',
+        serves: { language: 'openai-responses' },
         source: 'local',
         enabled: true,
-        protocol: 'openai-responses',
         apiKey: 'sk-CANARY-DO-NOT-PERSIST',
       }),
   },
@@ -215,9 +213,9 @@ describe('a body that does not match the contract', () => {
   })
 
   it('rejects a protocol that belongs to a different kind', async () => {
-    // The discriminant is the point of the union: a language connection
-    // cannot speak a retrieval protocol.
-    const crossed = { ...CONNECTION, protocol: 'brave' }
+    // Each kind keeps its own protocol union: a retrieval wire cannot be
+    // served under language.
+    const crossed = { ...CONNECTION, serves: { language: 'brave' } }
     const stub = stubFetch(() => jsonResponse([crossed]))
 
     const result = await clientWith(stub.fetch).listConnections()
@@ -423,10 +421,9 @@ describe('the api key', () => {
     const result = await clientWith(stub.fetch).createConnection({
       id: 'work-openai',
       displayName: 'Work OpenAI',
-      kind: 'language',
+      serves: { language: 'openai-responses' },
       source: 'local',
       enabled: true,
-      protocol: 'openai-responses',
       apiKey: CANARY,
     })
 

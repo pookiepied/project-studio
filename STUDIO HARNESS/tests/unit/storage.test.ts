@@ -67,7 +67,7 @@ describe("migrations", () => {
     // reversible side and an upgrade must not be what moves a server onto the
     // eager one.
     const handle = new DatabaseSync(":memory:");
-    const before = MIGRATIONS.filter((entry) => entry.name !== "mcp_server_purpose_and_provenance");
+    const before = MIGRATIONS.filter((entry) => entry.version < 22);
     migrate(handle, before);
 
     const now = Date.now();

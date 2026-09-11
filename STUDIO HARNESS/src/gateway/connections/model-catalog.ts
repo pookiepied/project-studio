@@ -10,6 +10,7 @@ import {
   type ProviderConnection,
   type ProviderKind,
   type ProviderModel,
+  servesKind,
 } from "../../contracts/providers.js";
 import {
   type ModelCapability,
@@ -114,16 +115,17 @@ export class ModelCatalog {
       ) {
         continue;
       }
-      if (filter?.kind !== undefined && filter.kind !== connection.kind) {
+      if (filter?.kind !== undefined && !servesKind(connection, filter.kind)) {
         continue;
       }
 
       const baseModels = await this.#baseModels(connection, manuals);
       const connectionOverrides = overrides.get(connection.id);
       // Availability is a fact about the provider's own list, which describes
-      // language models; the image catalog's ids are not enumerable through
-      // the same endpoint, so media rows are never marked from it.
-      const served = connection.kind === "language" ? probeStates.get(connection.id) : undefined;
+      // language models; media ids are not enumerable through the same
+      // endpoint, so media rows are never marked from it.
+      const served =
+        connection.serves.language !== undefined ? probeStates.get(connection.id) : undefined;
 
       for (const base of baseModels) {
         const model = this.#applyOverride(
@@ -325,14 +327,15 @@ export class ModelCatalog {
     for (const model of models) {
       const connection = byId.get(model.connectionId);
       if (connection === undefined) continue;
-      if (connection.kind !== "language" || !connection.enabled) continue;
+      const protocol = connection.serves.language;
+      if (protocol === undefined || !connection.enabled) continue;
 
       if (model.origin === "catalog") {
         if (model.capability.textGeneration !== "supported") continue;
       } else if (model.origin === "manual") {
         const runtimeHasIt =
           connection.catalogProvider !== undefined ||
-          loadable.has(connection.protocol);
+          loadable.has(protocol);
         if (!runtimeHasIt) continue;
       } else {
         continue;

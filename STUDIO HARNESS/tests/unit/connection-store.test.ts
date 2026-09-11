@@ -37,11 +37,10 @@ function draft(
   return {
     id,
     displayName: "OpenAI",
-    kind: "language",
+    serves: { language: "openai-responses" },
     source: "test",
     baseUrl: "https://api.example.test/v1",
     enabled: true,
-    protocol: "openai-responses",
     ...(apiKey === undefined ? {} : { apiKey }),
   };
 }
@@ -128,14 +127,8 @@ describe("provider connection store", () => {
     expect((await store.get("openai"))?.displayName).toBe("OpenAI");
   });
 
-  it("rejects runtime attempts to change id or kind during update", async () => {
+  it("rejects a runtime attempt to change the id during update", async () => {
     const original = await store.add(draft());
-
-    const kindPatch: ProviderConnectionPatch = { displayName: "Renamed" };
-    Reflect.set(kindPatch, "kind", "media");
-    await expect(store.update("openai", kindPatch)).rejects.toThrow(
-      ProviderConfigurationError,
-    );
 
     const idPatch: ProviderConnectionPatch = { displayName: "Renamed" };
     Reflect.set(idPatch, "id", "other");
@@ -144,6 +137,26 @@ describe("provider connection store", () => {
     );
 
     expect(await store.get("openai")).toEqual(original);
+  });
+
+  it("adds and removes the kinds a connection serves, and never leaves it serving nothing", async () => {
+    // One key, several kinds: the OpenAI key that served chat gains images
+    // and audio without becoming a different connection, and loses them
+    // again the same way. What it cannot do is serve nothing - a secret with
+    // no purpose is refused, and the stored record is untouched by the
+    // refusal.
+    await store.add(draft());
+
+    const widened = await store.update("openai", { serves: { media: "openai" } });
+    expect(widened.serves).toEqual({ language: "openai-responses", media: "openai" });
+
+    const narrowed = await store.update("openai", { serves: { media: null } });
+    expect(narrowed.serves).toEqual({ language: "openai-responses" });
+
+    await expect(
+      store.update("openai", { serves: { language: null } }),
+    ).rejects.toThrow(ProviderConfigurationError);
+    expect((await store.get("openai"))?.serves).toEqual({ language: "openai-responses" });
   });
 
   it("sets, clears, and reads back a cleared baseUrl as absent", async () => {

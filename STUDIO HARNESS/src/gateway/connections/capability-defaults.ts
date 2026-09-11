@@ -124,8 +124,7 @@ export class MergedRetrievalResolver {
       capability === "search" ? "webSearch" : "webFetch",
     );
     if (resolution === undefined) return undefined;
-    if (resolution.connection.kind !== "retrieval") return undefined;
-    return resolution.connection.protocol;
+    return resolution.connection.serves.retrieval;
   }
 
   /**
@@ -137,7 +136,7 @@ export class MergedRetrievalResolver {
   async keyFor(vendorId: string): Promise<string | undefined> {
     const connections = await this.#connections.list();
     const connection = connections.find(
-      (candidate) => candidate.kind === "retrieval" && candidate.protocol === vendorId,
+      (candidate) => candidate.serves.retrieval === vendorId,
     );
     if (connection !== undefined) {
       const fromConnection = await connectionCredentialSecret(this.#credentials, connection);
