@@ -1,4 +1,4 @@
-import type { CapabilitySlot } from "../../contracts/providers.js";
+import type { CapabilitySlot, MediaProtocol } from "../../contracts/providers.js";
 import { MediaError } from "../../contracts/media.js";
 import type { CapabilityResolver, CapabilityResolution } from "../connections/capability-defaults.js";
 import type { DriverEndpoint } from "./drivers/types.js";
@@ -15,10 +15,15 @@ import type { DriverEndpoint } from "./drivers/types.js";
  * who can fix a refusal is reading it from the composer, not from a taxonomy.
  */
 
-const LABELS: Readonly<Record<"speechGeneration" | "transcription", string>> = {
+const LABELS: Readonly<Record<GenerationSlot | "speechGeneration" | "transcription", string>> = {
   speechGeneration: "read-aloud",
   transcription: "dictation",
+  imageGeneration: "image",
+  imageEditing: "image editing",
+  videoGeneration: "video",
 };
+
+export type GenerationSlot = "imageGeneration" | "imageEditing" | "videoGeneration";
 
 /**
  * The protocols media can drive today, and what to say about the ones it
@@ -36,6 +41,50 @@ export interface MediaBinding extends DriverEndpoint {
   readonly slot: CapabilitySlot;
   readonly protocol: string;
   readonly modelId: string;
+}
+
+/**
+ * Binding an image or video slot to the adapter its connection speaks.
+ *
+ * Simpler than the audio binding because there is no OpenAI-shaped
+ * fallback: a generation goes through a media family or not at all, and
+ * the family is `serves.media` on the connection the slot's default names.
+ * Which adapters exist is the service's knowledge, not this file's; what is
+ * refused here is a connection with no media wire, or no address.
+ */
+export async function bindGenerationSlot(
+  resolver: CapabilityResolver,
+  slot: GenerationSlot,
+  requestedModelId?: string,
+): Promise<MediaBinding & { readonly protocol: MediaProtocol }> {
+  const resolution: CapabilityResolution | undefined = await resolver.resolve(slot);
+  if (resolution === undefined) {
+    throw new MediaError(
+      "slot-unset",
+      `No ${LABELS[slot]} model is connected. Choose one in Settings - Providers.`,
+    );
+  }
+  const { connection, model } = resolution;
+  const protocol = connection.serves.media;
+  if (protocol === undefined) {
+    throw new MediaError(
+      "slot-protocol",
+      `The connected ${LABELS[slot]} provider serves no media wire.`,
+    );
+  }
+  if (connection.baseUrl === undefined) {
+    throw new MediaError(
+      "slot-protocol",
+      `The connected ${LABELS[slot]} provider has no base URL to call.`,
+    );
+  }
+  return {
+    slot,
+    protocol,
+    baseUrl: connection.baseUrl,
+    credential: resolution.credential,
+    modelId: requestedModelId ?? model.modelId,
+  };
 }
 
 export async function bindAudioSlot(

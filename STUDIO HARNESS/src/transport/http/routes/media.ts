@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { Hono } from "hono";
 import * as v from "valibot";
 
@@ -10,6 +13,7 @@ import {
 import { StudioError } from "../../../contracts/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { MediaAdministration } from "../../../gateway/media/service.js";
+import { conversationArtifactsDirectory } from "../../../platform/paths.js";
 
 /**
  * The media routes: dictation and read-aloud, the app's own voice features.
@@ -24,7 +28,34 @@ import type { MediaAdministration } from "../../../gateway/media/service.js";
  * Bodies are JSON with base64 audio, the same encoding the attachments path
  * already speaks; the audio in a dictation is a couple of minutes of opus at
  * most, well inside a JSON round trip.
+ *
+ * The generation half - the jobs the model's image and video tools start -
+ * is read here too: the list of a conversation's jobs, a Stop for one, and
+ * the bytes of a finished output. The bytes are served from the
+ * conversation's artifacts directory by a file name the job registry made,
+ * and the name is checked against the shape the registry produces before
+ * any path is built, so a request cannot name a file the registry did not
+ * write. A finished output never changes, so the response says so and the
+ * webview caches it for the session.
  */
+
+/** `media_<run tag><counter>-<index>.<extension>` - exactly what `MediaJobs` writes. */
+const ARTIFACT_FILE_NAME = /^media_[a-z0-9]+-[0-9]+\.[a-z0-9]+$/;
+
+/** A conversation id is a path segment and nothing else. */
+const CONVERSATION_ID = /^[A-Za-z0-9_-]+$/;
+
+const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+};
 
 async function body(context: { req: { json(): Promise<unknown> } }): Promise<unknown> {
   try {
@@ -101,6 +132,55 @@ export function createMediaRoutes(media: MediaAdministration): Hono<AdmissionEnv
       return context.json(result, 200);
     } catch (error) {
       return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  routes.get("/jobs", (context) => {
+    const conversationId = context.req.query("conversationId") ?? "";
+    if (!CONVERSATION_ID.test(conversationId)) {
+      return context.json(failure(new MediaRouteError("A conversationId is required.")), 400);
+    }
+    return context.json({ jobs: media.listJobs?.(conversationId) ?? [] }, 200);
+  });
+
+  routes.post("/jobs/:id/stop", async (context) => {
+    try {
+      const parsed = v.safeParse(
+        v.object({ conversationId: v.pipe(v.string(), v.regex(CONVERSATION_ID)) }),
+        await body(context),
+      );
+      if (!parsed.success) {
+        throw new MediaRouteError("The stop body must be { \"conversationId\": \"...\" }.");
+      }
+      const stopped = media.stopJob?.(parsed.output.conversationId, context.req.param("id")) ?? false;
+      return stopped
+        ? context.json({ stopped: true }, 200)
+        : context.json({ error: "There is no such job.", code: "media.not-found" }, 404);
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  routes.get("/artifacts/:conversationId/:fileName", async (context) => {
+    const conversationId = context.req.param("conversationId");
+    const fileName = context.req.param("fileName");
+    if (!CONVERSATION_ID.test(conversationId) || !ARTIFACT_FILE_NAME.test(fileName)) {
+      return context.json({ error: "There is no such artifact.", code: "media.not-found" }, 404);
+    }
+    const extension = fileName.slice(fileName.lastIndexOf(".") + 1);
+    const mimeType = MIME_BY_EXTENSION[extension] ?? "application/octet-stream";
+    try {
+      const bytes = await readFile(join(conversationArtifactsDirectory(conversationId), fileName));
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          "content-type": mimeType,
+          "content-length": String(bytes.byteLength),
+          "cache-control": "private, max-age=31536000, immutable",
+        },
+      });
+    } catch {
+      return context.json({ error: "There is no such artifact.", code: "media.not-found" }, 404);
     }
   });
 

@@ -48,8 +48,9 @@ import { ModelCatalog } from "./gateway/connections/model-catalog.js";
 import { ProviderManagementService } from "./gateway/connections/management.js";
 import { createProviderIcons } from "./gateway/catalog/icons/index.js";
 import { CapabilityResolver } from "./gateway/connections/capability-defaults.js";
+import { MediaJobs } from "./gateway/media/jobs.js";
 import { MediaService } from "./gateway/media/service.js";
-import { studioPath } from "./platform/paths.js";
+import { conversationArtifactsDirectory, studioPath } from "./platform/paths.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
 import { RetrievalSettingsStore } from "./gateway/retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
@@ -225,12 +226,17 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // seam every consumer shares; the drivers they dispatch to live in
     // src/media/drivers, one file per protocol.
     bootLog("step 8b: MediaService entering");
+    // Generations are jobs the conversation owns: their bytes land in its
+    // artifacts directory, and nothing of ours keeps polling a vendor after
+    // Studio has closed, so the registry is stopped with the runtime below.
+    const mediaJobs = new MediaJobs({ artifactsDirectory: conversationArtifactsDirectory });
     const media = new MediaService({
       resolver: new CapabilityResolver({
         connections: providerConnections,
         catalog: modelCatalog,
         credentials: new KeyringCredentialStore(),
       }),
+      jobs: mediaJobs,
     });
     bootLog("step 8b: MediaService completed");
 
@@ -287,6 +293,9 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         try {
           titling.stop();
           contextUsage.stop();
+          // Nothing of ours keeps polling a vendor once Studio has closed;
+          // a job with a cancel endpoint is told.
+          mediaJobs.stopAll();
           // Awaited: MCP servers run in the project directory, and returning
           // before they are gone leaves them orphaned.
           await runtime.stop();
