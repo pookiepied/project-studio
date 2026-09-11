@@ -268,6 +268,48 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
     ],
   },
   {
+    id: "fal",
+    displayName: "FAL",
+    // The queue host is the base URL; a model id is the path. FAL's catalogue
+    // is broad and moves weekly, and its ids are the vendor's own: a person
+    // adds the models they use by hand, and these are the ones the research
+    // named as the backbone. Every one is a job.
+    serves: { media: "fal" },
+    baseUrl: "https://queue.fal.run",
+    models: [
+      {
+        id: "fal-ai/veo3.1",
+        displayName: "Veo 3.1 (FAL)",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+      },
+      {
+        id: "fal-ai/kling-video/v3/pro/text-to-video",
+        displayName: "Kling v3 Pro",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+      },
+      {
+        id: "bytedance/seedance-2.5/text-to-video",
+        displayName: "Seedance 2.5",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+      },
+      {
+        id: "fal-ai/flux-2/pro",
+        displayName: "FLUX.2 Pro",
+        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
+        shape: "poll",
+      },
+      {
+        id: "fal-ai/nano-banana",
+        displayName: "Nano Banana",
+        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
+        shape: "poll",
+      },
+    ],
+  },
+  {
     id: "elevenlabs",
     displayName: "ElevenLabs",
     serves: { media: "elevenlabs" },

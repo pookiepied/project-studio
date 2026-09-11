@@ -119,7 +119,7 @@ export const LANGUAGE_PROTOCOLS = [
 export type LanguageProtocol = (typeof LANGUAGE_PROTOCOLS)[number]
 
 /** `mediaProtocolSchema`. */
-export const MEDIA_PROTOCOLS = ['openai', 'openrouter', 'google', 'elevenlabs'] as const
+export const MEDIA_PROTOCOLS = ['openai', 'openrouter', 'google', 'elevenlabs', 'fal'] as const
 export type MediaProtocol = (typeof MEDIA_PROTOCOLS)[number]
 
 /** `retrievalProtocolSchema`. */

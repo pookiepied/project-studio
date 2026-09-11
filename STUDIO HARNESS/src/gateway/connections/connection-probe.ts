@@ -301,6 +301,7 @@ function probeTarget(
         },
       };
     case "google-generative-ai":
+    case "google":
       return {
         url: `${withVersion(origin, "v1beta")}/models`,
         headers: {
@@ -328,6 +329,16 @@ function probeTarget(
     case "firecrawl":
     case "jina":
       return { url: origin, base: origin, headers: { ...headers, ...bearer } };
+    case "fal":
+      // The queue host lists no models; the probe confirms the key is taken
+      // by the host answering at all, with FAL's own `Key` prefix.
+      return {
+        url: origin,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { authorization: `Key ${apiKey}` }),
+        },
+      };
   }
 }
 
@@ -346,7 +357,9 @@ function probeProtocol(connection: ProviderConnection) {
 
 /** Whether this connection's probe answers with a list that carries model ids. */
 function listsModels(connection: ProviderConnection): boolean {
-  return connection.serves.language !== undefined || connection.serves.media !== undefined;
+  if (connection.serves.language !== undefined) return true;
+  const media = connection.serves.media;
+  return media !== undefined && media !== "fal";
 }
 
 /**

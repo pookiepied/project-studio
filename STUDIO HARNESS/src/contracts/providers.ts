@@ -64,10 +64,10 @@ export type LanguageProtocol = v.InferOutput<typeof languageProtocolSchema>;
  * family covers images, speech and transcription on one key, and an entry per
  * endpoint would have multiplied connections for the same secret. Adding a
  * family is a contract change, which is the union's purpose; the gateway
- * plan adds `fal`, `deepgram`, `fish-audio` and `minimax` as each
+ * plan adds `deepgram`, `fish-audio` and `minimax` as each
  * adapter lands.
  */
-export const mediaProtocolSchema = v.picklist(["openai", "openrouter", "google", "elevenlabs"]);
+export const mediaProtocolSchema = v.picklist(["openai", "openrouter", "google", "elevenlabs", "fal"]);
 
 export type MediaProtocol = v.InferOutput<typeof mediaProtocolSchema>;
 

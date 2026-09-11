@@ -1,5 +1,7 @@
 import type { MediaAdapters } from "./types.js";
 import { elevenlabsMedia } from "./elevenlabs.js";
+import { falMedia } from "./fal.js";
+import { googleMedia } from "./google.js";
 import { openaiMedia } from "./openai.js";
 import { openrouterMedia } from "./openrouter.js";
 
@@ -16,6 +18,9 @@ export type { MediaAdapter, MediaAdapters, MediaBytes } from "./types.js";
  */
 export function builtinMediaAdapters(): MediaAdapters {
   return new Map(
-    [openrouterMedia, openaiMedia, elevenlabsMedia].map((adapter) => [adapter.protocol, adapter]),
+    [openrouterMedia, openaiMedia, elevenlabsMedia, googleMedia, falMedia].map((adapter) => [
+      adapter.protocol,
+      adapter,
+    ]),
   );
 }
