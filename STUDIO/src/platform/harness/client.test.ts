@@ -186,6 +186,18 @@ describe('routes', () => {
     ])
   })
 
+  it('clears a default by sending null, not an empty body', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+    const client = clientWith(stub.fetch)
+    await client.setDefault('imageGeneration', undefined)
+    expect(stub.calls[0]?.method).toBe('PUT')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/providers/defaults/imageGeneration`)
+    expect(stub.calls[0]?.body).toBe('null')
+
+    await client.setDefault('imageGeneration', { connectionId: 'work-openai', modelId: 'gpt-image-2' })
+    expect(stub.calls[1]?.body).toBe(JSON.stringify({ connectionId: 'work-openai', modelId: 'gpt-image-2' }))
+  })
+
   it('tolerates a trailing slash on the base URL', async () => {
     const stub = stubFetch(replyForRoute)
     const client = createHarnessClient({

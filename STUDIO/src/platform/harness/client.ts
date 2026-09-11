@@ -783,7 +783,9 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     },
 
     setDefault(slot, ref) {
-      return empty('PUT', `${PROVIDERS_PATH}/defaults/${encodeURIComponent(slot)}`, ref)
+      // Clearing is a body of `null`, which the route accepts; an absent body
+      // is not JSON and the route refuses it, leaving the slot as it was.
+      return empty('PUT', `${PROVIDERS_PATH}/defaults/${encodeURIComponent(slot)}`, ref ?? null)
     },
 
     addManualModel(connectionId, model) {
