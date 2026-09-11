@@ -362,8 +362,10 @@ language gateway is the only place that may import `@earendil-works/pi-ai`.
 - `src/gateway/language/` — Pi, confined to text: the model registry, the local and test
   adapters, the Pi runtime and credential bridge, the prompt trace, and `pi-catalog.ts`, which
   answers for Pi's models in contract types so no Pi type leaves the folder.
-- `src/gateway/media/` — Studio's own drivers for speech and transcription (and, as the gateway
-  plan lands, image, image editing and video), speaking to each vendor directly.
+- `src/gateway/media/` — Studio's own adapters, one per vendor media wire (`adapters/`), the
+  speech and transcription drivers, and `jobs.ts`, the registry every generation runs in as a job
+  whose bytes land in the conversation's artifacts directory. The model reaches it through
+  `src/tools/media/` (`studio_image`, `studio_video`); the app through `/api/media`.
 - `src/gateway/retrieval/` — the five web providers (Tavily, Brave, Exa for search; Jina,
   Firecrawl for reading a page) behind `web_search` and `web_fetch`.
 - `src/gateway/catalog/` — the provider library: the declared catalog for everything beyond

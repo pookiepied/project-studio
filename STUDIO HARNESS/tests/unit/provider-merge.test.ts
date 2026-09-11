@@ -615,19 +615,20 @@ describe("the declared catalog", () => {
     expect(await catalog.listModels({ kind: "media" })).toEqual([]);
   });
 
-  it("serves a media connection nothing from Pi, only what Studio declares", async () => {
+  it("reads a media connection's models from the vendor's live listing, never from Pi", async () => {
     // Pi is the language gateway and nothing else (ADR 0051). Its image
     // catalog used to be read into a media connection here; that read is
-    // gone, and until the OpenRouter media adapter reads OpenRouter's own
-    // listing, a media connection to a vendor Studio has not declared draws
-    // no models at all rather than a list nothing could run.
+    // gone. OpenRouter's media models come from OpenRouter's own listing,
+    // and here the listing is a closed loopback port, so the honest answer
+    // is nothing - not a list nothing could run, and nothing from Pi.
     await connections.add({
       id: "openrouter",
-      displayName: "OpenRouter Images",
+      displayName: "OpenRouter",
       serves: { media: "openrouter" },
       source: "local",
       enabled: true,
       catalogProvider: "openrouter",
+      baseUrl: "http://127.0.0.1:9/api/v1",
     });
     const catalog = new ModelCatalog({ db, connections });
     const listed = await catalog.listModels({ connectionId: "openrouter" });

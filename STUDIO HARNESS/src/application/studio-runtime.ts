@@ -66,6 +66,13 @@ import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
 import { BackgroundJobs, finishedNotice } from "../process/background.js";
+import { MediaService } from "../gateway/media/service.js";
+import type { MediaJobs } from "../gateway/media/jobs.js";
+import type { MediaAdapters } from "../gateway/media/adapters/types.js";
+import { CapabilityResolver } from "../gateway/connections/capability-defaults.js";
+import { ConnectionStore } from "../gateway/connections/connection-store.js";
+import { ModelCatalog } from "../gateway/connections/model-catalog.js";
+import { mediaFinishedNotice, mediaJobLines } from "../tools/media/index.js";
 import { ConversationStore } from "../conversations/store.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
 
@@ -102,6 +109,13 @@ export interface StudioRuntimeOptions {
   readonly projectRoot?: string;
   readonly clientId?: string;
   readonly sessionId?: string;
+  /**
+   * The generation jobs and the vendors' adapters, when this harness has
+   * media. Shared with the HTTP surface that lists and stops the jobs, so
+   * the tools and the panel see one registry.
+   */
+  readonly mediaJobs?: MediaJobs;
+  readonly mediaAdapters?: MediaAdapters;
   // There was a `mode?: () => ExecutionMode` here, and nothing passed it: the
   // mode was a process-wide callback with no writer, so every conversation ran
   // Manual forever. It is gone rather than kept as dead surface. The mode is a
@@ -216,6 +230,12 @@ function modelToolResult(value: unknown, notice?: string): ModelToolResult {
     content: [asText(value), ...appended],
     details: value,
   };
+}
+
+/** Two notices, or one, or none: the background commands' and the generations'. */
+function joinNotices(...notices: readonly (string | undefined)[]): string | undefined {
+  const present = notices.filter((notice): notice is string => notice !== undefined);
+  return present.length === 0 ? undefined : present.join("\n\n");
 }
 
 function sessionEnvironment(sandbox: LocalSandbox): Sandbox {
@@ -538,6 +558,14 @@ export class StudioRuntime implements AgentHost {
    * `stop()`, so nothing of ours outlives the harness.
    */
   readonly #jobs = new BackgroundJobs();
+  /**
+   * The media service the generation tools dispatch through: its own
+   * resolver over the same database and keyring as the provider surface,
+   * the way the web tools build theirs. Undefined when the harness was
+   * built without a job registry, and then no generation tool is
+   * registered.
+   */
+  readonly #media: MediaService | undefined;
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -552,6 +580,21 @@ export class StudioRuntime implements AgentHost {
     this.#sessionId = options.sessionId ?? "standalone";
 
     this.#db = options.database;
+    this.#media =
+      options.mediaJobs === undefined
+        ? undefined
+        : (() => {
+            const connections = new ConnectionStore({ db: this.#db, credentials: this.#credentials });
+            return new MediaService({
+              resolver: new CapabilityResolver({
+                connections,
+                catalog: new ModelCatalog({ db: this.#db, connections }),
+                credentials: this.#credentials,
+              }),
+              jobs: options.mediaJobs,
+              ...(options.mediaAdapters === undefined ? {} : { adapters: options.mediaAdapters }),
+            });
+          })();
     this.#conversations = new ConversationStore(this.#db);
     this.#projects = new ProjectStore(this.#db);
     this.#scopes = new SandboxScopeStore(this.#db);
@@ -941,7 +984,9 @@ export class StudioRuntime implements AgentHost {
               : `exited ${job.exitCode ?? "?"}`;
       return `${job.id} ${how}: ${job.command}`;
     });
-    return [...running, ...ended];
+    const media =
+      this.#media === undefined ? { running: [], ended: [] } : mediaJobLines(this.#media, conversationId);
+    return [...running, ...ended, ...media.running, ...media.ended];
   }
 
   /**
@@ -1278,6 +1323,15 @@ export class StudioRuntime implements AgentHost {
       accessLog: this.#accessLogFor(options.conversationId),
       imageBudget: this.#imageBudget,
       jobs: this.#jobs,
+      ...(this.#media === undefined
+        ? {}
+        : {
+            media: {
+              media: this.#media,
+              acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
+              imageBudget: this.#imageBudget,
+            },
+          }),
       discover: {
         // Bound here rather than passed around, because what they answer is
         // decided where they are built: enablement as this conversation's
@@ -1489,7 +1543,12 @@ export class StudioRuntime implements AgentHost {
                 // without the harness starting a turn nobody asked for.
                 return modelToolResult(
                   result,
-                  finishedNotice(this.#jobs.drainFinished(scope.conversationId)),
+                  joinNotices(
+                    finishedNotice(this.#jobs.drainFinished(scope.conversationId)),
+                    this.#media === undefined
+                      ? undefined
+                      : mediaFinishedNotice(mediaJobLines(this.#media, scope.conversationId).ended),
+                  ),
                 );
               } catch (error) {
                 if (error instanceof ToolError && error.kind === "unavailable") {

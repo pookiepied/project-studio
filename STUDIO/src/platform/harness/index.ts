@@ -31,6 +31,7 @@ export { harnessTransport } from './transport'
 
 export {
   attachmentDataUrl,
+  harnessBytesDataUrl,
   isAttachmentReference,
   pictureMime,
   setAttachmentBytesTransport,
@@ -197,8 +198,11 @@ export {
   parseMeasuredContextUsage,
   parseBackgroundJob,
   parseBackgroundJobs,
+  parseMediaJob,
+  parseMediaJobs,
   type MeasuredContextUsage,
   type BackgroundJob,
+  type MediaJob,
 } from './contracts'
 
 export {

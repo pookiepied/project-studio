@@ -2187,6 +2187,73 @@ export interface BackgroundJob {
 const JOB_STATES = ['running', 'exited', 'stopped', 'failed'] as const
 
 /**
+ * A generation job - an image or a video the model asked for - as the
+ * harness's `MediaJobs` reports it. Its outputs are files the harness holds,
+ * served at `/api/media/artifacts/<conversation>/<fileName>`.
+ */
+export interface MediaJob {
+  readonly id: string
+  readonly slot: CapabilitySlot
+  /** The prompt. */
+  readonly description: string
+  readonly modelId: string
+  readonly state: 'queued' | 'running' | 'done' | 'failed' | 'stopped'
+  readonly detail: string | null
+  readonly startedAt: number
+  readonly endedAt: number | null
+  readonly outputs: readonly { readonly fileName: string; readonly mimeType: string }[]
+  readonly error?: string
+}
+
+const MEDIA_JOB_STATES = ['queued', 'running', 'done', 'failed', 'stopped'] as const
+
+export function parseMediaJobs(value: unknown): readonly MediaJob[] {
+  if (typeof value !== 'object' || value === null) return []
+  const rows = (value as Record<string, unknown>)['jobs']
+  if (!Array.isArray(rows)) return []
+  return rows.flatMap((row) => {
+    const job = parseMediaJob(row)
+    return job === null ? [] : [job]
+  })
+}
+
+export function parseMediaJob(value: unknown): MediaJob | null {
+  if (typeof value !== 'object' || value === null) return null
+  const row = value as Record<string, unknown>
+  const id = row['id']
+  const slot = oneOf(CAPABILITY_SLOTS, row['slot'])
+  const state = row['state']
+  if (typeof id !== 'string' || id === '' || slot === null) return null
+  if (typeof state !== 'string' || !MEDIA_JOB_STATES.includes(state as MediaJob['state'])) return null
+  const number = (key: string): number | null => {
+    const found = row[key]
+    return typeof found === 'number' && Number.isFinite(found) ? found : null
+  }
+  const outputs = Array.isArray(row['outputs'])
+    ? row['outputs'].flatMap((output: unknown) => {
+        if (typeof output !== 'object' || output === null) return []
+        const record = output as Record<string, unknown>
+        const fileName = record['fileName']
+        const mimeType = record['mimeType']
+        return typeof fileName === 'string' && typeof mimeType === 'string' ? [{ fileName, mimeType }] : []
+      })
+    : []
+  const error = row['error']
+  return {
+    id,
+    slot,
+    description: typeof row['description'] === 'string' ? row['description'] : '',
+    modelId: typeof row['modelId'] === 'string' ? row['modelId'] : '',
+    state: state as MediaJob['state'],
+    detail: typeof row['detail'] === 'string' ? row['detail'] : null,
+    startedAt: number('startedAt') ?? 0,
+    endedAt: number('endedAt'),
+    outputs,
+    ...(typeof error === 'string' ? { error } : {}),
+  }
+}
+
+/**
  * Reads the jobs out of a listing, dropping anything malformed.
  *
  * A row that does not parse is left out rather than rendered as a job with

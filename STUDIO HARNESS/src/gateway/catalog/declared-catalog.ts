@@ -1,4 +1,4 @@
-import type { InvocationShape, ProviderKind } from "../../contracts/providers.js";
+import type { CapabilitySlot, InvocationShape, ProviderKind } from "../../contracts/providers.js";
 import type { ModelCapability, ReasoningLevel } from "../../contracts/models.js";
 
 /**
@@ -50,6 +50,12 @@ export interface DeclaredProvider {
   /** The provider's own endpoint, when one address serves every model. */
   readonly baseUrl: string | undefined;
   readonly models: readonly DeclaredModel[];
+  /**
+   * The slots this vendor serves whose models are read live rather than
+   * declared, so the library can say what a connection will offer before
+   * the listing has been fetched.
+   */
+  readonly liveCapabilities?: readonly CapabilitySlot[];
 }
 
 const NOT_CHAT = { textGeneration: "unsupported" } as const;
@@ -166,12 +172,12 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
     displayName: "OpenRouter",
     // OpenRouter serves speech, transcription, images and video on the chat
     // key. Its models are not declared here: the listing is live, moves
-    // weekly, and step 4 of the gateway plan reads it from OpenRouter's own
-    // endpoints when the adapter lands. Until then the media half of the
-    // connection exists and lists nothing, which is honest.
+    // weekly, and `openrouter-media.ts` reads it from OpenRouter's own
+    // endpoints for a connection that serves the wire.
     serves: { language: "openai-completions", media: "openrouter" },
     baseUrl: "https://openrouter.ai/api/v1",
     models: [],
+    liveCapabilities: ["imageGeneration", "imageEditing", "videoGeneration", "speechGeneration", "transcription"],
   },
   {
     id: "google",

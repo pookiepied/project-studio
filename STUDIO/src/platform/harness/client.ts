@@ -30,8 +30,10 @@ import {
   parseMeasuredContextUsage,
   parseBackgroundJob,
   parseBackgroundJobs,
+  parseMediaJobs,
   type MeasuredContextUsage,
   type BackgroundJob,
+  type MediaJob,
   parseConversationRecords,
   parseDetectedPresets,
   parseFolderListing,
@@ -323,6 +325,9 @@ export interface HarnessClient {
    * leave "the port is still held after I pressed stop".
    */
   stopConversationJob(id: string, jobId: string): Promise<HarnessResult<BackgroundJob | null>>
+  /** The generation jobs one conversation started - images and videos - and a stop for one. */
+  conversationMediaJobs(id: string): Promise<HarnessResult<readonly MediaJob[]>>
+  stopConversationMediaJob(id: string, jobId: string): Promise<HarnessResult<void>>
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
   updateConversation(
@@ -819,6 +824,21 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     speak(input) {
       return json('POST', `${MEDIA_PATH}/speech`, input, parseSpeechResult, 150_000)
+    },
+
+    conversationMediaJobs(id) {
+      return json(
+        'GET',
+        `${MEDIA_PATH}/jobs?conversationId=${encodeURIComponent(id)}`,
+        undefined,
+        parseMediaJobs,
+      )
+    },
+
+    stopConversationMediaJob(id, jobId) {
+      return empty('POST', `${MEDIA_PATH}/jobs/${encodeURIComponent(jobId)}/stop`, {
+        conversationId: id,
+      })
     },
 
     conversationJobs(id) {

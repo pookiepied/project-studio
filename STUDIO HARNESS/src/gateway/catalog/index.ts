@@ -24,6 +24,7 @@ import {
   reasoningLevelsFromPiModel,
 } from "../language/pi-catalog.js";
 import { DECLARED_PROVIDERS, declaredProviderFor, type DeclaredModel } from "./declared-catalog.js";
+import { openrouterMediaModels } from "./openrouter-media.js";
 
 /**
  * The provider library, joined from two sources into one shape.
@@ -176,6 +177,8 @@ export async function catalogModelsFor(
   const catalogProvider = connection.catalogProvider;
   if (catalogProvider === undefined) return [];
 
+  const live = await liveModelsFor(connection);
+
   if (connection.serves.language !== undefined && isLanguageCatalogProvider(catalogProvider)) {
     // Pi's language models come first; declared extras for the same vendor
     // arrive after and are deduplicated by id below.
@@ -191,10 +194,23 @@ export async function catalogModelsFor(
     );
     const declared = declaredModelsForSource(connection);
     const seen = new Set(pi.map((model) => model.modelId));
-    return [...pi, ...declared.filter((model) => !seen.has(model.modelId))];
+    const extras = [...declared, ...live].filter((model) => !seen.has(model.modelId));
+    return [...pi, ...extras];
   }
 
-  return declaredModelsForSource(connection);
+  return [...declaredModelsForSource(connection), ...live];
+}
+
+/**
+ * The models a vendor lists live rather than declares: OpenRouter's media
+ * catalogue, for a connection that serves its media wire. Empty for every
+ * other connection, and empty offline.
+ */
+async function liveModelsFor(connection: ProviderConnection): Promise<readonly CatalogSourceModel[]> {
+  if (connection.catalogProvider !== "openrouter" || connection.serves.media !== "openrouter") return [];
+  const baseUrl = connection.baseUrl ?? declaredProviderFor("openrouter")?.baseUrl;
+  if (baseUrl === undefined) return [];
+  return openrouterMediaModels(baseUrl);
 }
 
 /**
@@ -223,10 +239,13 @@ export async function listLibraryProviders(): Promise<readonly LibraryProviderEn
       displayName: declared?.displayName ?? displayNameFor(providerId),
       serves,
       baseUrl: majorityBaseUrlFor(providerId) ?? declared?.baseUrl,
-      capabilities: slotsServedBy([
-        ...models.map((model) => capabilityFromPiModel(model)),
-        ...(declared?.models.map((model) => capabilityFromDeclared(model)) ?? []),
-      ]),
+      capabilities: [
+        ...slotsServedBy([
+          ...models.map((model) => capabilityFromPiModel(model)),
+          ...(declared?.models.map((model) => capabilityFromDeclared(model)) ?? []),
+        ]),
+        ...(declared?.liveCapabilities ?? []),
+      ],
       modelCount: models.length + (declared?.models.length ?? 0),
     });
   }
@@ -240,7 +259,10 @@ export async function listLibraryProviders(): Promise<readonly LibraryProviderEn
       displayName: provider.displayName,
       serves,
       baseUrl: provider.baseUrl,
-      capabilities: slotsServedBy(provider.models.map((model) => capabilityFromDeclared(model))),
+      capabilities: [
+        ...slotsServedBy(provider.models.map((model) => capabilityFromDeclared(model))),
+        ...(provider.liveCapabilities ?? []),
+      ],
       modelCount: provider.models.length,
     });
   }

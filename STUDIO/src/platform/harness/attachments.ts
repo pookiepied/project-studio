@@ -227,7 +227,19 @@ export function attachmentDataUrl(
   conversationId: string,
   attachment: AttachmentReference,
 ): Promise<string | null> {
-  const key = `${conversationId}/${attachment.id}`
+  return harnessBytesDataUrl(attachmentPath(conversationId, attachment.id), pictureMime(attachment.mimeType))
+}
+
+/**
+ * The `data:` URL for the bytes the harness serves at one path, or `null`
+ * while they cannot be shown - the same resolver the attachments use, for
+ * the other immutable bytes the harness holds: a generated image or video
+ * under `/api/media/artifacts`. The mime is the caller's word, already
+ * narrowed to something an element can show, because it ends up inside
+ * the URL.
+ */
+export function harnessBytesDataUrl(path: string, mimeType: string): Promise<string | null> {
+  const key = path
   const settled = resolved.get(key)
   if (settled !== undefined) return Promise.resolve(settled)
   const failedAt = failed.get(key)
@@ -241,8 +253,8 @@ export function attachmentDataUrl(
   const request = (async (): Promise<string | null> => {
     try {
       const transport = bytesTransport ?? (isTauri() ? throughTauri : throughBrowser)
-      const bytes = await transport(attachmentPath(conversationId, attachment.id))
-      const url = `data:${pictureMime(attachment.mimeType)};base64,${base64Of(bytes)}`
+      const bytes = await transport(path)
+      const url = `data:${mimeType};base64,${base64Of(bytes)}`
       remember(key, url)
       return url
     } catch {

@@ -48,6 +48,7 @@ import { ModelCatalog } from "./gateway/connections/model-catalog.js";
 import { ProviderManagementService } from "./gateway/connections/management.js";
 import { createProviderIcons } from "./gateway/catalog/icons/index.js";
 import { CapabilityResolver } from "./gateway/connections/capability-defaults.js";
+import { builtinMediaAdapters } from "./gateway/media/adapters/index.js";
 import { MediaJobs } from "./gateway/media/jobs.js";
 import { MediaService } from "./gateway/media/service.js";
 import { conversationArtifactsDirectory, studioPath } from "./platform/paths.js";
@@ -174,6 +175,12 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // decision: it neither parks nor expires, so a store - not a broker -
     // is all the channel it needs.
     const plans = new PlanItemStore(database);
+    // Generations are jobs the conversation owns: their bytes land in its
+    // artifacts directory, and nothing of ours keeps polling a vendor after
+    // Studio has closed, so the registry is stopped with the runtime below.
+    // Built before the runtime because the tools and the HTTP surface share it.
+    const mediaJobs = new MediaJobs({ artifactsDirectory: conversationArtifactsDirectory });
+    const mediaAdapters = builtinMediaAdapters();
     const runtime = new StudioRuntime({
       database,
       logger: observability.logger,
@@ -182,6 +189,8 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       plans,
       clientId: admission.context.clientId,
       sessionId: admission.context.sessionId,
+      mediaJobs,
+      mediaAdapters,
     });
     studioRuntime = runtime;
     configureStudioRuntime(runtime);
@@ -226,10 +235,6 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // seam every consumer shares; the drivers they dispatch to live in
     // src/media/drivers, one file per protocol.
     bootLog("step 8b: MediaService entering");
-    // Generations are jobs the conversation owns: their bytes land in its
-    // artifacts directory, and nothing of ours keeps polling a vendor after
-    // Studio has closed, so the registry is stopped with the runtime below.
-    const mediaJobs = new MediaJobs({ artifactsDirectory: conversationArtifactsDirectory });
     const media = new MediaService({
       resolver: new CapabilityResolver({
         connections: providerConnections,
@@ -237,6 +242,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         credentials: new KeyringCredentialStore(),
       }),
       jobs: mediaJobs,
+      adapters: mediaAdapters,
     });
     bootLog("step 8b: MediaService completed");
 

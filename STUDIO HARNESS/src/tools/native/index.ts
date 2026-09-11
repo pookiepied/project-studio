@@ -16,6 +16,7 @@ import { registerGitTools } from "../git/index.js";
 import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
 import { registerWebTools } from "../web/index.js";
+import { registerMediaTools, type MediaToolRegistration } from "../media/index.js";
 
 export interface NativeToolRegistrationOptions {
   readonly database: StudioDatabase;
@@ -48,6 +49,8 @@ export interface NativeToolRegistrationOptions {
    * says so when one is asked for.
    */
   readonly jobs?: BackgroundJobs;
+  /** The generation tools; absent in a harness built without media. */
+  readonly media?: MediaToolRegistration;
   /**
    * The read history the filesystem family enforces read-before-modify with.
    *
@@ -116,6 +119,9 @@ export function registerNativeTools(
   }
   if (options.plan !== undefined) {
     registerPlanTools(gate, options.plan);
+  }
+  if (options.media !== undefined) {
+    registerMediaTools(gate, options.media);
   }
   registerWebTools(
     gate,

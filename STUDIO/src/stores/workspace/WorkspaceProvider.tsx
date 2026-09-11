@@ -34,6 +34,7 @@ import {
   type PendingQuestionRecord,
   type PlanSnapshot,
   type BackgroundJob,
+  type MediaJob,
   type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
@@ -287,6 +288,11 @@ interface WorkspaceValue {
   readonly backgroundJobs: {
     list: (conversationId: string) => Promise<HarnessResult<readonly BackgroundJob[]>>
     stop: (conversationId: string, jobId: string) => Promise<HarnessResult<BackgroundJob | null>>
+  }
+  /** The generation jobs - images and videos - bound the same way. */
+  readonly mediaJobs: {
+    list: (conversationId: string) => Promise<HarnessResult<readonly MediaJob[]>>
+    stop: (conversationId: string, jobId: string) => Promise<HarnessResult<void>>
   }
   readonly plans: {
     get: (conversationId: string) => Promise<HarnessResult<PlanSnapshot>>
@@ -864,6 +870,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const mediaJobs = useMemo(
+    () => ({
+      list: (conversationId: string) =>
+        clientRef.current?.conversationMediaJobs(conversationId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so there are no generations to list.',
+          },
+        }),
+      stop: (conversationId: string, jobId: string) =>
+        clientRef.current?.stopConversationMediaJob(conversationId, jobId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so nothing was stopped.',
+          },
+        }),
+    }),
+    [],
+  )
+
   const plans = useMemo(
     () => ({
       get: (conversationId: string) =>
@@ -1299,6 +1331,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       questions,
       plans,
       backgroundJobs,
+      mediaJobs,
       createProject,
       removeProject,
       setBranch,
@@ -1333,6 +1366,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       orphanTrees,
       plans,
       backgroundJobs,
+      mediaJobs,
       questions,
       refreshOrphanTrees,
       sweepOrphanTrees,
