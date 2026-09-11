@@ -9,6 +9,7 @@ import {
   type CapabilitySlot,
   type ConnectionServes,
   type InvocationShape,
+  type MediaProtocol,
   type ModelPricing,
   type ProviderConnection,
 } from "../../contracts/providers.js";
@@ -24,7 +25,9 @@ import {
   reasoningLevelsFromPiModel,
 } from "../language/pi-catalog.js";
 import { DECLARED_PROVIDERS, declaredProviderFor, type DeclaredModel } from "./declared-catalog.js";
-import { openrouterMediaModels } from "./openrouter-media.js";
+import { falListing } from "./fal-media.js";
+import type { MediaListing } from "./media-listing.js";
+import { openrouterListing } from "./openrouter-media.js";
 
 /**
  * The provider library, joined from two sources into one shape.
@@ -171,16 +174,18 @@ function declaredModelsForSource(
  * own id: two OpenAI accounts are two connections drawing one vendor's list.
  * A connection whose `catalogProvider` is undefined - the self-hosted case -
  * draws nothing here; such a connection serves only the models entered by
- * hand. Async because the live listings of step 4 of the gateway plan will
- * be read here, and every caller already awaits.
+ * hand. The credential, when given, travels to listings that ask for one,
+ * in the outbound header alone. Async because the live listings are read
+ * here, and every caller already awaits.
  */
 export async function catalogModelsFor(
   connection: ProviderConnection,
+  credential: string | undefined = undefined,
 ): Promise<readonly CatalogSourceModel[]> {
   const catalogProvider = connection.catalogProvider;
   if (catalogProvider === undefined) return [];
 
-  const live = await liveModelsFor(connection);
+  const live = await liveModelsFor(connection, credential);
 
   if (connection.serves.language !== undefined && isLanguageCatalogProvider(catalogProvider)) {
     // Pi's language models come first; declared extras and the live listing
@@ -273,15 +278,42 @@ function joinedCatalogModels(
 }
 
 /**
- * The models a vendor lists live rather than declares: OpenRouter's media
- * catalogue, for a connection that serves its media wire. Empty for every
- * other connection, and empty offline.
+ * The listings, keyed by the media wire they belong to. A vendor lists live
+ * when it publishes a catalogue; the three that do not (Deepgram, Fish
+ * Audio, MiniMax) keep their declared lists and their undefined, which is
+ * the honest entry for "the vendor has no such reading yet" - the compiler,
+ * not a comment, remembers which are left.
  */
-async function liveModelsFor(connection: ProviderConnection): Promise<readonly CatalogSourceModel[]> {
-  if (connection.catalogProvider !== "openrouter" || connection.serves.media !== "openrouter") return [];
-  const baseUrl = connection.baseUrl ?? declaredProviderFor("openrouter")?.baseUrl;
+const MEDIA_LISTINGS: Readonly<Record<MediaProtocol, MediaListing | undefined>> = {
+  openrouter: openrouterListing,
+  fal: falListing,
+  elevenlabs: undefined,
+  google: undefined,
+  openai: undefined,
+  deepgram: undefined,
+  "fish-audio": undefined,
+  minimax: undefined,
+};
+
+/**
+ * The models a vendor lists live rather than declares: its own catalogue, for
+ * a connection that serves its media wire under its own vendor. Empty for
+ * every other connection, and empty offline.
+ */
+async function liveModelsFor(
+  connection: ProviderConnection,
+  credential: string | undefined,
+): Promise<readonly CatalogSourceModel[]> {
+  const wire = connection.serves.media;
+  // The vendor's list belongs to the vendor: a connection pointed at
+  // somebody else's wire (a Google connection speaking the OpenAI wire, say)
+  // draws that somebody's listing from that somebody's connection, not here.
+  if (wire === undefined || connection.catalogProvider !== wire) return [];
+  const listing = MEDIA_LISTINGS[wire];
+  if (listing === undefined) return [];
+  const baseUrl = connection.baseUrl ?? declaredProviderFor(wire)?.baseUrl;
   if (baseUrl === undefined) return [];
-  return openrouterMediaModels(baseUrl);
+  return listing.models(baseUrl, credential);
 }
 
 /**

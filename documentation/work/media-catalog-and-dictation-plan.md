@@ -1,13 +1,14 @@
 # The media catalogue and dictation — the plan
 
-**Status:** Step 0 (ce952a8b) — the look found the faults on the way to the
-screen: a join that kept one copy of a model the vendor lists twice, so the
-Media page lost `google/gemini-3-pro-image`, and a kind question answered
-once per model instead of once per kind. Both fixed; the 121 pinned by tests
-on both sides of the wire; the microphone granted by Studio itself, with a
-requesting face. Step 1 (the listing contract and the featured shelf) lands
-in this commit; steps 2-6 remain (2026-09-11) · **Opened:** 2026-09-11 ·
-**Last worked:** 2026-09-11
+**Status:** Steps 0 (ce952a8b) and 1 (1c7787c4) landed — the look found the
+faults on the way to the screen (a join that kept one copy of a model the
+vendor lists twice, and a kind question answered once per model instead of
+once per kind); the 121 are pinned by tests on both sides of the wire; the
+microphone is granted by Studio itself, with a requesting face; the listing
+contract, the hour's cache, and the featured shelf are shared machinery, not
+a second copy. Step 2 (FAL live, its declared entries brought to the
+research's picks) lands in this commit; steps 3-6 remain (2026-09-11) ·
+**Opened:** 2026-09-11 · **Last worked:** 2026-09-11
 **Inputs:** [the gateway plan](gateway-plan.md) (landed), the developer's
 FAL model research of 2026-09-11 (Elo arena rankings against FAL prices,
 image and video only), and two live checks made while planning: the

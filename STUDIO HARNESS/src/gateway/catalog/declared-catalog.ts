@@ -277,42 +277,95 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "fal",
     displayName: "FAL",
-    // The queue host is the base URL; a model id is the path. FAL's catalogue
-    // is broad and moves weekly, and its ids are the vendor's own: a person
-    // adds the models they use by hand, and these are the ones the research
-    // named as the backbone. Every one is a job.
+    // The queue host is the base URL; a model id is the path, so every id
+    // here is also the endpoint a generation drives. The catalogue itself is
+    // read live (`fal-media.ts`; 1500 models, 990 in slots Studio answers,
+    // the day this landed) and what is declared here is the featured shelf:
+    // the research's picks. Where FAL splits one model across a
+    // text-to-image and an image-to-image endpoint, both are featured,
+    // because the editing slot recommends what the generation slot cannot;
+    // the video trio are the text-to-video endpoints, whose image-to-video
+    // siblings share their slot and add no second opinion. Every one is a
+    // job.
     serves: { media: "fal" },
     baseUrl: "https://queue.fal.run",
     models: [
       {
-        id: "fal-ai/veo3.1",
-        displayName: "Veo 3.1 (FAL)",
-        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        id: "fal-ai/flux-2-pro",
+        displayName: "FLUX.2 Pro",
+        capability: { ...NOT_CHAT, imageGeneration: "supported" },
         shape: "poll",
+        featured: true,
       },
       {
-        id: "fal-ai/kling-video/v3/pro/text-to-video",
-        displayName: "Kling v3 Pro",
+        id: "fal-ai/flux-2-pro/edit",
+        displayName: "FLUX.2 Pro (edit)",
+        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "fal-ai/nano-banana-2",
+        displayName: "Nano Banana 2",
+        capability: { ...NOT_CHAT, imageGeneration: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "fal-ai/nano-banana-2/edit",
+        displayName: "Nano Banana 2 (edit)",
+        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "bytedance/seedream/v5/pro/text-to-image",
+        displayName: "Seedream 5.0 Pro",
+        capability: { ...NOT_CHAT, imageGeneration: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "bytedance/seedream/v5/pro/edit",
+        displayName: "Seedream 5.0 Pro (edit)",
+        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "alibaba/qwen-image-3/text-to-image",
+        displayName: "Qwen Image 3",
+        capability: { ...NOT_CHAT, imageGeneration: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "alibaba/qwen-image-3/edit",
+        displayName: "Qwen Image 3 (edit)",
+        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
+        shape: "poll",
+        featured: true,
+      },
+      {
+        id: "alibaba/wan-3.0/text-to-video",
+        displayName: "Wan 3.0",
         capability: { ...NOT_CHAT, videoGeneration: "supported" },
         shape: "poll",
+        featured: true,
+      },
+      {
+        id: "minimax/h3/text-to-video",
+        displayName: "MiniMax H3",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+        featured: true,
       },
       {
         id: "bytedance/seedance-2.5/text-to-video",
         displayName: "Seedance 2.5",
         capability: { ...NOT_CHAT, videoGeneration: "supported" },
         shape: "poll",
-      },
-      {
-        id: "fal-ai/flux-2/pro",
-        displayName: "FLUX.2 Pro",
-        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
-        shape: "poll",
-      },
-      {
-        id: "fal-ai/nano-banana",
-        displayName: "Nano Banana",
-        capability: { ...NOT_CHAT, imageGeneration: "supported", imageEditing: "supported", vision: "supported" },
-        shape: "poll",
+        featured: true,
       },
     ],
   },

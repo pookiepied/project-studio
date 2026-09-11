@@ -464,8 +464,14 @@ export class ModelCatalog {
 
     // No catalogProvider means the user pointed at something the built-in
     // catalogs have never heard of — the normal self-hosted case, not an
-    // error. Such a connection serves only the models entered by hand.
-    const sources = await catalogModelsFor(connection);
+    // error. Such a connection serves only the models entered by hand. The
+    // credential goes only as far as the listings that ask for it, in the
+    // outbound header; a store that will not open reads as keyless, which
+    // every public catalogue accepts.
+    const sources = await catalogModelsFor(
+      connection,
+      await this.#connections.credentialFor(connection.id).catch(() => undefined),
+    );
     const seen = new Set(models.map((model) => model.modelId));
     for (const source of sources) {
       if (seen.has(source.modelId)) continue;

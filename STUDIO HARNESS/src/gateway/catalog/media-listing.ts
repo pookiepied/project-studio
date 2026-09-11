@@ -2,6 +2,7 @@ import { MediaError } from "../../contracts/media.js";
 import type { ModelPricing } from "../../contracts/providers.js";
 import type { ModelCapability } from "../../contracts/models.js";
 import { requestDirect } from "../../net/http.js";
+import { getObservability, isObservabilityInitialized } from "../../observability/index.js";
 import type { CatalogSourceModel } from "./index.js";
 
 /**
@@ -148,6 +149,28 @@ export interface MediaListing {
   forget(): void;
 }
 
+/**
+ * Records what one read of the listing kept and dropped, once per read -
+ * a cache hit replays no numbers. The dropped count is the whole point of
+ * the second decision: the next slot (image upscaling is the obvious first)
+ * is chosen from this number rather than from a feeling, and a number nobody
+ * wrote down is a feeling. Zero is logged too, because "we dropped nothing"
+ * is also a fact about the vendor, and the observation before observability
+ * initializes (a harness still coming up) is simply lost - nothing reads a
+ * catalogue before the webview can ask for one.
+ */
+function logListingRead(
+  vendor: string,
+  origin: string,
+  answer: MediaListingAnswer,
+): void {
+  if (!isObservabilityInitialized()) return;
+  getObservability().logger.info(
+    `${vendor} answered its listing with ${String(answer.models.length)} models; ${String(answer.dropped)} in categories no Studio slot answers`,
+    { vendor, origin, kept: answer.models.length, dropped: answer.dropped },
+  );
+}
+
 export function createMediaListing(options: MediaListingOptions): MediaListing {
   const { vendor } = options;
   const answerFor = listingFetch(vendor);
@@ -166,6 +189,7 @@ export function createMediaListing(options: MediaListingOptions): MediaListing {
       // settings screen, which must not wear the failure.
       const answer = await options.read({ origin, credential, fetch }).catch(() => undefined);
       if (answer === undefined || answer.models.length === 0) return [];
+      logListingRead(vendor, origin, answer);
       cache.set(origin, { at: now(), models: answer.models });
       return answer.models;
     },
