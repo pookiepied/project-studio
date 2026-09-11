@@ -69,6 +69,7 @@ const PLACEHOLDER_BY_SLOT: Readonly<Record<CapabilitySlot, string>> = {
 
 export function DefaultsSection({
   slots = ALL_SLOTS,
+  noun = 'model',
   defaults,
   connections,
   models,
@@ -76,6 +77,8 @@ export function DefaultsSection({
 }: {
   /** The slots this page shows; every slot when not given. */
   slots?: readonly CapabilitySlot[]
+  /** What the page calls a choice: "model" unless the page says otherwise. */
+  noun?: string
   defaults: DefaultSelection
   connections: readonly ProviderConnection[]
   models: readonly ProviderModel[]
@@ -90,6 +93,7 @@ export function DefaultsSection({
           current={defaults[slot]}
           connections={connections}
           models={models}
+          noun={noun}
           onSet={onSet}
         />
       ))}
@@ -102,12 +106,14 @@ function SlotRow({
   current,
   connections,
   models,
+  noun,
   onSet,
 }: {
   slot: CapabilitySlot
   current: ModelReferenceSlot | undefined
   connections: readonly ProviderConnection[]
   models: readonly ProviderModel[]
+  noun: string
   onSet: (slot: CapabilitySlot, ref: ModelReferenceSlot | undefined) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -194,7 +200,7 @@ function SlotRow({
           }
         >
           <div className="p-1.5">
-            <TextField value={search} onChange={setSearch} placeholder="Search models" />
+            <TextField value={search} onChange={setSearch} placeholder={`Search ${noun}s`} />
           </div>
           <div className="max-h-64 overflow-y-auto">
             {visible.map((model) => {
@@ -221,7 +227,7 @@ function SlotRow({
               )
             })}
             {visible.length === 0 ? (
-              <p className="px-2 py-2 text-caption text-muted-foreground">No model by that name.</p>
+              <p className="px-2 py-2 text-caption text-muted-foreground">No {noun} by that name.</p>
             ) : null}
           </div>
         </Popover>

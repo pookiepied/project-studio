@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ProvidersPane } from './ProvidersPane'
-import { KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from './harness.fixtures'
+import { CAPABILITY, KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from './harness.fixtures'
 
 /**
  * The pane, from the env vars down to the request body.
@@ -477,6 +477,35 @@ describe('creating a connection', () => {
       catalogProvider: 'tavily',
       apiKey: CANARY,
     })
+  })
+})
+
+describe('the Tools page', () => {
+  it('calls what a connection offers a service, not a model', async () => {
+    harnessConfigured()
+    const brave = {
+      ...KNOWN_VENDOR,
+      id: 'brave',
+      displayName: 'Brave Search',
+      catalogProvider: 'brave',
+      serves: { retrieval: 'brave' },
+    }
+    stubFetch((url, method) => {
+      if (url.includes('/models')) {
+        return jsonResponse([
+          {
+            ...modelFor('brave', 'brave-search'),
+            capability: { ...CAPABILITY, textGeneration: 'unsupported', webSearch: 'supported' },
+          },
+        ])
+      }
+      if (method === 'GET' && url.endsWith('/connections')) return jsonResponse([brave])
+      return defaultRoute(url, method)
+    })
+    render(<ProvidersPane kind="retrieval" />)
+    await screen.findByText('Brave Search')
+    expect(screen.getByText('1 of 1 services offered')).toBeTruthy()
+    expect(screen.queryByText(/models offered/)).toBeNull()
   })
 })
 

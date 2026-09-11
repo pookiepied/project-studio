@@ -31,6 +31,7 @@ import { cn } from '@/lib/cn'
 export function ModelLibrary({
   connection,
   models,
+  noun = 'model',
   onSelectionChange,
   onAddModel,
   onEditModel,
@@ -39,6 +40,8 @@ export function ModelLibrary({
 }: {
   connection: ProviderConnection
   models: readonly ProviderModel[]
+  /** What the page calls one row: "model" unless the page says otherwise. */
+  noun?: string
   /** Applies a whole-shelf selection; the complement is stored as hiding. */
   onSelectionChange: (selectedIds: readonly string[]) => void
   onAddModel: () => void
@@ -67,7 +70,7 @@ export function ModelLibrary({
   return (
     <div className="flex flex-col gap-2 rounded-md border bg-surface/50 p-2">
       <div className="flex items-center gap-2">
-        <TextField value={search} onChange={setSearch} placeholder="Search models" />
+        <TextField value={search} onChange={setSearch} placeholder={`Search ${noun}s`} />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

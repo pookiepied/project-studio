@@ -59,6 +59,18 @@ const PAGES: Readonly<Record<ProviderKind, { title: string; description: string 
   },
 }
 
+/**
+ * What a page calls the things a connection offers. Language and media
+ * entries are models; a Tools entry is a service - Brave Search is not a
+ * model, and a person reading "models offered" under it would be right to
+ * object.
+ */
+const NOUN_BY_KIND: Readonly<Record<ProviderKind, string>> = {
+  language: 'model',
+  media: 'model',
+  retrieval: 'service',
+}
+
 export function ProvidersPane({ kind }: { kind: ProviderKind }) {
   const providers = useProviders()
   const page = PAGES[kind]
@@ -167,6 +179,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
   const models = view.models.filter((model) => kindOfCapability(model.capability) === kind)
   const library = view.library.filter((entry) => entry.serves[kind] !== undefined)
   const slots = SLOTS_BY_KIND[kind]
+  const noun = NOUN_BY_KIND[kind]
 
   return (
     <>
@@ -184,6 +197,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
             key={record.id}
             record={record}
             models={models}
+            noun={noun}
             providers={providers}
             onAddModel={() => setAddingModel(record)}
             onRemove={() => setRemoving(record)}
@@ -199,6 +213,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
 
       <DefaultsSection
         slots={slots}
+        noun={noun}
         defaults={view.defaults}
         connections={connections}
         models={models}
@@ -243,6 +258,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
 function ConnectionRow({
   record,
   models: pageModels,
+  noun,
   providers,
   onAddModel,
   onRemove,
@@ -250,6 +266,8 @@ function ConnectionRow({
   record: ProviderConnection
   /** This page's models, from which the row takes its own connection's. */
   models: readonly ProviderModel[]
+  /** What this page calls one of them: "model" or "service". */
+  noun: string
   providers: Providers
   onAddModel: () => void
   onRemove: () => void
@@ -299,7 +317,7 @@ function ConnectionRow({
 
           <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
             <span>
-              {models.filter((model) => !model.hidden).length} of {models.length} models offered
+              {models.filter((model) => !model.hidden).length} of {models.length} {noun}s offered
             </span>
             <span aria-hidden>-</span>
             <CredentialBadge status={record.credential} />
@@ -358,7 +376,7 @@ function ConnectionRow({
                 onAddModel()
               }}
             >
-              Add model
+              Add {noun}
             </MenuItem>
 
             <MenuItem
@@ -367,7 +385,7 @@ function ConnectionRow({
                 setExpanded((value) => !value)
               }}
             >
-              {expanded ? 'Hide models' : 'Show models'}
+              {expanded ? `Hide ${noun}s` : `Show ${noun}s`}
             </MenuItem>
 
             <MenuItem
@@ -389,6 +407,7 @@ function ConnectionRow({
           <ModelLibrary
             connection={record}
             models={models}
+            noun={noun}
             selectionBusy={false}
             onSelectionChange={(selectedIds) => void providers.setModelSelection(record.id, selectedIds)}
             onAddModel={onAddModel}
