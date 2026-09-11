@@ -2,6 +2,7 @@ import * as v from "valibot";
 
 import {
   capabilitySlotSchema,
+  capabilityServesKind,
   defaultSelectionSchema,
   type CapabilitySlot,
   type DefaultSelection,
@@ -136,6 +137,16 @@ export class ModelCatalog {
         if (
           filter?.capability !== undefined &&
           model.capability[filter.capability] === "unsupported"
+        ) {
+          continue;
+        }
+        // The kind is the model's to answer, not only the connection's: a
+        // joined row that both chats and paints answers the Media question
+        // too, and filtering by connection alone would hand the caller its
+        // language models when they asked for this kind.
+        if (
+          filter?.kind !== undefined &&
+          !capabilityServesKind(model.capability, filter.kind)
         ) {
           continue;
         }

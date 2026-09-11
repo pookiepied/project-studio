@@ -4,8 +4,8 @@ import { Button, MenuItem, Popover } from '@/components/primitives'
 import { Placeholder, PlaceholderMark, PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'
 import {
+  capabilityServesKind,
   connectionKinds,
-  kindOfCapability,
   servesKindOf,
   SLOTS_BY_KIND,
   type ProviderConnection,
@@ -175,8 +175,11 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
   // that kind on them, the vendors that could serve it, and its slots. A
   // connection that serves several kinds shows on each page with that
   // page's models, and is one connection everywhere - one key, entered once.
+  // A model answers the kind question once per kind too: a joined row that
+  // both chats and paints shows on both pages, which is what
+  // `capabilityServesKind` is for.
   const connections = view.connections.filter((record) => servesKindOf(record, kind))
-  const models = view.models.filter((model) => kindOfCapability(model.capability) === kind)
+  const models = view.models.filter((model) => capabilityServesKind(model.capability, kind))
   const library = view.library.filter((entry) => entry.serves[kind] !== undefined)
   const slots = SLOTS_BY_KIND[kind]
   const noun = NOUN_BY_KIND[kind]

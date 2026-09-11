@@ -79,6 +79,7 @@ export {
   RETRIEVAL_PROTOCOLS,
   executionModeFromWire,
   executionModeToWire,
+  capabilityServesKind,
   connectionKinds,
   kindOfCapability,
   parseConnectionServes,

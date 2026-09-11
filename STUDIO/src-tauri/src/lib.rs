@@ -1,4 +1,5 @@
 mod harness;
+mod permissions;
 mod remote;
 mod services;
 mod tray;
@@ -525,6 +526,18 @@ fn start_remote_access_at_launch(app: AppHandle) {
   });
 }
 
+/// The permission questions, answered by Studio itself (see `permissions.rs`).
+///
+/// A plugin because its `on_webview_ready` fires for every webview this
+/// application ever creates - the main window, the diagnostic, the detached
+/// conversations - including ones built after setup, where a hook in
+/// `WebviewWindowBuilder` would have to be remembered by every builder.
+fn permissions_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+  tauri::plugin::Builder::<tauri::Wry>::new("studio-permissions")
+    .on_webview_ready(|webview| permissions::attach(&webview))
+    .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let supervisor = HarnessSupervisor::new();
@@ -572,6 +585,8 @@ pub fn run() {
     ))))
     .manage(std::sync::Arc::new(remote::PairingState::default()))
     .manage(remote::RemoteAccess::default())
+    // The permission grant, attached to every webview this app creates.
+    .plugin(permissions_plugin())
     // Remembers size and position across launches. A desktop app that reopens
     // at a fixed size every time is one the user has to re-arrange every time,
     // and on a second monitor that is the difference between usable and not.

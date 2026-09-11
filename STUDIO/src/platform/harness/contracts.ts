@@ -269,6 +269,22 @@ export function servesKindOf(connection: { readonly serves: ConnectionServes }, 
   return connection.serves[kind] !== undefined
 }
 
+/**
+ * Whether a model can do this kind of work, whatever else it also does.
+ *
+ * One model answers once per kind, not once in total: a joined row that both
+ * chats and paints (`google/gemini-3-pro-image`, a language model and the same
+ * hour an image model) has to show on both pages, and a single-kind vocabulary
+ * loses it on one of them. Text remains the language question, and a model
+ * that supports nothing recognisable still counts as language - the only kind
+ * a hand-entered model with an unknown capability can be run as. Mirrored from
+ * `capabilityServesKind` in the harness's `contracts/providers.ts`.
+ */
+export function capabilityServesKind(capability: ModelCapability, kind: ProviderKind): boolean {
+  if (kind === 'language') return kindOfCapability(capability) === 'language'
+  return SLOTS_BY_KIND[kind].some((slot) => capability[slot] === 'supported')
+}
+
 /** The kinds a connection serves, in the contract's fixed order. */
 export function connectionKinds(connection: { readonly serves: ConnectionServes }): readonly ProviderKind[] {
   return PROVIDER_KINDS.filter((kind) => connection.serves[kind] !== undefined)

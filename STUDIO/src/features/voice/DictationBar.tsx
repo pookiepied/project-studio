@@ -14,8 +14,15 @@ import { cn } from '@/lib/cn'
  * its contents change, which is the same contract the field itself follows on
  * focus.
  *
- * Three faces, one slot:
+ * Four faces, one slot:
  *
+ *   requesting   permission asked, nothing answered yet. This stage used to
+ *                borrow the blocked paragraph, so the one failure it actually
+ *                shelters - WebView2 never answering the permission request -
+ *                looked exactly like "no microphone available", and a stall
+ *                had no way to name itself. It shows the working dots and its
+ *                own word until either the mic answers or the promise is
+ *                abandoned.
  *   recording   real level as scrolling bars plus the clock. The bars are the
  *               last two seconds of measured level, newest on the right —
  *               each bar one frame of what the microphone actually heard, so
@@ -170,6 +177,18 @@ export function DictationBar({
           >
             <WorkingDots />
             <span>Transcribing</span>
+          </motion.div>
+        ) : stage === 'requesting' ? (
+          <motion.div
+            key="requesting"
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -6 }}
+            transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+            className="flex items-center gap-2.5"
+          >
+            <WorkingDots />
+            <span>Asking for the microphone</span>
           </motion.div>
         ) : (
           <motion.p

@@ -12,7 +12,7 @@ import {
   type ModelPricing,
   type ProviderConnection,
 } from "../../contracts/providers.js";
-import type { ModelCapability, ReasoningLevel } from "../../contracts/models.js";
+import type { CapabilityState, ModelCapability, ReasoningLevel } from "../../contracts/models.js";
 import { capabilityFromPiModel } from "../language/local/catalog.js";
 import {
   isLanguageCatalogProvider,
@@ -180,8 +180,9 @@ export async function catalogModelsFor(
   const live = await liveModelsFor(connection);
 
   if (connection.serves.language !== undefined && isLanguageCatalogProvider(catalogProvider)) {
-    // Pi's language models come first; declared extras for the same vendor
-    // arrive after and are deduplicated by id below.
+    // Pi's language models come first; declared extras and the live listing
+    // follow, and a shared id is joined rather than deduplicated - see
+    // `joinedCatalogModels`.
     const pi: readonly CatalogSourceModel[] = languageCatalogModels(catalogProvider).map(
       (model) => ({
         modelId: model.id,
@@ -192,13 +193,76 @@ export async function catalogModelsFor(
         pricing: pricingFromPiModel(model.cost),
       }),
     );
-    const declared = declaredModelsForSource(connection);
-    const seen = new Set(pi.map((model) => model.modelId));
-    const extras = [...declared, ...live].filter((model) => !seen.has(model.modelId));
-    return [...pi, ...extras];
+    return joinedCatalogModels([pi, declaredModelsForSource(connection), live]);
   }
 
-  return [...declaredModelsForSource(connection), ...live];
+  return joinedCatalogModels([declaredModelsForSource(connection), live]);
+}
+
+/** The capability dimensions a source can state. The two numbers are facts, not states. */
+const CAPABILITY_STATES = [
+  "textGeneration",
+  "streaming",
+  "reasoning",
+  "toolCalling",
+  "vision",
+  "embeddings",
+  "reranking",
+  "imageGeneration",
+  "imageEditing",
+  "videoGeneration",
+  "speechGeneration",
+  "transcription",
+  "webSearch",
+  "webFetch",
+] as const satisfies readonly (keyof Omit<ModelCapability, "contextWindow" | "maxOutputTokens">)[];
+
+function strongerState(
+  primary: CapabilityState,
+  extra: CapabilityState,
+): CapabilityState {
+  if (primary === "supported" || extra === "supported") return "supported";
+  if (primary === "unsupported" && extra === "unsupported") return "unsupported";
+  return "unknown";
+}
+
+/**
+ * One id, one record: later sources fold into earlier ones instead of being
+ * deduplicated away.
+ *
+ * The vendors list one model more than once because it answers more than one
+ * way - `google/gemini-3-pro-image` is a chat model Pi knows and, the same
+ * hour, an image model OpenRouter's images listing knows - and a set-of-ids
+ * dedupe threw the second half away, which is how the Media page lost it.
+ * What joins here is the truth of both: a dimension is supported when either
+ * record proves it, unsupported only when both say so, and unknown when one
+ * is merely undescribed. Identity (name, pricing, levels, shape) stays the
+ * first record's; the second record's only readers - the media slots - read
+ * capability alone, and its pricing is never shown (the plan's rule).
+ */
+function joinedCatalogModels(
+  sources: readonly (readonly CatalogSourceModel[])[],
+): readonly CatalogSourceModel[] {
+  const joined = new Map<string, CatalogSourceModel>();
+  for (const source of sources) {
+    for (const model of source) {
+      const primary = joined.get(model.modelId);
+      if (primary === undefined) {
+        joined.set(model.modelId, model);
+        continue;
+      }
+      const capability: { -readonly [K in keyof ModelCapability]: ModelCapability[K] } = {
+        ...primary.capability,
+        contextWindow: primary.capability.contextWindow,
+        maxOutputTokens: primary.capability.maxOutputTokens,
+      };
+      for (const dimension of CAPABILITY_STATES) {
+        capability[dimension] = strongerState(primary.capability[dimension], model.capability[dimension]);
+      }
+      joined.set(model.modelId, { ...primary, capability });
+    }
+  }
+  return [...joined.values()];
 }
 
 /**

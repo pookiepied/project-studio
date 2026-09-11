@@ -213,6 +213,35 @@ export function servesKind(
   return connection.serves[kind] !== undefined;
 }
 
+/** The slots each non-language kind is made of; language's slot is textGeneration alone. */
+const KIND_SLOTS: Readonly<Record<"media" | "retrieval", readonly CapabilitySlot[]>> = {
+  media: [
+    "imageGeneration",
+    "imageEditing",
+    "videoGeneration",
+    "speechGeneration",
+    "transcription",
+    "embeddings",
+  ],
+  retrieval: ["webSearch", "webFetch"],
+};
+
+/**
+ * Whether a model can do this kind of work, whatever else it also does.
+ *
+ * A model answers this question once per kind, not once in total: joining the
+ * catalogs produces rows that both chat and paint - `google/gemini-3-pro-image`
+ * is a language model Pi knows and, the same hour, an image model the vendor's
+ * own listing knows - and a single-kind vocabulary answers one of the two
+ * pages by losing the model. Text remains the language question, and a model
+ * that supports nothing recognisable still counts as language, because that is
+ * the only kind a hand-entered model with an unknown capability can be run as.
+ */
+export function capabilityServesKind(capability: ModelCapability, kind: ProviderKind): boolean {
+  if (kind === "language") return kindOfCapability(capability) === "language";
+  return KIND_SLOTS[kind].some((slot) => capability[slot] === "supported");
+}
+
 /**
  * The kind a model belongs to, read off what it can do.
  *

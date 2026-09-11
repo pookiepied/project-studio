@@ -145,3 +145,10 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so an MCP child cannot outlive the Host
 # holding a port or a file lock (meta-task #89).
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects"] }
+
+# The permission grant (`permissions.rs`): WebView2's PermissionRequested,
+# answered by Studio instead of by a stall or by Edge's own prompt. The
+# version tracks the copy already in this tree through Tauri's wry, so the
+# controller the platform seam hands us and the interfaces this module
+# registers against are one crate's, not two spellings of one set.
+webview2-com = "0.38"

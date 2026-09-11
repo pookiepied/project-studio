@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ProvidersPane } from './ProvidersPane'
 import { CAPABILITY, KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from './harness.fixtures'
+import type { ModelCapability, ProviderModel } from '@/platform/harness'
 
 /**
  * The pane, from the env vars down to the request body.
@@ -480,8 +481,83 @@ describe('creating a connection', () => {
   })
 })
 
-describe('the Tools page', () => {
-  it('calls what a connection offers a service, not a model', async () => {
+/**
+ * The harness's answer for an OpenRouter connection, shaped like the real one:
+ * 121 models the vendor lists as media (54 image, 29 video, 18 speech, 20
+ * transcription - the plan's own count), 12 it lists as language, and one -
+ * `google/gemini-3-pro-image`, joined by the catalog - that both chats and
+ * paints. The Media page has to offer all 122 and offer each once; a filter
+ * that lets the twelve through, drops the joined one, or duplicates it, is the
+ * leak this pins.
+ */
+const OPENROUTER_CONNECTION = {
+  id: 'openrouter',
+  displayName: 'OpenRouter',
+  serves: { language: 'openai-completions', media: 'openrouter' },
+  source: 'local' as const,
+  enabled: true,
+  catalogProvider: 'openrouter',
+  credential: 'set' as const,
+}
+
+function mediaCapable(id: string, capability: Partial<ModelCapability>): ProviderModel {
+  return {
+    ...modelFor(OPENROUTER_CONNECTION.id, id),
+    capability: { ...CAPABILITY, textGeneration: 'unsupported', ...capability },
+  }
+}
+
+function theHarnessAnswer(): ProviderModel[] {
+  const counted = (kind: string, count: number, capability: Partial<ModelCapability>): ProviderModel[] =>
+    Array.from({ length: count }, (_, at) => mediaCapable(`stand-in/${kind}-${at}`, capability))
+  return [
+    ...counted('image', 54, { imageGeneration: 'supported' }),
+    ...counted('video', 29, { videoGeneration: 'supported' }),
+    ...counted('speech', 18, { speechGeneration: 'supported' }),
+    ...counted('transcription', 20, { transcription: 'supported' }),
+    ...Array.from({ length: 12 }, (_, at) => modelFor(OPENROUTER_CONNECTION.id, `stand-in/chat-${at}`)),
+    // The joined model: one id, both truths. It keeps its textGeneration,
+    // which is what the join preserves, and gains the image half.
+    {
+      ...modelFor(OPENROUTER_CONNECTION.id, 'google/gemini-3-pro-image'),
+      capability: {
+        ...CAPABILITY,
+        imageGeneration: 'supported',
+        imageEditing: 'supported',
+        vision: 'supported',
+      },
+    },
+  ]
+}
+
+describe('the Media page against a 121-model answer', () => {
+  it('offers all 122, each once, and keeps a two-way model on both of its pages', async () => {
+    harnessConfigured()
+    stubFetch((url, method) => {
+      if (method === 'GET' && url.endsWith('/connections')) return jsonResponse([OPENROUTER_CONNECTION])
+      if (url.includes('/models')) return jsonResponse(theHarnessAnswer())
+      return defaultRoute(url, method)
+    })
+
+    const media = render(<ProvidersPane kind="media" />)
+    await screen.findByText('OpenRouter')
+    expect(screen.getByText('122 of 122 models offered')).toBeTruthy()
+
+    fireEvent.click(screen.getByLabelText('OpenRouter options'))
+    fireEvent.click(screen.getByText('Show models'))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(122)
+    expect(screen.getByLabelText('Offer google/gemini-3-pro-image')).toBeTruthy()
+    media.unmount()
+
+    // The same id answers the Models page too, where it chats: 12 language
+    // models plus the one it shares with the media half.
+    render(<ProvidersPane kind="language" />)
+    await screen.findByText('OpenRouter')
+    expect(screen.getByText('13 of 13 models offered')).toBeTruthy()
+  })
+})
+
+describe('the Tools page', () => {  it('calls what a connection offers a service, not a model', async () => {
     harnessConfigured()
     const brave = {
       ...KNOWN_VENDOR,
