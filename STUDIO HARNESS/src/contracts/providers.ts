@@ -326,6 +326,15 @@ export const providerModelSchema = v.object({
    * kept out of pickers, never silently deleted.
    */
   available: v.optional(v.boolean(), true),
+  /**
+   * Whether Studio recommends this model for what it does: the featured
+   * shelf, the few the person should reach for before reading two hundred
+   * ids. A word of the declared catalog, carried beside the live list it
+   * floats above; a model the vendor lists live never features by itself.
+   * Optional with a default of false so records stored before this field
+   * existed parse unchanged.
+   */
+  featured: v.optional(v.boolean(), false),
 });
 
 export type ProviderModel = v.InferOutput<typeof providerModelSchema>;

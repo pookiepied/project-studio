@@ -457,6 +457,14 @@ export interface ProviderModel {
    * nothing should be marked.
    */
   readonly available: boolean
+  /**
+   * Whether Studio recommends this model for what it does: the featured
+   * shelf, the few the person should reach for before reading two hundred
+   * ids. A word of the declared catalog, carried beside the live list it
+   * floats above; a model the vendor lists live never features by itself.
+   * Absent on old rows parses as false, which is what they were.
+   */
+  readonly featured: boolean
 }
 
 /**
@@ -717,6 +725,9 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
   // Absent parses as available: rows written before the field existed were
   // never marked, and a missing mark must not read as a bad mark.
   const available = value['available'] === undefined ? true : flag(value['available'])
+  // Absent parses as not featured, which is what every row written before
+  // this field existed was.
+  const featured = value['featured'] === undefined ? false : flag(value['featured'])
 
   if (
     connectionId === null ||
@@ -728,7 +739,8 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
     pricing === null ||
     hidden === null ||
     origin === null ||
-    available === null
+    available === null ||
+    featured === null
   ) {
     return null
   }
@@ -744,6 +756,7 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
     hidden,
     origin,
     available,
+    featured,
   }
 }
 

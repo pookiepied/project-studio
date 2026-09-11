@@ -44,6 +44,8 @@ export interface CatalogSourceModel {
   readonly displayName: string;
   readonly capability: ModelCapability;
   readonly reasoningLevels: readonly ReasoningLevel[];
+  /** Whether the featured shelf recommends it. Only a declared word can say so. */
+  readonly featured: boolean;
   readonly shape: InvocationShape;
   readonly pricing: ModelPricing;
 }
@@ -155,6 +157,7 @@ function declaredModelsForSource(
       displayName: model.displayName,
       capability: capabilityFromDeclared(model),
       reasoningLevels: model.reasoningLevels ?? [],
+      featured: model.featured ?? false,
       shape: model.shape,
       pricing: unknownPricing(),
     }))
@@ -189,6 +192,9 @@ export async function catalogModelsFor(
         displayName: model.name.length > 0 ? model.name : model.id,
         capability: capabilityFromPiModel(model),
         reasoningLevels: reasoningLevelsFromPiModel(model),
+        // The language shelf has no featured of its own; the featured shelf
+        // is the declared catalog's word about the few, and this is not it.
+        featured: false,
         shape: "stream",
         pricing: pricingFromPiModel(model.cost),
       }),
@@ -236,9 +242,10 @@ function strongerState(
  * dedupe threw the second half away, which is how the Media page lost it.
  * What joins here is the truth of both: a dimension is supported when either
  * record proves it, unsupported only when both say so, and unknown when one
- * is merely undescribed. Identity (name, pricing, levels, shape) stays the
- * first record's; the second record's only readers - the media slots - read
- * capability alone, and its pricing is never shown (the plan's rule).
+ * is merely undescribed. Identity - name, pricing, levels, shape, featured -
+ * stays the first record's; the second record's only readers - the media
+ * slots - read capability alone, and its pricing is never shown (the plan's
+ * rule).
  */
 function joinedCatalogModels(
   sources: readonly (readonly CatalogSourceModel[])[],

@@ -76,5 +76,6 @@ export function modelFor(
     hidden: false,
     origin: 'catalog',
     available: true,
+    featured: false,
   }
 }

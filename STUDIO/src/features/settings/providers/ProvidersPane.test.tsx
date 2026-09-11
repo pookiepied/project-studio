@@ -557,6 +557,64 @@ describe('the Media page against a 121-model answer', () => {
   })
 })
 
+describe('the featured shelf', () => {
+  it('puts the recommendation first in the library and the picker, and marks it', async () => {
+    harnessConfigured()
+    // The wire's order is the catalog's; the shelf's is the reader's. The
+    // featured model is the middle one, so the assertion cannot pass by
+    // coincidence.
+    const others = ['veo-3.1-generate-preview', 'gemini-3.1-flash-lite-image'].map((id) =>
+      modelFor(KNOWN_VENDOR.id, id),
+    )
+    const recommendation = {
+      ...modelFor(KNOWN_VENDOR.id, 'gemini-3.1-flash-image'),
+      featured: true,
+    }
+    stubFetch((url, method) => {
+      if (url.includes('/models')) return jsonResponse([others[0], recommendation, others[1]])
+      if (method === 'GET' && url.endsWith('/defaults')) return jsonResponse({})
+      return defaultRoute(url, method)
+    })
+    render(<ProvidersPane kind="language" />)
+    await screen.findByText('Work Anthropic')
+
+    fireEvent.click(screen.getByLabelText('Work Anthropic options'))
+    fireEvent.click(screen.getByText('Show models'))
+
+    const shelf = screen.getAllByLabelText(/Offer /).map((box) => box.getAttribute('aria-label'))
+    expect(shelf).toEqual([
+      'Offer gemini-3.1-flash-image',
+      'Offer veo-3.1-generate-preview',
+      'Offer gemini-3.1-flash-lite-image',
+    ])
+    expect(screen.getByText('Featured')).toBeTruthy()
+
+    // The picker agrees: the recommendation is the top of the list, named
+    // and marked, and the two behind it keep their arriving order. Two menus
+    // are in the document - the connection's own, still finishing its exit -
+    // so the picker is the one whose items are models. Its rows carry a
+    // selected-check, which makes them radios, not plain items.
+    fireEvent.click(screen.getByText('Choose'))
+    const picker = screen
+      .getAllByRole('menu')
+      .find((menu) =>
+        within(menu)
+          .queryAllByRole('menuitemradio')
+          .some((item) => (item.textContent ?? '').includes('veo-3.1-generate-preview')),
+      )
+    expect(picker).toBeDefined()
+    const items = (picker === undefined ? [] : within(picker).getAllByRole('menuitemradio')).map(
+      (item) => item.textContent,
+    )
+    expect(items[0]).toContain('gemini-3.1-flash-image')
+    expect(items[0]).toContain('Featured')
+    expect(items.slice(1)).toEqual([
+      expect.stringContaining('veo-3.1-generate-preview'),
+      expect.stringContaining('gemini-3.1-flash-lite-image'),
+    ])
+  })
+})
+
 describe('the Tools page', () => {  it('calls what a connection offers a service, not a model', async () => {
     harnessConfigured()
     const brave = {

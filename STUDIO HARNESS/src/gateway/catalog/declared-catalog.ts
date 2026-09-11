@@ -34,6 +34,13 @@ export interface DeclaredModel {
   readonly shape: InvocationShape;
   readonly contextWindow?: number;
   readonly reasoningLevels?: readonly ReasoningLevel[];
+  /**
+   * Whether this is one of the few the featured shelf recommends for what it
+   * does, rather than a member of the catalogue. Untouched by the live
+   * listing that may also carry the same id: where both speak, the declared
+   * recommendation rides the joined row.
+   */
+  readonly featured?: boolean;
 }
 
 export interface DeclaredProvider {

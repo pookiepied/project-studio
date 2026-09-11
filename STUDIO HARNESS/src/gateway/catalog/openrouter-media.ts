@@ -1,6 +1,12 @@
-import { MediaError } from "../../contracts/media.js";
 import type { ModelCapability } from "../../contracts/models.js";
-import { requestDirect } from "../../net/http.js";
+import {
+  capabilityFor,
+  createMediaListing,
+  dataEntries,
+  UNKNOWN_MODEL_PRICING,
+  type MediaListing,
+  type MediaListingFetch,
+} from "./media-listing.js";
 import type { CatalogSourceModel } from "./index.js";
 
 /**
@@ -11,94 +17,30 @@ import type { CatalogSourceModel } from "./index.js";
  * static: the listing moves weekly - 52 image models and 29 video models on
  * the day this was written - and a hand-kept copy would be stale before it
  * was committed. So a connection that serves OpenRouter's media wire reads
- * the four listings OpenRouter publishes, without a key, and the answer is
- * cached for an hour per base URL: long enough that a settings screen does
- * not fetch four listings on every paint, short enough that a model released
- * this morning is there this afternoon.
+ * the four listings OpenRouter publishes, without a key, and the shared
+ * machinery in `media-listing.ts` caches each connection's answer for an
+ * hour: long enough that a settings screen does not fetch four listings on
+ * every paint, short enough that a model released this morning is there
+ * this afternoon.
  *
  * Offline, or with the listings unreachable, the answer is empty and the
  * declared catalog stands; nothing here throws into a settings screen. No
- * pricing is read: audio, image and video are priced per second, per image
- * and per character across vendors, and there is no honest single number
- * to print - the plan's decision, and the reason `pricing` stays unknown.
+ * pricing is read: the reasons live in `media-listing.ts`, which is also
+ * what answers for the hour's cache, the empty-not-cached rule, and the
+ * unsupported floor - this file is the vendor's half, and only that.
  */
-
-interface Listing {
-  readonly at: number;
-  readonly models: readonly CatalogSourceModel[];
-}
-
-const CACHE_TTL_MS = 60 * 60 * 1_000;
-const LISTING_TIMEOUT_MS = 10_000;
-
-const cache = new Map<string, Listing>();
 
 /** Injectable for tests: the fetch of one listing URL, answering its JSON text. */
 export type ListingFetch = (url: string) => Promise<string>;
 
-const defaultFetch: ListingFetch = async (url) => {
-  const answered = await requestDirect({
-    url,
-    author: "user",
-    method: "GET",
-    headers: { accept: "application/json" },
-    timeoutMs: LISTING_TIMEOUT_MS,
-  });
-  if (answered.status >= 400) {
-    throw new MediaError("provider-refused", `OpenRouter answered ${String(answered.status)} to the listing.`);
-  }
-  return answered.body;
-};
-
-const UNKNOWN_PRICING = {
-  input: "unknown",
-  output: "unknown",
-  cacheRead: "unknown",
-  cacheWrite: "unknown",
-} as const;
-
-function capabilityFor(
-  earned: Partial<ModelCapability>,
-): ModelCapability {
-  return {
-    textGeneration: "unsupported",
-    streaming: "unknown",
-    reasoning: "unsupported",
-    toolCalling: "unsupported",
-    vision: "unknown",
-    embeddings: "unsupported",
-    reranking: "unsupported",
-    imageGeneration: "unsupported",
-    imageEditing: "unsupported",
-    videoGeneration: "unsupported",
-    speechGeneration: "unsupported",
-    transcription: "unsupported",
-    webSearch: "unsupported",
-    webFetch: "unsupported",
-    contextWindow: "unknown",
-    maxOutputTokens: "unknown",
-    ...earned,
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function entries(json: string): readonly Record<string, unknown>[] {
-  try {
-    const parsed: unknown = JSON.parse(json);
-    if (!isRecord(parsed) || !Array.isArray(parsed.data)) return [];
-    return parsed.data.filter(isRecord);
-  } catch {
-    return [];
-  }
+interface Earned {
+  readonly earned: Partial<ModelCapability>;
+  readonly shape: CatalogSourceModel["shape"];
 }
 
 function model(
   entry: Record<string, unknown>,
-  earned: Partial<ModelCapability>,
-  shape: CatalogSourceModel["shape"],
+  { earned, shape }: Earned,
 ): CatalogSourceModel | undefined {
   if (typeof entry.id !== "string" || entry.id.length === 0) return undefined;
   return {
@@ -106,8 +48,11 @@ function model(
     displayName: typeof entry.name === "string" && entry.name.length > 0 ? entry.name : entry.id,
     capability: capabilityFor(earned),
     reasoningLevels: [],
+    // Nothing OpenRouter lists is featured: the recommendation is a declared
+    // word about the few, and the live list is the vendor's, unhinted.
+    featured: false,
     shape,
-    pricing: UNKNOWN_PRICING,
+    pricing: UNKNOWN_MODEL_PRICING,
   };
 }
 
@@ -126,14 +71,26 @@ function takesInputImages(entry: Record<string, unknown>): boolean {
   );
 }
 
-async function listing(
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * One of the four listings, read and mapped. A listing that fails or answers
+ * nonsense is that kind's empty, not the catalogue's failure: a settings
+ * screen shows the three the vendor did answer, and the fourth answers on the
+ * next read, when the empty-not-cached rule brings the questions back.
+ */
+async function oneListing(
   url: string,
-  fetchListing: ListingFetch,
-  map: (entry: Record<string, unknown>) => CatalogSourceModel | undefined,
+  fetch: MediaListingFetch,
+  earn: (entry: Record<string, unknown>) => Earned | undefined,
 ): Promise<readonly CatalogSourceModel[]> {
   try {
-    return entries(await fetchListing(url)).flatMap((entry) => {
-      const mapped = map(entry);
+    return dataEntries(await fetch(url, {})).flatMap((entry) => {
+      const earned = earn(entry);
+      if (earned === undefined) return [];
+      const mapped = model(entry, earned);
       return mapped === undefined ? [] : [mapped];
     });
   } catch {
@@ -141,48 +98,53 @@ async function listing(
   }
 }
 
-export async function openrouterMediaModels(
-  baseUrl: string,
-  options: { readonly fetch?: ListingFetch; readonly now?: () => number } = {},
-): Promise<readonly CatalogSourceModel[]> {
-  const now = options.now ?? (() => Date.now());
-  const origin = baseUrl.replace(/\/+$/, "");
-  const cached = cache.get(origin);
-  if (cached !== undefined && now() - cached.at < CACHE_TTL_MS) return cached.models;
+const NO_KEY = undefined;
 
-  const fetchListing = options.fetch ?? defaultFetch;
-  const [speech, transcription, images, videos] = await Promise.all([
-    listing(`${origin}/models?output_modalities=speech`, fetchListing, (entry) =>
-      model(entry, { speechGeneration: "supported" }, "sync"),
-    ),
-    listing(`${origin}/models?output_modalities=transcription`, fetchListing, (entry) =>
-      model(entry, { transcription: "supported" }, "sync"),
-    ),
-    listing(`${origin}/images/models`, fetchListing, (entry) =>
-      model(
-        entry,
-        {
+export const openrouterListing: MediaListing = createMediaListing({
+  vendor: "OpenRouter",
+  read: async ({ origin, fetch: listingFetch }) => {
+    // Each listing answers exactly its own kind, so nothing the vendor lists
+    // goes unclassified and the dropped count stays zero: the query did the
+    // filtering.
+    const [speech, transcription, images, videos] = await Promise.all([
+      oneListing(`${origin}/models?output_modalities=speech`, listingFetch, () => ({
+        earned: { speechGeneration: "supported" },
+        shape: "sync",
+      })),
+      oneListing(`${origin}/models?output_modalities=transcription`, listingFetch, () => ({
+        earned: { transcription: "supported" },
+        shape: "sync",
+      })),
+      oneListing(`${origin}/images/models`, listingFetch, (entry) => ({
+        earned: {
           imageGeneration: "supported",
           ...(takesInputImages(entry)
             ? { imageEditing: "supported" as const, vision: "supported" as const }
             : {}),
         },
-        "sync",
-      ),
-    ),
-    listing(`${origin}/videos/models`, fetchListing, (entry) =>
-      model(entry, { videoGeneration: "supported" }, "poll"),
-    ),
-  ]);
+        shape: "sync",
+      })),
+      oneListing(`${origin}/videos/models`, listingFetch, () => ({
+        earned: { videoGeneration: "supported" },
+        shape: "poll",
+      })),
+    ]);
 
-  const models = [...speech, ...transcription, ...images, ...videos];
-  // An empty answer is not cached: it is what "offline" looks like, and the
-  // next paint should ask again rather than show nothing for an hour.
-  if (models.length > 0) cache.set(origin, { at: now(), models });
-  return models;
+    return {
+      models: [...speech, ...transcription, ...images, ...videos],
+      dropped: 0,
+    };
+  },
+});
+
+export async function openrouterMediaModels(
+  baseUrl: string,
+  options: { readonly fetch?: ListingFetch; readonly now?: () => number } = {},
+): Promise<readonly CatalogSourceModel[]> {
+  return openrouterListing.models(baseUrl, NO_KEY, options);
 }
 
 /** For tests. */
 export function forgetOpenrouterListings(): void {
-  cache.clear();
+  openrouterListing.forget();
 }

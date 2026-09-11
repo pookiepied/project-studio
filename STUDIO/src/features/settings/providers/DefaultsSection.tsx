@@ -9,6 +9,7 @@ import type {
   ProviderModel,
 } from '@/platform/harness'
 import { ALL_SLOTS, SLOT_LABELS } from '@/domain/models/slots'
+import { FEATURED_LABEL, featuredFirst } from '@/domain/models/featured'
 
 /**
  * The capability defaults: which model fills each slot.
@@ -138,7 +139,12 @@ function SlotRow({
   const vanished = current !== undefined && currentModel === undefined
   const markedUnavailable = currentModel !== undefined && !currentModel.available
 
-  const visible = eligible.filter((model) => {
+  // Featured first: the recommendation is the top of the list, which is the
+  // whole point of a recommendation. The search keeps that order among the
+  // rows it keeps.
+  const ordered = featuredFirst(eligible)
+
+  const visible = ordered.filter((model) => {
     const needle = search.trim().toLowerCase()
     if (needle === '') return true
     return (
@@ -222,6 +228,9 @@ function SlotRow({
                   <span className="flex items-center gap-1.5">
                     <ProviderMark provider={vendorOf(model, connection)} />
                     {model.displayName}
+                    {model.featured ? (
+                      <span className="text-muted-foreground/70">{FEATURED_LABEL}</span>
+                    ) : null}
                   </span>
                 </MenuItem>
               )

@@ -3,6 +3,7 @@ import { Icons, ProviderMark } from '@/components/icons'
 import { Button, MenuItem, Popover, TextField } from '@/components/primitives'
 import type { ProviderConnection, ProviderModel } from '@/platform/harness'
 import { ALL_SLOTS, SLOT_LABELS } from '@/domain/models/slots'
+import { FEATURED_LABEL, featuredFirst } from '@/domain/models/featured'
 import { cn } from '@/lib/cn'
 
 /**
@@ -26,6 +27,13 @@ import { cn } from '@/lib/cn'
  * dimension is a fact about the catalog, not a zero. A row the provider's own
  * model list no longer names is marked, greyed, and not selectable: the
  * connection was taught what its provider serves, by probe.
+ *
+ * ---- The shelf, and what comes first ----------------------------------------
+ *
+ * The featured models - Studio's own recommendation, a word of the declared
+ * catalog - lead the list, marked, before whatever the vendor lists live. The
+ * order is not the catalog's; it is the reader's: someone looking at two
+ * hundred ids is looking for the few worth reading, and they are the top ones.
  */
 
 export function ModelLibrary({
@@ -56,11 +64,13 @@ export function ModelLibrary({
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase()
-    if (needle === '') return models
-    return models.filter(
-      (model) =>
-        model.displayName.toLowerCase().includes(needle) ||
-        model.modelId.toLowerCase().includes(needle),
+    if (needle === '') return featuredFirst(models)
+    return featuredFirst(
+      models.filter(
+        (model) =>
+          model.displayName.toLowerCase().includes(needle) ||
+          model.modelId.toLowerCase().includes(needle),
+      ),
     )
   }, [models, search])
 
@@ -146,6 +156,9 @@ export function ModelLibrary({
                 )}
                 <p className="truncate text-caption text-muted-foreground">{model.modelId}</p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-caption text-muted-foreground">
+                  {model.featured ? (
+                    <span className="text-foreground/75">{FEATURED_LABEL}</span>
+                  ) : null}
                   {capabilityChips(model)}
                   <span>{windowText(model)}</span>
                   <span aria-hidden>-</span>

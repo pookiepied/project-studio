@@ -189,10 +189,10 @@ describe('parseProviderModels', () => {
   })
 
   it('accepts a well-formed list', () => {
-    // `available` is absent from the wire fixture because it is optional with
-    // a default: a row that predates the field was never marked, and "not
-    // marked" parses as available.
-    expect(parseProviderModels([MODEL])).toEqual([{ ...MODEL, available: true }])
+    // `available` and `featured` are absent from the wire fixture because
+    // they are optional with a default: a row that predates either field was
+    // never marked, and "not marked" parses as available, not featured.
+    expect(parseProviderModels([MODEL])).toEqual([{ ...MODEL, available: true, featured: false }])
   })
 
   it('reads absent reasoning levels as a model with none, and refuses a bad one', () => {
@@ -207,6 +207,12 @@ describe('parseProviderModels', () => {
     const { available: _available, ...without } = { ...MODEL, available: true }
     expect(parseProviderModel(without)?.available).toBe(true)
     expect(parseProviderModel({ ...MODEL, available: false })?.available).toBe(false)
+  })
+
+  it('reads absent featured as not featured and keeps a stated true', () => {
+    const { featured: _featured, ...without } = { ...MODEL, featured: false }
+    expect(parseProviderModel(without)?.featured).toBe(false)
+    expect(parseProviderModel({ ...MODEL, featured: true })?.featured).toBe(true)
   })
 
   it('fails the whole list when one element is wrong', () => {
