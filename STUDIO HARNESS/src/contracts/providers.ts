@@ -63,11 +63,19 @@ export type LanguageProtocol = v.InferOutput<typeof languageProtocolSchema>;
  * Each entry names a vendor's media wire *family*, not one endpoint: OpenAI's
  * family covers images, speech and transcription on one key, and an entry per
  * endpoint would have multiplied connections for the same secret. Adding a
- * family is a contract change, which is the union's purpose; the gateway
- * plan adds `deepgram`, `fish-audio` and `minimax` as each
- * adapter lands.
+ * family is a contract change, which is the union's purpose, and every
+ * family named here has an adapter under `gateway/media/adapters`.
  */
-export const mediaProtocolSchema = v.picklist(["openai", "openrouter", "google", "elevenlabs", "fal"]);
+export const mediaProtocolSchema = v.picklist([
+  "openai",
+  "openrouter",
+  "google",
+  "elevenlabs",
+  "fal",
+  "deepgram",
+  "fish-audio",
+  "minimax",
+]);
 
 export type MediaProtocol = v.InferOutput<typeof mediaProtocolSchema>;
 

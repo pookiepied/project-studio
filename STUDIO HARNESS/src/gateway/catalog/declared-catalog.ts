@@ -310,6 +310,84 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
     ],
   },
   {
+    id: "deepgram",
+    displayName: "Deepgram",
+    serves: { media: "deepgram" },
+    baseUrl: "https://api.deepgram.com/v1",
+    models: [
+      {
+        id: "nova-3",
+        displayName: "Nova 3",
+        capability: { ...NOT_CHAT, transcription: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "aura-2-thalia-en",
+        displayName: "Aura 2 (Thalia)",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
+    ],
+  },
+  {
+    id: "fish-audio",
+    displayName: "Fish Audio",
+    serves: { media: "fish-audio" },
+    baseUrl: "https://api.fish.audio/v1",
+    models: [
+      {
+        id: "s2.1-pro",
+        displayName: "S2.1 Pro",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "s1",
+        displayName: "S1",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "transcribe-1",
+        displayName: "Fish Transcribe",
+        capability: { ...NOT_CHAT, transcription: "supported" },
+        shape: "sync",
+      },
+    ],
+  },
+  {
+    id: "minimax",
+    displayName: "MiniMax",
+    serves: { media: "minimax" },
+    baseUrl: "https://api.minimax.io",
+    models: [
+      {
+        id: "speech-2.8-hd",
+        displayName: "Speech 2.8 HD",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "speech-2.8-turbo",
+        displayName: "Speech 2.8 Turbo",
+        capability: { ...NOT_CHAT, speechGeneration: "supported" },
+        shape: "sync",
+      },
+      {
+        id: "MiniMax-H3",
+        displayName: "MiniMax H3",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+      },
+      {
+        id: "MiniMax-H3-Max",
+        displayName: "MiniMax H3 Max",
+        capability: { ...NOT_CHAT, videoGeneration: "supported" },
+        shape: "poll",
+      },
+    ],
+  },
+  {
     id: "elevenlabs",
     displayName: "ElevenLabs",
     serves: { media: "elevenlabs" },

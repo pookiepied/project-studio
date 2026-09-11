@@ -283,6 +283,19 @@ function probeTarget(
           ...(apiKey === undefined ? {} : { "api-key": apiKey }),
         },
       };
+    case "deepgram":
+      // Deepgram's projects listing answers with the key's own projects.
+      return {
+        url: `${origin}/projects`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { authorization: `Token ${apiKey}` }),
+        },
+      };
+    case "fish-audio":
+      return { url: `${origin}/wallet/self/api-credit`, headers: { ...headers, ...bearer } };
+    case "minimax":
+      return { url: origin, headers: { ...headers, ...bearer } };
     case "elevenlabs":
       return {
         url: `${origin}/models`,
@@ -359,7 +372,7 @@ function probeProtocol(connection: ProviderConnection) {
 function listsModels(connection: ProviderConnection): boolean {
   if (connection.serves.language !== undefined) return true;
   const media = connection.serves.media;
-  return media !== undefined && media !== "fal";
+  return media !== undefined && !["fal", "deepgram", "fish-audio", "minimax"].includes(media);
 }
 
 /**
