@@ -1,17 +1,17 @@
+import type { CapabilitySlot } from "../../contracts/providers.js";
 import type { CapabilityResolver } from "../connections/capability-defaults.js";
 import {
   MediaError,
   type SpeechResult,
   type TranscribeResult,
 } from "../../contracts/media.js";
+import { builtinMediaAdapters } from "./adapters/index.js";
 import type {
   ImageGenerationInput,
   MediaAdapter,
   MediaAdapters,
   VideoGenerationInput,
 } from "./adapters/types.js";
-import { openaiSpeech } from "./drivers/openai-speech.js";
-import { openaiTranscribe } from "./drivers/openai-transcribe.js";
 import { MediaJobs, type MediaJobStatus } from "./jobs.js";
 import type {
   DriverEndpoint,
@@ -32,22 +32,29 @@ import { bindAudioSlot, bindGenerationSlot, type GenerationSlot } from "./resolv
  * socket.
  *
  * Two kinds of surface come through here. The app features - dictation and
- * read-aloud, where the person is the invoker - dispatch to the audio
- * drivers directly. The generation tools (`studio_image`, `studio_video`,
- * where the model is the invoker) dispatch to an adapter by the media wire
- * the slot's connection speaks, and every generation becomes a job in
- * `MediaJobs`, sync or polled alike. Both halves resolve through the one
- * capability seam, which is the whole reason the dispatch lives in one
- * module: they cannot drift about which vendor serves what.
+ * read-aloud, where the person is the invoker - and the generation tools
+ * (`studio_image`, `studio_video`, where the model is the invoker) both
+ * dispatch to an adapter by the media wire the slot's connection speaks;
+ * every generation becomes a job in `MediaJobs`, sync or polled alike. Both
+ * halves resolve through the one capability seam, which is the whole reason
+ * the dispatch lives in one module: they cannot drift about which vendor
+ * serves what.
  *
- * The adapter map is empty until the vendors' adapters land (gateway plan,
- * steps 4 to 7). A slot bound to a wire with no adapter fails as
- * `slot-protocol`, in the same sentence a connected-but-undriven audio
- * provider fails with.
+ * A slot bound to a wire no adapter speaks, or to an adapter without that
+ * capability, fails as `slot-protocol` in a sentence that says so.
  */
 
 /** OpenAI's TTS ceiling for one request. Splitting text is the caller's job. */
 const MAX_SPEECH_CHARS = 4096;
+
+/** The slot in the words a person reads in a refusal. */
+const SLOT_WORDS: Partial<Record<CapabilitySlot, string>> = {
+  speechGeneration: "read-aloud",
+  transcription: "dictation",
+  imageGeneration: "image",
+  imageEditing: "image editing",
+  videoGeneration: "video",
+};
 
 export interface MediaAdministration {
   transcribe(input: {
@@ -71,10 +78,13 @@ export interface MediaAdministration {
 
 export interface MediaServiceOptions {
   readonly resolver: CapabilityResolver;
-  /** Injectable for tests; production uses the OpenAI drivers. */
+  /**
+   * Injectable for tests: stand in for every adapter's speech or
+   * transcription, whatever wire the slot binds to.
+   */
   readonly speechDriver?: SpeechDriver;
   readonly transcribeDriver?: TranscriptionDriver;
-  /** The vendors' adapters, by the media wire each speaks. */
+  /** The vendors' adapters, by the media wire each speaks. The shipped set unless given. */
   readonly adapters?: MediaAdapters;
   /** The job registry generations run in. Required for the generation methods. */
   readonly jobs?: MediaJobs;
@@ -87,16 +97,16 @@ export interface GenerateOptions {
 
 export class MediaService {
   readonly #resolver: CapabilityResolver;
-  readonly #speech: SpeechDriver;
-  readonly #transcribe: TranscriptionDriver;
+  readonly #speech: SpeechDriver | undefined;
+  readonly #transcribe: TranscriptionDriver | undefined;
   readonly #adapters: MediaAdapters;
   readonly #jobs: MediaJobs | undefined;
 
   constructor(options: MediaServiceOptions) {
     this.#resolver = options.resolver;
-    this.#speech = options.speechDriver ?? openaiSpeech;
-    this.#transcribe = options.transcribeDriver ?? openaiTranscribe;
-    this.#adapters = options.adapters ?? new Map();
+    this.#speech = options.speechDriver;
+    this.#transcribe = options.transcribeDriver;
+    this.#adapters = options.adapters ?? builtinMediaAdapters();
     this.#jobs = options.jobs;
   }
 
@@ -174,12 +184,12 @@ export class MediaService {
     });
   }
 
-  #adapterFor(protocol: string, slot: GenerationSlot): MediaAdapter {
+  #adapterFor(protocol: string, slot: CapabilitySlot): MediaAdapter {
     const adapter = [...this.#adapters.values()].find((candidate) => candidate.protocol === protocol);
     if (adapter === undefined) {
       throw new MediaError(
         "slot-protocol",
-        `The connected ${slot === "videoGeneration" ? "video" : "image"} provider speaks a wire media cannot drive yet.`,
+        `The connected ${SLOT_WORDS[slot] ?? slot} provider speaks a wire media cannot drive yet.`,
       );
     }
     return adapter;
@@ -201,7 +211,14 @@ export class MediaService {
       throw new MediaError("provider-refused", "Only audio can be transcribed.");
     }
     const binding = await bindAudioSlot(this.#resolver, "transcription", input.modelId);
-    return this.#transcribe(
+    const transcribe = this.#transcribe ?? this.#adapterFor(binding.protocol, "transcription").transcribe;
+    if (transcribe === undefined) {
+      throw new MediaError(
+        "slot-protocol",
+        "The connected dictation provider's adapter does not transcribe.",
+      );
+    }
+    return transcribe(
       {
         audio: input.audio,
         mimeType: input.mimeType,
@@ -223,7 +240,14 @@ export class MediaService {
       );
     }
     const binding = await bindAudioSlot(this.#resolver, "speechGeneration", input.modelId);
-    return this.#speech(
+    const speak = this.#speech ?? this.#adapterFor(binding.protocol, "speechGeneration").speak;
+    if (speak === undefined) {
+      throw new MediaError(
+        "slot-protocol",
+        "The connected read-aloud provider's adapter does not speak.",
+      );
+    }
+    return speak(
       {
         text: input.text,
         modelId: binding.modelId,

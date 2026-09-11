@@ -1,6 +1,6 @@
 # The gateway — the plan
 
-**Status:** Steps 1–4 landed · **Opened:** 2026-09-11 · **Last worked:** 2026-09-11
+**Status:** Steps 1–5 landed · **Opened:** 2026-09-11 · **Last worked:** 2026-09-11
 **Inputs:** [the architecture brief](provider-architecture-brief.md) and
 [the protocol research](provider-protocol-research.md). Both are read as
 evidence here, not repeated.

@@ -26,11 +26,10 @@ const LABELS: Readonly<Record<GenerationSlot | "speechGeneration" | "transcripti
 export type GenerationSlot = "imageGeneration" | "imageEditing" | "videoGeneration";
 
 /**
- * The protocols media can drive today, and what to say about the ones it
- * cannot. OpenAI's audio endpoints hang off the same base URL as chat, so
- * both chat protocols serve; ElevenLabs has a real protocol value in the
- * store but no driver yet, and it is named as such rather than lumped into
- * "unknown".
+ * The language wires whose hosts also answer OpenAI's audio endpoints: a
+ * self-hosted OpenAI-compatible endpoint serves dictation off the same base
+ * URL as chat, with no media wire of its own. The binding names `openai` for
+ * such a connection so the OpenAI adapter drives it.
  */
 const OPENAI_AUDIO_PROTOCOLS: ReadonlySet<string> = new Set([
   "openai-completions",
@@ -101,21 +100,16 @@ export async function bindAudioSlot(
   }
 
   const { connection, model } = resolution;
-  if (connection.serves.media === "elevenlabs") {
-    throw new MediaError(
-      "slot-protocol",
-      "ElevenLabs cannot serve this yet; connect an OpenAI-compatible provider for it.",
-    );
-  }
-  // The OpenAI drivers speak the audio endpoints of any OpenAI-shaped host:
-  // OpenAI's own media family, or a language connection on one of the
-  // OpenAI wires whose base URL also answers /audio. The second case is how
-  // an OpenAI-compatible self-hosted endpoint serves dictation.
+  // A media wire when the connection has one; else a language connection on
+  // one of the OpenAI wires, whose base URL also answers /audio - how an
+  // OpenAI-compatible self-hosted endpoint serves dictation. Which adapters
+  // exist is the service's knowledge; what is refused here is a connection
+  // with no wire audio could ride.
   const language = connection.serves.language;
-  const openaiShaped =
-    connection.serves.media === "openai" ||
-    (language !== undefined && OPENAI_AUDIO_PROTOCOLS.has(language));
-  if (!openaiShaped) {
+  const protocol =
+    connection.serves.media ??
+    (language !== undefined && OPENAI_AUDIO_PROTOCOLS.has(language) ? "openai" : undefined);
+  if (protocol === undefined) {
     throw new MediaError(
       "slot-protocol",
       `The connected ${LABELS[slot]} provider speaks a protocol media cannot drive yet.`,
@@ -130,9 +124,7 @@ export async function bindAudioSlot(
 
   return {
     slot,
-    // The wire the driver is chosen by: the media family when the connection
-    // has one, else the language wire whose host also answers /audio.
-    protocol: connection.serves.media ?? language ?? "openai",
+    protocol,
     baseUrl: connection.baseUrl,
     credential: resolution.credential,
     // An explicit model (a route body naming one) outranks the slot's choice,
