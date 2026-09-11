@@ -331,13 +331,6 @@ function probeTarget(
         },
       };
     case "exa":
-      return {
-        url: origin,
-        headers: {
-          ...headers,
-          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
-        },
-      };
     case "tavily":
     case "firecrawl":
     case "jina":

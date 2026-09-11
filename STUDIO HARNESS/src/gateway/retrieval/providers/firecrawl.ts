@@ -15,7 +15,10 @@ import type { ReaderProvider, ReadRequest, ReadResult } from "../types.js";
  * different cost and a different permission question.
  */
 
-const ENDPOINT = "https://api.firecrawl.dev/v1/scrape";
+// v2 is the API Firecrawl now documents (checked 2026-09-11); v1 still
+// answers, but a scheduled migration beats an outage. The fields this file
+// sends and reads - formats, onlyMainContent, data.markdown - are the same.
+const ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
 interface FirecrawlResponse {
   readonly success?: boolean;

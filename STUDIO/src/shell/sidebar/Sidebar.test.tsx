@@ -91,12 +91,12 @@ describe('the sidebar column while Settings is the route', () => {
     // Group headings are the tree's `<p>` labels. One group shares its name
     // with a row inside it -- Account, which is filed under itself -- so the
     // query names the heading kind, not just the words.
-    for (const group of ['Application', 'Account', 'Models', 'Extensions', 'Agent', 'Coding', 'Archived']) {
+    for (const group of ['Application', 'Account', 'Providers', 'Extensions', 'Agent', 'Coding', 'Archived']) {
       expect(
         screen.getByText((_content, element) => element?.tagName === 'P' && _content === group),
       ).toBeTruthy()
     }
-    expect(screen.getByRole('button', { name: 'Providers' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Models' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
   })
 

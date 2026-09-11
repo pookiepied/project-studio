@@ -64,6 +64,7 @@ export function AddConnectionDialog({
   onCreate,
   onProbe,
   library,
+  customEndpoint = true,
 }: {
   open: boolean
   onClose: () => void
@@ -72,6 +73,12 @@ export function AddConnectionDialog({
   /** Probes the new connection; resolves to null only when there was no harness to ask. */
   onProbe: (id: string) => Promise<ProbeResult | HarnessFailure | null>
   library: readonly LibraryProvider[]
+  /**
+   * Whether a self-hosted endpoint may be added here. Only the Models page
+   * offers it: a custom endpoint speaks one of the language wires, and there
+   * is no such thing as a custom media or search endpoint to name.
+   */
+  customEndpoint?: boolean
 }) {
   const [mode, setMode] = useState<Mode>({ kind: 'pick' })
   const [search, setSearch] = useState('')
@@ -260,15 +267,19 @@ export function AddConnectionDialog({
             ))}
             {filtered.length === 0 ? (
               <p className="px-2 py-3 text-caption text-muted-foreground">
-                No provider by that name. A private endpoint can still be added by hand below.
+                {customEndpoint
+                  ? 'No provider by that name. A private endpoint can still be added by hand below.'
+                  : 'No provider by that name.'}
               </p>
             ) : null}
           </div>
-          <div className="border-t pt-3">
-            <Button variant="secondary" icon={<Icons.add />} onClick={() => setMode({ kind: 'custom' })}>
-              Custom endpoint
-            </Button>
-          </div>
+          {customEndpoint ? (
+            <div className="border-t pt-3">
+              <Button variant="secondary" icon={<Icons.add />} onClick={() => setMode({ kind: 'custom' })}>
+                Custom endpoint
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : mode.kind === 'custom' ? (
         <div className="flex flex-col gap-4 pt-1">

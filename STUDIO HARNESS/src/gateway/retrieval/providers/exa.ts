@@ -30,7 +30,9 @@ export function createExaSearch(apiKey: string): SearchProvider {
         provider: "exa",
         url: ENDPOINT,
         method: "POST",
-        headers: { "x-api-key": apiKey, "content-type": "application/json" },
+        // Exa's reference moved the key to a Bearer header (checked
+        // 2026-09-11); the `x-api-key` it used to document is not relied on.
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
         body: {
           query: request.query,
           numResults: request.limit,

@@ -45,10 +45,10 @@ import { ALL_SLOTS, SLOT_LABELS } from '@/domain/models/slots'
 /** The slots nothing invokes yet, and the sentence that says so, once. */
 const INVOKED: Readonly<Record<CapabilitySlot, boolean>> = {
   textGeneration: true,
-  imageGeneration: false,
-  imageEditing: false,
-  videoGeneration: false,
-  speechGeneration: false,
+  imageGeneration: true,
+  imageEditing: true,
+  videoGeneration: true,
+  speechGeneration: true,
   transcription: true,
   embeddings: false,
   webSearch: true,
@@ -57,22 +57,25 @@ const INVOKED: Readonly<Record<CapabilitySlot, boolean>> = {
 
 const PLACEHOLDER_BY_SLOT: Readonly<Record<CapabilitySlot, string>> = {
   textGeneration: '',
-  imageGeneration: 'Nothing invokes this yet - the studio-image tool arrives in a later update.',
-  imageEditing: 'Nothing invokes this yet - the studio-image tool arrives in a later update.',
-  videoGeneration: 'Nothing invokes this yet - the studio-video tool arrives in a later update.',
-  speechGeneration: 'Nothing invokes this yet - read-aloud arrives in a later update.',
+  imageGeneration: '',
+  imageEditing: '',
+  videoGeneration: '',
+  speechGeneration: '',
   transcription: '',
-  embeddings: 'Nothing invokes this yet - a Studio tool will embed through it in a later update.',
+  embeddings: 'Nothing invokes this yet - a Studio feature will embed through it in a later update.',
   webSearch: '',
   webFetch: '',
 }
 
 export function DefaultsSection({
+  slots = ALL_SLOTS,
   defaults,
   connections,
   models,
   onSet,
 }: {
+  /** The slots this page shows; every slot when not given. */
+  slots?: readonly CapabilitySlot[]
   defaults: DefaultSelection
   connections: readonly ProviderConnection[]
   models: readonly ProviderModel[]
@@ -80,7 +83,7 @@ export function DefaultsSection({
 }) {
   return (
     <div className="flex flex-col divide-y">
-      {ALL_SLOTS.map((slot) => (
+      {slots.map((slot) => (
         <SlotRow
           key={slot}
           slot={slot}

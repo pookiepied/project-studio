@@ -3,7 +3,15 @@ import { Icons, ProviderMark } from '@/components/icons'
 import { Button, MenuItem, Popover } from '@/components/primitives'
 import { Placeholder, PlaceholderMark, PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'
-import { connectionKinds, type ProviderConnection, type ProviderKind } from '@/platform/harness'
+import {
+  connectionKinds,
+  kindOfCapability,
+  servesKindOf,
+  SLOTS_BY_KIND,
+  type ProviderConnection,
+  type ProviderKind,
+  type ProviderModel,
+} from '@/platform/harness'
 import { Pane } from '@/features/settings/panes/Pane'
 import { CredentialBadge } from './CredentialBadge'
 import { ProbeLine } from './ProbeLine'
@@ -38,17 +46,31 @@ const KIND_LABELS: Readonly<Record<ProviderKind, string>> = {
  * what cannot invoke them yet sits in the defaults row itself, which is
  * where the invocation would be reached from. See `DefaultsSection`.
  */
-export function ProvidersPane() {
+/** The three pages, one per kind: what each is called and what it is for. */
+const PAGES: Readonly<Record<ProviderKind, { title: string; description: string }>> = {
+  language: { title: 'Models', description: 'The models that answer in text, and where they come from.' },
+  media: {
+    title: 'Media',
+    description: 'Images, video, speech and transcription: which provider makes each, and with which model.',
+  },
+  retrieval: {
+    title: 'Tools',
+    description: 'Web search and page reading: which service answers, and which is tried next.',
+  },
+}
+
+export function ProvidersPane({ kind }: { kind: ProviderKind }) {
   const providers = useProviders()
+  const page = PAGES[kind]
 
   return (
-    <Pane title="Providers" description="Where models come from, and what each can do.">
-      <PaneBody providers={providers} />
+    <Pane title={page.title} description={page.description}>
+      <PaneBody providers={providers} kind={kind} />
     </Pane>
   )
 }
 
-function PaneBody({ providers }: { providers: Providers }) {
+function PaneBody({ providers, kind }: { providers: Providers; kind: ProviderKind }) {
   const { view } = providers
 
   if (view.status === 'loading') {
@@ -71,7 +93,7 @@ function PaneBody({ providers }: { providers: Providers }) {
     )
   }
 
-  return <ProviderList providers={providers} />
+  return <ProviderList providers={providers} kind={kind} />
 }
 
 function NoHarness() {
@@ -123,7 +145,7 @@ function ProviderListSkeleton() {
   )
 }
 
-function ProviderList({ providers }: { providers: Providers }) {
+function ProviderList({ providers, kind }: { providers: Providers; kind: ProviderKind }) {
   const { view } = providers
   // The state comes first, ahead of the guard, the way `ConnectionRow` below
   // already does it. Hooks after a conditional return are only safe while the
@@ -137,17 +159,31 @@ function ProviderList({ providers }: { providers: Providers }) {
   const [addingModel, setAddingModel] = useState<ProviderConnection | null>(null)
   if (view.status !== 'ready') return null
 
+  // This page's slice: the connections that serve its kind, the models of
+  // that kind on them, the vendors that could serve it, and its slots. A
+  // connection that serves several kinds shows on each page with that
+  // page's models, and is one connection everywhere - one key, entered once.
+  const connections = view.connections.filter((record) => servesKindOf(record, kind))
+  const models = view.models.filter((model) => kindOfCapability(model.capability) === kind)
+  const library = view.library.filter((entry) => entry.serves[kind] !== undefined)
+  const slots = SLOTS_BY_KIND[kind]
+
   return (
     <>
-      {view.connections.length === 0 ? (
+      {connections.length === 0 ? (
         <p className="py-4 text-ui text-muted-foreground">
-          No connections yet. Add one to give Studio somewhere to send a request.
+          {kind === 'language'
+            ? 'No connections yet. Add one to give Studio somewhere to send a request.'
+            : kind === 'media'
+              ? 'No provider serves media yet. Add one, and the image, video and voice features find it here.'
+              : 'No provider serves search or page reading yet. Add one, and the web tools use it.'}
         </p>
       ) : (
-        view.connections.map((record) => (
+        connections.map((record) => (
           <ConnectionRow
             key={record.id}
             record={record}
+            models={models}
             providers={providers}
             onAddModel={() => setAddingModel(record)}
             onRemove={() => setRemoving(record)}
@@ -162,9 +198,10 @@ function ProviderList({ providers }: { providers: Providers }) {
       </div>
 
       <DefaultsSection
+        slots={slots}
         defaults={view.defaults}
-        connections={view.connections}
-        models={view.models}
+        connections={connections}
+        models={models}
         onSet={(slot, ref) => void providers.setDefault(slot, ref)}
       />
 
@@ -176,7 +213,8 @@ function ProviderList({ providers }: { providers: Providers }) {
           return result.ok ? null : result.error
         }}
         onProbe={(id) => providers.probe(id)}
-        library={view.library}
+        library={library}
+        customEndpoint={kind === 'language'}
       />
 
       <RemoveConnectionDialog
@@ -204,11 +242,14 @@ function ProviderList({ providers }: { providers: Providers }) {
 
 function ConnectionRow({
   record,
+  models: pageModels,
   providers,
   onAddModel,
   onRemove,
 }: {
   record: ProviderConnection
+  /** This page's models, from which the row takes its own connection's. */
+  models: readonly ProviderModel[]
   providers: Providers
   onAddModel: () => void
   onRemove: () => void
@@ -218,7 +259,7 @@ function ConnectionRow({
   const [expanded, setExpanded] = useState(false)
   if (view.status !== 'ready') return null
 
-  const models = view.models.filter((model) => model.connectionId === record.id)
+  const models = pageModels.filter((model) => model.connectionId === record.id)
   const probe = providers.probes.get(record.id)
   const probing = probe?.status === 'probing'
 

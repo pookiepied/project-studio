@@ -69,9 +69,17 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     ],
   },
   {
-    id: 'models',
-    name: 'Models',
-    sections: [{ id: 'providers', name: 'Providers', icon: Icons.providers }],
+    // Provider is the category; the three pages are the three kinds a
+    // connection can serve, in the contract's own words. One key added on
+    // any page serves every kind its vendor can, and shows on each page
+    // with that page's models.
+    id: 'providers',
+    name: 'Providers',
+    sections: [
+      { id: 'models', name: 'Models', icon: Icons.providers },
+      { id: 'media', name: 'Media', icon: Icons.generate },
+      { id: 'tools', name: 'Tools', icon: Icons.search },
+    ],
   },
   {
     id: 'extensions',

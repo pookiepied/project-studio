@@ -493,7 +493,7 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
     id: "firecrawl",
     displayName: "Firecrawl",
     serves: { retrieval: "firecrawl" },
-    baseUrl: "https://api.firecrawl.dev/v1",
+    baseUrl: "https://api.firecrawl.dev/v2",
     models: [
       {
         id: "firecrawl-scrape",

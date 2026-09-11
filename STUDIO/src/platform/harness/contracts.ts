@@ -237,6 +237,38 @@ export interface ConnectionServes {
   readonly retrieval?: RetrievalProtocol
 }
 
+/**
+ * `kindOfCapability` - the kind a model belongs to, read off what it can do.
+ * A model carries no kind of its own: text generation is language, search
+ * and fetch are retrieval, everything else that generates or transcribes is
+ * media, and a model that supports nothing recognisable is language.
+ */
+export function kindOfCapability(capability: ModelCapability): ProviderKind {
+  if (capability.textGeneration === 'supported') return 'language'
+  if (capability.webSearch === 'supported' || capability.webFetch === 'supported') return 'retrieval'
+  const media: readonly (keyof ModelCapability)[] = [
+    'imageGeneration',
+    'imageEditing',
+    'videoGeneration',
+    'speechGeneration',
+    'transcription',
+    'embeddings',
+  ]
+  if (media.some((slot) => capability[slot] === 'supported')) return 'media'
+  return 'language'
+}
+
+/** The capability slots each kind of provider fills. */
+export const SLOTS_BY_KIND: Readonly<Record<ProviderKind, readonly CapabilitySlot[]>> = {
+  language: ['textGeneration'],
+  media: ['imageGeneration', 'imageEditing', 'videoGeneration', 'speechGeneration', 'transcription', 'embeddings'],
+  retrieval: ['webSearch', 'webFetch'],
+}
+
+export function servesKindOf(connection: { readonly serves: ConnectionServes }, kind: ProviderKind): boolean {
+  return connection.serves[kind] !== undefined
+}
+
 /** The kinds a connection serves, in the contract's fixed order. */
 export function connectionKinds(connection: { readonly serves: ConnectionServes }): readonly ProviderKind[] {
   return PROVIDER_KINDS.filter((kind) => connection.serves[kind] !== undefined)

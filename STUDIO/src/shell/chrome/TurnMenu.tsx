@@ -295,7 +295,7 @@ export function TurnMenu() {
         onUse={(modelId, reasoningLevel) => chooseModel(modelId, reasoningLevel)}
         onOpenSettings={() => {
           setLibraryOpen(false)
-          openSettings('providers')
+          openSettings('models')
         }}
         onEnsure={ensureStore}
       />

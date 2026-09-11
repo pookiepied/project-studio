@@ -18,7 +18,7 @@ describe('the settings taxonomy', () => {
 
     expect(members.get('application')).toEqual(['general', 'appearance', 'devices', 'shortcuts'])
     expect(members.get('account')).toEqual(['account', 'personalization'])
-    expect(members.get('models')).toEqual(['providers'])
+    expect(members.get('providers')).toEqual(['models', 'media', 'tools'])
     expect(members.get('extensions')).toEqual(['mcp', 'connectors', 'browser-use'])
     expect(members.get('agent')).toEqual(['skills', 'hooks'])
     expect(members.get('coding')).toEqual(['git', 'worktrees', 'environments'])
@@ -40,6 +40,8 @@ describe('the settings taxonomy', () => {
     // by id, and the navigation default lands on General.
     expect(findSection('account')?.name).toBe('Account')
     expect(findSection('general')?.name).toBe('General')
-    expect(findSection('providers')?.name).toBe('Providers')
+    expect(findSection('models')?.name).toBe('Models')
+    expect(findSection('media')?.name).toBe('Media')
+    expect(findSection('tools')?.name).toBe('Tools')
   })
 })

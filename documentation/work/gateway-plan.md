@@ -1,6 +1,6 @@
 # The gateway — the plan
 
-**Status:** Steps 1–7 landed · **Opened:** 2026-09-11 · **Last worked:** 2026-09-11
+**Status:** All eight steps landed (2026-09-11); the media pane and pairing screen design pass, and a live hand-check of each vendor, remain · **Opened:** 2026-09-11 · **Last worked:** 2026-09-11
 **Inputs:** [the architecture brief](provider-architecture-brief.md) and
 [the protocol research](provider-protocol-research.md). Both are read as
 evidence here, not repeated.

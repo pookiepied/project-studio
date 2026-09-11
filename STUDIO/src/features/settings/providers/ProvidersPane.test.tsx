@@ -137,7 +137,7 @@ describe('with no harness', () => {
   it('says so plainly instead of showing a fixture catalog', async () => {
     harnessAbsent()
     stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
 
     await screen.findByText(/No harness is connected/)
     expect(screen.getByText(/Start Studio's harness/)).toBeTruthy()
@@ -157,7 +157,7 @@ describe('with no harness', () => {
   it('sends no request at all', async () => {
     harnessAbsent()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
 
     await screen.findByText(/No harness is connected/)
 
@@ -176,7 +176,7 @@ describe('when the load fails', () => {
     vi.stubGlobal('fetch', async () => {
       throw new TypeError('fetch failed')
     })
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
 
     await screen.findByText('Could not read providers.')
     expect(screen.getByText(new RegExp(BASE_URL.replace(/[.]/g, '\\.')))).toBeTruthy()
@@ -192,7 +192,7 @@ describe('when the load fails', () => {
     stubFetch(() =>
       jsonResponse({ error: 'Harness admission is required.', code: 'admission.unauthenticated' }, 401),
     )
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
 
     await screen.findByText('Harness admission is required.')
   })
@@ -202,7 +202,7 @@ describe('the list', () => {
   it('renders each connection with its offer and credential status', async () => {
     harnessConfigured()
     stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
 
     await screen.findByText('Work Anthropic')
     expect(screen.getByText('The box next door')).toBeTruthy()
@@ -218,7 +218,7 @@ describe('the list', () => {
 
   it('marks each row with the vendor it actually names', async () => {
     harnessConfigured()
-    const { container } = render(<ProvidersPane />)
+    const { container } = render(<ProvidersPane kind="language" />)
     stubFetch()
 
     await screen.findByText('The box next door')
@@ -240,7 +240,7 @@ describe('the list', () => {
       }
       return defaultRoute(url, method)
     })
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     fireEvent.click(screen.getAllByText('Check')[0] ?? document.createElement('button'))
@@ -268,7 +268,7 @@ describe('the list', () => {
       }
       return defaultRoute(url, method)
     })
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     fireEvent.click(screen.getAllByText('Check')[0] ?? document.createElement('button'))
@@ -284,7 +284,7 @@ describe('creating a connection', () => {
   it('sends the key in the request body, probes, and keeps the key nowhere', async () => {
     harnessConfigured()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     openCustomForm()
@@ -334,7 +334,7 @@ describe('creating a connection', () => {
   it('masks the key and does not offer to remember it', async () => {
     harnessConfigured()
     stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     openCustomForm()
@@ -347,7 +347,7 @@ describe('creating a connection', () => {
   it('omits the key entirely when none was typed', async () => {
     harnessConfigured()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     openCustomForm()
@@ -373,7 +373,7 @@ describe('creating a connection', () => {
       }
       return defaultRoute(url, method)
     })
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     openCustomForm()
@@ -395,7 +395,7 @@ describe('creating a connection', () => {
       }
       return defaultRoute(url, method)
     })
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     openCustomForm()
@@ -436,15 +436,26 @@ describe('creating a connection', () => {
       }
       return defaultRoute(url, method)
     })
-    render(<ProvidersPane />)
+    // The Models page offers the vendors that serve language and no other:
+    // Tavily serves only retrieval, and belongs to the Tools page.
+    const models = render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
+    fireEvent.click(screen.getByText('Add connection'))
+    const languagePicker = dialog('Add connection')
+    await within(languagePicker).findByText('OpenAI')
+    within(languagePicker).getByText('Chat - Images')
+    expect(within(languagePicker).queryByText('Tavily')).toBeNull()
+    models.unmount()
 
+    render(<ProvidersPane kind="retrieval" />)
+    await screen.findByText('Add connection')
     fireEvent.click(screen.getByText('Add connection'))
     const picker = dialog('Add connection')
-    await within(picker).findByText('OpenAI')
-    within(picker).getByText('Chat - Images')
     await within(picker).findByText('Tavily')
     within(picker).getByText('Web search')
+    expect(within(picker).queryByText('OpenAI')).toBeNull()
+    // No custom endpoint here: a self-hosted endpoint speaks a language wire.
+    expect(within(picker).queryByText('Custom endpoint')).toBeNull()
 
     // Choosing a library entry pre-fills the form from the harness's own
     // answer: the display name defaults to the vendor, and no base URL is
@@ -473,7 +484,7 @@ describe('enable and disable', () => {
   it('patches only the enabled flag', async () => {
     harnessConfigured()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     fireEvent.click(screen.getByLabelText('Work Anthropic options'))
@@ -490,7 +501,7 @@ describe('removing a connection', () => {
   it('asks first, names the connection, and says what happens to the key', async () => {
     harnessConfigured()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     fireEvent.click(screen.getByLabelText('Work Anthropic options'))
@@ -512,7 +523,7 @@ describe('removing a connection', () => {
   it('deletes nothing when the question is declined', async () => {
     harnessConfigured()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     fireEvent.click(screen.getByLabelText('Work Anthropic options'))
@@ -525,53 +536,49 @@ describe('removing a connection', () => {
 })
 
 describe('the capability defaults', () => {
-  it('renders every slot and refuses to offer a picker nothing can fill', async () => {
+  it("renders each page's slots, and refuses to offer a picker nothing can fill", async () => {
     harnessConfigured()
     stubFetch()
-    render(<ProvidersPane />)
+    // The Models page has the one language slot and none of the others.
+    const models = render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
+    expect(screen.getByText('Chat')).toBeTruthy()
+    for (const label of ['Images', 'Video', 'Speech', 'Web search']) {
+      expect(screen.queryByText(label)).toBeNull()
+    }
+    models.unmount()
 
-    // Nine slots, in the contract's order, from the one derived list.
-    for (const label of [
-      'Chat',
-      'Images',
-      'Image editing',
-      'Video',
-      'Speech',
-      'Transcription',
-      'Embeddings',
-      'Web search',
-      'Web fetch',
-    ]) {
+    // The Media page has the six media slots, in the contract's order. The
+    // only model the harness knows has textGeneration supported, so nothing
+    // fills an image slot and the row says so rather than rendering a dead
+    // picker.
+    render(<ProvidersPane kind="media" />)
+    await screen.findByText('Images')
+    for (const label of ['Images', 'Image editing', 'Video', 'Speech', 'Transcription', 'Embeddings']) {
       expect(screen.getByText(label)).toBeTruthy()
     }
-
-    // The only model on screen has textGeneration supported; the image slots
-    // have nothing fillable and say so with the one honest sentence about
-    // what would invoke them, rather than rendering a dead picker.
-    expect(screen.getAllByText(/No model with images is connected/)).toHaveLength(1)
-    expect(screen.getAllByText(/studio-image tool arrives in a later update/)).toHaveLength(2)
-    expect(screen.getByText(/No model with image editing is connected/)).toBeTruthy()
+    expect(screen.queryByText('Chat')).toBeNull()
+    expect(screen.getByText(/Connect a provider serving images to fill this slot/)).toBeTruthy()
+    expect(screen.getByText(/Connect a provider serving image editing to fill this slot/)).toBeTruthy()
   })
 
-  it('shows the one honest sentence where the invocation would be', async () => {
+  it('shows the one honest sentence only where nothing invokes the slot yet', async () => {
     harnessConfigured()
     stubFetch()
-    render(<ProvidersPane />)
-    await screen.findByText('Work Anthropic')
+    render(<ProvidersPane kind="media" />)
+    await screen.findByText('Images')
 
-    // Both image slots name the same future server, so the sentence appears
-    // twice; the video slot names its own, and web search - which is invoked
-    // today - gets no invocation sentence at all.
-    expect(screen.getAllByText(/studio-image tool arrives in a later update/)).toHaveLength(2)
-    expect(screen.getByText(/studio-video tool arrives in a later update/)).toBeTruthy()
-    expect(screen.getByText(/Connect a provider serving web search/)).toBeTruthy()
+    // The image, video and voice slots are invoked now - the studio tools
+    // and the read-aloud and dictation features - so they carry no such
+    // sentence; embeddings still has no consumer, and says so once.
+    expect(screen.getAllByText(/in a later update/)).toHaveLength(1)
+    expect(screen.getByText(/No model with embeddings is connected.*embed through it/)).toBeTruthy()
   })
 
   it('writes a default through PUT with the contract reference', async () => {
     harnessConfigured()
     const calls = stubFetch()
-    render(<ProvidersPane />)
+    render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
 
     fireEvent.click(screen.getAllByText('Choose')[0])
