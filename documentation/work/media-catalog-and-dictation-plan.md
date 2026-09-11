@@ -7,7 +7,7 @@ image and video only), and two live checks made while planning: the
 OpenRouter media listing answers 54 image, 29 video, 18 speech and 20
 transcription models today, and FAL's `GET https://api.fal.ai/v1/models`
 lists its whole catalogue with a category per model.
-**Decision:** none yet; D1 below becomes an ADR when the first step lands.
+**Decision:** none yet; D1, D3 and D5 below become ADRs when their steps land.
 
 The gateway can drive eight media vendors, but the person can only see a
 handful of models on most of them, because the declared catalogue is a
@@ -114,6 +114,29 @@ return the text only. The reply replaces the span; the original is held so
 one gesture puts it back. Nothing is persisted: no message, no turn, no
 usage row beyond what the language gateway already records.
 
+### D5. The microphone is granted by Studio itself, on every webview, before the page asks
+
+WebView2 answers a page's `getUserMedia` by raising `PermissionRequested`
+on the host. Left unhandled in a Tauri window the request stalls, and
+handled by the default it shows Edge's own permission bar inside Studio's
+frame — a foreign UI in a window that draws its own chrome. Studio answers
+the event itself: for its own origin and the microphone kind, `Allow`,
+every time, for every webview it creates (the main window from
+`tauri.conf.json`, the diagnostic window and the pop-outs from `lib.rs`),
+attached from `on_webview_ready` so no builder can forget it. Other kinds
+(camera, location, notifications, clipboard read) are `Deny` — Studio asks
+for nothing else, and a page that asks anyway gets no bar to click. The
+grant is per origin, so a remote page served to a phone is not affected:
+it runs in the phone's browser, which asks in its own way.
+
+This is the developer's own approach from a previous Tauri application,
+and it is the right one here for one more reason: the person already chose
+to install Studio and press the microphone; a second prompt in a borrowed
+style answers a question nobody asked. The remaining check is Windows's
+own microphone privacy setting, which no handler can override; when that
+refuses, `getUserMedia` rejects with `NotAllowedError` and the strip's
+blocked face says so, as it does today.
+
 ---
 
 ## 3. Questions answered before they are asked
@@ -141,9 +164,10 @@ out which.
    harness. On the Media page with an OpenRouter connection: count what
    shows against the 121 the harness returns; if fewer, find the filter and
    fix it. Press the microphone: confirm the stage stalls at `requesting`,
-   read the WebView2 permission path in `src-tauri`, add the handler or
-   capability that answers it, and give `requesting` a face so a stall can
-   never look like nothing again. Tests: the pane against a 121-model
+   then land D5 — the `PermissionRequested` handler on every webview
+   through `with_webview` and the `webview2-com` crate at the version
+   Tauri 2.11 pins — and give `requesting` a face so a stall can never
+   look like nothing again. Tests: the pane against a 121-model
    answer; the dictation hook against a `getUserMedia` that never settles.
 1. **The listing contract.** A `MediaListing` interface in
    `gateway/catalog/` with the hour cache, empty-not-cached rule and slot
