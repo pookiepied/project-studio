@@ -278,6 +278,18 @@ export async function listLibraryProviders(): Promise<readonly LibraryProviderEn
  * guess. Undefined for a vendor neither catalog names, or one whose declared
  * wires all fail to parse - a contract entry that was never added.
  */
+/**
+ * The address a catalog-backed connection calls when the person never typed
+ * one. The declared catalog answers first, because it names every media and
+ * retrieval vendor and carries the address each adapter was written against;
+ * the language catalog answers for the vendors only it knows, with the
+ * majority URL among that vendor's models. Undefined for a vendor neither
+ * catalog names, or one whose address is per-deployment (Azure).
+ */
+export function libraryBaseUrlFor(providerId: string): string | undefined {
+  return declaredProviderFor(providerId)?.baseUrl ?? majorityBaseUrlFor(providerId);
+}
+
 export function libraryServesFor(providerId: string): ConnectionServes | undefined {
   const declared = declaredProviderFor(providerId)?.serves ?? {};
   const language =

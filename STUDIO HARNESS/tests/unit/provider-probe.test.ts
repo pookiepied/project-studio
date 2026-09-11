@@ -6,6 +6,7 @@ import { ProviderConfigurationError } from "../../src/contracts/models.js";
 import type { AuthContext } from "../../src/admission/context.js";
 import type {
   LanguageProtocol,
+  MediaProtocol,
   ProviderConnection,
   ProviderConnectionDraft,
   RetrievalProtocol,
@@ -93,6 +94,18 @@ function languageConnection(baseUrl: string, protocol: LanguageProtocol): Provid
     enabled: true,
     credential: "set",
     serves: { language: protocol },
+  };
+}
+
+function mediaConnection(baseUrl: string, protocol: MediaProtocol): ProviderConnection {
+  return {
+    id: "mock-provider",
+    displayName: "Mock Provider",
+    source: "test",
+    baseUrl,
+    enabled: true,
+    credential: "set",
+    serves: { media: protocol },
   };
 }
 
@@ -374,10 +387,71 @@ describe("provider probe", () => {
 
     expect(probe.ok).toBe(true);
     expect(probe.modelCount).toBeUndefined();
-    // The base address itself: there is no model list to append on any of
-    // the retrieval protocols.
-    expect(target.requests[0]?.url).toBe("/");
+    // No model list on any retrieval wire: the cheapest question the vendor
+    // answers only with a good key, Tavily's usage here.
+    expect(target.requests[0]?.url).toBe("/usage");
     expect(target.requests[0]?.headers.authorization).toBe(`Bearer ${SECRET}`);
+  });
+
+  it("asks each vendor the question its API answers only with a good key", async () => {
+    const target = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end("{}");
+    });
+    const base = `http://127.0.0.1:${target.port}`;
+
+    await probeProviderConnection(retrievalConnection(base, "exa"), SECRET);
+    await probeProviderConnection(retrievalConnection(`${base}/v2`, "firecrawl"), SECRET);
+    await probeProviderConnection(retrievalConnection(base, "jina"), SECRET);
+    await probeProviderConnection(retrievalConnection(`${base}/res/v1`, "brave"), SECRET);
+    await probeProviderConnection(mediaConnection(`${base}/v1`, "fish-audio"), SECRET);
+    await probeProviderConnection(mediaConnection(base, "minimax"), SECRET);
+
+    expect(target.requests.map((request) => request.url)).toEqual([
+      "/websets/v0/websets?limit=1",
+      "/v2/team/credit-usage",
+      "/https://example.com",
+      "/res/v1/web/search?q=studio&count=1",
+      // The wallet sits beside /v1, not under it.
+      "/wallet/self/api-credit",
+      "/v1/files/list",
+    ]);
+    expect(target.requests[3]?.headers["x-subscription-token"]).toBe(SECRET);
+  });
+
+  it("reads a vendor's own way of refusing a key", async () => {
+    const answers: { status: number; body: string }[] = [
+      { status: 400, body: '{"detail":{"type":"authentication_error","code":"invalid_api_key"}}' },
+      { status: 422, body: '{"error":{"code":"SUBSCRIPTION_TOKEN_INVALID"}}' },
+      { status: 200, body: '{"base_resp":{"status_code":1004,"status_msg":"login fail"}}' },
+    ];
+    const target = await serve((_request, response) => {
+      const answer = answers.shift() ?? { status: 500, body: "{}" };
+      response.writeHead(answer.status, { "content-type": "application/json" });
+      response.end(answer.body);
+    });
+    const base = `http://127.0.0.1:${target.port}`;
+
+    const elevenlabs = await probeProviderConnection(mediaConnection(`${base}/v1`, "elevenlabs"), SECRET);
+    const brave = await probeProviderConnection(retrievalConnection(`${base}/res/v1`, "brave"), SECRET);
+    const minimax = await probeProviderConnection(mediaConnection(base, "minimax"), SECRET);
+
+    for (const probe of [elevenlabs, brave, minimax]) {
+      expect(probe.ok).toBe(false);
+      expect(probe.failure).toMatch(/rejected the credential/);
+    }
+  });
+
+  it("reads MiniMax's zero status as the key being good", async () => {
+    const target = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end('{"files":[],"base_resp":{"status_code":0,"status_msg":"success"}}');
+    });
+    const probe = await probeProviderConnection(
+      mediaConnection(`http://127.0.0.1:${target.port}`, "minimax"),
+      SECRET,
+    );
+    expect(probe.ok).toBe(true);
   });
 
   it("reports a connection with no base URL rather than guessing one", async () => {
@@ -401,6 +475,16 @@ describe("catalog base URL resolution", () => {
     expect(resolved).toBeDefined();
     if (resolved === undefined) return;
     expect(resolved.startsWith("https://api.openai.com")).toBe(true);
+  });
+
+  it("answers for a declared media or retrieval vendor the language catalog never names", () => {
+    // These vendors are added from the library with no base URL of their
+    // own, and the probe (like a generation) must still know where to go.
+    expect(catalogBaseUrlFor("fal")).toBe("https://queue.fal.run");
+    expect(catalogBaseUrlFor("deepgram")).toBe("https://api.deepgram.com/v1");
+    expect(catalogBaseUrlFor("elevenlabs")).toBe("https://api.elevenlabs.io/v1");
+    expect(catalogBaseUrlFor("brave")).toBe("https://api.search.brave.com/res/v1");
+    expect(catalogBaseUrlFor("tavily")).toBe("https://api.tavily.com");
   });
 
   it("returns undefined for a provider whose models carry no baseUrl", () => {

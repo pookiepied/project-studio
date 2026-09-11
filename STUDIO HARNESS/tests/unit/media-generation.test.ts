@@ -48,7 +48,7 @@ interface Recorded {
   readonly videos: { input: VideoGenerationInput; endpoint: DriverEndpoint }[];
 }
 
-function standIn(protocol: "openai" | "openrouter", answer: () => Generation): { adapter: MediaAdapter; recorded: Recorded } {
+function standIn(protocol: "openai" | "openrouter" | "fal", answer: () => Generation): { adapter: MediaAdapter; recorded: Recorded } {
   const recorded: Recorded = { images: [], videos: [] };
   const adapter: MediaAdapter = {
     protocol,
@@ -145,6 +145,34 @@ describe("image generation through the service", () => {
     expect(recorded.images[0]?.endpoint.credential).toBe("sk-openai-media-1");
     expect(recorded.images[0]?.endpoint.baseUrl).toBe("https://api.openai.test/v1");
     expect(JSON.stringify(finished)).not.toContain("sk-openai");
+  });
+
+  it("calls a library vendor at the library's own address when the connection carries none", async () => {
+    // A connection added from the library stores no base URL on purpose:
+    // absent means the vendor's own. FAL's address lives in the declared
+    // catalog, and a generation must find it there rather than refuse.
+    await connections.add({
+      id: "fal",
+      displayName: "FAL",
+      serves: { media: "fal" },
+      source: "local",
+      enabled: true,
+      catalogProvider: "fal",
+      apiKey: "fal-key-1",
+    });
+    await catalog.setDefault("imageGeneration", { connectionId: "fal", modelId: "fal-ai/flux-2/pro" });
+    const { adapter, recorded } = standIn("fal", () => ({
+      shape: "sync",
+      result: Promise.resolve([PNG]),
+    }));
+    const media = service([adapter]);
+
+    const started = await media.generateImage({ prompt: "a lighthouse" }, { conversationId: "conv-1" });
+    const finished = await jobs.finished("conv-1", started.id);
+
+    expect(finished?.state).toBe("done");
+    expect(recorded.images[0]?.endpoint.baseUrl).toBe("https://queue.fal.run");
+    expect(recorded.images[0]?.endpoint.credential).toBe("fal-key-1");
   });
 
   it("is an edit when input images travel, and resolves the editing slot's own model", async () => {

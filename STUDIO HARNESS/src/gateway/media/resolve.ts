@@ -1,6 +1,7 @@
 import type { CapabilitySlot, MediaProtocol } from "../../contracts/providers.js";
 import { MediaError } from "../../contracts/media.js";
 import type { CapabilityResolver, CapabilityResolution } from "../connections/capability-defaults.js";
+import { libraryBaseUrlFor } from "../catalog/index.js";
 import type { DriverEndpoint } from "./drivers/types.js";
 
 /**
@@ -71,16 +72,11 @@ export async function bindGenerationSlot(
       `The connected ${LABELS[slot]} provider serves no media wire.`,
     );
   }
-  if (connection.baseUrl === undefined) {
-    throw new MediaError(
-      "slot-protocol",
-      `The connected ${LABELS[slot]} provider has no base URL to call.`,
-    );
-  }
+  const baseUrl = addressOf(connection, slot);
   return {
     slot,
     protocol,
-    baseUrl: connection.baseUrl,
+    baseUrl,
     credential: resolution.credential,
     modelId: requestedModelId ?? model.modelId,
   };
@@ -115,21 +111,33 @@ export async function bindAudioSlot(
       `The connected ${LABELS[slot]} provider speaks a protocol media cannot drive yet.`,
     );
   }
-  if (connection.baseUrl === undefined) {
-    throw new MediaError(
-      "slot-protocol",
-      `The connected ${LABELS[slot]} provider has no base URL to call.`,
-    );
-  }
+  const baseUrl = addressOf(connection, slot);
 
   return {
     slot,
     protocol,
-    baseUrl: connection.baseUrl,
+    baseUrl,
     credential: resolution.credential,
     // An explicit model (a route body naming one) outranks the slot's choice,
     // which is how a person with two transcription models picks without
     // revisiting Settings mid-sentence.
     modelId: requestedModelId ?? model.modelId,
   };
+}
+
+/**
+ * Where a connection is called: the address the person typed, else the
+ * vendor's own from the library. A connection added from the library
+ * carries no address of its own on purpose - absent means the vendor's -
+ * so this is the only place the two are joined for media.
+ */
+function addressOf(connection: CapabilityResolution["connection"], slot: keyof typeof LABELS): string {
+  const baseUrl = connection.baseUrl ?? libraryBaseUrlFor(connection.catalogProvider ?? "");
+  if (baseUrl === undefined) {
+    throw new MediaError(
+      "slot-protocol",
+      `The connected ${LABELS[slot]} provider has no base URL to call.`,
+    );
+  }
+  return baseUrl;
 }

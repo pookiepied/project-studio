@@ -5,7 +5,7 @@ import {
   requestDirect,
   type HttpResponse,
 } from "../../net/http.js";
-import { majorityBaseUrlFor } from "../language/pi-catalog.js";
+import { libraryBaseUrlFor } from "../catalog/index.js";
 
 /**
  * 8 seconds. A model list is one small JSON document — served from a warm
@@ -47,6 +47,28 @@ interface ProbeTarget {
    */
   readonly base?: string;
   readonly headers: Record<string, string>;
+  /**
+   * A vendor's own way of saying the key was wrong, when it is not a 401 or
+   * 403: ElevenLabs answers 400, Brave 422, MiniMax HTTP 200 with a status
+   * code in the body. Returns true when the answer means the credential was
+   * refused.
+   */
+  readonly refusedCredential?: (status: number, body: string) => boolean;
+}
+
+/** Reads the answer as JSON when it is, else nothing. */
+function jsonIn(body: string): unknown {
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function minimaxStatusCode(body: string): number | undefined {
+  const parsed = jsonIn(body);
+  if (!isRecord(parsed) || !isRecord(parsed.base_resp)) return undefined;
+  return typeof parsed.base_resp.status_code === "number" ? parsed.base_resp.status_code : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -166,7 +188,11 @@ export async function probeProviderConnectionDetailed(
 
   const latencyMs = Date.now() - startedAt;
 
-  if (response.status === 401 || response.status === 403) {
+  const refused =
+    response.status === 401 ||
+    response.status === 403 ||
+    (target.refusedCredential?.(response.status, response.body) ?? false);
+  if (refused) {
     return {
       ok: false,
       reachedAt,
@@ -217,11 +243,12 @@ export async function probeProviderConnectionDetailed(
 
 /**
  * The base URL a catalog-backed connection probes when the user never typed
- * one: the majority URL among the vendor's own models, from the language
- * catalog that owns that question.
+ * one: the library's answer, which reads the declared catalog and then the
+ * language catalog. Kept under this name for the language bootstrap, which
+ * asks the same question of the same connection.
  */
 export function catalogBaseUrlFor(catalogProvider: string): string | undefined {
-  return majorityBaseUrlFor(catalogProvider);
+  return libraryBaseUrlFor(catalogProvider);
 }
 
 /**
@@ -251,6 +278,9 @@ export function catalogBaseUrlFor(catalogProvider: string): string | undefined {
 function withVersion(origin: string, version: string): string {
   return origin.endsWith(`/${version}`) ? origin : `${origin}/${version}`;
 }
+
+/** FAL's listing host, distinct from the queue host generations use. */
+const FAL_API_HOST = "https://api.fal.ai";
 
 function probeTarget(
   connection: ProviderConnection,
@@ -293,9 +323,21 @@ function probeTarget(
         },
       };
     case "fish-audio":
-      return { url: `${origin}/wallet/self/api-credit`, headers: { ...headers, ...bearer } };
+      // The wallet lives at the host, beside the /v1 the speech routes use.
+      return {
+        url: `${origin.replace(/\/v1$/, "")}/wallet/self/api-credit`,
+        headers: { ...headers, ...bearer },
+      };
     case "minimax":
-      return { url: origin, headers: { ...headers, ...bearer } };
+      // MiniMax answers HTTP 200 to a wrong key and says so in base_resp.
+      return {
+        url: `${origin}/v1/files/list`,
+        headers: { ...headers, ...bearer },
+        refusedCredential: (_status, body) => {
+          const code = minimaxStatusCode(body);
+          return code !== undefined && code !== 0;
+        },
+      };
     case "elevenlabs":
       return {
         url: `${origin}/models`,
@@ -303,6 +345,8 @@ function probeTarget(
           ...headers,
           ...(apiKey === undefined ? {} : { "xi-api-key": apiKey }),
         },
+        // A wrong key is a 400 whose detail names an authentication error.
+        refusedCredential: (status, body) => status === 400 && body.includes("authentication_error"),
       };
     case "anthropic-messages":
       return {
@@ -322,24 +366,32 @@ function probeTarget(
           ...(apiKey === undefined ? {} : { "x-goog-api-key": apiKey }),
         },
       };
+    // The retrieval vendors have no model list; each is asked the cheapest
+    // question its API answers only with a good key.
     case "brave":
+      // One search, one result: Brave has no account endpoint, and a wrong
+      // token is a 422 naming SUBSCRIPTION_TOKEN_INVALID.
       return {
-        url: origin,
+        url: `${origin}/web/search?q=studio&count=1`,
         headers: {
           ...headers,
           ...(apiKey === undefined ? {} : { "x-subscription-token": apiKey }),
         },
+        refusedCredential: (status, body) => status === 422 && body.includes("SUBSCRIPTION_TOKEN_INVALID"),
       };
     case "exa":
+      return { url: `${origin}/websets/v0/websets?limit=1`, headers: { ...headers, ...bearer } };
     case "tavily":
+      return { url: `${origin}/usage`, headers: { ...headers, ...bearer } };
     case "firecrawl":
+      return { url: `${origin}/team/credit-usage`, headers: { ...headers, ...bearer } };
     case "jina":
-      return { url: origin, base: origin, headers: { ...headers, ...bearer } };
+      return { url: `${origin}/https://example.com`, headers: { ...headers, ...bearer } };
     case "fal":
-      // The queue host lists no models; the probe confirms the key is taken
-      // by the host answering at all, with FAL's own `Key` prefix.
+      // The queue host lists no models; FAL's model listing lives on its API
+      // host and refuses a wrong key, with FAL's own `Key` prefix.
       return {
-        url: origin,
+        url: `${FAL_API_HOST}/v1/models?limit=1`,
         headers: {
           ...headers,
           ...(apiKey === undefined ? {} : { authorization: `Key ${apiKey}` }),
