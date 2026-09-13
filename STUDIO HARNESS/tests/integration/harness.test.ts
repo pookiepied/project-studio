@@ -1173,14 +1173,26 @@ describe.sequential("Flue harness vertical slice", () => {
       // the journal's early chunks and comes back with the offset to resume
       // from - exactly what a second device's first read does.
       const run = await client.send("two-readers", "[slow] read me twice");
-      const firstRead = await fetch(updatesUrl(run, "-1"), {
-        headers: { authorization: `Bearer ${running.token}` },
-      });
-      if (!firstRead.ok) {
-        throw new Error(`The first read answered ${String(firstRead.status)}.`);
+      // The premise is a journal with early chunks in it when the second
+      // reader attaches. Under a loaded suite the first read can land before
+      // the turn has written anything, and an offset taken then is the start
+      // - both readers would then see the same events and the property under
+      // test would be untested. So the first read repeats until the journal
+      // has something to hand over.
+      let midRunOffset = "";
+      for (let attempt = 0; attempt < 50 && midRunOffset === ""; attempt += 1) {
+        const firstRead = await fetch(updatesUrl(run, "-1"), {
+          headers: { authorization: `Bearer ${running.token}` },
+        });
+        if (!firstRead.ok) {
+          throw new Error(`The first read answered ${String(firstRead.status)}.`);
+        }
+        const chunks: unknown = await firstRead.json();
+        if (Array.isArray(chunks) && chunks.length > 0) {
+          midRunOffset = firstRead.headers.get("Stream-Next-Offset") ?? "";
+        }
+        if (midRunOffset === "") await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      await firstRead.json();
-      const midRunOffset = firstRead.headers.get("Stream-Next-Offset") ?? "";
       expect(midRunOffset).not.toBe("");
 
       const settledHere = (chunks: readonly unknown[]): boolean =>
