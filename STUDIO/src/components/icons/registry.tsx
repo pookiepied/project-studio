@@ -31,9 +31,9 @@ import {
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
-  SquarePen, SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
+  SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
-  Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, Scissors, ClipboardPaste,
+  Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -104,7 +104,11 @@ const REGISTRY = {
   settings: { mark: Settings2, motion: TURN_SLIGHT },
 
   // — Conversation --------------------------------------------------------
-  newChat: { mark: SquarePen },
+  // A new bubble, in the bubble family the other conversation marks use.
+  // It was a pen on a square, and the square's corners were the sharpest
+  // shape on the strip; a conversation here is a bubble everywhere else, so
+  // a new one is a bubble with a plus.
+  newChat: { mark: MessageSquarePlus },
   chat: { mark: MessageSquare },
   // The stopped-run question: a permission the kernel wants or a question the
   // model asked. A speech bubble carrying a question mark -- a conversation

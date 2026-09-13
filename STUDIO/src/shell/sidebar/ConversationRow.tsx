@@ -196,7 +196,6 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         <MenuItem
           icon={<Icons.delete />}
           destructive
-          note="The conversation, its files and its transcript. Cannot be undone."
           onSelect={() => {
             setMenuOpen(false)
             setConfirmingDelete(true)

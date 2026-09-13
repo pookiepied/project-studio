@@ -44,7 +44,7 @@ describe('the action lists', () => {
     const field = fieldWith('hello world', 0, 5)
     render(<ActionItems kind="field" selection="" target={field} close={vi.fn()} />)
 
-    expect(labels()).toEqual(['Cut', 'Copy', 'Paste', 'Select all'])
+    expect(labels()).toEqual(['Cut', 'Copy', 'Paste', 'Fix wording', 'Select all'])
     expect(screen.queryByText('New conversation')).toBeNull()
     expect(screen.queryByText('Reload interface')).toBeNull()
   })
@@ -57,6 +57,7 @@ describe('the action lists', () => {
     expect(disabled('Cut')).toBe(true)
     expect(disabled('Copy')).toBe(true)
     expect(disabled('Paste')).toBe(false)
+    expect(disabled('Fix wording')).toBe(true)
   })
 
   it('gives a selection its three verbs and none of the app\'s', () => {

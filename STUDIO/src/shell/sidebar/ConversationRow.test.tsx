@@ -202,13 +202,16 @@ describe('deleting from the row', () => {
     fireEvent.click(screen.getByText('Delete'))
   }
 
-  it('asks first, naming what the delete destroys', () => {
+  it('asks first, in one line, and the menu item is the one word', () => {
     openDelete()
 
     expect(remove).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Delete conversation' })).toBeTruthy()
-    expect(screen.getByText(/its files and its transcript/)).toBeTruthy()
-    expect(screen.getByText(/This cannot be undone/)).toBeTruthy()
+    expect(screen.getByText(/everything it holds/)).toBeTruthy()
+    expect(screen.getByText(/It cannot be undone/)).toBeTruthy()
+    // The inventory (files, transcript, ...) is gone from both the menu and
+    // the dialog; the dialog says what a delete means once, in one sentence.
+    expect(screen.queryByText(/transcript/)).toBeNull()
   })
 
   it('deletes on confirm and leaves the conversation it was reading', async () => {

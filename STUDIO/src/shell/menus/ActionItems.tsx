@@ -1,6 +1,7 @@
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator } from '@/components/primitives'
 import { writeDraft } from '@/features/chat/composer/drafts'
+import { improveDictation } from '@/features/voice/improve'
 import { copyText, readClipboardText } from '@/lib/clipboard'
 import { useNavigation } from '@/stores/navigation'
 
@@ -15,7 +16,11 @@ import { useNavigation } from '@/stores/navigation'
  * about that thing:
  *
  *   field      the caret is in a text field. Cut, Copy, Paste, Select all -
- *              what a text field does, and nothing the field cannot.
+ *              what a text field does - and Fix wording for a selection,
+ *              which is the one thing the webview's own menu had that this
+ *              one lacked. That menu offered the spell-checker's guesses;
+ *              this one hands the selected words to the same model Improve
+ *              uses and puts its version back in their place.
  *   selection  text is selected on the page. Copy it, widen it, or ask
  *              about it in a new conversation.
  *   page       nothing in particular. The app's verbs: a new conversation,
@@ -222,6 +227,31 @@ function FieldItems({
         Paste
       </MenuItem>
       <MenuSeparator />
+      <MenuItem
+        icon={<Icons.generate />}
+        disabled={!hasSelection}
+        onSelect={() => {
+          close()
+          if (!field) return
+          // The range is remembered, because the menu closing and the wait
+          // for the model both happen before the answer, and the field may
+          // have lost its selection to either. The answer goes exactly where
+          // the question came from; if the person has typed meanwhile, the
+          // field is theirs and the answer is dropped rather than pasted
+          // over new words.
+          const from = field.selectionStart ?? 0
+          const to = field.selectionEnd ?? 0
+          void improveDictation(selected).then((outcome) => {
+            if (outcome.kind !== 'ok') return
+            if (field.value.slice(from, to) !== selected) return
+            field.focus()
+            field.setSelectionRange(from, to)
+            insert(outcome.text)
+          })
+        }}
+      >
+        Fix wording
+      </MenuItem>
       <MenuItem
         icon={<Icons.check />}
         disabled={!field || field.value.length === 0}

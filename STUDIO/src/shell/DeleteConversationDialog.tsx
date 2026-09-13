@@ -11,9 +11,14 @@ import type { HarnessFailure } from '@/platform/harness'
  * a list of rows that look alike and a confirmation that does not say which
  * row it means is one nobody can actually check.
  *
- * What goes is stated plainly: the row, the files, the transcript, the
- * attachments and anything queued, the permissions and the extension
- * choices. A running conversation is refused by the harness rather than
+ * What goes is stated in one line - the conversation and everything it
+ * holds - rather than as the inventory it used to be. The inventory was the
+ * implementation listing itself (files, transcript, attachments, queue,
+ * permissions, extension choices), and nobody weighing a delete needs the
+ * list to know the answer; the row's own menu item had carried a shorter
+ * copy of the same list, so the warning was read twice before the dialog
+ * even opened. The menu says Delete, the dialog says what that means, once.
+ * A running conversation is refused by the harness rather than
  * deleted, and the refusal arrives here verbatim - the failure sentence is
  * evidence, never the headline, so it renders as the alert under the copy.
  *
@@ -77,9 +82,7 @@ export function DeleteConversationDialog({
           Delete {conversation?.title ?? 'this conversation'}?
         </p>
         <p className="text-caption text-muted-foreground">
-          This removes the conversation, its files, its transcript, its attachments and
-          anything queued for it, and forgets its permissions and extension choices. This
-          cannot be undone.
+          This removes the conversation and everything it holds. It cannot be undone.
         </p>
         {failure ? (
           <p role="alert" className="text-caption text-danger">

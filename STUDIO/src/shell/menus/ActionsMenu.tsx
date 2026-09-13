@@ -28,8 +28,8 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * edge that is off screen.
  */
 
-/** The tallest list - four rows and a rule - so the clamp keeps every list on screen. */
-const MENU_MAX_HEIGHT = 144
+/** The tallest list - the field's five rows and a rule - so the clamp keeps every list on screen. */
+const MENU_MAX_HEIGHT = 176
 
 export function ActionsMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
