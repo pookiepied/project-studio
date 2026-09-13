@@ -31,7 +31,7 @@ import {
 } from '@/platform/harness'
 import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { turnSettingsToWire } from '@/platform/harness'
-import { useWorkspace } from '@/stores/workspace'
+import { useLiveWork, useWorkspace } from '@/stores/workspace'
 import type { SeamFailure, TurnImageWire } from '@/platform/harness'
 import type { Conversation } from '@/domain/conversation/types'
 
@@ -63,7 +63,8 @@ import type { Conversation } from '@/domain/conversation/types'
  * behind it and no composer under it — nothing sent there could be answered.
  */
 export function ChatPage({ conversation }: { conversation: Conversation }) {
-  const { touch, settings, catalog, markRunning, markContextReport } = useWorkspace()
+  const { touch, settings, catalog } = useWorkspace()
+  const { markRunning, markContextReport } = useLiveWork()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)

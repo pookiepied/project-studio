@@ -5,7 +5,7 @@ import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useNavigation } from '@/stores/navigation'
-import { useWorkspace } from '@/stores/workspace'
+import { useLiveWork, useWorkspace } from '@/stores/workspace'
 
 /**
  * The top strip.
@@ -31,7 +31,8 @@ import { useWorkspace } from '@/stores/workspace'
  */
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations, running } = useWorkspace()
+  const { conversations } = useWorkspace()
+  const { running } = useLiveWork()
 
   const conversation =
     route.kind === 'chat'

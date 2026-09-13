@@ -5,7 +5,7 @@ import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { useForkConversation } from '@/features/chat/connection/fork'
 import { useNavigation } from '@/stores/navigation'
-import { useDetachConversation, useWorkspace } from '@/stores/workspace'
+import { useDetachConversation, useLiveWork, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/conversation/types'
 import { cn } from '@/lib/cn'
 
@@ -39,7 +39,8 @@ import { cn } from '@/lib/cn'
  */
 export function ConversationRow({ conversation }: { conversation: Conversation }) {
   const { route, openChat, goHome } = useNavigation()
-  const { rename, togglePin, setArchived, remove, running } = useWorkspace()
+  const { rename, togglePin, setArchived, remove } = useWorkspace()
+  const { running } = useLiveWork()
   const detach = useDetachConversation()
   const { forkWhole } = useForkConversation()
   const [menuOpen, setMenuOpen] = useState(false)

@@ -57,7 +57,7 @@ src/
     permissions/execution modes
     projects/   projects, source folders, marks
   stores/
-    workspace/  projects, conversations, turns
+    workspace/  the index and its writes; LiveWorkProvider is what is running now, published apart
     navigation/ where the user is
   features/
     chat/       composer, transcript, markdown, code, thinking

@@ -61,7 +61,8 @@ const rename = vi.fn()
 const running = new Set<string>()
 
 vi.mock('@/stores/workspace', () => ({
-  useWorkspace: () => ({ rename, togglePin, setArchived, remove, running }),
+  useWorkspace: () => ({ rename, togglePin, setArchived, remove }),
+  useLiveWork: () => ({ running }),
   useDetachConversation: () => vi.fn(),
 }))
 

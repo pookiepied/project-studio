@@ -56,12 +56,12 @@ vi.mock('@/stores/workspace', () => ({
     // themselves are held in `SidebarStates.test.tsx`.
     storePhase: { status: 'ready', error: null },
     ensureStore: vi.fn(async () => true),
-    running: new Set<string>(),
     rename: vi.fn(),
     togglePin: vi.fn(),
     setArchived: vi.fn(),
     remove: vi.fn(),
   }),
+  useLiveWork: () => ({ running: new Set<string>() }),
   useDetachConversation: () => vi.fn(),
 }))
 

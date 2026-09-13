@@ -10,7 +10,7 @@ import type { ConversationPhase } from '@/features/chat/connection/useConversati
 import { VoiceModeProvider } from '@/features/voice'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
-import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
+import { WorkspaceProvider, useLiveWork } from '@/stores/workspace'
 import { ChatPage } from './ChatPage'
 
 /**
@@ -85,7 +85,7 @@ function tree(conversation: Conversation) {
 
 /** Reads the store the sidebar's row would read, so the test sees the same thing. */
 function RunningProbe() {
-  const { running } = useWorkspace()
+  const { running } = useLiveWork()
   return (
     <ul aria-label="Working conversations">
       {[...running].map((id) => (

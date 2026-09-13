@@ -30,7 +30,7 @@ import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 import { ModelLibraryDialog } from '@/features/models/ModelLibraryDialog'
 import { CatalogStateNote } from '@/features/models/CatalogStateNote'
 import { useNavigation } from '@/stores/navigation'
-import { useWorkspace } from '@/stores/workspace'
+import { useLiveWork, useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 import { capital } from '@/lib/text'
 
@@ -109,9 +109,8 @@ export function TurnMenu() {
     conversations,
     catalog,
     ensureStore,
-    contextReports,
-    running,
   } = useWorkspace()
+  const { contextReports, running } = useLiveWork()
   const { route, openSettings } = useNavigation()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('root')
