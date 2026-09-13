@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { createHarnessClient, type HarnessClient, type HarnessResult } from './client'
-import type { ProviderConnection } from './contracts'
+import { createHarnessClient, type HarnessClient, type HarnessResult } from './index'
+import type { ProviderConnection } from '../contracts'
 
 /**
  * The transport, proved against a stubbed fetch.

@@ -153,7 +153,7 @@ function abortError(): Error {
  * The invoke underneath cannot be cancelled from JS — the command runs to
  * completion in Rust, bounded by its own timeout — but the client's timeout
  * only works if this side stops waiting, and an `AbortError` is how `fetch`
- * says "the caller gave up" rather than "the other end is gone". `client.ts`
+ * says "the caller gave up" rather than "the other end is gone". `client/request.ts`
  * reads the difference (`timedOut`).
  */
 function raceAbort<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
