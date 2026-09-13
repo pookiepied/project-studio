@@ -10,7 +10,7 @@ import {
   emptyProjection,
   isMessageBeingWritten,
   seededFrom,
-} from './projection'
+} from './index'
 
 /**
  * The transcript projection against hand-built chunks.
