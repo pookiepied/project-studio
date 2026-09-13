@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_IN, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -105,6 +105,28 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
   // the highlight points at a row that no longer exists.
   const index = Math.min(cursor, Math.max(entries.length - 1, 0))
 
+  // The field is a combobox and the rows are its listbox, in ARIA's words:
+  // the field keeps focus while the arrows move a highlight, and a screen
+  // reader learns which row is current from `aria-activedescendant` rather
+  // than from focus, which never leaves the field. The ids are minted here
+  // so two palettes could not name each other's rows.
+  const listId = useId()
+  const optionId = (entry: Entry) => `${listId}-${entry.id}`
+  const active = entries[index]
+  const list = useRef<HTMLDivElement>(null)
+
+  // The highlight can walk below the fold; the row it lands on comes into view.
+  useEffect(() => {
+    if (active === undefined) return
+    const row = list.current?.querySelector(`[id="${optionId(active)}"]`)
+    // jsdom has no scrollIntoView; a row that cannot scroll has nothing to do.
+    if (row instanceof HTMLElement && typeof row.scrollIntoView === 'function') {
+      row.scrollIntoView({ block: 'nearest' })
+    }
+    // `optionId` is a render-scoped closure over a stable id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
+
   const choose = (entry: Entry | undefined) => {
     if (!entry) return
     entry.run()
@@ -130,6 +152,11 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
           <Icons.search />
           <input
             ref={field}
+            role="combobox"
+            aria-expanded
+            aria-autocomplete="list"
+            aria-controls={listId}
+            aria-activedescendant={active === undefined ? undefined : optionId(active)}
             value={query}
             placeholder="Search conversations and settings"
             onChange={(event) => {
@@ -154,7 +181,13 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
           />
         </div>
 
-        <div className="studio-scroll-bounded max-h-[min(22rem,44vh)] overflow-y-auto p-1.5">
+        <div
+          ref={list}
+          id={listId}
+          role="listbox"
+          aria-label="Results"
+          className="studio-scroll-bounded max-h-[min(22rem,44vh)] overflow-y-auto p-1.5"
+        >
           {entries.length === 0 ? (
             <p className="px-2.5 py-6 text-center text-ui text-muted-foreground">
               Nothing matches that.
@@ -165,7 +198,12 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
               return (
                 <button
                   key={entry.id}
+                  id={optionId(entry)}
                   type="button"
+                  role="option"
+                  aria-selected={position === index}
+                  // The field holds focus; a click still chooses.
+                  tabIndex={-1}
                   onPointerEnter={() => setCursor(position)}
                   onClick={() => choose(entry)}
                   className={cn(

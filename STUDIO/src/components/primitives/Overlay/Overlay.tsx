@@ -1,8 +1,9 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_IN, SHELL } from '@/design/tokens'
 import { cn } from '@/lib/cn'
+import { useFocusTrap } from './useFocusTrap'
 
 /**
  * The scrim every modal surface opens over.
@@ -38,6 +39,10 @@ import { cn } from '@/lib/cn'
  * OS window is transparent and a square scrim over a rounded panel paints
  * into the corners the panel cut away.
  *
+ * The keyboard stays inside while the surface is open, and goes back to the
+ * control that opened it when it closes (`useFocusTrap`). The pointer cannot
+ * leave a modal; neither should Tab.
+ *
  * The scrim leaves on `EASE_IN` over `base`. A panel that leaves in the same
  * time on the same ease reads as closing; one that leaves faster reads as
  * blinking out with a scrim fading behind nothing -- see `Dialog`.
@@ -60,6 +65,9 @@ export function Overlay({
   className?: string
   children: ReactNode
 }) {
+  const scrim = useRef<HTMLDivElement | null>(null)
+  useFocusTrap(scrim, open)
+
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -73,6 +81,7 @@ export function Overlay({
     <AnimatePresence>
       {open ? (
         <motion.div
+          ref={scrim}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
