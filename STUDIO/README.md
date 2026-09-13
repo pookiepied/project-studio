@@ -42,7 +42,7 @@ move the whole system without breaking the pairing.
 ```
 src/
   index.css     the one stylesheet, importing styles/ in cascade order
-  styles/       type, tokens, palette, base, components, scroll, prose, player
+  styles/       fonts, type, tokens, palette, base, components, scroll, prose, player
   design/       tokens and theme. the source of truth for every value
     tokens/     typography, geometry, motion
     theme/      appearance state, persistence, the root variables

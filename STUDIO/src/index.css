@@ -1,15 +1,5 @@
 @import 'tailwindcss';
-/* The optical-size build. The default entry ships the weight axis alone, so
-   every size rendered the same letterforms -- drawn for large text, rendered
-   at 10px -- and the small roles read cramped for reasons nobody could name.
-   The opsz files carry both axes; with `font-optical-sizing: auto` (the
-   browser default) letterforms widen and space out as the size drops. */
-@import '@fontsource-variable/inter/opsz.css';
-@import '@fontsource/instrument-serif';
-/* The one mono the app ever draws. The stack it joins is a fallback ladder:
-   the bundled face renders on every machine, so code reads identically here
-   and on a Mac rather than inheriting whatever the OS happened to install. */
-@import '@fontsource-variable/jetbrains-mono';
+@import './styles/fonts.css';
 @import 'katex/dist/katex.min.css';
 
 /* One stylesheet, in cascade order: the scale everything derives from, the
