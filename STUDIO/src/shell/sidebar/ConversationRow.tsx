@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { SPRING_SNAPPY } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
+import { InlineRename, MenuItem, MenuSeparator, Popover } from '@/components/primitives'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { useForkConversation } from '@/features/chat/fork'
@@ -47,15 +47,9 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(conversation.title ?? '')
 
   const active = route.kind === 'chat' && route.conversationId === conversation.id
   const working = running.has(conversation.id)
-
-  const commit = () => {
-    rename(conversation.id, draft)
-    setEditing(false)
-  }
 
   const archive = () => {
     setArchived(conversation.id, true)
@@ -65,16 +59,14 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
 
   if (editing) {
     return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
-          if (event.key === 'Escape') setEditing(false)
+      <InlineRename
+        initial={conversation.title ?? ''}
+        onCommit={(value) => {
+          rename(conversation.id, value)
+          setEditing(false)
         }}
-        className="w-full rounded-md bg-selected px-2 py-1 text-ui text-foreground outline-none"
+        onCancel={() => setEditing(false)}
+        className="rounded-md px-2 py-1"
       />
     )
   }
@@ -184,7 +176,6 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         <MenuItem
           icon={<Icons.edit />}
           onSelect={() => {
-            setDraft(conversation.title ?? '')
             setMenuOpen(false)
             setEditing(true)
           }}

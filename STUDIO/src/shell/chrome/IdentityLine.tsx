@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { FADE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
+import { InlineRename, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
 import { ConversationExtensionsDialog } from '@/shell/ConversationExtensionsDialog'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { cn } from '@/lib/cn'
@@ -59,12 +59,6 @@ export function IdentityLine({
   const [branchOpen, setBranchOpen] = useState(false)
   const [extensionsOpen, setExtensionsOpen] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const field = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (editing) field.current?.select()
-  }, [editing])
 
   // Leaving a conversation abandons any half-finished rename with it.
   useEffect(() => {
@@ -79,26 +73,19 @@ export function IdentityLine({
 
   const project = projects.find((item) => item.id === conversation.projectId) ?? null
 
-  const commit = () => {
-    rename(conversation.id, draft)
-    setEditing(false)
-  }
-
   if (editing) {
     return (
-      <input
-        ref={field}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
-          if (event.key === 'Escape') setEditing(false)
+      <InlineRename
+        initial={conversation.title}
+        onCommit={(value) => {
+          rename(conversation.id, value)
+          setEditing(false)
         }}
+        onCancel={() => setEditing(false)}
         // Sized to content so the line does not jump width on becoming
         // editable, and capped so a long title cannot reach the window controls.
-        size={Math.max(draft.length, 14)}
-        className="max-w-[24rem] rounded-sm bg-selected px-1.5 py-0.5 text-center text-ui text-foreground outline-none"
+        fit
+        className="max-w-[24rem] rounded-sm px-1.5 py-0.5 text-center"
       />
     )
   }
@@ -162,7 +149,6 @@ export function IdentityLine({
         <MenuItem
           icon={<Icons.edit />}
           onSelect={() => {
-            setDraft(conversation.title ?? '')
             setMenuOpen(false)
             setEditing(true)
           }}
