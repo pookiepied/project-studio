@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT, LOOP } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { Button, IconButton } from '@/components/primitives'
+import { IconButton } from '@/components/primitives'
 import {
   MAX_IMAGES_PER_TURN,
   pickImageFiles,
@@ -15,8 +15,9 @@ import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
+import { ImprovePill } from '@/features/chat/composer/ImprovePill'
 import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
-import { DictationBar, useDictation } from '@/features/voice'
+import { DictationBar, TextLanding, landingDuration, useDictation } from '@/features/voice'
 import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
 import type { TurnImageWire } from '@/platform/harness'
 import { cn } from '@/lib/cn'
@@ -173,35 +174,65 @@ export function Composer({
   // so the composer answers the origin it is actually on.
   const voiceAvailable = voiceInputAvailable()
 
-  // The offer to tidy what a take dictated: it collects the take's words
-  // as they land and, once the take ends, offers Improve for exactly those.
-  const improveOffer = useImproveOffer({ text, setText })
+  /**
+   * A passage arriving in the field, shown arriving. While this holds text
+   * the field's slot plays `TextLanding` over it, for as long as the words
+   * take to rise; then the field returns holding the same words, and the
+   * caret with it. Both whole-passage writes go through here - a take
+   * landing and Improve's rewrite - so the composer has one way a passage
+   * arrives, and a paste stays what it is.
+   */
+  const [landing, setLanding] = useState<string | null>(null)
+  const landingTimer = useRef<number | null>(null)
+  const land = useCallback((passage: string) => {
+    if (landingTimer.current !== null) window.clearTimeout(landingTimer.current)
+    setLanding(passage)
+    landingTimer.current = window.setTimeout(() => {
+      landingTimer.current = null
+      setLanding(null)
+    }, landingDuration(passage) * 1000)
+  }, [])
+  useEffect(
+    () => () => {
+      if (landingTimer.current !== null) window.clearTimeout(landingTimer.current)
+    },
+    [],
+  )
+
+  // The offer to tidy the message once a take has landed in it. It rewrites
+  // the whole field, and its rewrite lands the way the take did.
+  const improveOffer = useImproveOffer({ text, setText, onImproved: land })
 
   const dictation = useDictation({
     // Appended, not assigned: dictation is one input among several, and a
     // sentence typed before speaking is not made wrong by being spoken after.
-    onText: (spoken) => {
-      improveOffer.record(spoken)
-      setText((current) => (current.trim().length > 0 ? `${current.trimEnd()} ${spoken}` : spoken))
+    // The whole take arrives at once, when it ends; nothing lands mid-take.
+    onTake: (spoken) => {
+      const next = textRef.current.trim().length > 0 ? `${textRef.current.trimEnd()} ${spoken}` : spoken
+      setText(next)
+      land(next)
+      improveOffer.open()
     },
   })
 
-  // Coming out of dictation, the caret goes back where it was — the field
-  // remounts as the strip leaves, so the focus has to wait for the return
-  // rather than firing from the hook's completion. The take's edges are
-  // the offer's too: a take starting withdraws the last offer, a take
-  // ending makes the next.
+  // A take starting withdraws the last offer until this one lands. The
+  // caret returns with the field, after the landing - see below.
   const wasDictating = useRef(false)
   useEffect(() => {
-    if (dictation.stage === 'requesting') improveOffer.begin()
-    if (dictation.stage === 'idle' && wasDictating.current) {
-      field.current?.focus()
-      improveOffer.finish()
-    }
+    if (dictation.stage === 'requesting') improveOffer.close()
+    if (dictation.stage === 'idle' && wasDictating.current && landing === null) field.current?.focus()
     wasDictating.current = dictation.stage !== 'idle'
     // The offer's callbacks are stable; the stage is the one input here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dictation.stage])
+
+  // The field remounts as the landing leaves, so the caret has to wait for
+  // the return rather than firing from the hook's completion.
+  const wasLanding = useRef(false)
+  useEffect(() => {
+    if (landing === null && wasLanding.current) field.current?.focus()
+    wasLanding.current = landing !== null
+  }, [landing])
 
   const focus = useCallback(() => field.current?.focus(), [])
   useTypeToFocus(true, focus)
@@ -381,30 +412,26 @@ export function Composer({
           pick's honest remainder — a file the rules refused, named where the
           person can still do something about it. */}
       <PendingImages images={images} onRemove={removeImage} />
-      {/* What the last take put in the field, offered for tidying while it is
-          still exactly those words. The row leaves with the words: a
-          keystroke, a send or another take takes the offer with it. */}
-      {improveOffer.offer !== null && !dictating ? (
-        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-muted-foreground" role="status">
-          <span>{improveOffer.offer.state === 'improved' ? 'Dictated, then improved' : 'Dictated'}</span>
-          <span aria-hidden>-</span>
-          {improveOffer.offer.state === 'improved' ? (
-            <Button variant="ghost" size="xs" onClick={improveOffer.undo}>
-              Undo
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={improveOffer.offer.state === 'working'}
-              onClick={() => void improveOffer.improve()}
-            >
-              {improveOffer.offer.state === 'working' ? 'Improving' : 'Improve'}
-            </Button>
-          )}
-          {improveOffer.offer.note !== null ? <span>{improveOffer.offer.note}</span> : null}
-        </div>
-      ) : null}
+      {/* The offer to tidy the message, once a take has landed in it. It
+          leaves with the message: a send, an emptied field or another take
+          takes it away. */}
+      <AnimatePresence initial={false}>
+        {improveOffer.offer !== null && !dictating ? (
+          <motion.div
+            key="improve"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: DURATION.base, ease: EASE_OUT }}
+          >
+            <ImprovePill
+              offer={improveOffer.offer}
+              onImprove={() => void improveOffer.improve()}
+              onUndo={improveOffer.undo}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       {refusals.length > 0 ? (
         <div className="mb-2" role="status">
           {refusals.map((entry, at) => (
@@ -504,6 +531,18 @@ export function Composer({
                   transcript={dictation.transcript}
                   onFrame={dictation.mic.onFrame}
                 />
+              </motion.div>
+            ) : landing !== null ? (
+              // The passage arriving: the same slot, the field's own type,
+              // so when the field takes over nothing on screen moves.
+              <motion.div
+                key="landing"
+                initial={{ opacity: 1 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: DURATION.fast }}
+              >
+                <TextLanding text={landing} />
               </motion.div>
             ) : (
               <motion.div

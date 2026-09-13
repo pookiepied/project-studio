@@ -9,79 +9,87 @@ import type { ImproveOutcome } from '@/features/voice/improve'
 import { useImproveOffer } from './useImproveOffer'
 
 /**
- * The offer, driven the way the composer drives it: a take begins, its
- * segments are recorded, it finishes, and the field's text is what the
- * hook watches. What is pinned: the offer exists only for the dictated
- * tail and only while it is unedited; Improve replaces that tail and
- * nothing before it; Undo puts it back; a refusal keeps the offer with a
- * sentence; a new take withdraws the last offer.
+ * The offer, driven the way the composer drives it: a take lands and opens
+ * it, the field's text is what the hook watches. What is pinned: the offer
+ * works on the whole field; Undo is there only while the field is still
+ * the model's text; a send or an emptied field withdraws it; a refusal
+ * keeps it with a sentence; a take starting withdraws it until it lands.
  */
 
 function harness(improve: (text: string) => Promise<ImproveOutcome>, initial = '') {
-  return renderHook(() => {
-    const [text, setTextState] = useState(initial)
-    const setText = (update: (current: string) => string) => setTextState(update)
-    const offer = useImproveOffer({ text, setText, improve })
+  const onImproved = vi.fn()
+  const hook = renderHook(() => {
+    const [text, setText] = useState(initial)
+    const offer = useImproveOffer({ text, setText, improve, onImproved })
     return { text, setText, ...offer }
   })
+  return { ...hook, onImproved }
 }
 
-/** One take: begin, the segments, finish - the composer's sequence. */
-function dictate(result: ReturnType<typeof harness>['result'], ...segments: string[]) {
-  act(() => result.current.begin())
-  for (const segment of segments) {
-    act(() => {
-      result.current.record(segment)
-      result.current.setText((current) => (current === '' ? segment : `${current} ${segment}`))
-    })
-  }
-  act(() => result.current.finish())
+/** One take landing: the composer appends the words, then opens the offer. */
+function dictate(result: ReturnType<typeof harness>['result'], spoken: string) {
+  act(() => {
+    result.current.setText(result.current.text === '' ? spoken : `${result.current.text} ${spoken}`)
+    result.current.open()
+  })
 }
 
 describe('the improve offer', () => {
-  it('appears for what a take dictated, and only while the tail is those words', () => {
-    const { result } = harness(() => Promise.resolve({ kind: 'ok', text: 'x' }), 'Typed first.')
+  it('opens when a take lands, and improves the whole field', async () => {
+    const improve = vi.fn(() => Promise.resolve<ImproveOutcome>({ kind: 'ok', text: 'Typed first. The thing is broken.' }))
+    const { result, onImproved } = harness(improve, 'Typed first.')
     expect(result.current.offer).toBeNull()
 
-    dictate(result, 'um so the thing', 'is broken')
-    expect(result.current.offer).toEqual({
-      state: 'ready',
-      span: 'um so the thing is broken',
-      note: null,
-    })
-
-    // A keystroke after the dictated words withdraws the offer: it was
-    // about those words, and these are no longer exactly those.
-    act(() => result.current.setText((current) => `${current} now`))
-    expect(result.current.offer).toBeNull()
-  })
-
-  it('is withdrawn by a send, and never made for a take that delivered nothing', () => {
-    const { result } = harness(() => Promise.resolve({ kind: 'ok', text: 'x' }))
-    dictate(result, 'hello')
-    expect(result.current.offer?.span).toBe('hello')
-    act(() => result.current.setText(() => ''))
-    expect(result.current.offer).toBeNull()
-
-    dictate(result)
-    expect(result.current.offer).toBeNull()
-  })
-
-  it('improves the dictated tail only, then undoes it', async () => {
-    const improve = vi.fn(() => Promise.resolve<ImproveOutcome>({ kind: 'ok', text: 'The thing is broken.' }))
-    const { result } = harness(improve, 'Typed first.')
     dictate(result, 'um so the thing is broken')
+    expect(result.current.offer).toEqual({ state: 'ready', note: null })
 
     await act(async () => {
       await result.current.improve()
     })
-    expect(improve).toHaveBeenCalledWith('um so the thing is broken')
+    // The whole field, not the dictated tail: the message is what reads.
+    expect(improve).toHaveBeenCalledWith('Typed first. um so the thing is broken')
     expect(result.current.text).toBe('Typed first. The thing is broken.')
-    expect(result.current.offer).toEqual({ state: 'improved', span: 'The thing is broken.', note: null })
+    expect(result.current.offer).toEqual({ state: 'improved', note: null })
+    expect(onImproved).toHaveBeenCalledWith('Typed first. The thing is broken.')
+  })
 
+  it('undoes to the field as it was, and stays offered', async () => {
+    const { result } = harness(() => Promise.resolve({ kind: 'ok', text: 'Better.' }), 'Typed.')
+    dictate(result, 'worse')
+    await act(async () => {
+      await result.current.improve()
+    })
     act(() => result.current.undo())
-    expect(result.current.text).toBe('Typed first. um so the thing is broken')
-    expect(result.current.offer).toEqual({ state: 'ready', span: 'um so the thing is broken', note: null })
+    expect(result.current.text).toBe('Typed. worse')
+    expect(result.current.offer).toEqual({ state: 'ready', note: null })
+  })
+
+  it('makes an edited improvement the person\'s own: no Undo, Improve again', async () => {
+    const { result } = harness(() => Promise.resolve({ kind: 'ok', text: 'Better.' }))
+    dictate(result, 'worse')
+    await act(async () => {
+      await result.current.improve()
+    })
+    act(() => result.current.setText('Better. And more.'))
+    expect(result.current.offer).toEqual({ state: 'ready', note: null })
+    // Undo has nothing to put back now; the field stays as typed.
+    act(() => result.current.undo())
+    expect(result.current.text).toBe('Better. And more.')
+  })
+
+  it('is withdrawn by a send or an emptied field, and by a take starting', () => {
+    const { result } = harness(() => Promise.resolve({ kind: 'ok', text: 'x' }))
+    dictate(result, 'hello')
+    expect(result.current.offer).not.toBeNull()
+    act(() => result.current.setText(''))
+    expect(result.current.offer).toBeNull()
+
+    dictate(result, 'again')
+    expect(result.current.offer).not.toBeNull()
+    act(() => result.current.close())
+    expect(result.current.offer).toBeNull()
+    // The field keeps its words; only the offer went.
+    expect(result.current.text).toBe('again')
   })
 
   it('shows working while the model answers, and does not improve twice', async () => {
@@ -105,10 +113,11 @@ describe('the improve offer', () => {
       await first
     })
     expect(result.current.text).toBe('Words.')
+    expect(result.current.offer?.state).toBe('improved')
   })
 
   it('keeps the offer with the sentence when the model refuses', async () => {
-    const { result } = harness(() =>
+    const { result, onImproved } = harness(() =>
       Promise.resolve({ kind: 'note', note: 'No text model is connected - pick one in Settings - Providers' }),
     )
     dictate(result, 'words')
@@ -118,23 +127,8 @@ describe('the improve offer', () => {
     expect(result.current.text).toBe('words')
     expect(result.current.offer).toEqual({
       state: 'ready',
-      span: 'words',
       note: 'No text model is connected - pick one in Settings - Providers',
     })
-  })
-
-  it('withdraws the last offer when a new take begins, and offers the new take', () => {
-    const { result } = harness(() => Promise.resolve({ kind: 'ok', text: 'x' }))
-    dictate(result, 'first take')
-    expect(result.current.offer?.span).toBe('first take')
-    act(() => result.current.begin())
-    expect(result.current.offer).toBeNull()
-    act(() => {
-      result.current.record('second take')
-      result.current.setText((current) => `${current} second take`)
-    })
-    act(() => result.current.finish())
-    expect(result.current.offer?.span).toBe('second take')
-    expect(result.current.text).toBe('first take second take')
+    expect(onImproved).not.toHaveBeenCalled()
   })
 })

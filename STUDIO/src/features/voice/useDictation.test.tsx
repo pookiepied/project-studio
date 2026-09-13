@@ -40,8 +40,8 @@ afterEach(() => {
 describe('a permission question that is never answered', () => {
   it('holds the hook in requesting, not blocked', async () => {
     stubMicrophone(pendingStream)
-    const onText = vi.fn()
-    const { result } = renderHook(() => useDictation({ onText }))
+    const onTake = vi.fn()
+    const { result } = renderHook(() => useDictation({ onTake }))
 
     // `start` awaits the microphone, so its promise stays pending here; the
     // stage is what the synchronous half of the call decides, which is the
@@ -53,7 +53,7 @@ describe('a permission question that is never answered', () => {
     expect(result.current.stage).toBe('requesting')
     expect(result.current.denied).toBe(false)
     expect(result.current.note).toBeNull()
-    expect(onText).not.toHaveBeenCalled()
+    expect(onTake).not.toHaveBeenCalled()
   })
 
   it('gives the waiting its own face, so a stall does not read as no microphone', () => {
