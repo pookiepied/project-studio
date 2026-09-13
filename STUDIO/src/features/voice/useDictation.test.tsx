@@ -74,3 +74,42 @@ describe('a permission question that is never answered', () => {
     expect(screen.queryByText(/Microphone blocked/)).toBeNull()
   })
 })
+
+describe('the recording face', () => {
+  it('shows the words as they land, and the escape hint until they do', () => {
+    const { rerender } = render(
+      <DictationBar stage="recording" elapsedMs={1200} denied={false} note={null} onFrame={() => () => {}} />,
+    )
+    expect(screen.getByText('Esc cancels')).toBeTruthy()
+
+    rerender(
+      <DictationBar
+        stage="recording"
+        elapsedMs={4200}
+        denied={false}
+        note={null}
+        transcript="The first sentence landed."
+        onFrame={() => () => {}}
+      />,
+    )
+    expect(screen.getByText('The first sentence landed.')).toBeTruthy()
+    expect(screen.queryByText('Esc cancels')).toBeNull()
+  })
+
+  it('shows the tail of a long transcript, not its head', () => {
+    const transcript = `${'word '.repeat(40)}the newest words`
+    render(
+      <DictationBar
+        stage="recording"
+        elapsedMs={9000}
+        denied={false}
+        note={null}
+        transcript={transcript}
+        onFrame={() => () => {}}
+      />,
+    )
+    const shown = screen.getByTitle(transcript)
+    expect(shown.textContent?.endsWith('the newest words')).toBe(true)
+    expect(shown.textContent?.startsWith('…')).toBe(true)
+  })
+})

@@ -24,7 +24,17 @@ export type TranscriptionOutcome =
   | { readonly kind: 'ok'; readonly text: string }
   | { readonly kind: 'note'; readonly note: string }
 
-export async function transcribeRecording(note: VoiceNote): Promise<TranscriptionOutcome> {
+/**
+ * `segment: true` is live dictation's reading of an empty answer: one
+ * segment of a take may hold a breath or a cough and transcribe to nothing,
+ * which is not a failure of the take. The whole-take reading, the default,
+ * still says so in a sentence, because a whole take that came back empty is
+ * a thing the person should hear about.
+ */
+export async function transcribeRecording(
+  note: VoiceNote,
+  options: { readonly segment?: boolean } = {},
+): Promise<TranscriptionOutcome> {
   const blob = note.blob
   if (blob === undefined || blob === null) {
     return {
@@ -53,6 +63,7 @@ export async function transcribeRecording(note: VoiceNote): Promise<Transcriptio
     return { kind: 'note', note: sentenceFor(sent.error.message) }
   }
   if (sent.value.text.trim() === '') {
+    if (options.segment) return { kind: 'ok', text: '' }
     return {
       kind: 'note',
       note: 'Nothing intelligible came back - try again, a little closer to the mic',

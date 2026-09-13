@@ -123,6 +123,7 @@ export function DictationBar({
   elapsedMs,
   denied,
   note,
+  transcript = '',
   onFrame,
 }: {
   stage: DictationStage
@@ -130,8 +131,13 @@ export function DictationBar({
   denied: boolean
   /** A sentence from the transcriber, when the words did not come back. */
   note: string | null
+  /** What this take has put in the field so far; the field itself is out of sight. */
+  transcript?: string
   onFrame: (listener: MicFrameListener) => () => void
 }) {
+  // The tail of the transcript, because the newest words are the ones that
+  // tell the person the transcriber is keeping up. The field holds the whole.
+  const tail = transcript.length > 72 ? `…${transcript.slice(-72).trimStart()}` : transcript
   return (
     // Exactly one line of composer text tall — the same box `ComposerField`'s
     // textarea occupies, so swapping one for the other cannot change the
@@ -164,7 +170,13 @@ export function DictationBar({
                 silently died. Tabular figures so the seconds tick without
                 the row shifting. */}
             <span className="shrink-0 tabular-nums text-foreground/80">{formatClock(elapsedMs)}</span>
-            <span className={cn('truncate', 'opacity-70')}>Esc cancels</span>
+            {tail === '' ? (
+              <span className={cn('truncate', 'opacity-70')}>Esc cancels</span>
+            ) : (
+              <span className="min-w-0 max-w-[45%] truncate text-foreground/80" title={transcript}>
+                {tail}
+              </span>
+            )}
           </motion.div>
         ) : stage === 'processing' ? (
           <motion.div

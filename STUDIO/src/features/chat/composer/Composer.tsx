@@ -495,6 +495,7 @@ export function Composer({
                   elapsedMs={dictation.elapsedMs}
                   denied={dictation.denied}
                   note={dictation.note}
+                  transcript={dictation.transcript}
                   onFrame={dictation.mic.onFrame}
                 />
               </motion.div>

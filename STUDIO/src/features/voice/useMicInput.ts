@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SegmentCutter } from '@/features/voice/segments'
 
 /**
  * The microphone, as a measured signal.
@@ -44,6 +45,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * dictation has the actual audio to hand to a transcriber. The blob is real;
  * transcription itself is the seam in `transcribe.ts`.
  *
+ * With `onSegment` as well, the recording is cut into segments while it runs
+ * - at the pauses `SegmentCutter` finds in this same level - and each one is
+ * handed over as it is cut, so the transcriber can start before the person
+ * has finished. A segment is a whole file: a recorder's timeslice chunks are
+ * not decodable on their own (only the first carries the container header),
+ * so a cut is the recorder stopped and a new one started on the same stream,
+ * not a chunk boundary. The final segment, whatever is left at `stop()`, is
+ * the note `takeNote` hands over, as it always was.
+ *
  * ---- Errors -----------------------------------------------------------------
  *
  * Permission refused, no device, or no API at all are *states of the feature*,
@@ -79,10 +89,16 @@ interface MicNodes {
   analyser: AnalyserNode
   frame: number
   recorder: MediaRecorder | null
+  /** The current recorder's own chunks; a rotated-out recorder keeps its own. */
   chunks: Blob[]
   startedAt: number
+  /** When the current segment's recorder started; the take's start until the first cut. */
+  segmentStartedAt: number
   /** The smoothed level the loop last computed, readable between frames. */
   level: number
+  /** Decides the cuts, when segments were asked for. */
+  cutter: SegmentCutter | null
+  onSegment: ((note: VoiceNote) => void) | null
 }
 
 /** MediaRecorder mimetypes in preference order; the first supported wins. */
@@ -110,7 +126,11 @@ export function useMicInput() {
     }
   }, [])
 
-  const start = useCallback(async (options?: { record?: boolean }): Promise<boolean> => {
+  const start = useCallback(async (options?: {
+    record?: boolean
+    /** Receives each segment as it is cut; asks for cutting by being given. */
+    onSegment?: (note: VoiceNote) => void
+  }): Promise<boolean> => {
     if (nodes.current) return true
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -141,14 +161,43 @@ export function useMicInput() {
       analyser.fftSize = 2048
       context.createMediaStreamSource(stream).connect(analyser)
 
-      let recorder: MediaRecorder | null = null
-      const chunks: Blob[] = []
-      if (options?.record && typeof MediaRecorder !== 'undefined') {
-        recorder = new MediaRecorder(stream, pickMimeType() ? { mimeType: pickMimeType() } : undefined)
+      const recording = options?.record === true && typeof MediaRecorder !== 'undefined'
+      // Each recorder collects into its own array, bound at creation: a
+      // recorder being rotated out may still deliver one last chunk after
+      // `stop()`, and it must land with its own segment, not the next one's.
+      const startRecorder = (): { recorder: MediaRecorder; chunks: Blob[] } => {
+        const own: Blob[] = []
+        const type = pickMimeType()
+        const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined)
         recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) chunks.push(event.data)
+          if (event.data.size > 0) own.push(event.data)
         }
         recorder.start(250)
+        return { recorder, chunks: own }
+      }
+      const first = recording ? startRecorder() : null
+      const recorder = first?.recorder ?? null
+      const chunks = first?.chunks ?? []
+
+      /** Ends the current segment and starts the next on the same stream. */
+      const cut = (active: MicNodes) => {
+        const finished = active.recorder
+        const handOver = active.onSegment
+        if (finished === null || handOver === null || finished.state === 'inactive') return
+        const finishedChunks = active.chunks
+        const now = performance.now()
+        const durationMs = now - active.segmentStartedAt
+        finished.onstop = () => {
+          handOver({
+            blob: new Blob(finishedChunks, { type: finished.mimeType || 'audio/webm' }),
+            durationMs,
+          })
+        }
+        finished.stop()
+        const next = startRecorder()
+        active.recorder = next.recorder
+        active.chunks = next.chunks
+        active.segmentStartedAt = now
       }
 
       const timeDomain = new Uint8Array(analyser.fftSize)
@@ -182,6 +231,7 @@ export function useMicInput() {
         active.level += (target - active.level) * rate
 
         for (const listener of listeners.current) listener(active.level, dtMs)
+        if (active.cutter?.observe(active.level, dtMs) === true) cut(active)
         active.frame = requestAnimationFrame(step)
       }
 
@@ -193,7 +243,10 @@ export function useMicInput() {
         recorder,
         chunks,
         startedAt: performance.now(),
+        segmentStartedAt: performance.now(),
         level: 0,
+        cutter: recording && options?.onSegment ? new SegmentCutter() : null,
+        onSegment: recording ? (options?.onSegment ?? null) : null,
       }
       setStatus('live')
       return true
@@ -220,12 +273,16 @@ export function useMicInput() {
     cancelAnimationFrame(active.frame)
     for (const track of active.stream.getTracks()) track.stop()
 
-    const durationMs = performance.now() - active.startedAt
-    if (active.recorder && active.recorder.state !== 'inactive') {
-      active.recorder.onstop = () => {
-        note.current = { blob: new Blob(active.chunks, { type: active.recorder?.mimeType || 'audio/webm' }), durationMs }
+    // The note is the last segment: the whole take when nothing was cut,
+    // what remains after the last cut when something was.
+    const durationMs = performance.now() - active.segmentStartedAt
+    const last = active.recorder
+    const lastChunks = active.chunks
+    if (last && last.state !== 'inactive') {
+      last.onstop = () => {
+        note.current = { blob: new Blob(lastChunks, { type: last.mimeType || 'audio/webm' }), durationMs }
       }
-      active.recorder.stop()
+      last.stop()
     }
 
     void active.context.close()

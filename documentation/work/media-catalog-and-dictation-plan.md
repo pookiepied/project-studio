@@ -5,8 +5,10 @@ Media page keeps the 121 OpenRouter models the catalogue answers; the
 microphone is granted by Studio itself, with a requesting face; the listing
 contract, the hour's cache and the featured shelf are shared machinery;
 FAL, ElevenLabs, Google and OpenAI list live (FAL kept ~990 of 1,501 on the
-day, the rest counted), the research's picks featured. Steps 4-6
-(segmented dictation, Improve, ADRs) remain (2026-09-13) ·
+day, the rest counted), the research's picks featured. Step 4 landed:
+dictation is live by segments - the recorder rotated at the cutter's
+pauses, each segment transcribed as cut, delivered in speaking order, the
+strip showing the words land. Steps 5-6 (Improve, ADRs) remain (2026-09-13) ·
 **Opened:** 2026-09-11 · **Last worked:** 2026-09-13
 **Inputs:** [the gateway plan](gateway-plan.md) (landed), the developer's
 FAL model research of 2026-09-11 (Elo arena rankings against FAL prices,
