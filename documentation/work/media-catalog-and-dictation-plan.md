@@ -8,7 +8,11 @@ FAL, ElevenLabs, Google and OpenAI list live (FAL kept ~990 of 1,501 on the
 day, the rest counted), the research's picks featured. Step 4 landed:
 dictation is live by segments - the recorder rotated at the cutter's
 pauses, each segment transcribed as cut, delivered in speaking order, the
-strip showing the words land. Steps 5-6 (Improve, ADRs) remain (2026-09-13) ·
+strip showing the words land. Step 5 landed: Improve is offered for the
+dictated tail, runs a fixed-prompt agent on the default model through
+POST /api/media/improve, replaces the span and undoes. Step 6 landed:
+ADRs 0052 (D1, D2), 0053 (D3, D4) and 0054 (D5). All steps landed
+(2026-09-13) ·
 **Opened:** 2026-09-11 · **Last worked:** 2026-09-13
 **Inputs:** [the gateway plan](gateway-plan.md) (landed), the developer's
 FAL model research of 2026-09-11 (Elo arena rankings against FAL prices,
@@ -16,7 +20,7 @@ image and video only), and two live checks made while planning: the
 OpenRouter media listing answers 54 image, 29 video, 18 speech and 20
 transcription models today, and FAL's `GET https://api.fal.ai/v1/models`
 lists its whole catalogue with a category per model.
-**Decision:** none yet; D1, D3 and D5 below become ADRs when their steps land.
+**Decision:** [ADR 0052](../decisions/0052-a-vendor-that-lists-is-listed-live.md) (D1, D2), [ADR 0053](../decisions/0053-dictation-is-live-by-segments.md) (D3, D4), [ADR 0054](../decisions/0054-the-microphone-is-studio-s-to-grant.md) (D5).
 
 The gateway can drive eight media vendors, but the person can only see a
 handful of models on most of them, because the declared catalogue is a

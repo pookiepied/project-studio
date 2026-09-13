@@ -85,6 +85,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0005](0005-model-provider-composition.md) | Model-provider composition |
 | [0009](0009-local-byok-providers.md) | Local BYOK providers |
 | [0051](0051-pi-is-the-language-gateway-and-nothing-else.md) | Pi is the language gateway, and nothing else — everything that talks to a vendor lives under `src/gateway/`, and only `language/` may import Pi |
+| [0052](0052-a-vendor-that-lists-is-listed-live.md) | A vendor that lists is listed live, and the hand list is the featured shelf — live media catalogues from five vendors, classified by the vendor's own word; unslotted categories dropped and counted |
 
 ### Gateway
 | | |
@@ -99,6 +100,8 @@ wrong answer, and why we believed it, is the useful part.
 | [0029](0029-mcp-session-tool-membership.md) | MCP session tool membership — amended by meta-task #56 |
 | [0048](0048-a-capability-is-announced-before-it-is-loaded.md) | A capability is announced before it is loaded — the inventory in the system block, and discovery on request |
 | [0049](0049-the-browser-is-ours-the-engine-is-the-machine-s.md) | The browser is ours, the engine is the machine's — why nothing ships an engine, and why 0048's eager rule is narrowed |
+| [0053](0053-dictation-is-live-by-segments.md) | Dictation is live by segments, on the transcribers that exist — the take cut at its pauses, text in speaking order, Improve offered afterwards and undoable |
+| [0054](0054-the-microphone-is-studio-s-to-grant.md) | The microphone is Studio's to grant — WebView2's permission question answered by the app on every webview; no stall, no borrowed prompt |
 
 ### Errors, observability, and recovery
 | | |
