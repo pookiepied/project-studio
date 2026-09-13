@@ -37,7 +37,7 @@ import {
   type MediaJob,
   type ProviderConnection,
 } from '@/platform/harness'
-import { defaultListen } from '@/features/chat/useConversation'
+import { defaultListen } from '@/platform/harness/lifecycle'
 import { readHandoff } from '@/stores/workspace/handoff'
 import { createTitleRefresh } from '@/stores/workspace/title-refresh'
 import { newId } from '@/lib/id'

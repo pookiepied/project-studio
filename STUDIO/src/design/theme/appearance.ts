@@ -1,5 +1,4 @@
-import { load } from '@tauri-apps/plugin-store'
-import { isTauri } from '@/platform/tauri'
+import { openStore as openStoreFile } from '@/platform/store'
 import {
   CODE_OFFSET_CHOICES,
   DEFAULT_CODE_OFFSET,
@@ -50,14 +49,7 @@ const STORAGE_KEY = 'studio.appearance'
  */
 const STORE_FILE = 'preferences.json'
 
-/** Resolves once, so a preference change does not reopen the file each time. */
-let storePromise: Promise<Awaited<ReturnType<typeof load>> | null> | null = null
-
-async function openStore() {
-  if (!isTauri()) return null
-  storePromise ??= load(STORE_FILE, { autoSave: false }).catch(() => null)
-  return storePromise
-}
+const openStore = () => openStoreFile(STORE_FILE)
 
 /**
  * Reads the stored preferences, migrating anything still in `localStorage`.

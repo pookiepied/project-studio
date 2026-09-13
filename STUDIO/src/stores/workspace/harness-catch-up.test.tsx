@@ -43,20 +43,14 @@ vi.mock('@/platform/harness', async () => {
   }
 })
 
-vi.mock('@/features/chat/useConversation', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>(
-    '@/features/chat/useConversation',
-  )
-  return {
-    ...actual,
-    // Subscribes successfully and then stays silent, which is exactly the
-    // case a missed event leaves behind.
-    defaultListen: (handler: (signal: { name: string; payload: unknown }) => void) => {
-      listeners.push(handler)
-      return Promise.resolve(() => undefined)
-    },
-  }
-})
+vi.mock('@/platform/harness/lifecycle', () => ({
+  // Subscribes successfully and then stays silent, which is exactly the
+  // case a missed event leaves behind.
+  defaultListen: (handler: (signal: { name: string; payload: unknown }) => void) => {
+    listeners.push(handler)
+    return Promise.resolve(() => undefined)
+  },
+}))
 
 const { WorkspaceProvider, useWorkspace } = await import('@/stores/workspace')
 

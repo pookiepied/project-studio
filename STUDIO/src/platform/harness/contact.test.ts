@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { defaultContactFor, defaultListen } from './useConversation'
+import { defaultContactFor } from './contact'
+import { defaultListen } from './lifecycle'
 
 /**
  * The two defaults, met in a browser (step 6): contact goes to the listener

@@ -1,4 +1,4 @@
-import { load } from '@tauri-apps/plugin-store'
+import { openStore as openStoreFile } from '@/platform/store'
 import {
   disable as disableAutostart,
   enable as enableAutostart,
@@ -42,20 +42,15 @@ export const DEFAULT_WINDOW_PREFERENCES: WindowPreferences = {
 const STORAGE_KEY = 'studio.window'
 const STORE_FILE = 'preferences.json'
 
-let storePromise: Promise<Awaited<ReturnType<typeof load>> | null> | null = null
-
 /**
- * The preferences file, opened once.
+ * The preferences file.
  *
- * Shared with the other-devices preference (`remote-access.ts`), which lives
- * in the same file under its own key: native code reads that file directly
- * at launch, so one file is one place for it to look.
+ * Shared with the other-devices preference (`remote-access.ts`) and the
+ * appearance, which live in the same file under their own keys: native code
+ * reads that file directly at launch, so one file is one place for it to
+ * look.
  */
-export async function openPreferencesStore() {
-  if (!isTauri()) return null
-  storePromise ??= load(STORE_FILE, { autoSave: false }).catch(() => null)
-  return storePromise
-}
+export const openPreferencesStore = () => openStoreFile(STORE_FILE)
 
 const openStore = openPreferencesStore
 

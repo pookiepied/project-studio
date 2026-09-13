@@ -1,5 +1,4 @@
-import { load } from '@tauri-apps/plugin-store'
-import { isTauri } from '@/platform/tauri'
+import { openStore as openStoreFile } from '@/platform/store'
 
 /**
  * Unsent composer text, kept across quits.
@@ -47,14 +46,7 @@ interface DraftRecord {
 
 type DraftMap = Record<string, DraftRecord>
 
-/** Resolves once, so a keystroke does not reopen the file. */
-let storePromise: Promise<Awaited<ReturnType<typeof load>> | null> | null = null
-
-async function openStore() {
-  if (!isTauri()) return null
-  storePromise ??= load(STORE_FILE, { autoSave: false }).catch(() => null)
-  return storePromise
-}
+const openStore = () => openStoreFile(STORE_FILE)
 
 /**
  * The in-memory copy, and the reason reads are synchronous.

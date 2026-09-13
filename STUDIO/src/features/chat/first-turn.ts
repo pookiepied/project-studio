@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { rememberFirstAdmission } from '@/features/chat/first-attach'
-import { defaultContactFor, type ContactHarness } from '@/features/chat/useConversation'
+import { defaultContactFor, type ContactHarness } from '@/platform/harness/contact'
 import { newId } from '@/lib/id'
 import type { SeamFailure, TurnImageWire, TurnSettingsWire } from '@/platform/harness'
 

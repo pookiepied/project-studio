@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
-
 import {
   createConversationClient,
-  httpHarnessStatus,
   type ChunkFacts,
   type ChunkPosition,
   type ConversationClient,
@@ -15,9 +11,13 @@ import {
   type TurnResult,
   type TurnSettingsWire,
 } from '@/platform/harness'
-import { isTauri } from '@/platform/tauri/window'
+import { defaultContactFor, type ContactHarness } from '@/platform/harness/contact'
+import {
+  defaultListen,
+  type LifecycleListen,
+  type LifecycleSignal,
+} from '@/platform/harness/lifecycle'
 import { firstAdmission, forgetFirstAdmission } from '@/features/chat/first-attach'
-import { isRecord } from '@/lib/guards'
 
 /**
  * The facts a retry signal carries, verbatim from the wire. Which attempt
@@ -172,96 +172,7 @@ export interface ConversationView {
 /* Injectable seams                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** What one contact attempt found. `starting` is a fact, not an absence. */
-type HarnessContact =
-  | { readonly kind: 'ready'; readonly client: ConversationClient }
-  | { readonly kind: 'starting' }
-  | { readonly kind: 'absent' }
-
-export type ContactHarness = () => Promise<HarnessContact>
-
-/** The lifecycle events Task 23 emits, normalised to a name plus raw payload. */
-export interface LifecycleSignal {
-  readonly name:
-    | 'harness-starting'
-    | 'harness-started'
-    | 'harness-stopped'
-    | 'harness-failed'
-    | 'harness-restarting'
-  readonly payload?: unknown
-}
-
-/** Subscribes to lifecycle events; resolves with the unsubscriber. */
-export type LifecycleListen = (
-  handler: (signal: LifecycleSignal) => void,
-) => Promise<() => void>
-
-const LIFECYCLE_EVENTS = [
-  'harness-starting',
-  'harness-started',
-  'harness-stopped',
-  'harness-failed',
-  'harness-restarting',
-] as const
-
-/**
- * The real lifecycle subscription, exported rather than private: the workspace
- * store re-reads the index on the same events (a restart may have moved the
- * endpoint), and re-declaring the list a second time is how the two copies
- * start disagreeing.
- */
-export const defaultListen: LifecycleListen = (handler) => {
-  if (!isTauri()) {
-    // A browser has no event bus to subscribe to: the supervisor emits these
-    // into the desktop webview, not over HTTP. An empty subscription that
-    // resolves with a no-op unsubscriber keeps the caller's shape; a browser
-    // notices a stopped or restarted harness when its next contact or request
-    // fails, which is how it notices everything.
-    return Promise.resolve(() => undefined)
-  }
-  const subscriptions = LIFECYCLE_EVENTS.map((name) =>
-    listen<unknown>(name, (event) => handler({ name, payload: event.payload })),
-  )
-  return Promise.all(subscriptions).then((unlisten) => () =>
-    unlisten.forEach((off) => off()),
-  )
-}
-
-/**
- * Asks the supervisor whether there is anything to attach to.
- *
- * A per-conversation factory rather than a shared function because the id is
- * a property of the call: ids are caller-chosen (ADR 0045), and the client
- * built here is one per conversation by construction. Outside Tauri the ask
- * goes to the listener that served the page, which answers for its own
- * supervisor; a page with no Studio behind it gets no answer, and the shipped
- * no-harness behaviour applies there as it always did.
- *
- * Whatever comes back must be stable across renders — it is an effect
- * dependency, like the settings pane's connect seam.
- */
-export function defaultContactFor(conversationId: string): ContactHarness {
-  return async () => {
-    if (!isTauri()) {
-      const report = await httpHarnessStatus()
-      if (report === null) return { kind: 'absent' }
-      if (report.state === 'starting') return { kind: 'starting' }
-      if (report.state !== 'running') return { kind: 'absent' }
-      return { kind: 'ready', client: createConversationClient({ conversationId }) }
-    }
-    let state: unknown
-    try {
-      const report: unknown = await invoke('get_harness_status')
-      state = isRecord(report) ? report['state'] : null
-    } catch {
-      // A status that cannot be answered is not a harness either.
-      return { kind: 'absent' }
-    }
-    if (state === 'starting') return { kind: 'starting' }
-    if (state !== 'running') return { kind: 'absent' }
-    return { kind: 'ready', client: createConversationClient({ conversationId }) }
-  }
-}
+export type { ContactHarness, LifecycleListen, LifecycleSignal }
 
 /* -------------------------------------------------------------------------- */
 /* Chunk reduction                                                             */
