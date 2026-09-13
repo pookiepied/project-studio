@@ -314,7 +314,6 @@ describe('a first turn admitted before this view existed', () => {
       offset: '9_4',
       submissionId: 'sub_first',
       text: 'the first words',
-      at: 1_700_000_000_000,
     })
     const script = turnScript()
     const channels = recordingChannels()
@@ -343,7 +342,6 @@ describe('a first turn admitted before this view existed', () => {
       offset: '9_4',
       submissionId: 'sub_first',
       text: 'the first words',
-      at: 1_700_000_000_000,
     })
     const first = { script: turnScript(), channels: recordingChannels() }
     const one = mount(first)

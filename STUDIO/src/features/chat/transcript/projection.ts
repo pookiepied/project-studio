@@ -289,16 +289,6 @@ export interface PendingSubmission {
   /** The submission the harness admitted. Its echo is what clears this. */
   readonly submissionId: string
   readonly text: string
-  /**
-   * When this window was handed the receipt — the earliest moment anything on
-   * this side knew a turn existed, earlier than any chunk about it can
-   * arrive. Nothing measures a duration from it, and nothing orders by it
-   * either — a held submission is always the newest thing there is, which is
-   * why it draws below every item without consulting a clock. What the screen
-   * reports about time is the reasoning run's own span, and the wait in front
-   * of that is drawn by nothing. See `first-attach.ts` for why it is kept.
-   */
-  readonly at: number
 }
 
 export interface TranscriptProjection {

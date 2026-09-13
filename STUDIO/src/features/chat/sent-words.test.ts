@@ -116,9 +116,6 @@ describe('a message between the composer and the log', () => {
     expect(view.result.current.pending).toEqual({
       submissionId: 'sub_1',
       text: WORDS,
-      // Stamped where the receipt is read. Its exact value is the clock's;
-      // that it exists is what every duration about this turn depends on.
-      at: expect.any(Number),
     })
   })
 
@@ -161,7 +158,6 @@ describe('a conversation opened by its own first turn', () => {
       offset: '9_4',
       submissionId: 'sub_first',
       text: 'the first thing anyone types',
-      at: 1_700_000_000_000,
     })
     const view = renderHook(() => useConversationTranscript('cnv_1'))
 
@@ -171,7 +167,6 @@ describe('a conversation opened by its own first turn', () => {
       // The moment the receipt was answered, carried across the navigation.
       // Counting from the mount instead would charge the model for the
       // navigation and make every first turn look slower than it was.
-      at: 1_700_000_000_000,
     })
     expect(view.result.current.items).toEqual([])
   })

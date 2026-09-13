@@ -33,16 +33,6 @@ export interface FirstAdmission {
    * `PendingSubmission`.
    */
   readonly text: string
-  /**
-   * When the receipt was answered — the earliest this side knew the turn
-   * existed. Nothing reads it. It was the anchor for a row that counted the
-   * wait, and that row is gone: what the screen reports about time is now a
-   * reasoning run's own span, and the silence in front of that is drawn by
-   * nothing. Kept because a receipt without the moment it arrived is a
-   * smaller fact than one with it, and the next thing that measures a wait
-   * will want it — not because anything measures one today.
-   */
-  readonly at: number
 }
 
 const pending = new Map<string, FirstAdmission>()

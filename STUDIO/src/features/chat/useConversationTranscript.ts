@@ -66,7 +66,6 @@ function openingProjection(conversationId: string): TranscriptProjection {
     : withPendingSubmission(emptyProjection(), {
         submissionId: opening.submissionId,
         text: opening.text,
-        at: opening.at,
       })
 }
 
@@ -127,12 +126,8 @@ export function useConversationTranscript(conversationId: string): {
       // places, one of which is a claim that it was sent.
       if (sent.ok) {
         const admitted = sent.value.submissionId
-        // Stamped where the receipt is read, which is the earliest this side
-        // knows the turn exists. Nothing measures a duration from it today;
-        // see `PendingSubmission`.
-        const at = Date.now()
         setProjection((current) =>
-          withPendingSubmission(current, { submissionId: admitted, text: message, at }),
+          withPendingSubmission(current, { submissionId: admitted, text: message }),
         )
       }
       return { ok: sent.ok }

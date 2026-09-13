@@ -37,8 +37,7 @@ function chunksOf(...raw: unknown[]): ChunkFacts[] {
 const SUBMISSION = 'sub_1'
 const WORDS = 'what did you make of it?'
 /** When the receipt reached this window. Fixed, so durations are assertable. */
-const ADMITTED = 1_700_000_000_000
-const HELD: PendingSubmission = { submissionId: SUBMISSION, text: WORDS, at: ADMITTED }
+const HELD: PendingSubmission = { submissionId: SUBMISSION, text: WORDS }
 
 function echoOf(submissionId: string, text: string, batch: number): unknown {
   return {

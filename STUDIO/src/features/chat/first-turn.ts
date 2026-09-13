@@ -73,11 +73,6 @@ export async function startConversation(request: {
   readonly images?: readonly TurnImageWire[]
   /** Defaults to asking the supervisor, exactly as a conversation view does. */
   readonly contactFor?: (conversationId: string) => ContactHarness
-  /**
-   * The clock the receipt is stamped with. A parameter because a rule about
-   * time cannot be tested against `Date.now`.
-   */
-  readonly now?: () => number
 }): Promise<FirstTurnOutcome> {
   const conversationId = newId('cnv')
   const contact = (request.contactFor ?? defaultContactFor)(conversationId)
@@ -91,7 +86,6 @@ export async function startConversation(request: {
     offset: sent.value.offset,
     submissionId: sent.value.submissionId,
     text: request.text,
-    at: request.now?.() ?? Date.now(),
   })
   return { ok: true, conversationId }
 }

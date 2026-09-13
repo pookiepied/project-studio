@@ -72,7 +72,6 @@ describe('starting a conversation with a live first turn', () => {
       text: 'the first thing anyone types',
       settings: SETTINGS,
       contactFor: attempt.contactFor,
-      now: () => 1_700_000_000_000,
     })
 
     expect(outcome.ok).toBe(true)
@@ -89,10 +88,6 @@ describe('starting a conversation with a live first turn', () => {
       offset: '9_4',
       submissionId: 'sub_first',
       text: 'the first thing anyone types',
-      // The moment of admission, which the view that mounts next counts the
-      // model's wait from. Taken here rather than there because a navigation
-      // sits between the two.
-      at: 1_700_000_000_000,
     })
     forgetFirstAdmission(outcome.conversationId)
   })

@@ -279,7 +279,6 @@ describe('the tail of a turn that has just been sent', () => {
   const HELD: PendingSubmission = {
     submissionId: 'sub_1',
     text: 'what did you make of it?',
-    at: 1_700_000_000_000,
   }
 
   it('shows the words immediately, before the log has echoed them', () => {
