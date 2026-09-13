@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Icons, ProviderMark } from '@/components/icons'
+import { Icons } from '@/components/icons'
+import { ProviderMark } from '@/features/models/ProviderMark'
 import { Button, MenuItem, Popover } from '@/components/primitives'
 import { Placeholder, PlaceholderMark, PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'

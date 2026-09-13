@@ -1,4 +1,5 @@
-import { Icons, ProviderMark } from '@/components/icons'
+import { Icons } from '@/components/icons'
+import { ProviderMark } from '@/features/models/ProviderMark'
 import { SelectionChip } from '@/components/primitives'
 import { familyName, type CatalogFamily } from '@/domain/models/families'
 import { cn } from '@/lib/cn'

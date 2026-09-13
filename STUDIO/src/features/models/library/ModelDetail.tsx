@@ -1,4 +1,5 @@
-import { Icons, ProviderMark } from '@/components/icons'
+import { Icons } from '@/components/icons'
+import { ProviderMark } from '@/features/models/ProviderMark'
 import { NavRow, StepSlider } from '@/components/primitives'
 import type { CatalogModel } from '@/domain/models/catalog'
 import { familyName } from '@/domain/models/families'

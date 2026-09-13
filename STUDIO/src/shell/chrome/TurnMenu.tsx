@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
-import { Icons, ProviderMark } from '@/components/icons'
+import { Icons } from '@/components/icons'
+import { ProviderMark } from '@/features/models/ProviderMark'
 import {
   MenuItem,
   MenuLabel,

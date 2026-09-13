@@ -3,7 +3,6 @@ import type { IconSize } from '@/design/tokens'
 import type { IconState } from './Icon'
 
 export { Icons } from './registry'
-export { ProviderMark } from './ProviderMark'
 
 /**
  * The type a stored icon has.

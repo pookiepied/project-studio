@@ -1,4 +1,4 @@
-import { ProviderMark } from '@/components/icons'
+import { ProviderMark } from '@/features/models/ProviderMark'
 import type { CatalogModel } from '@/domain/models/catalog'
 import { connectionsOf, familyName, type CatalogFamily } from '@/domain/models/families'
 import { ModelRow } from './ModelRow'
