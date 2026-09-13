@@ -118,8 +118,17 @@ const REGISTRY = {
   // Leaving the one surface whose navigation lives in the sidebar column.
   back: { mark: ArrowLeft },
 
-  // — Disclosure ----------------------------------------------------------
-  expand: { mark: ChevronDown },
+  // — There is more here --------------------------------------------------
+  //
+  // Two marks for two places the "more" can be. `disclosure` reveals it in
+  // the flow - a tree row's children, a thinking block's text, a breakdown
+  // under its figure - and turns to point at what it revealed, because the
+  // content moves the page and the mark should say which way. `dropdown`
+  // opens something that floats over the page - a menu, a popover - and
+  // does not turn, because nothing below it moved and the trigger is still
+  // where it was. A reader can tell them apart by whether the page got
+  // longer; the marks should agree with the page.
+  dropdown: { mark: ChevronDown },
   disclosure: { mark: ChevronRight, motion: TURN },
 
   // — Model and permission ------------------------------------------------

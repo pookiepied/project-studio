@@ -139,7 +139,7 @@ export function IdentityLine({
             >
               {conversation.title}
             </span>
-            <Icons.expand
+            <Icons.dropdown
               className="shrink-0 text-muted-foreground opacity-0 transition-opacity duration-fast group-hover/identity:opacity-100"
             />
           </button>

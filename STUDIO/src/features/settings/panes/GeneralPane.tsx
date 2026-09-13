@@ -90,7 +90,7 @@ export function GeneralPane() {
             >
               <Glyph />
               {mode.name}
-              <Icons.expand />
+              <Icons.dropdown />
             </button>
           }
         >

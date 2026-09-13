@@ -255,7 +255,7 @@ export function TurnMenu() {
               {warn ? (
                 <span className="shrink-0 tabular-nums text-muted-foreground">{percent}%</span>
               ) : null}
-              <Icons.disclosure state={open ? 'on' : 'rest'} className="opacity-60" />
+              <Icons.dropdown className="opacity-60" />
             </button>
           </Tooltip>
         }

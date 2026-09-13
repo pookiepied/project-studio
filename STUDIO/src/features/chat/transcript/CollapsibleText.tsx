@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { cn } from '@/lib/cn'
 
 /** Height cap while collapsed, in px. Roughly nine lines. */
 const COLLAPSED_MAX = 190
@@ -115,9 +114,7 @@ export function CollapsibleText({ text }: { text: string }) {
           className="mt-1.5 inline-flex items-center gap-1 self-start text-caption text-muted-foreground transition-colors hover:text-foreground"
         >
           {expanded ? 'Show less' : 'Show more'}
-          <Icons.expand
-            className={cn('transition-transform duration-base', expanded && 'rotate-180')}
-          />
+          <Icons.disclosure state={expanded ? 'on' : 'rest'} />
         </button>
       ) : null}
     </div>
