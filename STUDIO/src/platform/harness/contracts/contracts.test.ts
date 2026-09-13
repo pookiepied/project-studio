@@ -18,7 +18,7 @@ import {
   parseWireStreamEvent,
   readChunkFacts,
   readConversationSnapshot,
-} from './contracts'
+} from './index'
 
 /**
  * The parsers, on their own.

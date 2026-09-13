@@ -13,7 +13,7 @@
  *    `HarnessResult`, so a settings pane can render "harness not running"
  *    without an error boundary and without a try block.
  * 2. Nothing is trusted because TypeScript described it. Every response body
- *    goes through a parser from `contracts.ts`, and a body that does not match
+ *    goes through a parser from `contracts/`, and a body that does not match
  *    is a `malformed-response` failure rather than a value.
  * 3. No retries. A local process that does not answer is a fact to show the
  *    user, not a thing to hammer — a retry loop against a dead loopback port
@@ -631,7 +631,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       return failed({
         kind: 'malformed-response',
         message:
-          'The harness answered with a body that does not match the provider contract. The wire types in platform/harness/contracts.ts may have drifted from the harness.',
+          'The harness answered with a body that does not match the provider contract. The wire types in platform/harness/contracts/ may have drifted from the harness.',
       })
     }
     return { ok: true, value: parsed }

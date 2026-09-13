@@ -7,7 +7,7 @@ import {
   parsePurgeOutcome,
   parseOrphanSweepOutcome,
   parseOrphanTrees,
-} from './contracts'
+} from './index'
 
 /**
  * The conversation-index parsers, on their own.

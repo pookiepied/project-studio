@@ -8,7 +8,7 @@ import type { ModelCapability, ProviderConnection, ProviderModel } from '@/platf
  * directory because these shapes have to move when the wire contract moves,
  * and a fixture two directories away is a fixture nobody updates.
  *
- * Every value here must satisfy the parsers in `platform/harness/contracts.ts`.
+ * Every value here must satisfy the parsers in `platform/harness/contracts/`.
  * A fixture that would be rejected on the wire is a test proving nothing.
  */
 

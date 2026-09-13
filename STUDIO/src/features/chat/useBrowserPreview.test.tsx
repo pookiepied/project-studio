@@ -5,7 +5,7 @@ import { cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 
-import { present } from '@/platform/harness/conversation-chunks'
+import { present } from '@/platform/harness/contracts/chunks'
 import type {
   ToolCallView,
   TranscriptItem,

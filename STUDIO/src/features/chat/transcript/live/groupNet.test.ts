@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { present } from '@/platform/harness/conversation-chunks'
+import { present } from '@/platform/harness/contracts/chunks'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 
 import { netOf } from './groupNet'

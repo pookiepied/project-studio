@@ -66,7 +66,7 @@ src/
     home/ projects/ settings/ palette/
   platform/     the only files that touch the Tauri API
     tauri/      window and native menus
-    harness/    the wire contract, the client, the lifecycle events
+    harness/    the client, the lifecycle events; contracts/ is the wire, one file per concern
     store.ts    the one door to a preferences file
   shell/        window, top strip, sidebar, and menus/ for right-click and selection
 ```

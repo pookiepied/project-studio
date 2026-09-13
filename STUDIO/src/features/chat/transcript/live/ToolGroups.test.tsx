@@ -4,7 +4,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { present } from '@/platform/harness/conversation-chunks'
+import { present } from '@/platform/harness/contracts/chunks'
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 
 import { RollingCount, STEP_MS } from './RollingCount'

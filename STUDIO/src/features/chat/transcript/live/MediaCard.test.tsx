@@ -4,7 +4,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { present } from '@/platform/harness/conversation-chunks'
+import { present } from '@/platform/harness/contracts/chunks'
 import { setAttachmentBytesTransport } from '@/platform/harness/attachments'
 import type { MediaJob } from '@/platform/harness'
 import type { ToolCallView } from '@/features/chat/transcript/projection'

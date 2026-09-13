@@ -3,7 +3,7 @@ import type { LanguageProtocol } from '@/platform/harness'
 /**
  * Turning what someone typed into what the harness will accept.
  *
- * `platform/harness/contracts.ts` has `LANGUAGE_PROTOCOLS`, the protocols the
+ * `platform/harness/contracts/` has `LANGUAGE_PROTOCOLS`, the protocols the
  * harness actually branches on, and they are the only spelling left; what gets
  * SENT is the harness union, full stop. No translation table is written here,
  * and that is deliberate: a mapping between two lists would be another thing

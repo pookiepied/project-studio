@@ -15,7 +15,7 @@ import type { IconComponent } from '@/components/icons'
  * wire value is validated against, and it refuses `edits` and `auto` on
  * purpose, because a mode is a consent and the harness will not translate one
  * name into another on the user's behalf. The translation lives exactly once,
- * at the wire boundary (`platform/harness/contracts.ts`), so a change here
+ * at the wire boundary (`platform/harness/contracts/`), so a change here
  * touches no component and no wire value.
  */
 

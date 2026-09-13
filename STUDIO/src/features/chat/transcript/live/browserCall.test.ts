@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { present } from '@/platform/harness/conversation-chunks'
+import { present } from '@/platform/harness/contracts/chunks'
 import {
   browserAction,
   browserStepOf,
