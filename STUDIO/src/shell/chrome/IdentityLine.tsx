@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { FADE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { InlineRename, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
+import { InlineRename, MenuItem, MenuLabel, MenuSeparator, NavRow, Popover } from '@/components/primitives'
 import { ConversationExtensionsDialog } from '@/shell/ConversationExtensionsDialog'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { cn } from '@/lib/cn'
@@ -93,14 +93,13 @@ export function IdentityLine({
   return (
     <motion.div {...FADE} className="flex min-w-0 items-center gap-0.5">
       {project ? (
-        <button
-          type="button"
+        <NavRow
+          icon={<ProjectIconMark icon={project.icon} />}
+          className="hidden shrink-0 gap-1 @[26rem]:flex"
           onClick={() => openProject(project.id)}
-          className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[26rem]:flex"
         >
-          <ProjectIconMark icon={project.icon} />
           <span className="max-w-[7rem] truncate">{project.name}</span>
-        </button>
+        </NavRow>
       ) : null}
 
       {project ? (
@@ -252,16 +251,15 @@ export function IdentityLine({
             side="bottom"
             align="center"
             trigger={
-              <button
-                type="button"
-                onClick={() => setBranchOpen((open) => !open)}
+              <NavRow
+                icon={<Icons.branch />}
                 aria-haspopup="menu"
                 aria-expanded={branchOpen}
-                className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[34rem]:flex"
+                className="hidden shrink-0 gap-1 @[34rem]:flex"
+                onClick={() => setBranchOpen((open) => !open)}
               >
-                <Icons.branch />
                 <span className="max-w-[8rem] truncate">{project.branch}</span>
-              </button>
+              </NavRow>
             }
           >
             <MenuLabel>Branch</MenuLabel>

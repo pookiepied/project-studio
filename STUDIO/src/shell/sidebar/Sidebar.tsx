@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { COLLAPSE, DURATION, EASE_OUT, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { StudioMark } from '@/components/brand'
-import { IconButton, Tooltip } from '@/components/primitives'
+import { IconButton, NavRow, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
 import { SettingsTree } from '@/shell/sidebar/SettingsTree'
@@ -336,14 +336,9 @@ export function Sidebar({
             of destinations the column is showing. */}
         {inSettings ? null : (
           <div className="flex shrink-0 items-center justify-between px-2 pt-3 pb-2">
-            <button
-              type="button"
-              onClick={() => openSettings('account')}
-              className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-            >
-              <Icons.account />
+            <NavRow icon={<Icons.account />} className="min-w-0" onClick={() => openSettings('account')}>
               <span className="truncate">Account</span>
-            </button>
+            </NavRow>
 
             <IconButton label="Settings" onClick={() => openSettings()}>
               <Icons.settings size="md" />
@@ -368,12 +363,7 @@ function Action({
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-    >
-      {icon}
+    <NavRow icon={icon} onClick={onClick}>
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       {hint ? (
         // A keychord, drawn as the key itself: a chip, not plain text, so it
@@ -382,6 +372,6 @@ function Action({
           {hint}
         </kbd>
       ) : null}
-    </button>
+    </NavRow>
   )
 }

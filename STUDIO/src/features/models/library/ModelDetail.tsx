@@ -1,5 +1,5 @@
 import { Icons, ProviderMark } from '@/components/icons'
-import { StepSlider } from '@/components/primitives'
+import { NavRow, StepSlider } from '@/components/primitives'
 import type { CatalogModel } from '@/domain/models/catalog'
 import { familyName } from '@/domain/models/families'
 import {
@@ -57,16 +57,11 @@ export function ModelDetail({
 
   return (
     <div className="flex flex-col gap-5 py-1">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex w-fit items-center gap-1.5 rounded-sm px-2 py-1.5 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-      >
-        {/* Pointing back the way it came - the same turned mark every
-            disclosure uses, so back reads as back and not as decoration. */}
-        <Icons.disclosure className="rotate-180" />
+      {/* Pointing back the way it came - the same turned mark every
+          disclosure uses, so back reads as back and not as decoration. */}
+      <NavRow icon={<Icons.disclosure className="rotate-180" />} className="w-fit" onClick={onBack}>
         {backLabel}
-      </button>
+      </NavRow>
 
       <header className="flex items-start gap-3 px-2">
         <span className="flex h-[1lh] items-center text-title">
