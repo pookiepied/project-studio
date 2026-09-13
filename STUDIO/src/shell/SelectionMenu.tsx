@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
-import { ActionItems } from '@/shell/ActionItems'
+import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/FloatingMenu'
 
 /**
  * The selection menu.
@@ -36,19 +34,8 @@ import { ActionItems } from '@/shell/ActionItems'
  * verb is usually the first half of Copy.
  */
 
-const MENU_WIDTH = 208
 const MENU_HEIGHT = 252
-const EDGE_PADDING = 8
 const SELECTION_GAP = 8
-
-interface Placement {
-  readonly x: number
-  readonly y: number
-  /** Grows from the edge nearest the selection, so it arrives from it. */
-  readonly origin: 'bottom left' | 'top left'
-  readonly selection: string
-  readonly target: HTMLElement | null
-}
 
 /** Reads the current selection into menu state, or null if there is nothing to act on. */
 function readSelection(): { rect: DOMRect; selection: string; target: HTMLElement | null } | null {
@@ -71,7 +58,7 @@ function readSelection(): { rect: DOMRect; selection: string; target: HTMLElemen
 
 export function SelectionMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
-  const [placement, setPlacement] = useState<Placement | null>(null)
+  const [placement, setPlacement] = useState<FloatingPlacement | null>(null)
   // The latest placement for listeners that must not close over stale state.
   const openRef = useRef(false)
   openRef.current = placement !== null
@@ -199,28 +186,5 @@ export function SelectionMenu() {
     }
   }, [])
 
-  return (
-    <AnimatePresence>
-      {placement ? (
-        <motion.div
-          ref={menuRef}
-          role="menu"
-          aria-label="selection actions"
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
-          transition={SPRING_SNAPPY}
-          style={{
-            left: placement.x,
-            top: placement.y,
-            width: MENU_WIDTH,
-            transformOrigin: placement.origin,
-          }}
-          className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-overlay"
-        >
-          <ActionItems selection={placement.selection} target={placement.target} close={close} />
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  )
+  return <FloatingMenu ref={menuRef} placement={placement} label="selection actions" close={close} />
 }

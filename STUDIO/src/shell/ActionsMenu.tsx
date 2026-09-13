@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
-import { ActionItems } from '@/shell/ActionItems'
+import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/FloatingMenu'
 
 /**
  * The right-click menu.
@@ -27,20 +25,11 @@ import { ActionItems } from '@/shell/ActionItems'
  * edge that is off screen.
  */
 
-const MENU_WIDTH = 208
 const MENU_MAX_HEIGHT = 260
-const EDGE_PADDING = 8
-
-interface Position {
-  readonly x: number
-  readonly y: number
-  readonly selection: string
-  readonly target: HTMLElement | null
-}
 
 export function ActionsMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState<Position | null>(null)
+  const [position, setPosition] = useState<FloatingPlacement | null>(null)
 
   const close = () => setPosition(null)
 
@@ -55,6 +44,7 @@ export function ActionsMenu() {
       setPosition({
         x: Math.min(event.clientX, window.innerWidth - MENU_WIDTH - EDGE_PADDING),
         y: Math.min(event.clientY, window.innerHeight - MENU_MAX_HEIGHT - EDGE_PADDING),
+        origin: 'top left',
         selection: window.getSelection()?.toString().trim() ?? '',
         target: event.target as HTMLElement | null,
       })
@@ -84,22 +74,11 @@ export function ActionsMenu() {
   }, [])
 
   return (
-    <AnimatePresence>
-      {position ? (
-        <motion.div
-          ref={menuRef}
-          role="menu"
-          aria-label={position.selection ? 'selection actions' : 'page actions'}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
-          transition={SPRING_SNAPPY}
-          style={{ left: position.x, top: position.y, width: MENU_WIDTH, transformOrigin: 'top left' }}
-          className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-overlay"
-        >
-          <ActionItems selection={position.selection} target={position.target} close={close} />
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+    <FloatingMenu
+      ref={menuRef}
+      placement={position}
+      label={position?.selection ? 'selection actions' : 'page actions'}
+      close={close}
+    />
   )
 }
