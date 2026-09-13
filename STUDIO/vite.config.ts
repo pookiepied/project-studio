@@ -29,8 +29,26 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
   build: {
     // Tauri on Windows uses WebView2 (Chromium); elsewhere WKWebView (Safari).
-    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
+    // `main.tsx` awaits at the top level, which needs Safari 15 or later;
+    // the same bundle is served to other devices, so this is the floor for
+    // their browsers too.
+    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari15',
     minify: !process.env.TAURI_ENV_DEBUG,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rolldownOptions: {
+      output: {
+        // The rendering stack (markdown, maths, code highlighting) changes
+        // only when a dependency is bumped. Kept in its own chunk so a
+        // remote device keeps it cached across ordinary app changes.
+        codeSplitting: {
+          groups: [
+            {
+              name: 'render',
+              test: /node_modules[\/](react-markdown|remark-|rehype-|katex|micromark|mdast-|hast-|unified|react-syntax-highlighter|refractor|highlight\.js|lowlight)/,
+            },
+          ],
+        },
+      },
+    },
   },
 })
