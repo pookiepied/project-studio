@@ -382,14 +382,10 @@ function VoiceOrb({ session }: { session: ReturnType<typeof useVoiceSession> }) 
       />
       <div
         ref={core}
-        className="relative size-20 rounded-full"
-        style={{
-          background: 'currentColor',
-          // A soft inner lift, so the disc reads as a body with light on it
-          // rather than as a flat circle of fill.
-          boxShadow: 'inset 0 -6px 18px oklch(0 0 0 / 18%), inset 0 6px 14px oklch(1 0 0 / 14%)',
-          willChange: 'transform',
-        }}
+        // `shadow-body`: a soft inner lift, so the disc reads as a body with
+        // light on it rather than as a flat circle of fill.
+        className="relative size-20 rounded-full shadow-body"
+        style={{ background: 'currentColor', willChange: 'transform' }}
       />
     </div>
   )

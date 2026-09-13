@@ -130,6 +130,11 @@
      overlay  a menu or popover, near its trigger
      modal    a dialog or the palette, over a scrim
      panel    the compact sidebar, cast sideways over the page
+     body     an inner lift: light on the top of a solid disc, shade under it.
+              The voice orb is the one body in the app, and the only inset
+              shadow. Its two tints are fixed rather than the palette's,
+              because the disc is drawn in `currentColor` and the light on it
+              is the same in both themes.
      -------------------------------------------------------------------- */
   --shadow-chip: 0 1px 2px var(--shadow-tint-weak);
   --shadow-raised: 0 2px 10px var(--shadow-tint-weak), 0 0 0 1px var(--shadow-hairline);
@@ -137,6 +142,7 @@
   --shadow-overlay: 0 12px 36px -10px var(--shadow-tint-strong);
   --shadow-modal: 0 24px 64px -18px var(--shadow-tint-strong);
   --shadow-panel: 8px 0 28px -12px var(--shadow-tint-strong);
+  --shadow-body: inset 0 -6px 18px oklch(0 0 0 / 18%), inset 0 6px 14px oklch(1 0 0 / 14%);
 }
 
 /* ---------------------------------------------------------------------------
