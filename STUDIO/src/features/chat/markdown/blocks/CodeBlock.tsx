@@ -1,15 +1,8 @@
-import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { FormatGlyph, Mark, formatOfName, markOfName } from '@/components/icons/fileTypes'
-import { IconButton } from '@/components/primitives'
-import { copyText } from '@/lib/clipboard'
+import { CopyButton } from '@/components/primitives'
 import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 import { SyntaxHighlighter, displayName, resolveLanguage } from '@/features/chat/markdown/languages'
-
-/** How long the copy button holds its confirmation. */
-const COPIED_MS = 2000
 
 /**
  * A code block's glyph is the language's own mark -- the same marks the tool
@@ -60,8 +53,6 @@ function countLines(code: string): number {
  * horizontal scroller is the honest answer to a long line.
  */
 export function CodeBlock({ code, fence }: { code: string; fence: string }) {
-  const [copied, setCopied] = useState(false)
-
   // ```ts:src/utils/get-diff.ts — the language, then optionally where this came
   // from. A path makes a far better caption than a language name: "TypeScript"
   // is already obvious from the syntax colouring, while *which file* is the one
@@ -74,38 +65,13 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
   // the fence's content ended in a break, which is most of the time.
   const lines = countLines(code)
 
-  const copy = async () => {
-    if (!(await copyText(code))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), COPIED_MS)
-  }
-
   return (
     <BlockFrame
       glyph={<Glyph fence={language} />}
       label={path ?? displayName(language)}
       meta={lines === 1 ? '1 line' : `${lines} lines`}
       actions={
-        <>
-          {/* The confirmation swaps the glyph in place rather than adding a
-              "Copied" label. A label widens the button and shoves its
-              neighbours sideways, so the thing you just aimed at moves out
-              from under the pointer. The same button the artifacts carry. */}
-          <IconButton label={copied ? 'Copied' : 'Copy code'} size="sm" onClick={() => void copy()}>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={copied ? 'copied' : 'copy'}
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.6, opacity: 0 }}
-                transition={{ duration: DURATION.fast }}
-                className="flex items-center"
-              >
-                {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
-              </motion.span>
-            </AnimatePresence>
-          </IconButton>
-        </>
+        <CopyButton text={code} label="Copy code" />
       }
     >
       {/* `useInlineStyles={false}` is the whole theme decision. The highlighter

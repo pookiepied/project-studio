@@ -1,12 +1,5 @@
-import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION } from '@/design/tokens'
-import { Icons } from '@/components/icons'
-import { IconButton } from '@/components/primitives'
-import { copyText } from '@/lib/clipboard'
+import { CopyButton } from '@/components/primitives'
 import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
-
-const COPIED_MS = 2000
 
 /**
  * Prose the model produced *as an object* rather than as part of its answer.
@@ -40,32 +33,11 @@ export const TEXT_FENCES: Readonly<Record<string, string>> = {
 }
 
 export function TextBlock({ text, fence }: { text: string; fence: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    if (!(await copyText(text))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), COPIED_MS)
-  }
-
   return (
     <BlockFrame
       label={TEXT_FENCES[fence] ?? 'Text'}
       actions={
-        <IconButton label={copied ? 'Copied' : 'Copy text'} size="sm" onClick={() => void copy()}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={copied ? 'copied' : 'copy'}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.6, opacity: 0 }}
-              transition={{ duration: DURATION.fast }}
-              className="flex items-center"
-            >
-              {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
-            </motion.span>
-          </AnimatePresence>
-        </IconButton>
+        <CopyButton text={text} label="Copy text" />
       }
     >
       {/* `whitespace-pre-wrap`, not markdown. A draft is literal: if the model

@@ -1,9 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
-import { Icons, type IconComponent } from '@/components/icons'
-import { IconButton } from '@/components/primitives'
-import { copyText } from '@/lib/clipboard'
+import type { IconComponent } from '@/components/icons'
+import { CopyButton, IconButton } from '@/components/primitives'
 import { cn } from '@/lib/cn'
 
 export interface MessageAction {
@@ -55,14 +54,7 @@ export function MessageActions({
    */
   after?: ReactNode
 }) {
-  const [copied, setCopied] = useState(false)
   const [focusWithin, setFocusWithin] = useState(false)
-
-  const copy = async () => {
-    if (!(await copyText(copyPayload))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
-  }
 
   const shown = visible || focusWithin
 
@@ -98,9 +90,7 @@ export function MessageActions({
         !shown && 'pointer-events-none',
       )}
     >
-      <IconButton label={copied ? 'Copied' : 'Copy'} size="sm" onClick={() => void copy()}>
-        {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
-      </IconButton>
+      <CopyButton text={copyPayload} />
 
       {actions.map((action) => {
         const Glyph = action.icon
