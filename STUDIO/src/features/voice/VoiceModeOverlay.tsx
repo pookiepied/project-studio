@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
+import { DURATION, EASE_OUT, LOOP, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
 import { IconButton } from '@/components/primitives'
@@ -137,7 +137,7 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
                         aria-hidden
                         className="size-1.5 rounded-full bg-foreground"
                         animate={{ opacity: [1, 0.3, 1] }}
-                        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                        transition={LOOP.pulse}
                       />
                     ) : null}
                     {STAGE_LABEL[session.stage]}

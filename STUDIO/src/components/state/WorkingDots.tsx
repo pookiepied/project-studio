@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { LOOP } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -26,7 +27,7 @@ export function WorkingDots({ className }: { className?: string }) {
           key={index}
           className="size-[3px] rounded-full bg-current"
           animate={{ opacity: [0.25, 0.85, 0.25] }}
-          transition={{ duration: 1.1, ease: 'easeInOut', repeat: Infinity, delay: index * 0.36 }}
+          transition={{ ...LOOP.pulse, delay: index * (LOOP.pulse.duration / 3) }}
         />
       ))}
     </span>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
+import { COMPOSER, DURATION, EASE_OUT, LOOP } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { Button, IconButton } from '@/components/primitives'
 import {
@@ -737,7 +737,7 @@ function WorkingRing() {
       // travels around.
       className="pointer-events-none absolute -inset-[3px]"
       animate={{ rotate: 360 }}
-      transition={{ duration: 1.1, ease: 'linear', repeat: Infinity }}
+      transition={LOOP.spin}
     >
       <circle
         cx="12"

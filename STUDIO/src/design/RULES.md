@@ -120,8 +120,13 @@ surface leaves to the wrong side while the new one enters from the right.
 The variants in `tokens/motion.ts` (`surfaceVariants`) re-read the move as
 each pose plays; use them wherever a handover can change direction.
 
-The splash is the one exception to the ceiling. It is not interaction: it plays
-once, before anything can be clicked.
+The splash is one exception to the ceiling. It is not interaction: it plays
+once, before anything can be clicked. The other is the ambient loops, the app
+saying "still working" while nobody does anything - they are a state made
+visible, not a transition. They pick from `LOOP` in `tokens/motion.ts`: `spin`
+(a ring turning, linear), `pulse` (a body breathing in place), `sweep` (a
+highlight travelling across something). A staggered set spreads its delays
+from the loop's own duration, never from a second number.
 
 Reduced motion is handled twice, globally, and never in a component:
 `<MotionConfig reducedMotion="user">` and the media query in `styles/base.css`.

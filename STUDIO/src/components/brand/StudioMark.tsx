@@ -1,5 +1,5 @@
 import { motion, type Transition } from 'framer-motion'
-import { EASE_OUT } from '@/design/tokens'
+import { EASE_OUT, LOOP } from '@/design/tokens'
 
 /**
  * The Studio mark: five rounded tiles descending in a staircase.
@@ -56,7 +56,7 @@ function tileMotion(index: number, busy: boolean, entrance: boolean): TileMotion
   return {
     initial: { opacity: 1, scale: 1 },
     animate: { opacity: [0.62, 1, 0.62], scale: [0.94, 1, 0.94] },
-    transition: { duration: 1.4, repeat: Infinity, ease: 'easeInOut', delay: index * 0.12 },
+    transition: { ...LOOP.pulse, delay: index * (LOOP.pulse.duration / 10) },
   }
 }
 

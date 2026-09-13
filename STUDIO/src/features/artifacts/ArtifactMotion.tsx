@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { DURATION, EASE_OUT, staggerDelay } from '@/design/tokens'
+import { DURATION, EASE_OUT, LOOP, staggerDelay } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -74,7 +74,7 @@ export function WorkingHalo({ working, children }: { working: boolean; children:
           aria-hidden
           className="absolute inset-0 rounded-lg bg-current opacity-10"
           animate={{ opacity: [0.05, 0.16, 0.05], scale: [1, 1.06, 1] }}
-          transition={{ duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
+          transition={LOOP.sweep}
         />
       ) : null}
       <span className="relative flex items-center">{children}</span>

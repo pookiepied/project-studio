@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
+import { LOOP } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -173,7 +174,7 @@ function Spinner() {
       aria-hidden
       className="size-3.5 rounded-full border-[1.5px] border-current border-t-transparent opacity-70"
       animate={{ rotate: 360 }}
-      transition={{ duration: 0.7, ease: 'linear', repeat: Infinity }}
+      transition={LOOP.spin}
     />
   )
 }

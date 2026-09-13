@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { CONTROL } from '@/design/tokens'
+import { CONTROL, LOOP } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -74,7 +74,7 @@ export function Placeholder({
           className="absolute inset-0"
           style={{ background: SWEEP_GRADIENT }}
           animate={{ x: ['-60%', '60%'] }}
-          transition={{ duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
+          transition={LOOP.sweep}
         />
       ) : null}
       {children ? (

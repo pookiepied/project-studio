@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { LOOP } from '@/design/tokens'
 
 /**
  * A conversation that is working while you are somewhere else.
@@ -63,12 +64,10 @@ export function ActivityMark({ size = 10 }: { size?: number }) {
           }}
           animate={{ opacity: [0.12, 0.9, 0.12] }}
           transition={{
-            duration: 1.6,
-            repeat: Infinity,
-            ease: 'easeInOut',
+            ...LOOP.sweep,
             // Spread across the cycle rather than a fixed step, so the sweep
             // wraps continuously instead of restarting with a visible gap.
-            delay: (index / CELLS.length) * 1.6,
+            delay: (index / CELLS.length) * LOOP.sweep.duration,
           }}
         />
       ))}

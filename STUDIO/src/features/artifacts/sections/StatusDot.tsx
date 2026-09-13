@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { LOOP } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 import type { ArtifactStatus } from '@/domain/artifacts/types'
 
@@ -26,7 +27,7 @@ export function StatusDot({
         aria-hidden
         className={cn(base, 'bg-foreground')}
         animate={{ opacity: [0.35, 1, 0.35] }}
-        transition={{ duration: 1.2, ease: 'easeInOut', repeat: Infinity }}
+        transition={LOOP.pulse}
       />
     )
   }

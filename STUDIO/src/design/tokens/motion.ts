@@ -50,6 +50,29 @@ export const DURATION = {
   slow: 0.26,
 } as const
 
+/**
+ * The ambient loops: the app saying "still working" without anybody having
+ * done anything. Outside the 300ms ceiling by design (RULES §10) - a loop is
+ * not a transition, it is a state made visible - and the one place variety
+ * was still hand-picked: six durations across nine files for three ideas.
+ *
+ *   spin   a ring turning: the button spinner, the composer's working ring.
+ *          Linear, because a wheel that eases reads as a wheel that sticks.
+ *   pulse  a body breathing in place: dots, a status point, the mark's tiles,
+ *          the orb's listening point.
+ *   sweep  a highlight travelling across something: the skeleton sweep, the
+ *          working halo, the activity grid.
+ *
+ * Each is a complete framer `transition`; a staggered set spreads its `delay`
+ * from the same duration (`LOOP.pulse.duration / 3`), so the phase offsets
+ * scale with the pace rather than being a second hand-picked number.
+ */
+export const LOOP = {
+  spin: { duration: 0.9, ease: 'linear', repeat: Infinity },
+  pulse: { duration: 1.2, ease: 'easeInOut', repeat: Infinity },
+  sweep: { duration: 1.7, ease: 'easeInOut', repeat: Infinity },
+} as const
+
 /** Panels that track a drag or a toggle: the sidebar and anything paced to it. */
 export const SPRING_PANEL = { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 } as const
 
