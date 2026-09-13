@@ -182,7 +182,7 @@ export const VoiceWave = drawnMark(
  * worth reading before anyone moves them back into a `<path>`.
  *
  * Rounding the control steps to whole pixels (see the block on control geometry
- * in `index.css`) makes the square symmetric about its own centre at every size
+ * in `styles/type.css`) makes the square symmetric about its own centre at every size
  * setting — at 100% display scaling. It is not enough at 125% or 150%, which is
  * what Windows 11 ships on most laptops, because the button's box is then a
  * fractional number of *device* pixels and the mark inherits the fraction.

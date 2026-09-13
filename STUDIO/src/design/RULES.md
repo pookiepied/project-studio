@@ -2,7 +2,7 @@
 
 What Studio decides once, so no component decides it again.
 
-This file is the reasoning. The values live in `tokens/` and in `index.css`;
+This file is the reasoning. The values live in `tokens/` and in `styles/`;
 if the two ever disagree, this file is what they were both trying to say.
 
 Studio is a calm app for a person having a conversation. It is not a developer
@@ -124,7 +124,7 @@ The splash is the one exception to the ceiling. It is not interaction: it plays
 once, before anything can be clicked.
 
 Reduced motion is handled twice, globally, and never in a component:
-`<MotionConfig reducedMotion="user">` and the media query in `index.css`.
+`<MotionConfig reducedMotion="user">` and the media query in `styles/base.css`.
 
 ---
 

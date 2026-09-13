@@ -1,0 +1,105 @@
+/* The element defaults, and the reduced-motion collapse. */
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    /* The OS window is transparent; the rounded panel inside paints the
+       visible surface. */
+    background: transparent;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    /* Un-roled text inherits the UI size, exactly as it did when the root
+       carried it -- the default size moved one level down, not away. */
+    font-size: var(--text-ui);
+  }
+
+  html {
+    @apply font-sans;
+    /* The root font-size is 16px and stays there. It was once set to the UI
+       text size, and that single line put two unit systems at war: every
+       Tailwind spacing utility is rem-based, so every control height, padding
+       and dialog width silently painted at 0.81x of the value it was authored
+       as, while the icons, radii and geometry tokens -- all px -- painted at
+       full size. A 28px button rendered 22.75px with a 14px mark inside it,
+       the composer's 52px arithmetic never added up, and each size preference
+       rescaled the layout without moving the marks, so the two drifted apart
+       by a different amount at every setting.
+
+       Text size is a property of the roles, applied in px through
+       `--ui-size`. Layout geometry is a property of the rem grid. The root is
+       where those two decisions stop colliding. */
+    font-size: 16px;
+    /* Hairlines are 1px of low-contrast neutral. Without this they sample
+       unevenly at fractional device pixels and the shell looks smudged. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Nothing in the app is selectable chrome. Content opts back in below. */
+  button,
+  [role='button'],
+  [role='menuitem'],
+  [role='menuitemradio'],
+  [role='option'],
+  [role='radio'],
+  [role='tab'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Keyboard focus, and only keyboard focus.
+
+     `:focus-visible` is the whole reason this can be a real, visible ring: the
+     browser only matches it when focus arrived from the keyboard, so clicking a
+     button never draws one. That distinction is what people are reacting to
+     when they call a focus style ugly -- a ring that appears under the mouse is
+     noise, and the usual response is to delete the ring entirely.
+
+     Which is what this rule used to do. `outline: none` with nothing put back
+     meant that tabbing through Studio moved focus invisibly: no ring anywhere,
+     on any control, with no way to tell where you were. An outline is used
+     rather than a box-shadow so it follows the element's own border-radius and
+     cannot be clipped by an ancestor's `overflow: hidden`. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Off by default: a desktop app uses the platform arrow over controls, and a
+     pointer cursor is a web convention. Offered in settings because enough
+     people expect the web behaviour that it is worth not arguing about. */
+  .pointer-cursor button,
+  .pointer-cursor [role='button'],
+  .pointer-cursor [role='menuitem'],
+  .pointer-cursor [role='menuitemradio'],
+  .pointer-cursor a {
+    cursor: pointer;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion
+
+   Framer is handled at the root by `<MotionConfig reducedMotion="user">`. This
+   covers CSS transitions and any third-party subtree. Transitions collapse to
+   about one frame rather than 0ms so state changes still fire `transitionend`.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

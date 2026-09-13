@@ -16,7 +16,7 @@
  *
  * Reduced motion is handled once, at the root, by `<MotionConfig
  * reducedMotion="user">`. CSS transitions are covered by the matching media
- * query in `index.css`. Never branch on the preference inside a component.
+ * query in `styles/base.css`. Never branch on the preference inside a component.
  */
 import type { Variants } from 'framer-motion'
 

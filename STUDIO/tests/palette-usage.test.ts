@@ -31,14 +31,14 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * This test lives outside `src` and reads the tree with `node:fs`, the way
- * the harness's own source-scanning tests do. Importing `index.css` from
+ * the harness's own source-scanning tests do. Importing the stylesheet from
  * inside the app's module graph does not work for this: the Tailwind plugin
  * is merged into the test config, so it answers with the stylesheet it has
  * compiled rather than the one on disk, and the `@theme` block this reads is
- * exactly what compiling consumes.
+ * exactly what compiling consumes. The `@theme` block is `styles/tokens.css`.
  */
 const SOURCE_ROOT = fileURLToPath(new URL('../src/', import.meta.url))
-const STYLESHEET = fileURLToPath(new URL('../src/index.css', import.meta.url))
+const STYLESHEET = fileURLToPath(new URL('../src/styles/tokens.css', import.meta.url))
 
 /** Every component source, tests left out. */
 function sourceFiles(directory: string = SOURCE_ROOT): readonly string[] {

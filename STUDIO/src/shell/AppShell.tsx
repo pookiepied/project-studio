@@ -45,7 +45,7 @@ export function AppShell() {
    * it -- mid-flight, at the spring's peak velocity, the whole document
    * rewrapped per frame and the move stuttered exactly in its middle. While
    * this is true the transcript's off-screen rows step out of layout (see
-   * `studio-reflow-light` in index.css), and step back in when it lands.
+   * `studio-reflow-light` in styles/components.css), and step back in when it lands.
    */
   const [reflowLight, setReflowLight] = useState(false)
   const { conversations, projects, storePhase } = useWorkspace()

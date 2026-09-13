@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn'
  *
  * The keyboard outline is a separate register and stays `--ring`: Tab-only,
  * drawn outside the control where it cannot crowd anything. The fields never
- * consume it directly — see the token note in `index.css` for the history of
+ * consume it directly — see the token note in `styles/type.css` for the history of
  * the regression that proved why.
  */
 

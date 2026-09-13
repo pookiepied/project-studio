@@ -68,7 +68,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
       `reducedMotion="user"` is the whole reduced-motion story for Framer: it
       strips transforms and layout animations app-wide while keeping opacity,
       which is the correct fallback for every animation in `design/tokens`. CSS
-      transitions are covered by the matching media query in `index.css`. Never
+      transitions are covered by the matching media query in `styles/base.css`. Never
       branch on the preference inside a component — one switch, here.
     */
     <MotionConfig reducedMotion="user">

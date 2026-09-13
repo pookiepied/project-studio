@@ -221,7 +221,7 @@ export function resolveTheme(theme: Theme): ResolvedTheme {
  * Push the appearance onto the document.
  *
  * Sizes become two CSS variables rather than a class or a set of overrides,
- * because every step in the type scale is expressed in `index.css` as a
+ * because every step in the type scale is expressed in `styles/type.css` as a
  * multiple of these. One variable moves the whole system and keeps the icon
  * pairing intact; a per-element override would not.
  */
@@ -231,7 +231,7 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
 
   root.classList.toggle('dark', resolved === 'dark')
   root.style.setProperty('--ui-size', `${appearance.uiSize}px`)
-  // The offset, not the size: `--code-size` is a `calc()` in index.css that
+  // The offset, not the size: `--code-size` is a `calc()` in styles/type.css that
   // derives from this and `--ui-size` together, so the step survives a change
   // to either one.
   root.style.setProperty('--code-offset', `${appearance.codeOffset}px`)

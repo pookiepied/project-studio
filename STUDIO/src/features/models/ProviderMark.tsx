@@ -176,7 +176,7 @@ export function ProviderMark({
   className?: string
 }) {
   // `text` is the ordinary case and it is deliberately NOT text-sized: see the
-  // note on `--provider-mark` in `index.css` for why a brand logo cannot be
+  // note on `--provider-mark` in `styles/type.css` for why a brand logo cannot be
   // sized like a Lucide glyph. The named steps stay available for the two
   // places that want a larger mark, and the tile keeps its ratio to whichever
   // step was asked for so the slot never changes shape.

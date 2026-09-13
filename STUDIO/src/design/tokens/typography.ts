@@ -85,7 +85,7 @@ export type CodeOffset = (typeof CODE_OFFSET_CHOICES)[number]
 /**
  * The defaults of record.
  *
- * `index.css` declares matching values on `:root` as a pre-script fallback, and
+ * `styles/type.css` declares matching values on `:root` as a pre-script fallback, and
  * `assertScaleDefaults` below fails loudly in development if the two ever
  * disagree — the CSS is a safety net, these are the authority.
  */
@@ -122,7 +122,7 @@ export function assertScaleDefaults(): void {
   const offset = declared('--code-offset')
   if (ui !== DEFAULT_UI_SIZE || offset !== DEFAULT_CODE_OFFSET) {
     console.error(
-      `[design/tokens] index.css and typography.ts disagree about the defaults: ` +
+      `[design/tokens] styles/type.css and typography.ts disagree about the defaults: ` +
         `CSS says --ui-size ${ui}px / --code-offset ${offset}px, ` +
         `TS says ${DEFAULT_UI_SIZE}px / ${DEFAULT_CODE_OFFSET}px. Make them match.`,
     )
@@ -136,7 +136,7 @@ export function assertScaleDefaults(): void {
  * text it sits in (1.1em), so the pairing above is enforced by the layout
  * rather than restated at each call site. The named steps are for marks with no
  * text beside them, and they resolve to the `--icon-*` variables in
- * `index.css`, which derive from `--ui-size` — a standalone mark tracks the
+ * `styles/type.css`, which derive from `--ui-size` — a standalone mark tracks the
  * size preference exactly as a text-paired one does, where the old fixed px
  * steps stood still while everything around them moved.
  */

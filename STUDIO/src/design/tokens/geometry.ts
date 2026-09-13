@@ -38,7 +38,7 @@ export const RADIUS = {
 /**
  * Control heights, as multiples of the interface text size.
  *
- * The ratios are `--control-*` in `index.css`, and this is the numeric mirror
+ * The ratios are `--control-*` in `styles/type.css`, and this is the numeric mirror
  * of them: Framer cannot spring a `calc()`, so the handful of controls that
  * animate a height or a radius need real numbers. Derived rather than restated,
  * so the two cannot drift the way the type scale and the geometry did — which
@@ -140,7 +140,7 @@ export const SHELL = {
    *   top     `topStrip.height` (solid) + 20 (the gradient below it)
    *   bottom  40 (the composer's gradient; the composer itself paints no fill)
    *
-   * Mirrored by `--scroll-inset-top` / `--scroll-inset-bottom` in `index.css`,
+   * Mirrored by `--scroll-inset-top` / `--scroll-inset-bottom` in `styles/tokens.css`,
    * which is what `.studio-scroll-inset` actually reads.
    */
   scrollbarInset: { top: 40 + 20, bottom: 40 },

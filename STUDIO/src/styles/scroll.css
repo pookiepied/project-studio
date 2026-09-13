@@ -1,0 +1,101 @@
+/* Scrollbars. */
+
+/* ---------------------------------------------------------------------------
+   Scrollbars
+
+   Thin, thumb-only, tinted from the foreground so one rule works in both
+   themes.
+
+   `.studio-scroll-inset` solves a specific bug: the transcript fades into the
+   surface at both ends, and a thumb that runs the full track height slides
+   under those fades and half disappears. The border-box trick holds the thumb
+   back from each end using a transparent border, which the thumb's background
+   does not paint into. Scroll range is untouched -- only the indicator is
+   shorter, and the content still reaches both ends.
+   --------------------------------------------------------------------------- */
+@layer base {
+  /* Firefox only. Chromium ignores `::-webkit-scrollbar` entirely once
+     `scrollbar-width` is set, which would silently pin us to Chromium's ~10px
+     "thin" bar instead of the 5px below. WebView2 is Chromium, so the webkit
+     path is the one that matters for the desktop app. */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in oklch, var(--foreground) 15%, transparent) transparent;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: color-mix(in oklch, var(--foreground) 13%, transparent);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--foreground) 26%, transparent);
+  }
+
+  /* The transcript owns its own scroll compensation, so the browser must not
+     also be doing it.
+
+     Chromium's scroll anchoring shifts `scrollTop` when content is inserted
+     above the viewport -- measured, by exactly the height added. That is the
+     same job `useTranscriptWindow` does when it pages in older turns, and both
+     running is a double correction: it threw the reader several hundred pixels
+     the wrong way, which is how this was found.
+
+     Ours is the one that stays, because anchoring is a heuristic that
+     suppresses itself in cases it considers ambiguous -- including around
+     programmatic scrolls, and the follow performs one on every frame of every
+     stream. A correction that silently stops applying under load is worse than
+     one that always runs.
+
+     The descendant selector is required: anchoring picks an anchor *node*
+     inside the scroller, so switching it off on the container alone leaves
+     every child still eligible. */
+  .studio-no-anchor,
+  .studio-no-anchor * {
+    overflow-anchor: none;
+  }
+
+  /* Held back from both ends of the track, so the thumb never slides under the
+     fades at the top and bottom of a scrolling page and half-disappears.
+
+     Opting in is deliberate and this is the rule for it: a scroller gets the
+     inset when it is a *page* -- something with a masked top edge, under the
+     window's top strip. The sidebar, a dialog, a menu and the palette all
+     scroll inside a bounded surface with hard edges, and insetting a thumb
+     there would just make it look short. The number is a variable rather than
+     the literal 44 that used to sit here beside a comment promising it matched
+     `SHELL.scrollbarInset` -- a promise nothing enforced. */
+  .studio-scroll-inset::-webkit-scrollbar-track {
+    margin-block: var(--scroll-inset-top) var(--scroll-inset-bottom);
+  }
+
+  /* A *bounded* scroller: a menu, a palette, a dialog. The page inset above is
+     wrong here -- there are no fades to keep a thumb out of -- but two other
+     things are needed, and neither was being done.
+
+     `scrollbar-gutter: stable` reserves the track whether or not it is
+     occupied. Without it the bar appears the moment a list outgrows its box and
+     takes its width out of the content, so every row jumps sideways as you
+     scroll -- which is exactly what the model menu was doing.
+
+     The track is then held back by the surface's own corner radius, so the
+     thumb stops before the curve instead of running into it. A straight bar
+     drawn into a rounded corner is the detail that makes a menu look
+     unfinished. */
+  .studio-scroll-bounded {
+    scrollbar-gutter: stable;
+  }
+
+  .studio-scroll-bounded::-webkit-scrollbar-track {
+    margin-block: var(--radius-lg);
+  }
+}

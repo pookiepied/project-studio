@@ -1,0 +1,228 @@
+/* The type scale and the control geometry, both derived from `--ui-size`. */
+
+/* ---------------------------------------------------------------------------
+   The type scale
+
+   Sizes derive from `--ui-size`, which the appearance settings write to the
+   root. One variable moves the whole system, so the icon pairing declared in
+   `design/tokens/typography.ts` survives a preference change -- which it would
+   not if each step carried an absolute px value.
+
+   The offsets below mirror that file. If you change one, change both.
+   --------------------------------------------------------------------------- */
+:root {
+  --ui-size: 12px;
+  /* Code text is an *offset* from the interface text, never an absolute size.
+
+     A mono face at the same nominal size as its sans surroundings paints
+     larger -- x-heights and stroke density differ -- so a step down is what
+     keeps a fenced block from outweighing the sentence introducing it. Now
+     that `body` is level with `ui`, this step is the only thing still doing
+     that job.
+
+     Stated as an offset because as an absolute it only held at one setting:
+     code was pinned at 11px, so at `--ui-size: 14` it sat three steps under
+     rather than one, and the settings pane could reach interface 11 with code
+     12 -- mono *larger* than the sans beside it, which is the exact inversion
+     the step exists to prevent. The relationship is the thing worth storing;
+     the pixel falls out of it. */
+  --code-offset: -1px;
+  --code-size: calc(var(--ui-size) + var(--code-offset));
+
+  /* A dense desktop UI keeps most of its text at one size on purpose, so the
+     steps below are not where hierarchy comes from -- weight, colour and
+     tracking on the role classes are. What the sizes must do is separate the
+     three things that are genuinely different tasks: labelling a control,
+     reading prose, and heading a section. */
+  --text-micro: calc(var(--ui-size) - 2px);
+  --text-caption: calc(var(--ui-size) - 1px);
+  --text-ui: var(--ui-size);
+  /* Level with `ui`, and this is the correction that mattered.
+     Body has now been all three things: a pixel over the interface, level with
+     it, and one under. One step under was the last of them, and measurement is
+     what ended the argument: at `ui - 1` the transcript was rendering at 11px
+     while every button, menu and sidebar row around it rendered at 12 -- the
+     one column of text in the app anyone actually *reads* was the smallest
+     text on screen, and the composer you type into was smaller still.
+
+     The optics argument for the step was real -- a full-foreground column does
+     carry more mass than muted chrome -- but the answer to that is leading and
+     measure, which this role already has (`--leading-body` is the loosest in
+     the scale, and `SHELL.measure` caps the column). Size was the wrong lever:
+     it bought a little optical calm and paid for it by making reading text the
+     least legible thing in the window.
+
+     Level also collapses a duplicate. `caption` was `ui - 1` too, so the two
+     roles were byte-identical in size and differed only in leading -- which is
+     what made the interface read as inconsistent for reasons nobody could
+     point at: identical pixels at different rhythm read as different sizes.
+     Caption is now the only role at `ui - 1`, and it means one thing. */
+  --text-body: var(--ui-size);
+  --text-title: calc(var(--ui-size) + 7px);
+  --text-display: calc(var(--ui-size) + 19px);
+
+  /* -- Leading ---------------------------------------------------------------
+
+     Tokens, not numbers written at each role, because the same size at two
+     different leadings is the single most reliable way to make an interface
+     look inconsistent while every measurement says it is fine. `.text-body`
+     and `.studio-prose` are the pair this actually happened to: both were
+     `--text-body`, one led at 1.68 and the other at 1.72, and the transcript
+     visibly disagreed with itself. They read the same token now. */
+  --leading-micro: 1.45;
+  --leading-caption: 1.5;
+  --leading-ui: 1.55;
+  --leading-body: 1.7;
+  --leading-title: 1.3;
+
+  /* -- The icon steps --------------------------------------------------------
+
+     The absolute marks, as CSS variables rather than TS constants, because
+     they must track `--ui-size` the way the text-paired marks do. A glyph
+     beside text sizes itself at 1.1em and follows the text anywhere; a mark
+     standing alone in a button or a rail has no text to follow, and when these
+     were fixed px the two kinds of mark drifted apart by a different amount at
+     every size setting -- a page dense with labelled rows scaled while a page
+     of round controls stood still, which is the asymmetry this file exists to
+     prevent.
+
+     The offsets are the ones the scale was drawn with, held at every setting:
+     a mark sits about a tenth over its text, which is +1px at these sizes and
+     +2px by title weight. `md` was the last literal here -- 16px, pinned to the
+     composer's round controls "whatever the text is doing". That exemption is
+     gone with the controls it described: the composer is on `--control-md` now
+     like every other icon button, so its mark can derive like every other mark
+     and there is nothing left in this block that stands still. */
+  --icon-xs: calc(var(--ui-size) - 1px);
+  --icon-sm: calc(var(--ui-size) + 1px);
+  --icon-md: calc(var(--ui-size) + 3px);
+  --icon-lg: calc(var(--ui-size) + 9px);
+
+  /* The left edge of a row's label: one `sm` mark across, plus the gap the row
+     puts between its mark and its words. A follow-on line -- a failure's
+     reason, a remedy, a detail -- aligns to this variable rather than
+     restating the two numbers beside it, which is how the text under a row
+     came to sit a pixel off the label it was aligned to: the mark's step
+     moved with the size preference and the hardcoded rem did not. */
+  --row-label-inset: calc(var(--icon-sm) + 0.375rem);
+
+  /* -- The provider mark, which is not an icon --------------------------------
+
+     A brand logo sized as text, at 1.1em, is unreadable, and the reason is
+     arithmetic rather than taste. Our marks come from Lucide, drawn at two or
+     three strokes precisely so they survive at 12px. A vendor logo is drawn
+     for a business card: OpenAI's knot is about eight interlocking strokes
+     across its width, so at 13px each stroke lands under one device pixel and
+     the mark is a smudge. Measured across the twenty vendors we cache, the
+     ones that survive at 1.1em are exactly the ones with three strokes or
+     fewer -- Anthropic, Meta, Google, Groq. Everything denser fails.
+
+     So the mark gets its own step, deliberately larger than the text beside
+     it, and a tile to sit in. The tile is doing real work: it gives every
+     vendor the same silhouette, so a dense logo, a simple one and a fallback
+     letter all occupy one identity slot rather than three different-looking
+     shapes in a column. It is also what stops the fix from being "make the
+     interface bigger" -- the type scale does not move at all.
+
+     1.4x and 1.85x of the interface text. Whole pixels at every setting, for
+     the reason `--control-*` is rounded below: a fractional box snaps its
+     painted background to the device grid and the mask inside it does not, so
+     the logo drifts off the centre of its own tile.
+
+     Declared unrounded here and rounded in the `@supports` block below, for
+     the reason stated there: a custom property holding a function the browser
+     does not know is stored as-is and only found invalid when it is
+     substituted, which leaves the property unset rather than falling back. */
+  --provider-mark: calc(var(--ui-size) * 1.4);
+  --provider-tile: calc(var(--ui-size) * 1.85);
+
+  /* -- Control geometry ------------------------------------------------------
+
+     The other half of the type scale, and the half that was missing.
+
+     Text lived here, driven by `--ui-size`. Control heights lived in
+     `design/tokens/geometry.ts` as fixed px constants calibrated when the
+     interface text was 14px. Nothing re-derived them when it became 12, so the
+     boxes kept the proportions of a larger scale while the text inside them
+     shrank -- and a size preference moved the text and left every box exactly
+     where it was. That is the specific reason changing a font size "did
+     nothing" to the sidebar: the sidebar row is geometry, and geometry was not
+     listening.
+
+     The ratios are the ones the app already used where it looked right. A row,
+     a chip and an icon button all measured 2.2-2.33x their text; only the
+     composer was an outlier, at 4.7x, because its height was set by the round
+     controls inside it and the text had no say. Stated as multiples of
+     `--ui-size`, the agreement holds at every setting instead of only at 12.
+
+     `round-trip` note: these are also mirrored in `geometry.ts` for the few
+     places that must animate a number (Framer cannot spring a `calc()`), and
+     that file derives them from the same ratios rather than restating pixels.
+
+     Written as exact fractions rather than rounded decimals. `2.33` is not
+     seven thirds, and the difference showed up immediately: the TS mirror
+     rounded 27.96 up to 28 while this side did not, so the composer's computed
+     height and its measured height disagreed by a twentieth of a pixel from
+     the first render. Invisible, but it is the same species of drift this
+     whole block exists to end, and a fraction costs nothing.
+
+     A compact round control -- menu affordances, row overflow buttons. */
+  --control-sm: calc(var(--ui-size) * 2);
+  /** The default: icon buttons in the chrome, and the composer's row. */
+  --control-md: calc(var(--ui-size) * 7 / 3);
+  /** The largest round control in the chrome. */
+  --control-lg: calc(var(--ui-size) * 8 / 3);
+  /** The stage control: voice mode's transport, and nothing else. */
+  --control-xl: calc(var(--ui-size) * 11 / 3);
+}
+
+/* -- Control sizes land on whole pixels --------------------------------------
+
+   The fractions above are the right ratios and the wrong numbers. Sevens,
+   eighths and elevenths over three are exact integers at exactly one setting,
+   which is the 12px default:
+
+     ui        11        12        13        14
+     md    25.667        28    30.333    32.667
+     lg    29.333        32    34.667    37.333
+     xl    40.333        44    47.667    51.333
+
+   A round control does not care -- a circle's edge is curved, so it antialiases
+   evenly the whole way round and a third of a pixel of width is invisible on
+   it. What cares is anything with a straight vertical edge sitting inside one,
+   and the transport square is the clearest case in the app. Centring puts the
+   square's midpoint on the button's midpoint, so a button 47.667px wide has its
+   midpoint at 23.833 and the square's two edges land on different fractions of
+   a device pixel: one paints a faint partial column, the other a nearly solid
+   one. The geometry is exact -- measured at 0.00px on both axes -- and the
+   painted mark is still heavier on one side, which the eye reads as the square
+   having slid that way.
+
+   That is why this was reported as an alignment bug three times and survived
+   two fixes aimed at the mark. Growing the glyph a step and swapping Lucide's
+   outline for a solid square both changed what is drawn; neither changed which
+   pixel its edges fall on. Only the default setting was ever clean, which is
+   also why it kept measuring as centred on the machine it was measured on.
+
+   Rounding to whole pixels makes the offset from button edge to icon box a
+   whole or half pixel at every setting, and the square symmetric about its own
+   centre at all four. The ratios are unchanged in intent -- at most a third of
+   a pixel moves, on a control between 25 and 52px.
+
+   `@supports` because a custom property holding an unsupported function is not
+   rejected at parse time: it is stored, substituted, and only then found to be
+   invalid, at which point the control has no size at all rather than falling
+   back to the calc. The guard is what makes the fallback actually happen. */
+@supports (width: round(1px, 1px)) {
+  :root {
+    --control-md: round(calc(var(--ui-size) * 7 / 3), 1px);
+    --control-lg: round(calc(var(--ui-size) * 8 / 3), 1px);
+    --control-xl: round(calc(var(--ui-size) * 11 / 3), 1px);
+
+    /* The provider mark and its tile, for the same reason and one more: the
+       mark is painted as a CSS mask over a background, and a mask on a
+       fractional box resamples the logo off the pixel grid every render. */
+    --provider-mark: round(calc(var(--ui-size) * 1.4), 1px);
+    --provider-tile: round(calc(var(--ui-size) * 1.85), 1px);
+  }
+}

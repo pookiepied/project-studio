@@ -110,7 +110,7 @@ export function useTranscriptWindow<T extends WindowedItem>(
    * way. The two fixes fought and the sum was the bug.
    *
    * So anchoring is switched off on the viewport (`overflow-anchor: none` in
-   * `index.css`) and this owns the correction outright. Deferring to the
+   * `styles/components.css`) and this owns the correction outright. Deferring to the
    * browser instead would work today and is the more fragile choice: anchoring
    * is a heuristic that suppresses itself in cases it considers ambiguous —
    * including around programmatic scrolls, which the follow performs on every

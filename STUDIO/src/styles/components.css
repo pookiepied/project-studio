@@ -1,0 +1,266 @@
+/* The component classes: blur surfaces, icon colour, the working label, the type roles, and the sidebar's cheap-layout spring. */
+
+@layer components {
+  /* -- Blur surfaces -------------------------------------------------------
+     Anything floating over content is translucent and blurs what is behind it.
+     `saturate` is part of the recipe, not decoration: a plain blur of neutral
+     content reads flat and muddy, and pushing saturation back restores depth.
+     The app is monochrome, so this only changes how the blur samples.
+     ---------------------------------------------------------------------- */
+  .studio-blur {
+    background-color: var(--overlay);
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .studio-blur {
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
+    }
+
+    .studio-blur-scrim {
+      -webkit-backdrop-filter: blur(5px);
+      backdrop-filter: blur(5px);
+    }
+  }
+
+  .studio-selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* -- Icon colour, held independent of the text beside it ------------------
+
+     Every mark in the app renders inside `.studio-icon`, and until this rule
+     existed each one simply inherited `currentColor`. That is why "icons stop
+     darkening" kept being fixed and kept coming back: the fix was applied to
+     the buttons whose *own* colour changed, while the real cause was every row
+     whose *text* darkens -- a sidebar row, a menu item, a branch chip, the
+     account button. Fourteen of them. The row darkens its label on hover, the
+     icon inherits, and the mark goes black again. Chasing that per component is
+     unwinnable, because the next row anyone writes reintroduces it.
+
+     Setting the colour here breaks the inheritance once. A mark is
+     `--muted-foreground` no matter what the text around it is doing, in every
+     state that text can be in, which is the rule this interface wanted all
+     along: the surface says where you are, the glyph stays put.
+
+     It sits in `@layer components` so it can still be overridden deliberately.
+     A Tailwind `text-*` utility on the mark -- or on an ancestor via
+     `[&_.studio-icon]:text-*` -- lives in the utilities layer and wins. Two
+     places need that and both are opting in on purpose: the solid send button,
+     whose mark sits on a black chip, and a destructive menu row. */
+  .studio-icon {
+    color: var(--muted-foreground);
+  }
+
+  /* Icon stroke, held constant in device pixels.
+
+     The marks are drawn on a 24-unit grid and set anywhere from 12 to 22px, so
+     a stroke measured in viewBox units paints 1.17px in a menu and 1.83px in a
+     header -- the same mark at two weights, which is what stops an icon set
+     reading as one family. `non-scaling-stroke` measures the width in device
+     pixels instead, so 1.2 is 1.2 everywhere and pairs with Inter 400/500.
+
+     It has to be set on the shapes rather than the <svg>: `vector-effect` is
+     not an inherited property, so declaring it on the root does nothing. */
+  /* Both selectors are needed because there are two renderers and their roots
+     differ: `fromLucide` wraps a finished component in a <span>, so the shapes
+     are a level down, while `defineIcon` draws the <svg> itself and carries the
+     class on it. The drawn marks went without this for as long as the class was
+     only on the wrapper -- which is why the project marks alone kept both the
+     row's colour and a stroke that thickened with size. */
+  .studio-icon svg :is(path, circle, rect, line, polyline, polygon, ellipse),
+  .studio-icon:is(svg) :is(path, circle, rect, line, polyline, polygon, ellipse) {
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* -- Work in flight, written in the label itself --------------------------
+
+     A valley of lower opacity sweeps through the words of a row that is
+     producing something -- the thinking row while its trace is arriving.
+     Taken from the Thinking + Reasoning component of aicss.dev and rebuilt
+     from the theme's own colour: the gradient's stops are `currentColor`, so
+     the sweep follows the row into hover, into dark mode and onto any future
+     surface with no second palette to keep in step. The component's own
+     version needed a light block, a dark block and a scheme fallback; this
+     needs none of them.
+
+     `color` is left untouched and only the fill goes transparent, because
+     `currentColor` inside the gradient resolves against `color` -- filling
+     the colour out would take the gradient's own stops down with it.
+
+     An ambient loop rather than an interaction transition, so the ~300ms
+     ceiling does not govern it. Reduced motion collapses the animation to a
+     single frame, which is the solid label: nothing the reader needs
+     disappears with the motion. */
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .studio-shimmer {
+      -webkit-text-fill-color: transparent;
+      background-image: linear-gradient(
+        90deg,
+        currentColor 0%,
+        currentColor 30%,
+        color-mix(in oklab, currentColor 45%, transparent) 45%,
+        color-mix(in oklab, currentColor 45%, transparent) 55%,
+        currentColor 70%,
+        currentColor 100%
+      );
+      background-size: 300% 100%;
+      background-repeat: no-repeat;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: studio-shimmer 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+    }
+  }
+
+  @keyframes studio-shimmer {
+    0%,
+    18% {
+      background-position: 100% 0;
+    }
+    82%,
+    100% {
+      background-position: 0% 0;
+    }
+  }
+
+  /* The context bar while a turn is in flight.
+
+     The figure it draws is still moving -- a measured turn plus an estimate
+     of everything after it -- so the bar breathes rather than sitting as a
+     settled fact. It moves in sympathy with the title's shimmer rather than
+     reporting the run itself; the title is what reports it. Slower than the
+     send button's halo on purpose: the halo sits on the control you press to
+     stop, where urgency is the point, and this sits inside a menu you opened
+     to read.
+
+     Opacity only, so nothing about the bar's length or position moves and the
+     proportions stay readable through the whole cycle. The global
+     reduced-motion rule collapses it to a single frame, which is the bar at
+     rest -- the measurement it draws is unaffected. */
+  .studio-breathe {
+    animation: studio-breathe 2.6s ease-in-out infinite;
+  }
+
+  @keyframes studio-breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.65;
+    }
+  }
+
+  /* The editorial serif. Display sizes carry the page's one statement -- the
+     home greeting, a page title. Anywhere else it stops being a voice and
+     becomes a second UI font, so the sans carries everything that is read
+     rather than announced. */
+  .studio-display {
+    @apply font-display;
+    font-size: var(--text-display);
+    line-height: 1.15;
+    font-optical-sizing: auto;
+  }
+
+  /* The same serif at heading size, for the short labelled moments: dialog
+     headers and the sidebar wordmark. Same voice as display, one step down,
+     so the family reads as one system rather than two unrelated choices. */
+  .studio-heading {
+    @apply font-display;
+    font-size: var(--text-title);
+    line-height: 1.25;
+  }
+
+  /* -- The type roles, as classes -----------------------------------------
+     Components reach for these rather than a raw `text-[13px]`, so a role only
+     ever changes in one place.
+
+     A role is a size *and* a weight *and* a tracking, which is the correction
+     that mattered here. Carrying size alone meant a caption and a UI label
+     differed by one pixel and by nothing else, so applying the right class
+     changed nothing visible and the whole interface read as one flat size.
+
+     Tracking moves against size, which is how type has always worked: small
+     text needs its letters opened up to stay legible, large text needs them
+     closed up or it looks loose and amateurish. Inter is drawn for this and
+     responds well to about a half-percent either side.
+     ---------------------------------------------------------------------- */
+
+  /* Section headers, badges, counts. Small enough that weight has to do the
+     work of being noticed, wide enough that it does not turn into a smudge. */
+  .text-micro {
+    font-size: var(--text-micro);
+    line-height: var(--leading-micro);
+    font-weight: 500;
+    letter-spacing: 0.045em;
+  }
+
+  /* Secondary: hints, notes, timestamps. The one role that leans on colour --
+     it is nearly UI-sized, so it says "aside" by being quieter, not smaller. */
+  .text-caption {
+    font-size: var(--text-caption);
+    line-height: var(--leading-caption);
+    letter-spacing: 0.006em;
+  }
+
+  /* The workhorse. Buttons, menus, rows, the composer. */
+  .text-ui {
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+    letter-spacing: 0;
+  }
+
+  /* Transcript prose, and nothing else. Wider leading because this is the only
+     text in the app anyone reads a paragraph of. */
+  .text-body {
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+    letter-spacing: -0.003em;
+  }
+
+  /* Monospaced text outside the transcript: a JSON view, a stderr dump, any
+     block where alignment carries meaning. `--code-size` already existed and
+     was reachable only from prose `code`, so every panel wanting it had to
+     invent something -- and two of them invented `.text-code`, which was not a
+     utility at all and therefore silently did nothing. Named for what those
+     panels already ask for, so the class they were reaching for now exists.
+
+     Size only. The font family stays with `font-mono` at the call site,
+     because a few places want the code size in the UI face. */
+  .text-code {
+    font-size: var(--code-size);
+    line-height: 1.55;
+  }
+
+  /* Headings. The step where size alone finally is enough -- but it takes the
+     weight and the tighter tracking to stop reading as merely bigger UI text. */
+  .text-title {
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+    font-weight: 590;
+    letter-spacing: -0.014em;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The sidebar's spring, paid for in cheap layout
+
+   The sidebar animates its WIDTH, which means the page re-lays-out on every
+   frame of the spring -- and the transcript is the heaviest thing in it. At
+   the spring's peak velocity the whole document rewrapped per frame, and the
+   move stuttered exactly in its middle: smooth leaving, laggy at the turn,
+   smooth landing. While `studio-reflow-light` is on the page (AppShell holds
+   it for the length of the spring, fed by the sidebar's own animation
+   callbacks), every message row steps out of layout and remembers the size
+   it last rendered, so a frame costs only the rows on screen. When the
+   spring lands the class leaves, and everything is laid out for real again.
+   Scoped to the move on purpose: an always-on rule would hand the paging
+   window estimated heights for rows nobody has rendered yet, and the
+   hold-still correction there measures real heights.
+ */
+
+.studio-reflow-light .studio-message {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}

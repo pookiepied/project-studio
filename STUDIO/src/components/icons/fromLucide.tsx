@@ -34,7 +34,7 @@ import { cn } from '@/lib/cn'
  * ---- Stroke -----------------------------------------------------------------
  *
  * The painted line is held at ~1.2px at every step by `vector-effect:
- * non-scaling-stroke` (applied in `index.css` via `.studio-icon`), which reads
+ * non-scaling-stroke` (applied in `styles/components.css` via `.studio-icon`), which reads
  * the width in device pixels rather than viewBox units. Without it the same
  * mark paints 1.17px in a menu and 1.83px at the `lg` step, and the set stops
  * reading as one weight.

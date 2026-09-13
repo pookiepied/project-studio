@@ -12,7 +12,7 @@ import 'media-chrome'
  * control strip: a full-width opaque bar, square hit areas that flash a grey
  * box on hover, and a row of six icons. That is the wrong object for a
  * generated clip sitting inside a chat message. So the appearance is entirely
- * ours, in `index.css` under `.studio-player`, and this file is structure.
+ * ours, in `styles/player.css` under `.studio-player`, and this file is structure.
  *
  * ---- Where the black came from -------------------------------------------
  *

@@ -36,7 +36,7 @@ import { extendTailwindMerge } from 'tailwind-merge'
  * let this survive three passes over the same symptom.
  *
  * Keep this list in step with the roles in `design/tokens/typography.ts` and the
- * classes in `index.css`. All three describe one scale.
+ * classes in `styles/components.css`. All three describe one scale.
  */
 const twMerge = extendTailwindMerge({
   extend: {

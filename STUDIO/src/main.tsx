@@ -6,7 +6,7 @@ import { applyAppearance, loadAppearance } from '@/design/theme'
 import { assertScaleDefaults } from '@/design/tokens'
 import { flushDrafts, primeDrafts } from '@/features/chat/composer/drafts'
 
-// Before anything writes to the root: compares the defaults `index.css`
+// Before anything writes to the root: compares the defaults `styles/type.css`
 // declares against the ones `typography.ts` owns, and complains in development
 // if they have drifted apart. Must precede `applyAppearance`, which replaces
 // those values with the stored preference. No-op in production.

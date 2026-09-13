@@ -75,7 +75,7 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
       }
     >
       {/* `useInlineStyles={false}` is the whole theme decision. The highlighter
-          emits `hljs-*` class names and the palette lives in `index.css` next
+          emits `hljs-*` class names and the palette lives in `styles/prose.css` next
           to the tokens, so it follows the theme with no prop, no re-render and
           no imported colour object. The container's own radius and overflow
           clip the corners, so the highlighter paints none of its own.
