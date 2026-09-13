@@ -5,6 +5,7 @@ import { formatClock } from '@/features/voice/waveform'
 import type { MicFrameListener } from '@/features/voice/useMicInput'
 import type { DictationStage } from '@/features/voice/useDictation'
 import { cn } from '@/lib/cn'
+import { WorkingDots } from '@/components/state'
 
 /**
  * The composer while it is being spoken to.
@@ -102,22 +103,6 @@ function LevelBars({ onFrame }: { onFrame: (listener: MicFrameListener) => () =>
   )
 }
 
-/** Three dots, cycling. Pace is deliberately unhurried: this is a wait. */
-function WorkingDots() {
-  return (
-    <span aria-hidden className="flex items-center gap-1 pl-0.5">
-      {[0, 1, 2].map((index) => (
-        <motion.span
-          key={index}
-          className="size-[3px] rounded-full bg-muted-foreground"
-          animate={{ opacity: [0.25, 1, 0.25] }}
-          transition={{ duration: 1.1, repeat: Infinity, delay: index * 0.18, ease: 'easeInOut' }}
-        />
-      ))}
-    </span>
-  )
-}
-
 export function DictationBar({
   stage,
   elapsedMs,
@@ -187,7 +172,7 @@ export function DictationBar({
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             className="flex items-center gap-2.5"
           >
-            <WorkingDots />
+            <WorkingDots className="pl-0.5" />
             <span>Transcribing</span>
           </motion.div>
         ) : stage === 'requesting' ? (
@@ -199,7 +184,7 @@ export function DictationBar({
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             className="flex items-center gap-2.5"
           >
-            <WorkingDots />
+            <WorkingDots className="pl-0.5" />
             <span>Asking for the microphone</span>
           </motion.div>
         ) : (

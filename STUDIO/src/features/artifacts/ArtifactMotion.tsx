@@ -59,35 +59,6 @@ export function AnimatedItem({
 }
 
 /**
- * Three dots, for a step that is running.
- *
- * Beside a label rather than replacing it: "Searching" that becomes "Searching…"
- * tells you it is live without the label changing, so the line does not reflow
- * when it finishes.
- */
-export function WorkingDots() {
-  return (
-    <span aria-hidden className="inline-flex items-center gap-[3px] pl-1 align-middle">
-      {[0, 1, 2].map((index) => (
-        <motion.span
-          key={index}
-          className="size-[3px] rounded-full bg-current opacity-60"
-          animate={{ opacity: [0.25, 0.85, 0.25] }}
-          transition={{
-            duration: 1.1,
-            ease: 'easeInOut',
-            repeat: Infinity,
-            // A third of the cycle apart, so the three read as a travelling
-            // wave rather than as three things blinking together.
-            delay: index * 0.36,
-          }}
-        />
-      ))}
-    </span>
-  )
-}
-
-/**
  * The soft pulse on an artifact that is still working.
  *
  * On the icon's own container rather than on the artifact frame: pulsing the

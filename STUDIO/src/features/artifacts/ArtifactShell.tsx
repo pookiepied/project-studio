@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
-import { WorkingDots, WorkingHalo } from '@/features/artifacts/ArtifactMotion'
+import { WorkingDots } from '@/components/state'
+import { WorkingHalo } from '@/features/artifacts/ArtifactMotion'
 import { useRail } from '@/stores/rail'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
@@ -83,7 +84,7 @@ export function ArtifactShell({
             )}
           >
             {status}
-            {working ? <WorkingDots /> : null}
+            {working ? <WorkingDots className="pl-1" /> : null}
           </p>
         </div>
 

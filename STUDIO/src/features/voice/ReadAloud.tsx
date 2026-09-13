@@ -5,6 +5,7 @@ import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { speakText } from '@/features/voice/speak'
 import { cn } from '@/lib/cn'
+import { WorkingDots } from '@/components/state'
 
 /**
  * Read aloud, as one control that grows into the player it needs.
@@ -117,7 +118,7 @@ export function ReadAloud({ text }: { text: string }) {
           >
             {stage === 'loading' ? (
               <>
-                <WorkingDots />
+                <WorkingDots className="text-muted-foreground" />
                 <span className="text-caption text-muted-foreground">Reading aloud</span>
               </>
             ) : (
@@ -148,22 +149,6 @@ export function ReadAloud({ text }: { text: string }) {
           </motion.span>
         )}
       </AnimatePresence>
-    </span>
-  )
-}
-
-/** Three dots, cycling: the wait before the first sample. Same clock as dictation. */
-function WorkingDots() {
-  return (
-    <span aria-hidden className="flex items-center gap-1">
-      {[0, 1, 2].map((index) => (
-        <motion.span
-          key={index}
-          className="size-[3px] rounded-full bg-muted-foreground"
-          animate={{ opacity: [0.25, 1, 0.25] }}
-          transition={{ duration: 1.1, repeat: Infinity, delay: index * 0.18, ease: 'easeInOut' }}
-        />
-      ))}
     </span>
   )
 }
