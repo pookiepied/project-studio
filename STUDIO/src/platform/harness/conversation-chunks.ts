@@ -64,7 +64,7 @@ export interface ChunkPosition {
   readonly index: number
 }
 
-export function readChunkPosition(value: unknown): ChunkPosition | null {
+function readChunkPosition(value: unknown): ChunkPosition | null {
   if (!isRecord(value)) return null
   const batch = finiteNumber(value['batch'])
   const index = finiteNumber(value['index'])
@@ -88,10 +88,10 @@ export function readChunkPosition(value: unknown): ChunkPosition | null {
  * one stop control press must not make a conversation's history unreadable.
  * The transcript does not render these; see `seededFrom`.
  */
-export type MessageRole = 'user' | 'assistant' | 'system'
+type MessageRole = 'user' | 'assistant' | 'system'
 
 /** How far a projected text or reasoning part had got when the snapshot was taken. */
-export type PartState = 'streaming' | 'done'
+type PartState = 'streaming' | 'done'
 
 /**
  * One materialized part of a message. `text` and `reasoning` arrive complete
@@ -101,7 +101,7 @@ export type PartState = 'streaming' | 'done'
  * from silence. A tool part carries its call and whatever answer exists for
  * it at projection time.
  */
-export type MessagePartFacts =
+type MessagePartFacts =
   | { readonly kind: 'text'; readonly text: string; readonly state: PartState }
   | { readonly kind: 'reasoning'; readonly text: string; readonly state: PartState }
   | {
@@ -150,7 +150,7 @@ export interface ConversationMessageFacts {
 }
 
 /** How one submission ended, per the settlement records. */
-export interface SettlementFacts {
+interface SettlementFacts {
   readonly submissionId: string
   readonly outcome: 'completed' | 'failed' | 'aborted'
   readonly result: { readonly present: boolean; readonly value: unknown }
@@ -178,7 +178,7 @@ export interface SettlementFacts {
  * fabricated success. `details` also exists on the wire but was empty in
  * every capture; it stays unmirrored until something needs it.
  */
-export interface SettlementErrorFacts {
+interface SettlementErrorFacts {
   /** Whether the wire carried an error object at all. */
   readonly present: boolean
   /** The error class name — "FlueError", "FlueHttpError". */
@@ -231,7 +231,7 @@ export interface Present<T> {
   readonly value: T | undefined
 }
 
-export function absent(): Present<never> {
+function absent(): Present<never> {
   return { present: false, value: undefined }
 }
 
@@ -345,7 +345,7 @@ function readParts(value: unknown): readonly MessagePartFacts[] | null {
   return parts
 }
 
-export function readConversationMessage(value: unknown): ConversationMessageFacts | null {
+function readConversationMessage(value: unknown): ConversationMessageFacts | null {
   if (!isRecord(value)) return null
   const id = text(value['id'])
   const role = oneOf(['user', 'assistant', 'system'] as const, value['role'])
@@ -419,7 +419,7 @@ export function readConversationSnapshot(value: unknown): ConversationSnapshotFa
 /* -------------------------------------------------------------------------- */
 
 /** How a settled turn ended; absent on everything else. */
-export type TurnOutcome = 'completed' | 'failed' | 'aborted'
+type TurnOutcome = 'completed' | 'failed' | 'aborted'
 
 /**
  * What one projected chunk says, mirrored from `ConversationStreamChunk`.

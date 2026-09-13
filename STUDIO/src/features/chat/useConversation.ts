@@ -172,7 +172,7 @@ export interface ConversationView {
 /* -------------------------------------------------------------------------- */
 
 /** What one contact attempt found. `starting` is a fact, not an absence. */
-export type HarnessContact =
+type HarnessContact =
   | { readonly kind: 'ready'; readonly client: ConversationClient }
   | { readonly kind: 'starting' }
   | { readonly kind: 'absent' }

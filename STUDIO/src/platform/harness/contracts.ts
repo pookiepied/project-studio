@@ -100,15 +100,15 @@ function listOf<T>(parse: (value: unknown) => T | null, value: unknown): readonl
 /* -------------------------------------------------------------------------- */
 
 /** `providerKindSchema`. */
-export const PROVIDER_KINDS = ['language', 'media', 'retrieval'] as const
+const PROVIDER_KINDS = ['language', 'media', 'retrieval'] as const
 export type ProviderKind = (typeof PROVIDER_KINDS)[number]
 
 /** `providerSourceSchema`. `local` is this machine's store; `test` is the double. */
-export const PROVIDER_SOURCES = ['local', 'test'] as const
-export type ProviderSource = (typeof PROVIDER_SOURCES)[number]
+const PROVIDER_SOURCES = ['local', 'test'] as const
+type ProviderSource = (typeof PROVIDER_SOURCES)[number]
 
 /** `languageProtocolSchema`. */
-export const LANGUAGE_PROTOCOLS = [
+const LANGUAGE_PROTOCOLS = [
   'openai-completions',
   'openai-responses',
   'anthropic-messages',
@@ -119,7 +119,7 @@ export const LANGUAGE_PROTOCOLS = [
 export type LanguageProtocol = (typeof LANGUAGE_PROTOCOLS)[number]
 
 /** `mediaProtocolSchema`. */
-export const MEDIA_PROTOCOLS = [
+const MEDIA_PROTOCOLS = [
   'openai',
   'openrouter',
   'google',
@@ -129,30 +129,30 @@ export const MEDIA_PROTOCOLS = [
   'fish-audio',
   'minimax',
 ] as const
-export type MediaProtocol = (typeof MEDIA_PROTOCOLS)[number]
+type MediaProtocol = (typeof MEDIA_PROTOCOLS)[number]
 
 /** `retrievalProtocolSchema`. */
-export const RETRIEVAL_PROTOCOLS = ['brave', 'tavily', 'exa', 'firecrawl', 'jina'] as const
-export type RetrievalProtocol = (typeof RETRIEVAL_PROTOCOLS)[number]
+const RETRIEVAL_PROTOCOLS = ['brave', 'tavily', 'exa', 'firecrawl', 'jina'] as const
+type RetrievalProtocol = (typeof RETRIEVAL_PROTOCOLS)[number]
 
 /** `invocationShapeSchema`. How the harness issues a call and waits for it. */
-export const INVOCATION_SHAPES = ['stream', 'sync', 'poll'] as const
-export type InvocationShape = (typeof INVOCATION_SHAPES)[number]
+const INVOCATION_SHAPES = ['stream', 'sync', 'poll'] as const
+type InvocationShape = (typeof INVOCATION_SHAPES)[number]
 
 /**
  * `credentialStatusSchema`. What is known about a key without holding it:
  * the store has one, the process inherited one, or there is none.
  */
-export const CREDENTIAL_STATUSES = ['set', 'from-env', 'absent'] as const
+const CREDENTIAL_STATUSES = ['set', 'from-env', 'absent'] as const
 export type CredentialStatus = (typeof CREDENTIAL_STATUSES)[number]
 
 /** `capabilityStateSchema` from `contracts/models.ts`. */
-export const CAPABILITY_STATES = ['supported', 'unsupported', 'unknown'] as const
+const CAPABILITY_STATES = ['supported', 'unsupported', 'unknown'] as const
 export type CapabilityState = (typeof CAPABILITY_STATES)[number]
 
 /** `providerModelSchema.origin`. Why a model is in the list at all. */
-export const MODEL_ORIGINS = ['catalog', 'manual', 'fetched'] as const
-export type ModelOrigin = (typeof MODEL_ORIGINS)[number]
+const MODEL_ORIGINS = ['catalog', 'manual', 'fetched'] as const
+type ModelOrigin = (typeof MODEL_ORIGINS)[number]
 
 /**
  * The reasoning levels a model may support, mirrored from
@@ -176,7 +176,7 @@ export type ReasoningLevel = (typeof REASONING_LEVELS)[number]
  * another on the user's behalf, so the translation happens here, on this side
  * of the boundary, and nowhere else.
  */
-export const EXECUTION_MODES = ['manual', 'auto-edit', 'full-auto'] as const
+const EXECUTION_MODES = ['manual', 'auto-edit', 'full-auto'] as const
 export type ExecutionModeWire = (typeof EXECUTION_MODES)[number]
 
 const MODE_TO_WIRE: Record<PermissionMode, ExecutionModeWire> = {
@@ -205,8 +205,8 @@ export function executionModeFromWire(value: ExecutionModeWire): PermissionMode 
  * A reasoning choice as the index stores it: a level, or "default" - the
  * provider's own behaviour. Mirrored from `reasoningChoiceSchema`.
  */
-export const REASONING_CHOICES = ['default', ...REASONING_LEVELS] as const
-export type ReasoningChoice = (typeof REASONING_CHOICES)[number]
+const REASONING_CHOICES = ['default', ...REASONING_LEVELS] as const
+type ReasoningChoice = (typeof REASONING_CHOICES)[number]
 
 /** `CAPABILITY_SLOTS`. The `capability` filter `GET /models` accepts. */
 export const CAPABILITY_SLOTS = [
@@ -243,7 +243,7 @@ export interface ConnectionServes {
  * and fetch are retrieval, everything else that generates or transcribes is
  * media, and a model that supports nothing recognisable is language.
  */
-export function kindOfCapability(capability: ModelCapability): ProviderKind {
+function kindOfCapability(capability: ModelCapability): ProviderKind {
   if (capability.textGeneration === 'supported') return 'language'
   if (capability.webSearch === 'supported' || capability.webFetch === 'supported') return 'retrieval'
   const media: readonly (keyof ModelCapability)[] = [
@@ -290,7 +290,7 @@ export function connectionKinds(connection: { readonly serves: ConnectionServes 
   return PROVIDER_KINDS.filter((kind) => connection.serves[kind] !== undefined)
 }
 
-export function parseConnectionServes(value: unknown): ConnectionServes | null {
+function parseConnectionServes(value: unknown): ConnectionServes | null {
   if (!isRecord(value)) return null
   const language = value['language'] === undefined ? undefined : oneOf(LANGUAGE_PROTOCOLS, value['language'])
   const media = value['media'] === undefined ? undefined : oneOf(MEDIA_PROTOCOLS, value['media'])
@@ -348,7 +348,7 @@ export type ProviderConnectionDraft = Omit<ProviderConnection, 'credential'> & {
  * What one patch may say about the kinds a connection serves: a protocol
  * adds or re-wires the kind, `null` removes it, absent leaves it alone.
  */
-export interface ConnectionServesPatch {
+interface ConnectionServesPatch {
   readonly language?: LanguageProtocol | null
   readonly media?: MediaProtocol | null
   readonly retrieval?: RetrievalProtocol | null
@@ -684,7 +684,7 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
   }
 }
 
-export function parseModelPricing(value: unknown): ModelPricing | null {
+function parseModelPricing(value: unknown): ModelPricing | null {
   if (!isRecord(value)) return null
   const input = numberOrUnknown(value['input'])
   const output = numberOrUnknown(value['output'])
@@ -696,7 +696,7 @@ export function parseModelPricing(value: unknown): ModelPricing | null {
   return { input, output, cacheRead, cacheWrite }
 }
 
-export function parseReasoningLevels(value: unknown): readonly ReasoningLevel[] | null {
+function parseReasoningLevels(value: unknown): readonly ReasoningLevel[] | null {
   // Absent parses as empty: records written before this field existed are
   // models the harness knew no levels for, which is what empty says.
   if (value === undefined) return []
@@ -764,7 +764,7 @@ export function parseProviderModels(value: unknown): readonly ProviderModel[] | 
   return listOf(parseProviderModel, value)
 }
 
-export function parseLibraryProvider(value: unknown): LibraryProvider | null {
+function parseLibraryProvider(value: unknown): LibraryProvider | null {
   if (!isRecord(value)) return null
 
   const id = text(value['id'])
@@ -907,7 +907,7 @@ export interface ConversationRecord {
 }
 
 /** The marks a project may wear; mirrored from `projectIconSchema`. */
-export const PROJECT_ICON_KEYS = [
+const PROJECT_ICON_KEYS = [
   'arc',
   'stack',
   'grid',
@@ -918,9 +918,9 @@ export const PROJECT_ICON_KEYS = [
   'diamond',
 ] as const
 
-export type ProjectIconKey = (typeof PROJECT_ICON_KEYS)[number]
+type ProjectIconKey = (typeof PROJECT_ICON_KEYS)[number]
 
-export interface ProjectFolderRecord {
+interface ProjectFolderRecord {
   readonly id: string
   readonly name: string
   readonly path: string
@@ -1013,7 +1013,7 @@ export function parseConversationRecords(value: unknown): readonly ConversationR
   return listOf(parseConversationRecord, value)
 }
 
-export function parseProjectFolder(value: unknown): ProjectFolderRecord | null {
+function parseProjectFolder(value: unknown): ProjectFolderRecord | null {
   if (!isRecord(value)) return null
   const id = text(value['id'])
   const name = text(value['name'])
@@ -1105,7 +1105,7 @@ export interface ConversationPatch {
  * was destroyed and what was not, so a partial failure is legible instead
  * of being flattened into "removed".
  */
-export interface PurgeDetail {
+interface PurgeDetail {
   readonly indexRow: boolean
   readonly tree: boolean
   readonly journal: boolean
@@ -1237,16 +1237,14 @@ export interface ProjectPatch {
  */
 
 /** The verdict half of an answer; the harness accepts nothing else. */
-export const APPROVAL_VERDICTS = ['allow', 'deny'] as const
-export type ApprovalVerdict = (typeof APPROVAL_VERDICTS)[number]
+type ApprovalVerdict = 'allow' | 'deny'
 
 /**
  * How long an allow lasts. `always` outlives the conversation: a real grant
  * in the harness's store, which is why the prompt that offers it treats it as
  * the heavier choice.
  */
-export const GRANT_DURATIONS = ['once', 'conversation', 'always'] as const
-export type GrantDuration = (typeof GRANT_DURATIONS)[number]
+export type GrantDuration = 'once' | 'conversation' | 'always'
 
 export interface ApprovalAnswer {
   readonly verdict: ApprovalVerdict
@@ -1265,7 +1263,7 @@ export interface ApprovalAnswer {
 }
 
 /** One rung of the scope ladder the kernel offered; rendered, never invented here. */
-export interface ApprovalScopeOption {
+interface ApprovalScopeOption {
   readonly id: string
   readonly label: string
   readonly detail: string
@@ -1282,7 +1280,7 @@ export interface ApprovalScopeOption {
 }
 
 /** Why the kernel asked. `policy` asks survive every mode and are worth explaining. */
-export type DecisionSourceWire = 'policy' | 'grant' | 'default'
+type DecisionSourceWire = 'policy' | 'grant' | 'default'
 
 export interface PendingApprovalRecord {
   readonly id: string
@@ -1302,7 +1300,7 @@ export interface PendingApprovalRecord {
   readonly reason: string
 }
 
-export function parsePendingApproval(value: unknown): PendingApprovalRecord | null {
+function parsePendingApproval(value: unknown): PendingApprovalRecord | null {
   if (!isRecord(value)) return null
 
   const id = text(value['id'])
@@ -1391,14 +1389,14 @@ export function parsePendingApprovals(
  */
 
 /** One choice on a question, as the ask card renders it. */
-export interface PendingQuestionOption {
+interface PendingQuestionOption {
   readonly id: string
   readonly label: string
   /** What happens if this option is chosen, said before the choice. */
   readonly description: string
 }
 
-export interface PendingQuestionPayload {
+interface PendingQuestionPayload {
   readonly question: string
   /** A short label, at most twelve characters, for the compact display. */
   readonly header: string
@@ -1425,7 +1423,7 @@ export interface PendingQuestionRecord {
   readonly payload: PendingQuestionPayload
 }
 
-export function parsePendingQuestion(value: unknown): PendingQuestionRecord | null {
+function parsePendingQuestion(value: unknown): PendingQuestionRecord | null {
   if (!isRecord(value)) return null
 
   const id = text(value['id'])
@@ -1654,7 +1652,7 @@ export type McpAuthKind = (typeof MCP_AUTH_KINDS)[number]
  * not, and a screen that showed them the same way would leave someone waiting
  * for a retry that is never coming.
  */
-export const MCP_STATES = [
+const MCP_STATES = [
   'idle',
   'starting',
   'ready',
@@ -1672,8 +1670,8 @@ export type McpState = (typeof MCP_STATES)[number]
  * choice to offer - and offering it would only give someone a way to be wrong
  * about their own server.
  */
-export const MCP_ERAS = ['modern', 'legacy'] as const
-export type McpEra = (typeof MCP_ERAS)[number]
+const MCP_ERAS = ['modern', 'legacy'] as const
+type McpEra = (typeof MCP_ERAS)[number]
 
 /**
  * Which scope produced the answer for a row.
@@ -1682,8 +1680,8 @@ export type McpEra = (typeof MCP_ERAS)[number]
  * just "on". Absent means nothing anywhere had an opinion, which resolves to
  * off.
  */
-export const SCOPE_KINDS = ['global', 'project', 'conversation'] as const
-export type ScopeKind = (typeof SCOPE_KINDS)[number]
+const SCOPE_KINDS = ['global', 'project', 'conversation'] as const
+type ScopeKind = (typeof SCOPE_KINDS)[number]
 
 /**
  * What one scope has decided, and what the whole chain answers.
@@ -1706,7 +1704,7 @@ export interface McpScopeReading {
   readonly decidedAt?: ScopeKind
 }
 
-export interface McpServerStatus {
+interface McpServerStatus {
   readonly state: McpState
   /** Failed starts so far. Zero unless the state is failed or given-up. */
   readonly attempts: number
@@ -1728,9 +1726,9 @@ export interface McpServerStatus {
  * one day returned a secret could not smuggle it through a spread.
  */
 /** Whose server this is, and therefore whether its tools load eagerly. */
-export type McpProvenance = 'system' | 'user'
+type McpProvenance = 'system' | 'user'
 
-export const MCP_PROVENANCES = ['system', 'user'] as const
+const MCP_PROVENANCES = ['system', 'user'] as const
 
 export interface McpServerRecord {
   readonly id: string
@@ -1980,24 +1978,10 @@ export type McpServerDraft = Omit<
 }
 
 export {
-  absent,
-  present,
   readChunkFacts,
-  readChunkPosition,
-  readConversationMessage,
   readConversationSnapshot,
   type ChunkFacts,
-  type ChunkPosition,
-  type ConversationMessageFacts,
   type ConversationSnapshotFacts,
-  type MessagePartFacts,
-  type MessageRole,
-  type ModelRefFacts,
-  type Present,
-  type SettlementErrorFacts,
-  type SettlementFacts,
-  type TurnOutcome,
-  type UsageFacts,
 } from './conversation-chunks'
 
 /* -------------------------------------------------------------------------- */
@@ -2011,13 +1995,13 @@ export {
  * here the same way they are kept apart in the pane.
  */
 
-export const SANDBOX_LEVELS = ['contained', 'trusted'] as const
+const SANDBOX_LEVELS = ['contained', 'trusted'] as const
 export type SandboxLevel = (typeof SANDBOX_LEVELS)[number]
 
-export const SANDBOX_SCOPE_MODES = ['read', 'write'] as const
+const SANDBOX_SCOPE_MODES = ['read', 'write'] as const
 export type SandboxScopeMode = (typeof SANDBOX_SCOPE_MODES)[number]
 
-export const SANDBOX_SCOPE_SOURCES = ['preset', 'custom', 'question'] as const
+const SANDBOX_SCOPE_SOURCES = ['preset', 'custom', 'question'] as const
 export type SandboxScopeSource = (typeof SANDBOX_SCOPE_SOURCES)[number]
 
 export interface SandboxScopeRow {
@@ -2040,8 +2024,8 @@ export interface SandboxScopeRow {
  * ordinary case.
  */
 
-export const TRUST_DECISIONS = ['trusted', 'untrusted', 'undecided'] as const
-export type TrustDecision = (typeof TRUST_DECISIONS)[number]
+const TRUST_DECISIONS = ['trusted', 'untrusted', 'undecided'] as const
+type TrustDecision = (typeof TRUST_DECISIONS)[number]
 
 export interface FolderTrust {
   readonly root: string
@@ -2057,7 +2041,7 @@ export interface SandboxScopeInfo {
   readonly trust: readonly FolderTrust[]
 }
 
-export interface DetectedPresetPath {
+interface DetectedPresetPath {
   readonly path: string
   readonly mode: SandboxScopeMode
 }
@@ -2089,10 +2073,6 @@ export function parseSandboxScopeRow(value: unknown): SandboxScopeRow | null {
   return { projectId, path, mode, source, presetId: presetId.value, grantedAt }
 }
 
-export function parseSandboxScopeRows(value: unknown): readonly SandboxScopeRow[] | null {
-  return listOf(parseSandboxScopeRow, value)
-}
-
 export function parseFolderTrust(value: unknown): FolderTrust | null {
   if (!isRecord(value)) return null
   const root = text(value['root'])
@@ -2112,7 +2092,7 @@ export function parseSandboxScopeInfo(value: unknown): SandboxScopeInfo | null {
   return { project, machineWide, level, trust }
 }
 
-export function parseDetectedPreset(value: unknown): DetectedPreset | null {
+function parseDetectedPreset(value: unknown): DetectedPreset | null {
   if (!isRecord(value)) return null
   const id = text(value['id'])
   const title = text(value['title'])
@@ -2144,7 +2124,7 @@ export function parseDetectedPresets(value: unknown): readonly DetectedPreset[] 
  * harness-error carrying `validateFolderPath`'s sentence.
  */
 
-export interface BrowsedDirectory {
+interface BrowsedDirectory {
   readonly name: string
   readonly path: string
 }
@@ -2158,7 +2138,7 @@ export interface FolderListing {
   readonly directories: readonly BrowsedDirectory[]
 }
 
-export function parseBrowsedDirectory(value: unknown): BrowsedDirectory | null {
+function parseBrowsedDirectory(value: unknown): BrowsedDirectory | null {
   if (!isRecord(value)) return null
   const name = text(value['name'])
   const path = text(value['path'])
@@ -2287,7 +2267,7 @@ export function parseMediaJobs(value: unknown): readonly MediaJob[] {
   })
 }
 
-export function parseMediaJob(value: unknown): MediaJob | null {
+function parseMediaJob(value: unknown): MediaJob | null {
   if (typeof value !== 'object' || value === null) return null
   const row = value as Record<string, unknown>
   const id = row['id']

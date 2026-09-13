@@ -20,9 +20,9 @@ import { improveDictation, type ImproveOutcome } from '@/features/voice/improve'
  * typed before or after.
  */
 
-export type ImproveOfferState = 'ready' | 'working' | 'improved'
+type ImproveOfferState = 'ready' | 'working' | 'improved'
 
-export interface ImproveOffer {
+interface ImproveOffer {
   readonly state: ImproveOfferState
   /** The words the offer is about: the field's current tail. */
   readonly span: string

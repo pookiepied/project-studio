@@ -52,37 +52,6 @@
  * as emphasis.
  */
 
-type TypeRole = 'micro' | 'caption' | 'ui' | 'body' | 'title' | 'display'
-
-interface TypeStep {
-  /** Font size in px at the default `--ui-size`, before a preference moves it. */
-  readonly size: number
-  readonly lineHeight: number
-  /** The icon size that reads as equal weight beside this text. */
-  readonly icon: number
-}
-
-/**
- * The pairing of record. `index.css` derives its `--text-*` and `--icon-*`
- * variables to match this table at the default `--ui-size`; it is exported so
- * the two sides of that agreement have one place to be read from, and so a
- * future settings surface can describe the pairing without re-deriving it.
- */
-export const TYPE: Record<TypeRole, TypeStep> = {
-  /** Section headers, badges, counts. Carries weight and open tracking. */
-  micro: { size: 10, lineHeight: 1.45, icon: 11 },
-  /** Secondary labels, menu hints, notes. Separated by colour, not size. */
-  caption: { size: 11, lineHeight: 1.5, icon: 13 },
-  /** The workhorse: buttons, menus, the sidebar, the composer. */
-  ui: { size: 12, lineHeight: 1.55, icon: 13 },
-  /** Transcript prose, and nothing else. Level with `ui`; see index.css. */
-  body: { size: 12, lineHeight: 1.7, icon: 13 },
-  /** Section headings. */
-  title: { size: 19, lineHeight: 1.3, icon: 21 },
-  /** Page titles and greetings. Serif. */
-  display: { size: 31, lineHeight: 1.15, icon: 31 },
-}
-
 /**
  * What the appearance settings may offer.
  *

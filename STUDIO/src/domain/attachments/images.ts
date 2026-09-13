@@ -35,7 +35,7 @@ import type { SeamFailure, TurnImageWire } from '@/platform/harness'
  * megabytes of binary encodes just under Flue's fourteen-million-character
  * base64 ceiling with the JSON wrapper still to spend.
  */
-export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
+const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 export type ImageMimeType = (typeof IMAGE_MIME_TYPES)[number]
 
 /** How many images one turn may carry. */

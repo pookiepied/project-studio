@@ -10,7 +10,7 @@ type Role = 'user' | 'assistant'
  * kind of content with a different default: collapsed. Folding it into the text
  * would mean the transcript had to parse it back out to hide it.
  */
-export interface Thinking {
+interface Thinking {
   readonly text: string
   /** Seconds spent. Shown in the collapsed header, so it is worth the glance. */
   readonly seconds: number

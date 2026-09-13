@@ -51,7 +51,7 @@ export interface StreamChannel {
 /** Builds the channel a stream's events arrive over; injectable for tests. */
 export type ChannelFactory = (onMessage: (message: WireStreamEvent) => void) => StreamChannel
 
-export function defaultChannelFactory(
+function defaultChannelFactory(
   onMessage: (message: WireStreamEvent) => void,
 ): StreamChannel {
   return new Channel<WireStreamEvent>(onMessage)
@@ -70,7 +70,7 @@ export interface StreamHandle {
 }
 
 /** What a caller asks for when it wants to read a run. */
-export interface StreamRequest {
+interface StreamRequest {
   /** The path, carrying its view and nothing else. */
   readonly path: string
   /** The opaque offset to resume strictly after. */
@@ -88,7 +88,7 @@ export type OpenStream = (request: StreamRequest) => StreamHandle
 /* The desktop window: Rust reads, and says what it read                       */
 /* -------------------------------------------------------------------------- */
 
-export function commandStream(invoke: ServiceInvoke, createChannel: ChannelFactory): OpenStream {
+function commandStream(invoke: ServiceInvoke, createChannel: ChannelFactory): OpenStream {
   return ({ path, offset, onEvent, streamId }) => {
     const channel = createChannel((raw) => {
       const event = parseWireStreamEvent(raw)

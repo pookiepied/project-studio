@@ -23,7 +23,7 @@
  */
 
 /** A smoothed level at or above this counts as speech. Ordinary speech sits well above. */
-export const SPEECH_LEVEL = 0.06
+const SPEECH_LEVEL = 0.06
 /** How long a level under `SPEECH_LEVEL` must last, after speech, to be a pause. */
 export const PAUSE_MS = 700
 /** A segment that has not paused by this long is cut regardless. */

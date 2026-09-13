@@ -43,7 +43,7 @@ const STATE_POLL_MS = 4_000
 /** How often the addresses are re-read. */
 const ADDRESS_POLL_MS = 30_000
 
-export type Reach = 'unknown' | 'off' | 'on'
+type Reach = 'unknown' | 'off' | 'on'
 
 export interface RemoteAccessView {
   readonly reach: Reach

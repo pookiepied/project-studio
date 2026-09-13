@@ -206,7 +206,7 @@ export type MessageEnd =
   | { readonly state: 'failed'; readonly reason: string | null }
   | { readonly state: 'aborted'; readonly reason: string | null }
 
-export interface UserAttachmentView {
+interface UserAttachmentView {
   readonly mediaType: string
   readonly filename: string | null
   readonly size: number | null
@@ -309,7 +309,7 @@ export interface TranscriptProjection {
 }
 
 /** Where a message's open file run lives, and what it is a run of. */
-export interface OpenFileRun {
+interface OpenFileRun {
   readonly segmentIndex: number
   readonly groupIndex: number
   readonly file: string
@@ -1023,21 +1023,6 @@ export function isMessageBeingWritten(
     item.kind === 'assistant' &&
     item.end.state === 'stopped'
   )
-}
-
-/**
- * Whether this item has anything on screen for a reader to look at.
- *
- * An assistant message exists from `message-started`, which is a fact about
- * the LOG, not about the page: until its first delta lands it has no segments
- * and renders as an empty box. Anything deciding what the tail of a
- * transcript should look like has to ask this rather than "is there an
- * assistant message", or it hands the screen over to a record with nothing in
- * it — which is exactly the second or more of blankness between the working
- * mark disappearing and the first reasoning arriving.
- */
-export function hasVisibleContent(item: TranscriptItem): boolean {
-  return item.kind === 'assistant' ? item.segments.length > 0 : true
 }
 
 /** A projection built from nothing but a snapshot — the cold start's opening state. */

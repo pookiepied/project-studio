@@ -5,7 +5,7 @@ import type {
   ProviderConnection,
   ProviderModel,
 } from '@/platform/harness'
-import { REASONING_LEVEL_NOTES, type ReasoningChoice, type ReasoningLevel } from './types'
+import type { ReasoningLevel } from './types'
 
 /**
  * The model catalog as the picker sees it: the harness's own list, mapped once
@@ -65,7 +65,7 @@ export interface CatalogModel {
  * when it names one, otherwise the connection itself - the normal case for a
  * self-hosted endpoint, whose models are keyed by their own id.
  */
-export function connectionVendorOf(connection: ProviderConnection): string {
+function connectionVendorOf(connection: ProviderConnection): string {
   return connection.catalogProvider ?? connection.id
 }
 
@@ -75,13 +75,13 @@ export function connectionVendorOf(connection: ProviderConnection): string {
  * slash in it claims the prefix, and unknown authors fall back to the custom
  * mark at the component.
  */
-export function authorOf(modelId: string, vendor: string): string {
+function authorOf(modelId: string, vendor: string): string {
   const separator = modelId.indexOf('/')
   return separator > 0 ? modelId.slice(0, separator) : vendor
 }
 
 /** Maps one wire model onto the picker's row, against its connection. */
-export function catalogModelOf(
+function catalogModelOf(
   model: ProviderModel,
   connection: ProviderConnection | undefined,
 ): CatalogModel {
@@ -147,7 +147,7 @@ export function findCatalogModel(
  * at a model this catalog no longer carries - both are "nothing to show", and
  * neither is worth inventing a row for.
  */
-export function findDefaultModel(catalog: {
+function findDefaultModel(catalog: {
   readonly models: readonly CatalogModel[]
   readonly defaults: DefaultSelection
 }): CatalogModel | undefined {
@@ -186,6 +186,3 @@ export function resolveTurnModel(
 }
 
 /** Display copy for a reasoning level. */
-export function reasoningChoiceNote(choice: ReasoningChoice): string {
-  return REASONING_LEVEL_NOTES.find((level) => level.id === choice)?.note ?? choice
-}

@@ -116,7 +116,7 @@ export interface StorePhase {
  * catalog the harness will not serve must not blank the sidebar, and an index
  * that failed must not hide the picker's state behind the sidebar's error.
  */
-export interface CatalogPhase {
+interface CatalogPhase {
   readonly status: 'loading' | 'ready' | 'no-harness' | 'failed'
   readonly error: HarnessFailure | null
 }

@@ -40,7 +40,7 @@ export type ProbeState =
   | { readonly status: 'done'; readonly result: ProbeResult }
   | { readonly status: 'failed'; readonly error: HarnessFailure }
 
-export type ProvidersView =
+type ProvidersView =
   /** `resolveHarnessAddress()` returned null. */
   | { readonly status: 'no-harness' }
   | { readonly status: 'loading' }
@@ -97,7 +97,7 @@ export interface Providers {
  */
 export type HarnessConnect = () => Promise<HarnessClient | null>
 
-export async function connectToHarness(): Promise<HarnessClient | null> {
+async function connectToHarness(): Promise<HarnessClient | null> {
   const address = await resolveHarnessAddress()
   return address === null ? null : createHarnessClient(address)
 }

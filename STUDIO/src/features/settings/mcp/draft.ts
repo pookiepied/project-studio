@@ -14,7 +14,7 @@ import {
  * the two halves of the repo share no code. If they drift, the harness wins
  * and the person meets its refusal instead of this one.
  */
-export const DESCRIPTION_LIMIT = 300
+const DESCRIPTION_LIMIT = 300
 
 /**
  * The dialog's working copy of a server.

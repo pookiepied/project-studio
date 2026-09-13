@@ -92,7 +92,7 @@ import type { PermissionMode } from '@/domain/permissions/modes'
 // The seam types live in `stream.ts` beside the two implementations that
 // satisfy them, and are re-exported here because this module's own options
 // are where callers meet them.
-export type { ChannelFactory, OpenStream, ServiceInvoke, StreamChannel }
+export type { ServiceInvoke, StreamChannel }
 
 /* -------------------------------------------------------------------------- */
 /* Failures and results                                                        */
@@ -141,7 +141,7 @@ function nonEmpty(value: unknown): string | null {
  * An unclassifiable rejection stays `unreachable` with whatever sentence
  * travelled with it — never swallowed.
  */
-export function seamFailure(value: unknown): SeamFailure {
+function seamFailure(value: unknown): SeamFailure {
   if (!isRecord(value) || typeof value['kind'] !== 'string') {
     return {
       kind: 'unreachable',
@@ -181,7 +181,7 @@ export type TurnResult<T> =
   | { readonly ok: false; readonly error: SeamFailure }
 
 /** The receipt for one submitted turn: where its events begin. */
-export interface SubmittedTurn {
+interface SubmittedTurn {
   /** Server-assigned; correlates the turn's messages and its settlement. */
   readonly submissionId: string
   /** Opaque stream offset captured at admission. Reading from here yields this turn. */
@@ -318,7 +318,7 @@ export type ConversationDelivery =
   | { readonly kind: 'keep-alive'; readonly offset: string }
   | { readonly kind: 'ended'; readonly offset: string }
 
-export interface AttachHandlers {
+interface AttachHandlers {
   onEvent: (delivery: ConversationDelivery) => void
 }
 
@@ -331,14 +331,14 @@ export interface AttachHandlers {
  * nothing to read, nothing broke, and submitting the first turn will
  * create what this read could not find.
  */
-export type StreamSettlement =
+type StreamSettlement =
   | { readonly outcome: 'ended' }
   | { readonly outcome: 'absent' }
   | { readonly outcome: 'cancelled' }
   | { readonly outcome: 'broken'; readonly failure: SeamFailure }
   | { readonly outcome: 'refused'; readonly failure: SeamFailure }
 
-export interface AttachHandle {
+interface AttachHandle {
   /** Settles once, when the underlying read finishes for any reason. */
   readonly settled: Promise<StreamSettlement>
   /** Stops THIS READ promptly through the cancellation registry. Idempotent. */

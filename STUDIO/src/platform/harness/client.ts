@@ -108,7 +108,7 @@ import { harnessTransport } from './transport'
  * over the slowest path and is still short enough that a wedged harness is
  * visible rather than a hang.
  */
-export const DEFAULT_TIMEOUT_MS = 12_000
+const DEFAULT_TIMEOUT_MS = 12_000
 
 /** Where the harness is and what proves we may talk to it. */
 export interface HarnessAddress {
@@ -166,7 +166,7 @@ export type HarnessResult<T> =
   | { readonly ok: false; readonly error: HarnessFailure }
 
 /** Filter accepted by `GET /api/providers/models`. */
-export interface ModelFilter {
+interface ModelFilter {
   readonly connectionId?: string
   readonly kind?: ProviderKind
   readonly capability?: CapabilitySlot

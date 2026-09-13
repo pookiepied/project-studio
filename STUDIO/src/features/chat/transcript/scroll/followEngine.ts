@@ -62,7 +62,7 @@ export interface Follower {
  * Per-step options. Everything defaults to the streaming follow's own
  * behaviour; callers pass things only when a step means something else.
  */
-export interface StepOptions {
+interface StepOptions {
   /**
    * Take a navigation-sized distance instantly rather than gliding through
    * it. True by default -- a jump this large mid-stream is disorientation

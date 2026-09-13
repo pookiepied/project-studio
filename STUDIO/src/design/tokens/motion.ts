@@ -120,21 +120,21 @@ export const ENTER = {
  */
 export type SurfaceMove = 'push' | 'pop' | 'sibling'
 
-export const SURFACE_PUSH = {
+const SURFACE_PUSH = {
   initial: { opacity: 0, x: 32 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -24 },
   transition: { duration: DURATION.slow, ease: EASE_OUT },
 } as const
 
-export const SURFACE_POP = {
+const SURFACE_POP = {
   initial: { opacity: 0, x: -32 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: 24 },
   transition: { duration: DURATION.slow, ease: EASE_OUT },
 } as const
 
-export const SURFACE_SIBLING = {
+const SURFACE_SIBLING = {
   initial: { opacity: 0 },
   animate: { opacity: 1 },
   exit: { opacity: 0 },
@@ -142,7 +142,7 @@ export const SURFACE_SIBLING = {
 } as const
 
 /** The transition preset for a move between surfaces. */
-export function surfaceTransition(move: SurfaceMove) {
+function surfaceTransition(move: SurfaceMove) {
   return move === 'push' ? SURFACE_PUSH : move === 'pop' ? SURFACE_POP : SURFACE_SIBLING
 }
 

@@ -32,16 +32,6 @@ export interface SceneState {
   readonly build: Stage
 }
 
-export const SCENE_START: SceneState = {
-  search: 'pending',
-  image: 'pending',
-  video: 'pending',
-  issue: 'pending',
-  mail: 'pending',
-  calendar: 'pending',
-  build: 'pending',
-}
-
 export const SCENE_DONE: SceneState = {
   search: 'done',
   image: 'done',
@@ -420,25 +410,3 @@ export function renderScene(state: SceneState): string {
 
   return parts.join('\n\n')
 }
-
-/**
- * The order things happen in, and when.
- *
- * Overlapping on purpose: two artifacts are working at once for part of it,
- * because that is what a real turn looks like and because a demo that resolves
- * each card before starting the next never exercises the case where several
- * are animating together.
- */
-export const SCENE_SCRIPT: readonly { readonly at: number; readonly patch: Partial<SceneState> }[] =
-  [
-    { at: 300, patch: { search: 'running' } },
-    { at: 2200, patch: { search: 'done', image: 'running' } },
-    { at: 4200, patch: { video: 'running' } },
-    { at: 5200, patch: { image: 'done' } },
-    { at: 7000, patch: { video: 'done', issue: 'running' } },
-    { at: 8200, patch: { mail: 'running' } },
-    { at: 9200, patch: { issue: 'done', calendar: 'running' } },
-    { at: 10400, patch: { mail: 'done' } },
-    { at: 11400, patch: { calendar: 'done', build: 'running' } },
-    { at: 13600, patch: { build: 'done' } },
-  ]

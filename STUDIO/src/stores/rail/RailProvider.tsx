@@ -116,7 +116,7 @@ export function jobsEntryId(conversationId: string): string {
 }
 
 /** The id of a conversation's browser preview. Keyed the same way. */
-export function browserEntryId(conversationId: string): string {
+function browserEntryId(conversationId: string): string {
   return `browser:${conversationId}`
 }
 

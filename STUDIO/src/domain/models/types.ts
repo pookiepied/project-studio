@@ -15,11 +15,9 @@
  * levels at all, and the control is absent rather than present and inert -
  * so "off" is not a choice either.
  */
-export const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
+const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 
 export type ReasoningLevel = (typeof REASONING_LEVELS)[number]
-
-export const REASONING_CHOICES = [...REASONING_LEVELS] as const
 
 export type ReasoningChoice = ReasoningLevel
 
