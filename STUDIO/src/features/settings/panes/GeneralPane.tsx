@@ -1,5 +1,6 @@
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, Popover, Segmented } from '@/components/primitives'
+import { PERMISSION_MODE_ICONS } from '@/features/chat/permissions/modeIcon'
 import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
 import { isTauri } from '@/platform/tauri'
@@ -30,7 +31,7 @@ export function GeneralPane() {
   const { settings, setSettings } = useWorkspace()
   const [open, setOpen] = useState(false)
   const mode = findPermissionMode(settings.permission)
-  const Glyph = mode.icon
+  const Glyph = PERMISSION_MODE_ICONS[mode.id]
   const onDesktop = isTauri()
 
   // Both desktop settings are read once when the pane opens rather than held

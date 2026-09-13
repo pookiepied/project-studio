@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { MenuItem, MenuLabel, Popover, Tooltip } from '@/components/primitives'
+import { PERMISSION_MODE_ICONS } from '@/features/chat/permissions/modeIcon'
 import { PERMISSION_MODES, findPermissionMode, type PermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -27,7 +28,7 @@ export function PermissionControl({ conversationId }: { conversationId: string |
   // A conversation the store has never heard of cannot have a stored mode,
   // and the window's setting is the truth.
   const mode = findPermissionMode(conversation?.permissionMode ?? settings.permission)
-  const Mark = mode.icon
+  const Mark = PERMISSION_MODE_ICONS[mode.id]
   const loud = mode.id === 'auto'
 
   const pick = (candidate: PermissionMode) => {

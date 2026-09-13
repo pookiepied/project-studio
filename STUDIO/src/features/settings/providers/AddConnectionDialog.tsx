@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { ProviderMark } from '@/features/models/ProviderMark'
+import { ProviderMark } from '@/features/models'
 import { Button, Dialog, MenuItem, Popover, TextField } from '@/components/primitives'
 import type {
   HarnessFailure,

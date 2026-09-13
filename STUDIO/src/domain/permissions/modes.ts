@@ -1,6 +1,3 @@
-import { Icons } from '@/components/icons'
-import type { IconComponent } from '@/components/icons'
-
 /**
  * Execution modes.
  *
@@ -17,6 +14,9 @@ import type { IconComponent } from '@/components/icons'
  * name into another on the user's behalf. The translation lives exactly once,
  * at the wire boundary (`platform/harness/contracts/`), so a change here
  * touches no component and no wire value.
+ *
+ * The glyph each mode wears lives with the components that draw it
+ * (`features/chat/permissions/modeIcon.ts`); this file is data only.
  */
 
 export type PermissionMode = 'manual' | 'edits' | 'auto'
@@ -28,7 +28,6 @@ export interface PermissionModeSpec {
   readonly note: string
   /** The longer form, for settings. */
   readonly detail: string
-  readonly icon: IconComponent
 }
 
 export const PERMISSION_MODES: readonly PermissionModeSpec[] = [
@@ -38,7 +37,6 @@ export const PERMISSION_MODES: readonly PermissionModeSpec[] = [
     note: 'Ask before everything.',
     detail:
       'Nothing runs without your approval. Every file write, command, and network request stops and asks first.',
-    icon: Icons.permissionManual,
   },
   {
     id: 'edits',
@@ -46,7 +44,6 @@ export const PERMISSION_MODES: readonly PermissionModeSpec[] = [
     note: 'Write files freely. Ask to run.',
     detail:
       'Reading and editing files inside the project happens without asking. Running commands and reaching the network still stop for approval.',
-    icon: Icons.permissionEdits,
   },
   {
     id: 'auto',
@@ -54,7 +51,6 @@ export const PERMISSION_MODES: readonly PermissionModeSpec[] = [
     note: 'Proceed unless a rule says ask.',
     detail:
       'Anything left at its default proceeds. Only the things a rule explicitly marks as ask will stop. Undo history still records every change.',
-    icon: Icons.permissionAuto,
   },
 ]
 

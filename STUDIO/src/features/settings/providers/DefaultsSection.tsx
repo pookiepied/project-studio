@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, MenuItem, Popover, TextField } from '@/components/primitives'
-import { ProviderMark } from '@/features/models/ProviderMark'
+import { ProviderMark } from '@/features/models'
 import type {
   CapabilitySlot,
   DefaultSelection,

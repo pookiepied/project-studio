@@ -46,32 +46,50 @@ src/
   design/       tokens and theme. the source of truth for every value
     tokens/     typography, geometry, motion
     theme/      appearance state, persistence, the root variables
-  components/
+  lib/          small pure helpers with no opinion about the app
+  components/   React with no knowledge of the domain
     icons/      the registry -- one glyph, one concept, enforced
     brand/      the Studio mark
     primitives/ Popover, Dialog, Tooltip, IconButton, Segmented, Button, Field
-  domain/       types and data. no React
+    placeholder/ the neutral shapes a thing takes before it has arrived
+    state/      Deferred, StateNote, RetryButton, WorkingDots: how waiting and failure look
+  domain/       types and data. no React, nothing from components/
     conversation/ the conversation record, and the gallery's identity
     turn/       turn settings and the context-window arithmetic
     failures/   what a failed turn's sentence means, and the remedy it earns
     browser/    a browser call's step and frame, as the rail and the transcript both read them
     models/     providers, models, effort, recent picks
     permissions/execution modes
-    projects/   projects, source folders, marks
-  stores/
+    projects/   projects, source folders, the names of their marks
+  stores/       app-wide state, one provider per concern
     workspace/  the index and its writes; LiveWorkProvider is what is running now, published apart
     navigation/ where the user is
-  features/
+    rail/       what the side rail holds open
+  features/     one folder per thing the app does; index.ts names what the shell mounts
     chat/       composer, transcript, markdown, code, thinking
       connection/ how a conversation reaches the harness: first turn, attach, fork
       gallery/  every artifact the app can draw, as one fixed transcript
+      transcript/projection/ the wire's chunks folded into rows
+    artifacts/  the renderers, and the registry from kind to renderer
+    rail/       the side rail's frame, its tabs, and the browser panel
+    jobs/       background commands: what is running, what it printed, how to end it
+    plans/      the conversation's plan, as a pill and a panel
+    models/     the model library, provider marks, and the catalog's states
+    voice/      dictation, voice mode, read-aloud
     home/ projects/ settings/ palette/
   platform/     the only files that touch the Tauri API
     tauri/      window and native menus
     harness/    the lifecycle events; contracts/ is the wire and client/ the routes, one file per concern
     store.ts    the one door to a preferences file
   shell/        window, top strip, sidebar, and menus/ for right-click and selection
+  showcase/     a second entry point that draws every primitive on one page. dev only
+tests/          checks that read the source tree from outside it; they cannot import what they scan
 ```
+
+A test sits beside the module it exercises and takes its name. When a test
+exercises a behaviour that crosses several files in one folder, it takes the
+behaviour's name instead (`connection/submitted-turn.test.tsx`), and it still
+sits in that folder.
 
 Two rules worth keeping:
 

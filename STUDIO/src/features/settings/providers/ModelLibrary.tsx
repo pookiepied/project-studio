@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { ProviderMark } from '@/features/models/ProviderMark'
+import { ProviderMark } from '@/features/models'
 import { Button, MenuItem, Popover, TextField } from '@/components/primitives'
 import type { ProviderConnection, ProviderModel } from '@/platform/harness'
 import { ALL_SLOTS, SLOT_LABELS } from '@/domain/models/slots'

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { ProviderMark } from '@/features/models/ProviderMark'
+import { CatalogStateNote, ModelLibraryDialog, ProviderMark } from '@/features/models'
 import {
   MenuItem,
   MenuLabel,
@@ -27,8 +27,6 @@ import {
 import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { loadRecentModelIds, rememberRecentModel } from '@/domain/models/recents'
 import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
-import { ModelLibraryDialog } from '@/features/models/ModelLibraryDialog'
-import { CatalogStateNote } from '@/features/models/CatalogStateNote'
 import { useNavigation } from '@/stores/navigation'
 import { useLiveWork, useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'

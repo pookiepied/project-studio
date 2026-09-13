@@ -6,7 +6,7 @@ import { InlineRename, MenuItem, MenuLabel, MenuSeparator, NavRow, Popover } fro
 import { ConversationExtensionsDialog } from '@/shell/ConversationExtensionsDialog'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { cn } from '@/lib/cn'
-import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
+import { ProjectIconMark } from '@/features/projects'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/conversation/types'

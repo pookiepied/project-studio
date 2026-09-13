@@ -12,7 +12,7 @@ import {
   reseeded,
   withPendingSubmission,
   type PendingSubmission,
-} from './projection'
+} from './index'
 
 /**
  * Words that have been sent and not yet echoed.
