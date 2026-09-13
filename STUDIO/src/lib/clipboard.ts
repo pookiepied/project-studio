@@ -50,3 +50,16 @@ function copyThroughSelection(text: string): boolean {
   if (previous instanceof HTMLElement) previous.focus({ preventScroll: true })
   return copied
 }
+
+/**
+ * The clipboard's text, or the empty string when it cannot be read: a
+ * runtime without the API, or one that refused. A paste that reads nothing
+ * inserts nothing; it does not explain itself.
+ */
+export async function readClipboardText(): Promise<string> {
+  try {
+    return await navigator.clipboard.readText()
+  } catch {
+    return ''
+  }
+}

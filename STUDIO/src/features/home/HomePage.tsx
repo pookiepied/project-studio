@@ -13,11 +13,16 @@ import { StartConversation } from '@/features/chat/composer'
  *
  * ---- The line -------------------------------------------------------------
  *
- * "What are we making?" was a prompt, and a prompt on an empty screen is the
- * software asking the user to perform. This says what Studio is instead, in the
- * voice the rest of the app is written in: plain, declarative, and about the
- * work rather than about the tool. It is the one display moment in the app, so
- * it carries the serif and the serif goes nowhere else.
+ * A greeting for the time of day, and nothing under it. It has been a prompt
+ * ("What are we making?") and a pair of claims ("A quieter way to work. /
+ * Everything it can do, none of it in the way."). The prompt asked the
+ * person to perform on an empty screen; the claims were the software
+ * describing itself to someone who had already opened it, and the second
+ * line meant nothing to anyone who had not read the design notes. A
+ * greeting is the one line that is about the person rather than the tool,
+ * and it is what the calmest screen in a well-made app tends to say. The
+ * field's placeholder does the inviting. This is the one display moment in
+ * the app, so it carries the serif and the serif goes nowhere else.
  *
  * ---- Where the first message goes ------------------------------------------
  *
@@ -26,7 +31,15 @@ import { StartConversation } from '@/features/chat/composer'
  * this surface decides is that a conversation started here belongs to no
  * project.
  */
+/** Morning until noon, afternoon until six, evening after. */
+export function greetingFor(hour: number): string {
+  if (hour < 12) return 'Good morning.'
+  if (hour < 18) return 'Good afternoon.'
+  return 'Good evening.'
+}
+
 export function HomePage() {
+  const greeting = greetingFor(new Date().getHours())
   return (
     <div
       className="flex h-full flex-col items-center justify-center"
@@ -39,10 +52,7 @@ export function HomePage() {
           transition={{ duration: DURATION.slow, ease: EASE_OUT }}
           className="mb-7 text-center"
         >
-          <h1 className="studio-display text-foreground">A quieter way to work.</h1>
-          <p className="mt-2 text-ui text-muted-foreground">
-            Everything it can do, none of it in the way.
-          </p>
+          <h1 className="studio-display text-foreground">{greeting}</h1>
         </motion.div>
 
         <motion.div

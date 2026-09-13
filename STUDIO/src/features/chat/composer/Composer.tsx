@@ -15,7 +15,7 @@ import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
-import { ImprovePill } from '@/features/chat/composer/ImprovePill'
+import { ImproveButton } from '@/features/chat/composer/ImproveButton'
 import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
 import { DictationBar, TextLanding, landingDuration, useDictation } from '@/features/voice'
 import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
@@ -412,26 +412,13 @@ export function Composer({
           pick's honest remainder — a file the rules refused, named where the
           person can still do something about it. */}
       <PendingImages images={images} onRemove={removeImage} />
-      {/* The offer to tidy the message, once a take has landed in it. It
-          leaves with the message: a send, an emptied field or another take
-          takes it away. */}
-      <AnimatePresence initial={false}>
-        {improveOffer.offer !== null && !dictating ? (
-          <motion.div
-            key="improve"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: DURATION.base, ease: EASE_OUT }}
-          >
-            <ImprovePill
-              offer={improveOffer.offer}
-              onImprove={() => void improveOffer.improve()}
-              onUndo={improveOffer.undo}
-            />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {/* Improve's one sentence when it could not run - no model, harness
+          down. A rare line, in the place the picker's refusals take. */}
+      {improveOffer.offer?.note ? (
+        <p className="mb-2 text-caption text-muted-foreground" role="status">
+          {improveOffer.offer.note}
+        </p>
+      ) : null}
       {refusals.length > 0 ? (
         <div className="mb-2" role="status">
           {refusals.map((entry, at) => (
@@ -597,6 +584,28 @@ export function Composer({
               controls hide, and the reason takes the slot where the voice
               button would be. A button that refuses when pressed is a worse
               answer than a line that says so first. */}
+          {/* Improve, once a take has landed: it acts on the field, so it
+              sits with the controls that do, and it is the size they are.
+              It leaves with the message - a send, an emptied field or another
+              take takes it away - and the row does not move either way. */}
+          <AnimatePresence initial={false}>
+            {improveOffer.offer !== null && !dictating ? (
+              <motion.div
+                key="improve"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              >
+                <ImproveButton
+                  offer={improveOffer.offer}
+                  onImprove={() => void improveOffer.improve()}
+                  onUndo={improveOffer.undo}
+                />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+
           {voiceAvailable && (
             <IconButton
               label={dictation.stage === 'recording' ? 'Stop and transcribe' : 'Dictate'}

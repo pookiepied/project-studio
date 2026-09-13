@@ -33,7 +33,7 @@ import {
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquarePen, SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
-  Link2, Maximize2, Sparkles,
+  Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, Scissors, ClipboardPaste,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -112,6 +112,11 @@ const REGISTRY = {
   // marks, which say how far ahead the app may run rather than that it has
   // stopped.
   ask: { mark: MessageCircleQuestionMark },
+  // Asking about text you selected: a bubble carrying a quotation, because
+  // the selection goes into the message as one. Not `newChat`, which it used
+  // to share - that mark means an empty conversation, and this one starts
+  // full.
+  askAbout: { mark: MessageSquareQuote },
   more: { mark: MoreHorizontal },
   openExternal: { mark: ExternalLink },
   jumpToLatest: { mark: ArrowDown, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
@@ -170,6 +175,13 @@ const REGISTRY = {
 
   // — Message actions -----------------------------------------------------
   copy: { mark: Copy },
+  // The text field's own verbs, for its right-click menu. Cut and paste are
+  // the pair copy completes; nothing else in the app cuts or pastes.
+  cut: { mark: Scissors },
+  paste: { mark: ClipboardPaste },
+  // Putting back what Improve did to the field. One arrow curling back -
+  // not `reload`, which spins forward and means the interface starting over.
+  undo: { mark: Undo2 },
   // The pencil is the edit verb wherever it is performed. The message action
   // here and the transcript's file-editing tool chip are the same concept --
   // an edit -- so they share the mark rather than splitting it by surface.

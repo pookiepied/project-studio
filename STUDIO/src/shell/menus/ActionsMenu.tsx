@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { fieldAt } from '@/shell/menus/ActionItems'
 import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
@@ -10,10 +11,12 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * in every environment; this is what appears instead, styled like the rest of
  * the app and carrying app-native verbs.
  *
- * The contents change with what is under the pointer. With a selection it is
- * about the text: copy it, select it all, or ask about it as a new conversation.
- * With no selection it is about the app: a new conversation, a reload of the
- * interface, search, and settings.
+ * The contents change with what is under the pointer. In a text field it is
+ * the field's verbs: cut, copy, paste, select all. Over a selection it is
+ * about the text: copy it, select it all, or ask about it as a new
+ * conversation. Anywhere else it is about the app: a new conversation, a
+ * reload of the interface, search, and settings. Each list is only its own;
+ * see `ActionItems` for why the app verbs no longer trail the others.
  *
  * The verbs themselves are shared with the selection menu through
  * `ActionItems`, so the two cannot drift apart — they are the same list of
@@ -25,7 +28,8 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * edge that is off screen.
  */
 
-const MENU_MAX_HEIGHT = 260
+/** The tallest list - four rows and a rule - so the clamp keeps every list on screen. */
+const MENU_MAX_HEIGHT = 144
 
 export function ActionsMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -41,11 +45,14 @@ export function ActionsMenu() {
   useEffect(() => {
     const onContextMenu = (event: MouseEvent) => {
       event.preventDefault()
+      const selection = window.getSelection()?.toString().trim() ?? ''
+      const kind = fieldAt(event.target) ? 'field' : selection ? 'selection' : 'page'
       setPosition({
+        kind,
         x: Math.min(event.clientX, window.innerWidth - MENU_WIDTH - EDGE_PADDING),
         y: Math.min(event.clientY, window.innerHeight - MENU_MAX_HEIGHT - EDGE_PADDING),
         origin: 'top left',
-        selection: window.getSelection()?.toString().trim() ?? '',
+        selection,
         target: event.target as HTMLElement | null,
       })
     }
@@ -77,7 +84,7 @@ export function ActionsMenu() {
     <FloatingMenu
       ref={menuRef}
       placement={position}
-      label={position?.selection ? 'selection actions' : 'page actions'}
+      label={position?.kind === 'field' ? 'text field actions' : position?.kind === 'selection' ? 'selection actions' : 'page actions'}
       close={close}
     />
   )

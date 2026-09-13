@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { fieldAt } from '@/shell/menus/ActionItems'
 import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
@@ -34,7 +35,8 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * verb is usually the first half of Copy.
  */
 
-const MENU_HEIGHT = 252
+/** Three rows and the panel's padding: the selection list is short on purpose. */
+const MENU_HEIGHT = 104
 const SELECTION_GAP = 8
 
 /** Reads the current selection into menu state, or null if there is nothing to act on. */
@@ -44,6 +46,11 @@ function readSelection(): { rect: DOMRect; selection: string; target: HTMLElemen
 
   const text = active.toString().trim()
   if (!text) return null
+
+  // A selection inside a text field is the field's: it has its own
+  // right-click menu, and a panel rising over every shift-arrow while
+  // someone edits a sentence is the menu chasing the caret.
+  if (fieldAt(document.activeElement)) return null
 
   const rect = active.getRangeAt(0).getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) return null
@@ -89,7 +96,7 @@ export function SelectionMenu() {
 
     const above = read.rect.top - MENU_HEIGHT - SELECTION_GAP
     if (above >= EDGE_PADDING) {
-      setPlacement({ x, y: above, origin: 'bottom left', selection: read.selection, target: read.target })
+      setPlacement({ x, y: above, origin: 'bottom left', kind: 'selection', selection: read.selection, target: read.target })
     } else {
       setPlacement({
         x,
@@ -101,6 +108,7 @@ export function SelectionMenu() {
           Math.max(EDGE_PADDING, window.innerHeight - MENU_HEIGHT - EDGE_PADDING),
         ),
         origin: 'top left',
+        kind: 'selection',
         selection: read.selection,
         target: read.target,
       })

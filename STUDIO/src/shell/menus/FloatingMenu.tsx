@@ -1,7 +1,7 @@
 import { forwardRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
-import { ActionItems } from '@/shell/menus/ActionItems'
+import { ActionItems, type ActionKind } from '@/shell/menus/ActionItems'
 
 /** The menu's width, which its placement has to know before it renders. */
 export const MENU_WIDTH = 208
@@ -13,6 +13,8 @@ export interface FloatingPlacement {
   readonly y: number
   /** The corner the menu grows from, so it arrives from what summoned it. */
   readonly origin: 'top left' | 'bottom left'
+  /** Which list: the field's verbs, the selection's, or the page's. */
+  readonly kind: ActionKind
   readonly selection: string
   readonly target: HTMLElement | null
 }
@@ -53,7 +55,7 @@ export const FloatingMenu = forwardRef<
           }}
           className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-overlay"
         >
-          <ActionItems selection={placement.selection} target={placement.target} close={close} />
+          <ActionItems kind={placement.kind} selection={placement.selection} target={placement.target} close={close} />
         </motion.div>
       ) : null}
     </AnimatePresence>
