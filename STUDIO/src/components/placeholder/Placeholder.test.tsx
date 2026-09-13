@@ -60,6 +60,14 @@ describe('PlaceholderText', () => {
     expect(bone?.className).toContain('h-[1lh]')
     expect(bone?.className).toContain('w-1/2')
   })
+
+  it('takes its width as a style, so a percentage lands on the bar', () => {
+    // Every skeleton used to pass '58%' as a class name, which no stylesheet
+    // has a rule for, and every bar rendered full width.
+    const { container } = render(<PlaceholderText width="58%" />)
+    const bone = container.querySelector('span[aria-hidden]') as HTMLElement
+    expect(bone.style.width).toBe('58%')
+  })
 })
 
 describe('PlaceholderMark', () => {

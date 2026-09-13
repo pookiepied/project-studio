@@ -91,7 +91,7 @@ export function ProjectPage({ project }: { project: Project }) {
           {storePhase.status === 'loading' ? (
             <div role="status" aria-label="Loading conversations" className="flex flex-col gap-2 py-1 text-ui">
               {['58%', '41%', '66%'].map((width) => (
-                <PlaceholderText key={width} className={width} />
+                <PlaceholderText key={width} width={width} />
               ))}
             </div>
           ) : storePhase.status === 'failed' ? (

@@ -144,11 +144,11 @@ function ProviderListSkeleton() {
         <div key={row.title} className="flex items-start gap-2.5 py-3">
           <PlaceholderMark />
           <div className="min-w-0 flex-1 pt-0.5">
-            <PlaceholderText className={row.title} />
+            <PlaceholderText width={row.title} />
             {/* Caption-sized: the second line of a real row is a caption, and
                 the skeleton holds its leading too, so the arrival of the rows
                 moves nothing. */}
-            <PlaceholderText className={`mt-0.5 h-[1.375em] ${row.detail}`} />
+            <PlaceholderText width={row.detail} className="mt-0.5 h-[1.375em]" />
           </div>
           <Placeholder className="mt-0.5 h-7 w-16 shrink-0 rounded-md" />
         </div>

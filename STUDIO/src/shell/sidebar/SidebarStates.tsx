@@ -60,7 +60,7 @@ function SkeletonRow({ width, header = false }: { width: string; header?: boolea
     <div
       className={`flex items-center rounded-md py-1 text-ui ${header ? 'pl-1.5' : 'pl-2'}`}
     >
-      <PlaceholderText className={width} />
+      <PlaceholderText width={width} />
     </div>
   )
 }

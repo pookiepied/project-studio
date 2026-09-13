@@ -21,7 +21,7 @@ export function LibrarySkeleton() {
             className="flex items-center gap-1.5 rounded-md px-2 py-1.5 max-[48rem]:justify-center max-[48rem]:px-0"
           >
             <PlaceholderMark size={13} />
-            <PlaceholderText className={`max-[48rem]:hidden ${width}`} />
+            <PlaceholderText width={width} className="max-[48rem]:hidden" />
           </div>
         ))}
       </div>

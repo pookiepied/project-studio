@@ -93,15 +93,22 @@ export function Placeholder({
  * inherits nothing lands on the root's line box, which is a reasonable bone
  * rather than a wrong one. Width comes from the call site, varied on purpose:
  * a column of equal bars reads as a pattern, not as a list.
+ *
+ * `width` is a style, not a class. Every call site used to hand a percentage
+ * in as a class name, which no stylesheet has a rule for, so every bar in
+ * the app was full width and the variation the comment above promises was
+ * never on screen.
  */
 export function PlaceholderText({
+  width,
   className,
   style,
 }: {
+  width?: string
   className?: string
   style?: CSSProperties
 }) {
-  return <Placeholder className={cn('h-[1lh]', className)} style={style} />
+  return <Placeholder className={cn('h-[1lh]', className)} style={{ width, ...style }} />
 }
 
 /**

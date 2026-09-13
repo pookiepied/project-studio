@@ -49,7 +49,7 @@ export function ProjectExtensions({ projectId }: { projectId: string }) {
     return (
       <div role="status" aria-label="Loading extensions" className="flex flex-col gap-2 py-1 text-ui">
         {['58%', '41%'].map((width) => (
-          <PlaceholderText key={width} className={width} />
+          <PlaceholderText key={width} width={width} />
         ))}
       </div>
     )

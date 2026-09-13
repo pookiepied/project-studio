@@ -253,7 +253,7 @@ function ArchiveSkeleton() {
       {['44%', '61%', '38%', '52%'].map((width) => (
         <div key={width} className="flex items-center gap-2.5 py-2.5">
           <Placeholder className="size-4 shrink-0 rounded-xs" />
-          <PlaceholderText className={`text-ui ${width}`} />
+          <PlaceholderText width={width} className="text-ui" />
           <Placeholder className="h-7 w-16 shrink-0 rounded-md" />
         </div>
       ))}
