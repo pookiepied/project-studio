@@ -6,7 +6,8 @@ import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
 import { useForkConversation } from '@/features/chat/fork'
-import { Transcript, useAutoScroll } from '@/features/chat/transcript'
+import { useAutoScroll } from '@/features/chat/transcript'
+import { galleryItems } from '@/features/chat/transcript/galleryItems'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
@@ -30,7 +31,6 @@ import {
 } from '@/platform/harness'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { turnSettingsToWire } from '@/platform/harness'
-import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { SeamFailure, TurnImageWire } from '@/platform/harness'
 import type { Conversation } from '@/domain/session/types'
@@ -57,28 +57,20 @@ import type { Conversation } from '@/domain/session/types'
  * two projections of one log here, never derived from each other — nothing
  * in the live path reads rendered state to build a request.
  *
- * The artifact gallery is the one exception: its replies are a local demo of
- * stages no harness produces, so it keeps the seeded transcript it has always
- * had. That is a display of artifacts, not a conversation with an agent.
+ * The artifact gallery is the one exception: it is a display of artifacts,
+ * not a conversation with an agent. It draws through the same live
+ * components from a fixed list of items (`galleryItems`), with no harness
+ * behind it and no composer under it — nothing sent there could be answered.
  */
-export function ChatPage({
-  conversation,
-  onForked,
-}: {
-  conversation: Conversation
-  /**
-   * Where a fork opens. The default navigates in place, which is right in the
-   * studio; a detached window has no navigation to move, so it passes its own
-   * and gives the fork a window of its own instead.
-   */
-  onForked?: (conversationId: string) => void
-}) {
-  const { status, fork, touch, settings, catalog, markRunning, markContextReport } =
-    useWorkspace()
-  const { openChat } = useNavigation()
+export function ChatPage({ conversation }: { conversation: Conversation }) {
+  const { touch, settings, catalog, markRunning, markContextReport } = useWorkspace()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
+  // Built once per gallery visit: the list is fixed, and a fresh array each
+  // render would re-key the memoized rows for nothing.
+  const [shown] = useState(() => (gallery ? galleryItems() : null))
+  const items = shown ?? live.items
 
   // The permission questions this conversation's runs raise, and the answers
   // a person gives here. Inactive on the gallery: nothing there is real
@@ -185,7 +177,7 @@ export function ChatPage({
   }, [gallery, conversation.id, live.items, measuredContext, running, markContextReport])
 
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
-    useAutoScroll(gallery ? conversation.messages : live.items, conversation.id)
+    useAutoScroll(items, conversation.id)
 
   // Branch from one answer: everything up to and including it becomes the
   // first message of a new conversation, named for its source.
@@ -200,14 +192,6 @@ export function ChatPage({
     void branchFrom(conversation, live.items, messageId)
   }
   const onBranch = useCallback((messageId: string) => branchRef.current(messageId), [])
-
-  const forkFrom = useCallback(
-    (messageId: string) => {
-      const created = fork(conversation.id, messageId)
-      if (created) (onForked ?? openChat)(created)
-    },
-    [fork, conversation.id, onForked, openChat],
-  )
 
   /**
    * A refusal the send path raises before the POST: the turn is addressed to
@@ -323,23 +307,14 @@ export function ChatPage({
             paddingBottom: 20,
           }}
         >
-          {gallery ? (
-            <Transcript
-              conversation={conversation}
-              status={status}
-              viewport={viewport}
-              onFork={forkFrom}
-            />
-          ) : (
-            <LiveTranscript
-              items={live.items}
-              pending={live.pending}
-              phase={live.phase}
-              viewport={viewport}
-              conversationId={conversation.id}
-              onBranch={onBranch}
-            />
-          )}
+          <LiveTranscript
+            items={items}
+            pending={gallery ? null : live.pending}
+            phase={gallery ? { status: 'idle' } : live.phase}
+            viewport={viewport}
+            conversationId={conversation.id}
+            onBranch={gallery ? undefined : onBranch}
+          />
         </div>
       </div>
 
@@ -452,86 +427,80 @@ export function ChatPage({
           ) : null}
         </div>
 
-        <div
-          className="relative z-10 mx-auto w-full bg-surface pb-4"
-          style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
-        >
-          {!gallery ? (
-            <>
-              <ConnectionNotice
-                phase={live.phase}
-                onResume={live.resume}
-                refused={live.refused}
-                onDismissRefusal={live.dismissRefusal}
-              />
-              {attachRefusal !== null ? (
-                <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
-              ) : null}
-              {approvals.questions.length > 0 ? (
-                <div className="mb-3">
-                  <ApprovalPrompt
-                    // Keyed by the active question, so answering one and
-                    // moving to the next remounts the card. Without it the
-                    // duration chosen for the previous question stays
-                    // selected, and a person who granted "Always" once would
-                    // find the next question already set to "Always" - a
-                    // wider consent than they were asked for, preselected by
-                    // an answer they gave about something else.
-                    key={approvals.questions[0]?.id}
-                    questions={approvals.questions}
-                    answeringId={approvals.answeringId}
-                    onAnswer={approvals.answer}
-                  />
-                </div>
-              ) : null}
-              {questions.rows.length > 0 ? (
-                <div className="mb-3">
-                  <QuestionPrompt
-                    // Keyed the same way, and for the same reason: a
-                    // selection made for one question must never be found
-                    // still holding when the next one is on screen.
-                    key={questions.rows[0]?.id}
-                    rows={questions.rows}
-                    answeringId={questions.answeringId}
-                    onAnswer={questions.answer}
-                    onStop={questions.stop}
-                  />
-                </div>
-              ) : null}
-              {approvals.answeredElsewhere !== null ? (
-                <AnsweredElsewhere sentence={approvals.answeredElsewhere} />
-              ) : null}
-              {questions.answeredElsewhere !== null ? (
-                <AnsweredElsewhere sentence={questions.answeredElsewhere} />
-              ) : null}
-            </>
-          ) : null}
+        {gallery ? null : (
+          <div
+            className="relative z-10 mx-auto w-full bg-surface pb-4"
+            style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
+          >
+            <ConnectionNotice
+              phase={live.phase}
+              onResume={live.resume}
+              refused={live.refused}
+              onDismissRefusal={live.dismissRefusal}
+            />
+            {attachRefusal !== null ? (
+              <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
+            ) : null}
+            {approvals.questions.length > 0 ? (
+              <div className="mb-3">
+                <ApprovalPrompt
+                  // Keyed by the active question, so answering one and
+                  // moving to the next remounts the card. Without it the
+                  // duration chosen for the previous question stays
+                  // selected, and a person who granted "Always" once would
+                  // find the next question already set to "Always" - a
+                  // wider consent than they were asked for, preselected by
+                  // an answer they gave about something else.
+                  key={approvals.questions[0]?.id}
+                  questions={approvals.questions}
+                  answeringId={approvals.answeringId}
+                  onAnswer={approvals.answer}
+                />
+              </div>
+            ) : null}
+            {questions.rows.length > 0 ? (
+              <div className="mb-3">
+                <QuestionPrompt
+                  // Keyed the same way, and for the same reason: a
+                  // selection made for one question must never be found
+                  // still holding when the next one is on screen.
+                  key={questions.rows[0]?.id}
+                  rows={questions.rows}
+                  answeringId={questions.answeringId}
+                  onAnswer={questions.answer}
+                  onStop={questions.stop}
+                />
+              </div>
+            ) : null}
+            {approvals.answeredElsewhere !== null ? (
+              <AnsweredElsewhere sentence={approvals.answeredElsewhere} />
+            ) : null}
+            {questions.answeredElsewhere !== null ? (
+              <AnsweredElsewhere sentence={questions.answeredElsewhere} />
+            ) : null}
 
-          <Composer
-            conversationId={conversation.id}
-            // While a question holds the run, the field must not invite a new
-            // message: the turn is stopped, and what the page is waiting for
-            // is the answer above, not more words.
-            placeholder={
-              approvals.questions.length > 0 || questions.rows.length > 0
-                ? 'Waiting for your answer above'
-                : 'Reply'
-            }
-            {...(gallery
-              ? {}
-              : {
-                  onSend: sendTurn,
-                  // Admitted counts. A turn the harness has taken but not yet
-                  // started producing is still a turn: the words are gone,
-                  // the stop control is the only thing that can call it back,
-                  // and on the real provider that window has been most of the
-                  // turn's length. Reading `streaming` alone is what left the
-                  // composer idle for six of a seven-second turn.
-                  busy: isTurnRunning(live.phase),
-                  onStop: stopTurn,
-                })}
-          />
-        </div>
+            <Composer
+              conversationId={conversation.id}
+              // While a question holds the run, the field must not invite a new
+              // message: the turn is stopped, and what the page is waiting for
+              // is the answer above, not more words.
+              placeholder={
+                approvals.questions.length > 0 || questions.rows.length > 0
+                  ? 'Waiting for your answer above'
+                  : 'Reply'
+              }
+              onSend={sendTurn}
+              // Admitted counts. A turn the harness has taken but not yet
+              // started producing is still a turn: the words are gone, the
+              // stop control is the only thing that can call it back, and on
+              // the real provider that window has been most of the turn's
+              // length. Reading `streaming` alone is what left the composer
+              // idle for six of a seven-second turn.
+              busy={isTurnRunning(live.phase)}
+              onStop={stopTurn}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

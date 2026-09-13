@@ -12,9 +12,10 @@ import type { Conversation } from '@/domain/session/types'
  * being worked on.
  *
  * It is seeded finished rather than empty on purpose: opening it should *show*
- * you the artifacts, not ask you to run something first. Sending anything in
- * it answers through the demo turn path (`demo-turns.ts`), so the working
- * states below stay one keystroke away without being the default.
+ * you the artifacts, not ask you to run something first. It takes no
+ * messages -- there is no harness behind it and nothing could answer -- so
+ * the page draws it with no composer, through the same components a real
+ * reply lands in (`galleryItems`).
  */
 export const GALLERY_CONVERSATION_ID = 'cnv_gallery'
 

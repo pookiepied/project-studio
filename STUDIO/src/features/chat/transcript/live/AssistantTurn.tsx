@@ -151,7 +151,7 @@ function Segment({
       return (
         <ThinkingBlock
           text={segment.text}
-          span={{ kind: 'measured', since: segment.startedAt, until: segment.updatedAt }}
+          span={{ since: segment.startedAt, until: segment.updatedAt }}
           live={live}
         />
       )

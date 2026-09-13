@@ -20,8 +20,8 @@ import { ChatPage } from './ChatPage'
  * set, and the set is fed by whichever view witnesses the conversation's
  * phase machine. What is under test here is that wiring -- submitted and
  * streaming mark the conversation, a settlement or a broken read un-marks
- * it, and the gallery is excluded because the demo turn owns its own
- * marking. The phase machine itself is judged in `submitted-turn.test.tsx`;
+ * it, and the gallery is excluded because nothing ever runs there. The
+ * phase machine itself is judged in `submitted-turn.test.tsx`;
  * this file holds the transcript hook as a stub and judges only what the
  * page does with what it is told.
  */
@@ -216,7 +216,7 @@ describe('the working mark mirrors the phase machine into the workspace', () => 
     await waitFor(() => expect(workingList().textContent).toBe(''))
   })
 
-  it('never marks the gallery, whose demo turn owns its own marking', async () => {
+  it('never marks the gallery, where nothing runs', async () => {
     const view = render(
       tree({ ...CONVERSATION, id: GALLERY_CONVERSATION_ID, title: 'Everything Studio can show' }),
     )

@@ -24,8 +24,8 @@ export function PermissionControl({ conversationId }: { conversationId: string |
     conversationId === null
       ? undefined
       : conversations.find((candidate) => candidate.id === conversationId)
-  // A conversation the store has never heard of cannot have a stored mode;
-  // that is the gallery's demo turn, and the window's setting is the truth.
+  // A conversation the store has never heard of cannot have a stored mode,
+  // and the window's setting is the truth.
   const mode = findPermissionMode(conversation?.permissionMode ?? settings.permission)
   const Mark = mode.icon
   const loud = mode.id === 'auto'

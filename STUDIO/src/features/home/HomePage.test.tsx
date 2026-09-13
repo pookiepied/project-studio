@@ -24,9 +24,6 @@ import { HomePage } from './HomePage'
  */
 
 const workspace = {
-  status: 'idle' as const,
-  send: vi.fn(() => 'demo-conversation'),
-  stop: vi.fn(),
   beginConversation: vi.fn(),
   settings: { permission: 'manual' },
   setSettings: vi.fn(),
@@ -59,7 +56,7 @@ function field(): HTMLTextAreaElement {
 }
 
 describe('the composer that starts a conversation', () => {
-  it('never sends through the demo turn runner', async () => {
+  it('holds the words when the harness refuses the first turn', async () => {
     render(
       <VoiceModeProvider>
         <HomePage />
@@ -70,7 +67,7 @@ describe('the composer that starts a conversation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.getByText(/was not sent/)).toBeTruthy())
-    expect(workspace.send).not.toHaveBeenCalled()
+    expect(field().value).toBe('the first thing anyone types')
   })
 
   it('creates no conversation and opens no page for a send that was not taken', async () => {

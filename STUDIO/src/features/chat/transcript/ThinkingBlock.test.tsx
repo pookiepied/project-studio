@@ -26,7 +26,7 @@ import { ThinkingBlock, type ThinkingSpan } from './ThinkingBlock'
 const OPENED = 1_700_000_000_000
 
 function measured(since: number | null, until: number | null): ThinkingSpan {
-  return { kind: 'measured', since, until }
+  return { since, until }
 }
 
 afterEach(() => {
@@ -78,14 +78,6 @@ describe('what the row says about a finished run', () => {
     expect(screen.queryByText(/Thought for/)).toBeNull()
   })
 
-  it('repeats a stated duration rather than measuring one', () => {
-    // The artifact gallery is a scripted display, not a conversation. Its
-    // number was written down, and the clock has nothing to do with it.
-    render(
-      <ThinkingBlock text="working it out" span={{ kind: 'stated', seconds: 4 }} live={false} />,
-    )
-    expect(screen.getByText('Thought for 4s')).toBeTruthy()
-  })
 })
 
 describe('the clock while a run is live', () => {
@@ -133,13 +125,6 @@ describe('the clock while a run is live', () => {
     expect(screen.getByText('Thought for 7s')).toBeTruthy()
   })
 
-  it('runs no clock for a stated duration, which cannot change', () => {
-    render(<ThinkingBlock text="half a thought" span={{ kind: 'stated', seconds: 4 }} live />)
-    act(() => {
-      vi.advanceTimersByTime(60_000)
-    })
-    expect(screen.getByText('Thinking for 4s')).toBeTruthy()
-  })
 })
 
 /**

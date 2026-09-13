@@ -14,7 +14,7 @@ import type { ReasoningChoice } from '@/domain/models/types'
 import { DEFAULT_PERMISSION_MODE, type PermissionMode } from '@/domain/permissions/modes'
 import type { ContextReport } from '@/domain/session/context'
 import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/session/gallery'
-import type { Conversation, SessionStatus, TurnSettings } from '@/domain/session/types'
+import type { Conversation, TurnSettings } from '@/domain/session/types'
 import type { Project } from '@/domain/projects/types'
 import { detachedConversationId } from '@/platform/tauri'
 import {
@@ -38,7 +38,6 @@ import {
   type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
-import { useDemoTurns } from '@/stores/workspace/demo-turns'
 import { readHandoff } from '@/stores/workspace/handoff'
 import { createTitleRefresh } from '@/stores/workspace/title-refresh'
 import { newId } from '@/lib/id'
@@ -60,12 +59,9 @@ import { newId } from '@/lib/id'
  * YET, and could not be loaded - as different states, mirroring
  * `useConversation`'s phase machine rather than inventing a third shape.
  *
- * Two things stay local on purpose:
- *
- * - The artifact gallery is a display of renderers, not a conversation.
- *   `ChatPage` withholds sending for it already; it has no stream to index,
- *   so it never becomes a row in the harness's store either.
- * - The demo turn path (`demo-turns.ts`) keeps answering only for the gallery.
+ * One thing stays local on purpose: the artifact gallery is a display of
+ * renderers, not a conversation. It has no stream to index, so it never
+ * becomes a row in the harness's store, and it takes no messages.
  */
 /**
  * The resting turn settings. Null modelId is the harness's own default - the
@@ -197,7 +193,6 @@ interface WorkspaceValue {
   readonly storePhase: StorePhase
   /** The model catalog the picker reads: harness-served rows, or a named state. */
   readonly catalog: ModelCatalogState
-  readonly status: SessionStatus
   /**
    * Which conversations are working right now.
    *
@@ -207,9 +202,8 @@ interface WorkspaceValue {
   readonly running: ReadonlySet<string>
   /**
    * Marks a conversation working, or settled. Kept on the store rather than
-   * derived, because the witnesses live in two places -- the phase machine of
-   * an open conversation, and the demo turn's own callbacks -- and neither
-   * should own the set both feed.
+   * derived, because the witness is the phase machine of an open
+   * conversation, and the sidebar asks about conversations that are not open.
    */
   markRunning: (conversationId: string, active: boolean) => void
   /**
@@ -347,10 +341,6 @@ interface WorkspaceValue {
   }) => void
   /** Stamps recency after an admitted later turn. */
   touch: (conversationId: string) => void
-  send: (conversationId: string | null, text: string) => string
-  stop: () => void
-  fork: (conversationId: string, messageId: string) => string | null
-
   rename: (conversationId: string, title: string) => void
   setProject: (conversationId: string, projectId: string | null) => void
   togglePin: (conversationId: string) => void
@@ -417,7 +407,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   ])
   const [storePhase, setStorePhase] = useState<StorePhase>({ status: 'loading', error: null })
   const [catalog, setCatalog] = useState<ModelCatalogState>(EMPTY_CATALOG)
-  const [status, setStatus] = useState<SessionStatus>('idle')
   const [running, setRunning] = useState<ReadonlySet<string>>(() => new Set())
 
   // Mirrors `running` so the true-to-false transition - a turn actually
@@ -1276,33 +1265,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
-  /* --------------------- the demo path (gallery only) --------------------- */
-
-  const findConversation = useCallback(
-    (conversationId: string): Conversation | undefined =>
-      findIn([remoteConversations, localConversations], conversationId),
-    [localConversations, remoteConversations],
-  )
-
-  const turns = useDemoTurns({
-    status: setStatus,
-    modelId: useCallback(() => settings.modelId, [settings.modelId]),
-    markRunning,
-    findConversation,
-    upsertLocal: setLocalConversations,
-  })
-  const cancel = useCallback(() => {
-    turns.cancel()
-    // The method, not the object: `turns` is rebuilt every render and only
-    // `cancel` is called through this callback.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turns.cancel])
-
-  const stop = useCallback(() => {
-    cancel()
-    setStatus('idle')
-  }, [cancel])
-
   /* -------------------------------- value --------------------------------- */
 
   const conversations = useMemo(
@@ -1316,7 +1278,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       conversations,
       storePhase,
       catalog,
-      status,
       running,
       markRunning,
       contextReports,
@@ -1337,9 +1298,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setBranch,
       beginConversation,
       touch,
-      send: turns.send,
-      stop,
-      fork: turns.fork,
       rename,
       setProject,
       togglePin,
@@ -1382,14 +1340,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setConversationPermission,
       setProject,
       setSettings,
-      status,
-      stop,
       storePhase,
       settings,
       touch,
       togglePin,
-      turns.fork,
-      turns.send,
     ],
   )
 

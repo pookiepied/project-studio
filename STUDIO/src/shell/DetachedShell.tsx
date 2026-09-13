@@ -7,7 +7,7 @@ import { startWindowDrag } from '@/platform/tauri'
 import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
-import { useDetachConversation, useWorkspace } from '@/stores/workspace'
+import { useWorkspace } from '@/stores/workspace'
 
 /**
  * One conversation, in a window of its own.
@@ -33,19 +33,9 @@ import { useDetachConversation, useWorkspace } from '@/stores/workspace'
  */
 export function DetachedShell({ conversationId }: { conversationId: string }) {
   const { conversations } = useWorkspace()
-  const detach = useDetachConversation()
   const conversation = conversations.find((item) => item.id === conversationId)
 
   if (!conversation) return <Missing />
-
-  // A fork is a new conversation, and this window is about one. The default —
-  // navigating in place — is invisible here, because this shell renders the
-  // conversation it was opened for and no route. So a fork gets what any new
-  // conversation deserves: a window of its own.
-  const openFork = (forkId: string) => {
-    const forked = conversations.find((item) => item.id === forkId)
-    detach(forkId, forked?.title ?? 'Untitled')
-  }
 
   const frame = windowFrame()
 
@@ -84,7 +74,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
           </div>
         </header>
 
-        <ChatPage conversation={conversation} onForked={openFork} />
+        <ChatPage conversation={conversation} />
       </div>
       </VoiceModeProvider>
     </div>

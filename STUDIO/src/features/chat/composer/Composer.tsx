@@ -18,7 +18,6 @@ import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
 import { DictationBar, useDictation } from '@/features/voice'
 import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
-import { useWorkspace } from '@/stores/workspace'
 import type { TurnImageWire } from '@/platform/harness'
 import { cn } from '@/lib/cn'
 
@@ -66,18 +65,17 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  *
  * ---- Where a send goes -----------------------------------------------------
  *
- * Anywhere a message can reach the harness, it does, and the caller says so
- * by passing `onSend`/`busy`/`onStop`: the text leaves for the harness, stop
- * aborts the RUN (the only thing that means abort), and this component never
- * learns more about either than that. That is every conversation, and — since
- * Task 33 — home and a project page too, where a send starts a conversation
- * by admitting its first turn before anything is created or navigated to.
+ * To the harness, always, through `onSend`: the text leaves for the harness,
+ * stop aborts the RUN (the only thing that means abort), and this component
+ * never learns more about either than that. That is every conversation, and
+ * home and a project page too, where a send starts a conversation by
+ * admitting its first turn before anything is created or navigated to.
  *
- * The default path, the workspace store's local demo turn, has exactly one
- * caller left: the artifact gallery, which is a display of stages no harness
- * produces rather than a conversation with an agent. It was the default for
- * the two entry points as well, which meant every conversation in the app
- * began with a turn that never left the window. Two transports, one control.
+ * There used to be a second transport underneath -- the workspace store's
+ * local demo turn, which typed a canned reply into a record -- and for a
+ * while it was the default, so every conversation in the app began with a
+ * turn that never left the window. Its last caller was the artifact gallery,
+ * which has no composer now: a display of artifacts has nothing to answer.
  *
  * A live send answers with a receipt, and the field holds the words until
  * the receipt says the harness took them. Clearing optimistically turned a
@@ -101,33 +99,25 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
 export function Composer({
   conversationId,
   placeholder,
-  onSent,
   onSend,
-  busy: busyOverride,
+  busy: turnRunning = false,
   onStop,
 }: {
   conversationId: string | null
   placeholder: string
-  onSent?: (conversationId: string) => void
   /**
-   * When present, sends go here instead of the demo turn runner. The answer
-   * is a receipt, not a fire-and-forget: the field clears only when `ok`
-   * says the harness took the message.
+   * Where a send goes. The answer is a receipt, not a fire-and-forget: the
+   * field clears only when `ok` says the harness took the message. The
+   * images beside the words clear with the same rule — they belong to this
+   * message, and stay when the field still holds words the receipt did not
+   * take.
    */
-  /**
-   * When present, sends go here instead of the demo turn runner. The answer
-   * is a receipt, not a fire-and-forget: the field clears only when `ok`
-   * says the harness took the message. The images beside the words clear
-   * with the same rule — they belong to this message, and stay when the
-   * field still holds words the receipt did not take.
-   */
-  onSend?: (text: string, images: readonly TurnImageWire[]) => Promise<{ readonly ok: boolean }>
-  /** Overrides the demo busy state while `onSend` owns sending. */
+  onSend: (text: string, images: readonly TurnImageWire[]) => Promise<{ readonly ok: boolean }>
+  /** The harness has a turn of ours: admitted, not yet settled. */
   busy?: boolean
-  /** Aborts the harness run; only meaningful with `onSend`. */
+  /** Aborts the harness run. */
   onStop?: () => void
 }) {
-  const { status, send, stop } = useWorkspace()
   // Seeded from the stored draft rather than the empty string. An async read
   // would mount the field blank and fill it a frame later, which reads as the
   // app losing the sentence and then changing its mind.
@@ -216,12 +206,11 @@ export function Composer({
   const focus = useCallback(() => field.current?.focus(), [])
   useTypeToFocus(true, focus)
 
-  const live = onSend !== undefined
   // OR, never a fallback. The page passes a boolean for the whole POST round
   // trip — `false`, because the turn has not started streaming yet — so
-  // `busyOverride ?? sending` would never reach `sending` where it is wired,
-  // and the in-flight lock would exist only for callers that omit the prop.
-  const busy = live ? (busyOverride ?? false) || sending : status !== 'idle'
+  // `turnRunning` alone would leave the field open for the length of the
+  // round trip, and the in-flight lock is what closes it.
+  const busy = turnRunning || sending
   const canSend = (text.trim().length > 0 || images.length > 0) && !busy
   const dictating = dictation.stage !== 'idle'
 
@@ -251,69 +240,51 @@ export function Composer({
 
   /**
    * Whatever the clipboard or a drag carries lands in the strip through the
-   * same rules the picker uses -- judged, read, refused by name. Gated on the
-   * live transport, as the picker is: the demo turn carries only words, so
-   * there is nothing for a dropped file to ride on. Text pastes never reach
-   * here -- a clipboard with files in it is an attachment event; a clipboard
-   * of words is the field doing its job.
+   * same rules the picker uses -- judged, read, refused by name. Text pastes
+   * never reach here -- a clipboard with files in it is an attachment event;
+   * a clipboard of words is the field doing its job.
    */
   const ingestFiles = useCallback(
     (files: readonly File[]) => {
-      if (!live || files.length === 0) return
+      if (files.length === 0) return
       addImages(files)
     },
-    [live, addImages],
+    [addImages],
   )
 
   const submit = () => {
     if (!canSend) return
-    if (live && onSend !== undefined) {
-      const outgoing = text
-      const carried = images
-      setSending(true)
-      void onSend(outgoing, carried).then(
-        (receipt) => {
-          setSending(false)
-          // Clear only what the harness actually took, and only if the
-          // field still holds exactly that — words typed during the round
-          // trip belong to the next message, not this receipt. Same for the
-          // strip: a different array is a different message being built.
-          if (!receipt.ok || textRef.current !== outgoing || imagesRef.current !== carried) {
-            return
-          }
-          setText('')
-          // Written out now rather than after the quiet window. A quit inside
-          // that window would otherwise restore words the harness already
-          // took, which reads as the app duplicating the message.
-          clearDraft(conversationId)
-          setMultiline(false)
-          setImages([])
-          setRefusals([])
-        },
-        () => {
-          // A send that threw instead of answering is not an acceptance
-          // either. The words stay, exactly as for an explicit refusal.
-          setSending(false)
-        },
-      )
-      return
-    }
-    const id = send(conversationId, text)
-    setText('')
-    clearDraft(conversationId)
-    setImages([])
-    setRefusals([])
-    setMultiline(false)
-    if (conversationId === null && id) onSent?.(id)
+    const outgoing = text
+    const carried = images
+    setSending(true)
+    void onSend(outgoing, carried).then(
+      (receipt) => {
+        setSending(false)
+        // Clear only what the harness actually took, and only if the
+        // field still holds exactly that — words typed during the round
+        // trip belong to the next message, not this receipt. Same for the
+        // strip: a different array is a different message being built.
+        if (!receipt.ok || textRef.current !== outgoing || imagesRef.current !== carried) {
+          return
+        }
+        setText('')
+        // Written out now rather than after the quiet window. A quit inside
+        // that window would otherwise restore words the harness already
+        // took, which reads as the app duplicating the message.
+        clearDraft(conversationId)
+        setMultiline(false)
+        setImages([])
+        setRefusals([])
+      },
+      () => {
+        // A send that threw instead of answering is not an acceptance
+        // either. The words stay, exactly as for an explicit refusal.
+        setSending(false)
+      },
+    )
   }
 
-  const halt = () => {
-    if (live) {
-      onStop?.()
-      return
-    }
-    stop()
-  }
+  const halt = () => onStop?.()
 
   return (
     <div
@@ -327,12 +298,10 @@ export function Composer({
       // webview would open the file over the app. A drop carrying no files
       // (dragged words, a dragged selection) is left to the field's default,
       // which inserts the text where the caret is.
-      onDragOver={(event) => {
-        if (live) event.preventDefault()
-      }}
+      onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         const files = Array.from(event.dataTransfer.files)
-        if (!live || files.length === 0) return
+        if (files.length === 0) return
         event.preventDefault()
         ingestFiles(files)
       }}
@@ -490,10 +459,8 @@ export function Composer({
           )}
         >
           {/* The image picker is this menu's one live item: the dialog it
-              opens is the webview's own file input, no plugin. The demo
-              transport carries only words, so on the gallery there is no
-              handler to attach and the item closes as it always has. */}
-          <AddMenu onImage={live ? () => picker.current?.click() : undefined} />
+              opens is the webview's own file input, no plugin. */}
+          <AddMenu onImage={() => picker.current?.click()} />
 
           {/* What Studio may do, next to the thing that will make it do it.
               The mode is the one setting whose consequence lands on the user's
@@ -502,9 +469,9 @@ export function Composer({
               than three clicks deep in a menu in the window chrome. Mark only
               at rest; the name is a hover and a click away. With a live
               conversation it shows and settles that conversation's own stored
-              mode; on the gallery and on home there is nothing stored, so it
-              is the window's setting. */}
-          <PermissionControl conversationId={live ? conversationId : null} />
+              mode; on home there is nothing stored, so it is the window's
+              setting. */}
+          <PermissionControl conversationId={conversationId} />
         </motion.div>
 
         <motion.div

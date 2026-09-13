@@ -97,7 +97,7 @@ export function ThinkingBlock({
 }) {
   const trace = text.trim() === '' ? null : text
   const [sheetOpen, setSheetOpen] = useState(false)
-  useTick(live && span.kind === 'measured')
+  useTick(live)
   const seconds = spanSeconds(span, live)
 
   // Plain text, changing in place. These words used to cross-fade, back when
@@ -220,24 +220,18 @@ function TraceSheet({
 }
 
 /**
- * How this row knows how long the thinking took — and the two answers are
- * genuinely different kinds of thing, so the caller has to say which it has.
- *
- * `measured` is a live conversation: two moments this window recorded, and a
- * duration derived from them. `stated` is the artifact gallery, which is a
- * scripted display rather than a conversation with an agent — its number was
- * written down, not observed. Collapsing the two into a bare `seconds` is what
- * let a measured zero and a stated zero mean the same thing on screen.
+ * How this row knows how long the thinking took: two moments this window
+ * recorded, and a duration derived from them. Never a number handed in from
+ * elsewhere — the gallery used to state one, and a stated zero and a
+ * measured zero meant the same thing on screen. A span with no start is a
+ * run nothing here observed, and the row says only "Thought".
  */
-export type ThinkingSpan =
-  | { readonly kind: 'stated'; readonly seconds: number }
-  | {
-      readonly kind: 'measured'
-      /** When this window began waiting for the reply this run belongs to. */
-      readonly since: number | null
-      /** When this run's last delta landed; null while none has, or on a replay. */
-      readonly until: number | null
-    }
+export interface ThinkingSpan {
+  /** When this window began waiting for the reply this run belongs to. */
+  readonly since: number | null
+  /** When this run's last delta landed; null while none has, or on a replay. */
+  readonly until: number | null
+}
 
 /**
  * The duration to show, or null when this row cannot honestly report one.
@@ -248,7 +242,6 @@ export type ThinkingSpan =
  * without one there is no measurement, and the row says so by saying nothing.
  */
 function spanSeconds(span: ThinkingSpan, live: boolean): number | null {
-  if (span.kind === 'stated') return span.seconds
   if (span.since === null) return null
   // A finished run whose two timestamps are the same instant was seen ONCE.
   // That is not a span of zero, and rendering it as one would put "Thought

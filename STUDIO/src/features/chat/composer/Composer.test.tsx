@@ -8,14 +8,11 @@ import { VoiceModeProvider } from '@/features/voice'
 import { Composer } from './Composer'
 import type { TurnImageWire } from '@/platform/harness'
 
-// The composer reads the workspace store for the demo transport's status and
-// send; a stub keeps this test about the live receipt mechanics alone. The
-// permission control beside the field needs one real mode id to render.
+// The permission control beside the field reads the workspace store, and
+// needs one real mode id to render; a stub keeps this test about the receipt
+// mechanics alone.
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
-    status: 'idle',
-    send: vi.fn(() => 'demo-conversation'),
-    stop: vi.fn(),
     settings: { permission: 'manual' },
     setSettings: vi.fn(),
     // The permission control now reads the conversation's stored mode; this
@@ -265,20 +262,6 @@ describe('paste and drop', () => {
       clipboardData: { files: [] },
     })
     expect(screen.queryByRole('img')).toBeNull()
-  })
-
-  it('takes nothing on the demo transport, where images have no ride', () => {
-    render(
-      <VoiceModeProvider>
-        <Composer conversationId="cnv_1" placeholder="Reply" />
-      </VoiceModeProvider>,
-    )
-    fireEvent.paste(screen.getByRole('textbox'), {
-      clipboardData: {
-        files: [new File([pngBytes], 'pasted.png', { type: 'image/png' })],
-      },
-    })
-    expect(screen.queryByAltText('pasted.png')).toBeNull()
   })
 })
 

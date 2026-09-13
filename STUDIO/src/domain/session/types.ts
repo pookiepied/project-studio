@@ -58,9 +58,6 @@ export interface Conversation {
   readonly permissionMode: PermissionMode
 }
 
-/** What the session is doing. Drives the mark, the send button, and the composer. */
-export type SessionStatus = 'idle' | 'thinking' | 'streaming'
-
 /**
  * What a turn is sent with.
  *
