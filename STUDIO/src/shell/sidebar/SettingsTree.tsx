@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion'
+import { SelectionChip } from '@/components/primitives'
 import { SETTINGS_GROUPS } from '@/features/settings/sections'
-import { SPRING_SNAPPY } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -66,12 +65,7 @@ export function SettingsTree({
                     would appear and disappear in two places at once rather
                     than travel. */}
                 {selected ? (
-                  <motion.span
-                    layoutId="settings-tree-selection"
-                    transition={SPRING_SNAPPY}
-                    aria-hidden
-                    className="absolute inset-0 rounded-md bg-selected"
-                  />
+                  <SelectionChip list="settings-tree" />
                 ) : null}
 
                 <span className="relative flex shrink-0 items-center">

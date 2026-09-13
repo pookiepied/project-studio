@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion'
-import { SPRING_SNAPPY } from '@/design/tokens'
 import { Icons, ProviderMark } from '@/components/icons'
+import { SelectionChip } from '@/components/primitives'
 import { familyName, type CatalogFamily } from '@/domain/models/families'
 import { cn } from '@/lib/cn'
 
@@ -105,12 +104,7 @@ function IndexRow({
       )}
     >
       {active ? (
-        <motion.span
-          layoutId="library-index"
-          transition={SPRING_SNAPPY}
-          aria-hidden
-          className="absolute inset-0 rounded-md bg-selected"
-        />
+        <SelectionChip list="library-index" />
       ) : null}
       {mark !== undefined ? <ProviderMark provider={mark} className="relative shrink-0" /> : null}
       <span className="relative min-w-0 flex-1 truncate max-[48rem]:hidden">{label}</span>

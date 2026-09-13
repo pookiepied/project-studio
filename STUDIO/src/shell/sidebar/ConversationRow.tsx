@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { SPRING_SNAPPY } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { InlineRename, MenuItem, MenuSeparator, Popover } from '@/components/primitives'
+import { InlineRename, MenuItem, MenuSeparator, Popover, SelectionChip } from '@/components/primitives'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { useForkConversation } from '@/features/chat/fork'
@@ -93,12 +91,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
     >
       {/* Behind the label, and shared across the whole column. */}
       {active ? (
-        <motion.span
-          layoutId="sidebar-selection"
-          transition={SPRING_SNAPPY}
-          aria-hidden
-          className="absolute inset-0 rounded-md bg-selected"
-        />
+        <SelectionChip list="sidebar" />
       ) : null}
       <button
         type="button"
