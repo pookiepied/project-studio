@@ -4,7 +4,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { contextBreakdown } from '@/domain/session/context'
+import { contextBreakdown } from '@/domain/turn/context'
 import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 
 /**

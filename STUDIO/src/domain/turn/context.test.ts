@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextBreakdown, contextReport, formatTokens, measuredTotal } from '@/domain/session/context'
-import type { ContextReport } from '@/domain/session/context'
+import { contextBreakdown, contextReport, formatTokens, measuredTotal } from '@/domain/turn/context'
+import type { ContextReport } from '@/domain/turn/context'
 
 /** The measured total, refusing rather than asserting when nothing measured. */
 function total(report: ContextReport): number {

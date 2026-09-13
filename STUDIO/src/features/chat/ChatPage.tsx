@@ -7,7 +7,7 @@ import { Composer } from '@/features/chat/composer'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
 import { useForkConversation } from '@/features/chat/fork'
 import { useAutoScroll } from '@/features/chat/transcript'
-import { galleryItems } from '@/features/chat/transcript/galleryItems'
+import { galleryItems } from '@/features/chat/gallery/items'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
@@ -22,18 +22,18 @@ import { JobsPill } from '@/features/jobs/JobsPill'
 import { useBackgroundJobs } from '@/features/jobs/useBackgroundJobs'
 import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
-import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
-import { contextReport } from '@/domain/session/context'
+import { GALLERY_CONVERSATION_ID } from '@/domain/conversation/gallery'
+import { contextReport } from '@/domain/turn/context'
 import {
   createHarnessClient,
   resolveHarnessAddress,
   type MeasuredContextUsage,
 } from '@/platform/harness'
-import { effectiveTurnSettings } from '@/domain/session/settings'
+import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { turnSettingsToWire } from '@/platform/harness'
 import { useWorkspace } from '@/stores/workspace'
 import type { SeamFailure, TurnImageWire } from '@/platform/harness'
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 
 /**
  * A conversation: a scrolling transcript with the composer beneath it.

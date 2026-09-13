@@ -1,4 +1,4 @@
-import { GENERATED_IMAGE, GENERATED_VIDEO, GENERATED_VIDEO_POSTER } from '@/domain/session/gallery/marks'
+import { GENERATED_IMAGE, GENERATED_VIDEO, GENERATED_VIDEO_POSTER } from '@/features/chat/gallery/marks'
 import type { Artifact } from '@/domain/artifacts/types'
 
 /**

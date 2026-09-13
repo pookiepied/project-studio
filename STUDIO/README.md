@@ -49,17 +49,22 @@ src/
     brand/      the Studio mark
     primitives/ Popover, Dialog, Tooltip, IconButton, Segmented, Button, Field
   domain/       types and data. no React
-    models/     providers, models, effort
+    conversation/ the conversation record, and the gallery's identity
+    turn/       turn settings and the context-window arithmetic
+    models/     providers, models, effort, recent picks
     permissions/execution modes
     projects/   projects, source folders, marks
-    session/    conversations, messages, and the demo content
   stores/
     workspace/  projects, conversations, turns
     navigation/ where the user is
   features/
     chat/       composer, transcript, markdown, code, thinking
+      gallery/  every artifact the app can draw, as one fixed transcript
     home/ projects/ settings/ palette/
-  platform/tauri/ the only files that touch the Tauri API
+  platform/     the only files that touch the Tauri API
+    tauri/      window and native menus
+    harness/    the wire contract, the client, the lifecycle events
+    store.ts    the one door to a preferences file
   shell/        window, top strip, sidebar, actions menu
 ```
 
@@ -74,15 +79,12 @@ level on a dial, permission is a shield, models wear provider marks.
 **Fonts are bundled.** Inter and Instrument Serif come from `@fontsource`, so a
 local-first app makes no network request to render text.
 
-## Where the demo is
+## Where the gallery is
 
-`domain/session/demo.ts` holds every piece of fake content, and
-`stores/workspace/useDemoTurn.ts` is the entire stand-in transport. The
-component tree calls `send` and `stop` and knows nothing about how text arrives.
-
-A real runtime replaces `useDemoTurn` and keeps one contract: set `thinking`,
-then `streaming`, append to the trailing assistant message as text arrives, and
-land on `idle`.
+`features/chat/gallery/` holds the one piece of fixed content left: the
+artifact gallery, every renderer's output in its finished state, drawn through
+the same live transcript components a real reply lands in. It has no composer.
+There is no other demo transport; every conversation speaks to the harness.
 
 ## What is real, and what is a placeholder
 

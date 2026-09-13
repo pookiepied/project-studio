@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { effectiveTurnSettings } from './settings'
-import type { Conversation, TurnSettings } from './types'
+import type { Conversation, TurnSettings } from '@/domain/conversation/types'
 
 /**
  * The derivation the picker displays and the send paths send - one function,
@@ -19,7 +19,6 @@ const CONVERSATION: Conversation = {
   id: 'cnv_1',
   title: null,
   projectId: null,
-  messages: [],
   updatedAt: 1_000,
   pinned: false,
   archived: false,

@@ -11,8 +11,8 @@ import {
   type ConversationMessageFacts,
 } from '@/platform/harness'
 import { startConversation } from '@/features/chat/first-turn'
-import { effectiveTurnSettings } from '@/domain/session/settings'
-import type { Conversation } from '@/domain/session/types'
+import { effectiveTurnSettings } from '@/domain/turn/settings'
+import type { Conversation } from '@/domain/conversation/types'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 
 /**

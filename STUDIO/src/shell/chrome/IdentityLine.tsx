@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 
 /**
  * Project, conversation, branch — one line, centred in the strip.

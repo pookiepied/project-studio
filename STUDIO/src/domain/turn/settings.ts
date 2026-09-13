@@ -1,6 +1,6 @@
 import type { ReasoningChoice } from '@/domain/models/types'
 import type { PermissionMode } from '@/domain/permissions/modes'
-import type { Conversation, TurnSettings } from '@/domain/session/types'
+import type { Conversation, TurnSettings } from '@/domain/conversation/types'
 
 /**
  * The settings the next turn from a surface will actually go out with.

@@ -1,6 +1,5 @@
-import { SCENE_DONE, renderScene } from '@/domain/session/gallery/scene'
 import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 
 /**
  * The gallery conversation.
@@ -15,7 +14,8 @@ import type { Conversation } from '@/domain/session/types'
  * you the artifacts, not ask you to run something first. It takes no
  * messages -- there is no harness behind it and nothing could answer -- so
  * the page draws it with no composer, through the same components a real
- * reply lands in (`galleryItems`).
+ * reply lands in. What it shows lives beside the page that shows it,
+ * `features/chat/gallery`; this record is the identity the sidebar lists.
  */
 export const GALLERY_CONVERSATION_ID = 'cnv_gallery'
 
@@ -31,25 +31,7 @@ export function galleryConversation(): Conversation {
     modelId: null,
     reasoningLevel: null,
     // Not a conversation the harness holds, so the mode is the window's
-    // default. It is never sent anywhere: the gallery answers locally.
+    // default. It is never sent anywhere: the gallery takes no messages.
     permissionMode: DEFAULT_PERMISSION_MODE,
-    messages: [
-      {
-        id: 'msg_gallery_user',
-        role: 'user',
-        text: 'Show me every kind of artifact you can render, and let me watch them resolve.',
-        createdAt: Date.now() - 6 * 60 * 1000,
-      },
-      {
-        id: 'msg_gallery_assistant',
-        role: 'assistant',
-        text: renderScene(SCENE_DONE),
-        createdAt: Date.now() - 5 * 60 * 1000,
-        thinking: {
-          text: 'Six kinds, three with dedicated renderers and three without, so the fallback is on show too. Overlap a couple of them so the working states are visible together.',
-          seconds: 3.1,
-        },
-      },
-    ],
   }
 }

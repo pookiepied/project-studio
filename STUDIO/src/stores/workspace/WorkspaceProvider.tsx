@@ -12,9 +12,9 @@ import type { CatalogModel } from '@/domain/models/catalog'
 import { catalogFrom } from '@/domain/models/catalog'
 import type { ReasoningChoice } from '@/domain/models/types'
 import { DEFAULT_PERMISSION_MODE, type PermissionMode } from '@/domain/permissions/modes'
-import type { ContextReport } from '@/domain/session/context'
-import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/session/gallery'
-import type { Conversation, TurnSettings } from '@/domain/session/types'
+import type { ContextReport } from '@/domain/turn/context'
+import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/conversation/gallery'
+import type { Conversation, TurnSettings } from '@/domain/conversation/types'
 import type { Project } from '@/domain/projects/types'
 import { detachedConversationId } from '@/platform/tauri'
 import {
@@ -149,8 +149,6 @@ function mapRecord(record: ConversationRecordLike): Conversation {
     id: record.id,
     title: record.title,
     projectId: record.projectId,
-    // The stream owns what was said. This list carries identity only.
-    messages: [],
     updatedAt: record.lastTurnAt,
     pinned: record.pinned,
     archived: record.archived,
@@ -394,16 +392,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const [remoteConversations, setRemoteConversations] = useState<readonly Conversation[]>(
     () =>
-      (seed?.conversations ?? []).filter(
-        (item) => item.id !== GALLERY_CONVERSATION_ID && item.messages.length === 0,
-      ),
+      (seed?.conversations ?? []).filter((item) => item.id !== GALLERY_CONVERSATION_ID),
   )
   const [remoteProjects, setRemoteProjects] = useState<readonly Project[]>(
     () => seed?.projects ?? [],
   )
   const [localConversations, setLocalConversations] = useState<readonly Conversation[]>(() => [
     galleryConversation(),
-    ...((seed?.conversations ?? []).filter((item) => item.messages.length > 0)),
   ])
   const [storePhase, setStorePhase] = useState<StorePhase>({ status: 'loading', error: null })
   const [catalog, setCatalog] = useState<ModelCatalogState>(EMPTY_CATALOG)
@@ -948,7 +943,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             id: input.id,
             title: input.title ?? null,
             projectId: input.projectId,
-            messages: [],
             updatedAt: Date.now(),
             pinned: false,
             archived: false,

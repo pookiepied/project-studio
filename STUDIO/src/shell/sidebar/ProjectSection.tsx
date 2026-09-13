@@ -8,7 +8,7 @@ import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { Project } from '@/domain/projects/types'
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 import { cn } from '@/lib/cn'
 
 /**

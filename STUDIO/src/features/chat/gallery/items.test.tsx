@@ -8,8 +8,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
 import { WorkspaceProvider } from '@/stores/workspace'
-import { galleryItems } from './galleryItems'
-import { LiveTranscript } from './live/LiveTranscript'
+import { galleryItems } from './items'
+import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 
 /**
  * The artifact gallery draws through the live transcript.

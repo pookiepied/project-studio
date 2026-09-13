@@ -1,4 +1,4 @@
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 import type { Project } from '@/domain/projects/types'
 
 /**
@@ -85,7 +85,7 @@ function isSnapshot(value: unknown): value is WorkspaceSnapshot {
 function isConversation(value: unknown): value is Conversation {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Partial<Conversation>
-  return typeof candidate.id === 'string' && Array.isArray(candidate.messages)
+  return typeof candidate.id === 'string' && typeof candidate.updatedAt === 'number'
 }
 
 function isProject(value: unknown): value is Project {

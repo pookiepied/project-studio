@@ -23,9 +23,9 @@ import {
   formatTokens,
   type ContextBreakdown,
   type ContextReport,
-} from '@/domain/session/context'
-import { effectiveTurnSettings } from '@/domain/session/settings'
-import { loadRecentModelIds, rememberRecentModel } from '@/domain/session/recents'
+} from '@/domain/turn/context'
+import { effectiveTurnSettings } from '@/domain/turn/settings'
+import { loadRecentModelIds, rememberRecentModel } from '@/domain/models/recents'
 import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 import { ModelLibraryDialog } from '@/features/models/ModelLibraryDialog'
 import { CatalogStateNote } from '@/features/models/CatalogStateNote'

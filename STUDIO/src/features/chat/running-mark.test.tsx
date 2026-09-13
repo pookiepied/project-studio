@@ -4,8 +4,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
-import type { Conversation } from '@/domain/session/types'
+import { GALLERY_CONVERSATION_ID } from '@/domain/conversation/gallery'
+import type { Conversation } from '@/domain/conversation/types'
 import type { ConversationPhase } from '@/features/chat/useConversation'
 import { VoiceModeProvider } from '@/features/voice'
 import { NavigationProvider } from '@/stores/navigation'
@@ -64,7 +64,6 @@ const CONVERSATION: Conversation = {
   modelId: null,
   reasoningLevel: null,
   permissionMode: 'manual',
-  messages: [],
 }
 
 function tree(conversation: Conversation) {

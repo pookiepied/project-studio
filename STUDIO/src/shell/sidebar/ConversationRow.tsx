@@ -6,7 +6,7 @@ import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { useForkConversation } from '@/features/chat/fork'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 import { cn } from '@/lib/cn'
 
 /**

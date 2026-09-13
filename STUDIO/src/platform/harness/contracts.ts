@@ -876,7 +876,7 @@ export function parseHarnessErrorBody(value: unknown): HarnessErrorBody | null {
  * and reading them back is `useConversation`'s job above.
  *
  * Like every contract here these are wire types; the sidebar's `Conversation`
- * lives in `domain/session/types.ts` and mapping happens once at the store.
+ * lives in `domain/conversation/types.ts` and mapping happens once at the store.
  */
 
 export interface ConversationRecord {

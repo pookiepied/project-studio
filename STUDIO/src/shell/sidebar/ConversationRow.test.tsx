@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConversationRow } from './ConversationRow'
-import type { Conversation } from '@/domain/session/types'
+import type { Conversation } from '@/domain/conversation/types'
 
 /**
  * One conversation in the sidebar.
@@ -33,7 +33,6 @@ const CONVERSATION: Conversation = {
   id: 'cnv_1',
   title: 'A conversation being read',
   projectId: null,
-  messages: [],
   updatedAt: 2_000,
   pinned: false,
   archived: false,
