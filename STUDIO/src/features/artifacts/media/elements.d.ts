@@ -23,10 +23,7 @@ declare module 'react' {
       'media-play-button': MediaElement
       'media-time-range': MediaElement
       'media-time-display': MediaElement
-      'media-duration-display': MediaElement
       'media-mute-button': MediaElement
-      'media-fullscreen-button': MediaElement
-      'media-poster-image': MediaElement
     }
   }
 }
