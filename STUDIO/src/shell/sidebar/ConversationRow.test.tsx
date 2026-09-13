@@ -65,7 +65,7 @@ vi.mock('@/stores/workspace', () => ({
   useDetachConversation: () => vi.fn(),
 }))
 
-vi.mock('@/features/chat/fork', () => ({
+vi.mock('@/features/chat/connection/fork', () => ({
   useForkConversation: () => ({ forkWhole: vi.fn() }),
 }))
 

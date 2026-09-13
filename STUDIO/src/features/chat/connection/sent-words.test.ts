@@ -9,12 +9,12 @@ import { readChunkFacts } from '@/platform/harness'
 import {
   forgetFirstAdmission,
   rememberFirstAdmission,
-} from '@/features/chat/first-attach'
+} from '@/features/chat/connection/first-attach'
 import type {
   ConversationContent,
   ConversationPhase,
   ConversationView,
-} from '@/features/chat/useConversation'
+} from '@/features/chat/connection/useConversation'
 
 /**
  * Where a sent message lives between leaving the composer and reaching the log.
@@ -43,8 +43,8 @@ const connection: Connection = {
   phase: { status: 'live' },
 }
 
-vi.mock('@/features/chat/useConversation', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/features/chat/useConversation')>()
+vi.mock('@/features/chat/connection/useConversation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/chat/connection/useConversation')>()
   return {
     ...actual,
     useConversation: (
@@ -65,7 +65,7 @@ vi.mock('@/features/chat/useConversation', async (importOriginal) => {
   }
 })
 
-const { useConversationTranscript } = await import('@/features/chat/useConversationTranscript')
+const { useConversationTranscript } = await import('@/features/chat/connection/useConversationTranscript')
 
 const WORDS = 'what did you make of it?'
 

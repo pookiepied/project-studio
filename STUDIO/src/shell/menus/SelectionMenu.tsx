@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/FloatingMenu'
+import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
  * The selection menu.

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer/Composer'
-import { useFirstTurn } from '@/features/chat/first-turn'
+import { useFirstTurn } from '@/features/chat/connection/first-turn'
 import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { useNavigation } from '@/stores/navigation'

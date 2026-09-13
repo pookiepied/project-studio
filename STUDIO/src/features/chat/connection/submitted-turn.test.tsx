@@ -14,7 +14,7 @@ import {
 import {
   forgetFirstAdmission,
   rememberFirstAdmission,
-} from '@/features/chat/first-attach'
+} from '@/features/chat/connection/first-attach'
 import type { ContactHarness, LifecycleListen } from './useConversation'
 import { useConversation } from './useConversation'
 

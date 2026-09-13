@@ -4,7 +4,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ConversationPhase } from '@/features/chat/useConversation'
+import type { ConversationPhase } from '@/features/chat/connection/useConversation'
 
 const startHarness = vi.fn<() => Promise<boolean>>()
 const harnessFailureReason = vi.fn<() => Promise<string | null>>()

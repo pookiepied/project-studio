@@ -6,7 +6,7 @@ import {
   classifyFailureKind,
   failureRemedy,
 } from '@/features/chat/transcript/failure-kind'
-import type { ConversationPhase } from '@/features/chat/useConversation'
+import type { ConversationPhase } from '@/features/chat/connection/useConversation'
 import type { SeamFailure } from '@/platform/harness'
 
 /**

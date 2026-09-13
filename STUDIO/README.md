@@ -59,13 +59,14 @@ src/
     navigation/ where the user is
   features/
     chat/       composer, transcript, markdown, code, thinking
+      connection/ how a conversation reaches the harness: first turn, attach, fork
       gallery/  every artifact the app can draw, as one fixed transcript
     home/ projects/ settings/ palette/
   platform/     the only files that touch the Tauri API
     tauri/      window and native menus
     harness/    the wire contract, the client, the lifecycle events
     store.ts    the one door to a preferences file
-  shell/        window, top strip, sidebar, actions menu
+  shell/        window, top strip, sidebar, and menus/ for right-click and selection
 ```
 
 Two rules worth keeping:

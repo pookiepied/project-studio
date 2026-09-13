@@ -1,7 +1,7 @@
 import { forwardRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
-import { ActionItems } from '@/shell/ActionItems'
+import { ActionItems } from '@/shell/menus/ActionItems'
 
 /** The menu's width, which its placement has to know before it renders. */
 export const MENU_WIDTH = 208

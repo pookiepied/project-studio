@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { useConversation } from '@/features/chat/useConversation'
-import type { ConversationContent } from '@/features/chat/useConversation'
+import { useConversation } from '@/features/chat/connection/useConversation'
+import type { ConversationContent } from '@/features/chat/connection/useConversation'
 import type { SeamFailure, TurnImageWire, TurnSettingsWire } from '@/platform/harness'
-import { firstAdmission } from '@/features/chat/first-attach'
+import { firstAdmission } from '@/features/chat/connection/first-attach'
 import {
   applyChunks,
   emptyProjection,

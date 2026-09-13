@@ -17,7 +17,7 @@ import {
   type LifecycleListen,
   type LifecycleSignal,
 } from '@/platform/harness/lifecycle'
-import { firstAdmission, forgetFirstAdmission } from '@/features/chat/first-attach'
+import { firstAdmission, forgetFirstAdmission } from '@/features/chat/connection/first-attach'
 
 /**
  * The facts a retry signal carries, verbatim from the wire. Which attempt

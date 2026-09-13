@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { Icons } from '@/components/icons'
-import type { RetryWaitFacts } from '@/features/chat/useConversation'
+import type { RetryWaitFacts } from '@/features/chat/connection/useConversation'
 
 /**
  * The wait between a refused attempt and the retry the harness scheduled.

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { GALLERY_CONVERSATION_ID } from '@/domain/conversation/gallery'
 import type { Conversation } from '@/domain/conversation/types'
-import type { ConversationPhase } from '@/features/chat/useConversation'
+import type { ConversationPhase } from '@/features/chat/connection/useConversation'
 import { VoiceModeProvider } from '@/features/voice'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
@@ -50,7 +50,7 @@ const live = vi.hoisted((): LiveStub => ({
   dismissRefusal: () => {},
 }))
 
-vi.mock('@/features/chat/useConversationTranscript', () => ({
+vi.mock('@/features/chat/connection/useConversationTranscript', () => ({
   useConversationTranscript: (): LiveStub => live,
 }))
 

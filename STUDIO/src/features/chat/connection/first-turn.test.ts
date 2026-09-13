@@ -6,8 +6,8 @@ import {
   type StreamChannel,
   type WireStreamEvent,
 } from '@/platform/harness'
-import { firstAdmission, forgetFirstAdmission } from '@/features/chat/first-attach'
-import type { ContactHarness } from '@/features/chat/useConversation'
+import { firstAdmission, forgetFirstAdmission } from '@/features/chat/connection/first-attach'
+import type { ContactHarness } from '@/features/chat/connection/useConversation'
 
 import { startConversation } from './first-turn'
 
