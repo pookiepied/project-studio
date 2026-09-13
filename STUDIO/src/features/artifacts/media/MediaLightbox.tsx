@@ -2,7 +2,13 @@ import { motion } from 'framer-motion'
 import { DURATION, EASE_IN, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton, Overlay } from '@/components/primitives'
-import { VideoPlayer } from '@/features/artifacts/media/VideoPlayer'
+import { Placeholder } from '@/components/placeholder/Placeholder'
+import { Deferred, lazyNamed } from '@/components/state'
+
+const VideoPlayer = lazyNamed(
+  () => import('@/features/artifacts/media/VideoPlayer'),
+  'VideoPlayer',
+)
 
 /**
  * A generated image or clip, opened larger.
@@ -66,7 +72,22 @@ export function MediaLightbox({
             read as the video escaping the rounded shape. */}
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-block-inner bg-code-surface">
           {video && src ? (
-            <VideoPlayer src={src} poster={poster} title={title} autoPlay />
+            // The player's chrome is a chunk of its own: most sessions never
+            // open a video. While it arrives the poster stands where the
+            // frame will be, under the house sweep, so the box does not jump
+            // when the controls land.
+            <Deferred
+              label="Video player"
+              fallback={
+                <Placeholder className="size-full">
+                  {poster ? (
+                    <img src={poster} alt="" className="size-full object-contain opacity-60" />
+                  ) : null}
+                </Placeholder>
+              }
+            >
+              <VideoPlayer src={src} poster={poster} title={title} autoPlay />
+            </Deferred>
           ) : (
             <img
               src={src ?? poster}

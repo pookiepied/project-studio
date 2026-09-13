@@ -1,71 +1,48 @@
-import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
-import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash'
-import c from 'react-syntax-highlighter/dist/esm/languages/hljs/c'
-import cpp from 'react-syntax-highlighter/dist/esm/languages/hljs/cpp'
-import csharp from 'react-syntax-highlighter/dist/esm/languages/hljs/csharp'
-import css from 'react-syntax-highlighter/dist/esm/languages/hljs/css'
-import diff from 'react-syntax-highlighter/dist/esm/languages/hljs/diff'
-import go from 'react-syntax-highlighter/dist/esm/languages/hljs/go'
-import java from 'react-syntax-highlighter/dist/esm/languages/hljs/java'
-import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
-import kotlin from 'react-syntax-highlighter/dist/esm/languages/hljs/kotlin'
-import markdown from 'react-syntax-highlighter/dist/esm/languages/hljs/markdown'
-import php from 'react-syntax-highlighter/dist/esm/languages/hljs/php'
-import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python'
-import ruby from 'react-syntax-highlighter/dist/esm/languages/hljs/ruby'
-import rust from 'react-syntax-highlighter/dist/esm/languages/hljs/rust'
-import scala from 'react-syntax-highlighter/dist/esm/languages/hljs/scala'
-import sql from 'react-syntax-highlighter/dist/esm/languages/hljs/sql'
-import swift from 'react-syntax-highlighter/dist/esm/languages/hljs/swift'
-import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript'
-import xml from 'react-syntax-highlighter/dist/esm/languages/hljs/xml'
-import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
+/**
+ * What a fence says, and what it means.
+ *
+ * Pure: the aliases, the display names and the set of grammars the app
+ * highlights, with no grammar loaded. The block's header reads these the
+ * moment it renders; the highlighter itself (`highlighter.ts`, the grammars
+ * and the renderer) is a chunk that arrives when the first block asks.
+ * Anything not in `GRAMMARS` still renders - unhighlighted, which is the
+ * correct failure.
+ */
 
 /**
- * Languages, registered explicitly.
- *
- * The `Light` build with a hand-picked set, not the full one: the default
- * export of `react-syntax-highlighter` bundles nearly two hundred grammars, and
- * a local-first desktop app has no business shipping a megabyte of parsers for
- * languages nobody in it will open.
- *
- * Adding one is an import and a register line. Anything unregistered still
- * renders — it just renders unhighlighted, which is the correct failure.
- *
  * The bar for entry is demand, not fame: a language the model is actually
  * asked to write. The nine mainstream ones joined when a reader who asked for
- * Java got a block wearing the Java mark and no color — an economy
+ * Java got a block wearing the Java mark and no color - an economy
  * indistinguishable from breakage. Perl, Haskell, Lua, Objective-C, MATLAB
  * and Fortran stay out: rare here, and plain text under the right mark is the
- * honest state for them.
+ * honest state for them. Adding one is a name here and an import in
+ * `highlighter.ts`.
  */
-const GRAMMARS: Record<string, unknown> = {
-  bash,
-  c,
-  cpp,
-  csharp,
-  css,
-  diff,
-  go,
-  java,
-  json,
-  kotlin,
-  markdown,
-  php,
-  python,
-  ruby,
-  rust,
-  scala,
-  sql,
-  swift,
-  typescript,
-  xml,
-  yaml,
-}
+export const GRAMMARS = [
+  'bash',
+  'c',
+  'cpp',
+  'csharp',
+  'css',
+  'diff',
+  'go',
+  'java',
+  'json',
+  'kotlin',
+  'markdown',
+  'php',
+  'python',
+  'ruby',
+  'rust',
+  'scala',
+  'sql',
+  'swift',
+  'typescript',
+  'xml',
+  'yaml',
+] as const
 
-for (const [name, grammar] of Object.entries(GRAMMARS)) {
-  SyntaxHighlighter.registerLanguage(name, grammar)
-}
+const GRAMMAR_SET: ReadonlySet<string> = new Set(GRAMMARS)
 
 /**
  * What the fence says, mapped to a registered grammar.
@@ -124,7 +101,7 @@ const DISPLAY: Record<string, string> = {
 export function resolveLanguage(fence: string): string {
   const lower = fence.trim().toLowerCase()
   const resolved = ALIASES[lower] ?? lower
-  return resolved in GRAMMARS ? resolved : 'text'
+  return GRAMMAR_SET.has(resolved) ? resolved : 'text'
 }
 
 export function displayName(fence: string): string {
@@ -137,4 +114,3 @@ export function displayName(fence: string): string {
   return DISPLAY[resolved] ?? (lower ? lower.toUpperCase() : 'Text')
 }
 
-export { SyntaxHighlighter }

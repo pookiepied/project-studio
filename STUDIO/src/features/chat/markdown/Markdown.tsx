@@ -1,12 +1,11 @@
 import { memo, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { ArtifactBlock } from '@/features/artifacts'
 import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/blocks'
+import { useMath } from '@/features/chat/markdown/useMath'
 
 /**
  * Model output, rendered.
@@ -231,10 +230,18 @@ const COMPONENTS: Components = {
 }
 
 export const Markdown = memo(function Markdown({ text }: { text: string }): ReactNode {
+  // The maths plugins join the pipeline only for a reply that carries a
+  // formula, and only once they have arrived (`useMath`). The sanitiser
+  // keeps its place between raw and katex either way.
+  const math = useMath(text)
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeRaw, [rehypeSanitize, SCHEMA], rehypeKatex]}
+      remarkPlugins={math === null ? [remarkGfm] : [remarkGfm, math.remark]}
+      rehypePlugins={
+        math === null
+          ? [rehypeRaw, [rehypeSanitize, SCHEMA]]
+          : [rehypeRaw, [rehypeSanitize, SCHEMA], math.rehype]
+      }
       components={COMPONENTS}
     >
       {text}

@@ -2,7 +2,14 @@ import { Icons } from '@/components/icons'
 import { FormatGlyph, Mark, formatOfName, markOfName } from '@/components/icons/fileTypes'
 import { CopyButton } from '@/components/primitives'
 import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
-import { SyntaxHighlighter, displayName, resolveLanguage } from '@/features/chat/markdown/languages'
+import { Deferred, lazyNamed } from '@/components/state'
+import { PlainCode } from '@/features/chat/markdown/blocks/PlainCode'
+import { displayName, resolveLanguage } from '@/features/chat/markdown/languages'
+
+const HighlightedCode = lazyNamed(
+  () => import('@/features/chat/markdown/blocks/HighlightedCode'),
+  'HighlightedCode',
+)
 
 /**
  * A code block's glyph is the language's own mark -- the same marks the tool
@@ -74,48 +81,13 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
         <CopyButton text={code} label="Copy code" />
       }
     >
-      {/* `useInlineStyles={false}` is the whole theme decision. The highlighter
-          emits `hljs-*` class names and the palette lives in `styles/prose.css` next
-          to the tokens, so it follows the theme with no prop, no re-render and
-          no imported colour object. The container's own radius and overflow
-          clip the corners, so the highlighter paints none of its own.
-          Line numbers ride the highlighter's own gutter -- it is the only
-          renderer that can number the lines the tokens actually land on -- and
-          the numbers are unselectable, so a hand-dragged selection copies
-          code, not a column of digits. The copy button copies the raw text
-          either way. */}
-      <SyntaxHighlighter
-        language={resolveLanguage(language)}
-        useInlineStyles={false}
-        showLineNumbers
-        lineNumberStyle={{
-          display: 'inline-block',
-          minWidth: '1.75rem',
-          marginRight: '0.75rem',
-          textAlign: 'right',
-          color: 'var(--muted-foreground)',
-          opacity: 0.65,
-          userSelect: 'none',
-        }}
-        className="studio-code"
-        customStyle={{
-          margin: 0,
-          // No top padding: the head above already separates the code from
-          // everything else, and a second gap under the rule read as the code
-          // starting late. The bottom keeps its own -- the last line must not
-          // sit on the frame's edge or under the horizontal bar. The last
-          // value is the code's left inset; the gutter sits closer to the
-          // frame's edge than the code sits to the gutter, which is the
-          // ordering an editor reads by.
-          padding: '0 1.125rem 0.875rem 0.75rem',
-          fontSize: 'var(--code-size)',
-          lineHeight: 1.7,
-          background: 'transparent',
-        }}
-        codeTagProps={{ style: { fontFamily: 'var(--font-mono)', fontWeight: 400 } }}
-      >
-        {code}
-      </SyntaxHighlighter>
+      {/* The highlighter and its grammars are a chunk of their own; the first
+          block a session draws waits a few frames for it. Until it lands the
+          same code stands in the same place in plain text, gutter and all, so
+          the only thing that changes when the chunk arrives is the colour. */}
+      <Deferred label="Syntax highlighting" fallback={<PlainCode code={code} />}>
+        <HighlightedCode code={code} language={resolveLanguage(language)} />
+      </Deferred>
     </BlockFrame>
   )
 }

@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Markdown } from '@/features/chat/markdown/Markdown'
 import { CodeBlock } from './CodeBlock'
+import { PlainCode } from './PlainCode'
 import { TextBlock } from './TextBlock'
+
+/** How long a lazily fetched chunk may take under the whole suite's load. */
+const CHUNK = { timeout: 8_000 }
 
 afterEach(() => {
   // The config does not set `globals: true`, so testing-library's automatic
@@ -60,15 +64,34 @@ describe('CodeBlock', () => {
     expect(container.querySelector('svg.lucide-code')).toBeNull()
   })
 
-  it('colors the languages the set commits to, including through an alias', () => {
+  it('colors the languages the set commits to, including through an alias', async () => {
     // The nine mainstream grammars joined after a reader who asked for Java
     // got a block wearing the Java mark and no color. This pins one of the
     // nine and one fence spelling that resolves through the alias table.
+    // The highlighter is a chunk that arrives on demand, so the colour lands
+    // a moment after the block does.
+    // A generous wait: under the whole suite's load the chunk can take
+    // longer than the library's one-second default to import.
     const { container } = render(<CodeBlock code={'public class A {}'} fence="java" />)
-    expect(container.querySelector('.hljs-keyword')).not.toBeNull()
+    await waitFor(() => expect(container.querySelector('.hljs-keyword')).not.toBeNull(), CHUNK)
 
     const aliased = render(<CodeBlock code={'void f() { return; }'} fence="c++" />)
-    expect(aliased.container.querySelector('.hljs-keyword')).not.toBeNull()
+    await waitFor(
+      () => expect(aliased.container.querySelector('.hljs-keyword')).not.toBeNull(),
+      CHUNK,
+    )
+  })
+
+  it('shows the same lines, numbered, while the highlighter is on its way', () => {
+    // Before the chunk lands the block is plain text in the same geometry -
+    // the gutter included - so the only change when colour arrives is colour.
+    // The plain rendering is judged directly: whether it is on screen at a
+    // given instant depends on the chunk's timing, which is not the claim.
+    const { container } = render(<PlainCode code={'a\nb\nc'} />)
+    const pre = container.querySelector('pre.studio-code')
+    expect(pre?.textContent).toContain('a')
+    expect(pre?.textContent).toContain('3')
+    expect(container.querySelectorAll('code > span')).toHaveLength(3)
   })
 
   it('hides nothing: no fade mask, and the body scrolls inside the frame', () => {
@@ -85,10 +108,14 @@ describe('CodeBlock', () => {
     expect(screen.getByText('60 lines')).toBeTruthy()
   })
 
-  it('numbers the lines, unselectable beside the code', () => {
+  it('numbers the lines, unselectable beside the code', async () => {
     const { container } = render(<CodeBlock code={'a\nb\nc'} fence="py" />)
+    await waitFor(
+      () =>
+        expect(container.querySelectorAll('.react-syntax-highlighter-line-number')).toHaveLength(3),
+      CHUNK,
+    )
     const numbers = container.querySelectorAll('.react-syntax-highlighter-line-number')
-    expect(numbers).toHaveLength(3)
     const first = numbers[0]
     expect(first?.getAttribute('style') ?? '').toContain('user-select: none')
   })
@@ -211,10 +238,11 @@ describe('fence routing', () => {
     })
   })
 
-  it('renders math through the katex pipeline', () => {
+  it('renders math through the katex pipeline', async () => {
     const { container } = render(<Markdown text={'$E = mc^2$'} />)
     // KaTeX marks its output with its own class; a formula that fell through
-    // would render as the literal `$E = mc^2$` text.
-    expect(container.querySelector('.katex')).not.toBeNull()
+    // would render as the literal `$E = mc^2$` text. The typesetter arrives
+    // on demand, so the class appears once the chunk has landed.
+    await waitFor(() => expect(container.querySelector('.katex')).not.toBeNull(), CHUNK)
   })
 })

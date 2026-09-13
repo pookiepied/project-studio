@@ -1,5 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { VoiceModeOverlay } from '@/features/voice/VoiceModeOverlay'
+import { Deferred, lazyNamed } from '@/components/state'
+
+// The stage - the orb, the waveform, the microphone and the speech
+// pipeline behind them - is a chunk of its own, fetched the first time
+// someone enters voice mode. Once it has been entered it stays mounted, so
+// leaving still plays the stage's exit rather than cutting it.
+const VoiceModeOverlay = lazyNamed(
+  () => import('@/features/voice/VoiceModeOverlay'),
+  'VoiceModeOverlay',
+)
 
 /**
  * Who may open the voice stage, and where it renders.
@@ -26,14 +35,25 @@ const VoiceModeContext = createContext<VoiceModeValue | null>(null)
 
 export function VoiceModeProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false)
-  const enter = useCallback(() => setActive(true), [])
+  const [entered, setEntered] = useState(false)
+  const enter = useCallback(() => {
+    setEntered(true)
+    setActive(true)
+  }, [])
   const leave = useCallback(() => setActive(false), [])
   const value = useMemo(() => ({ active, enter, leave }), [active, enter, leave])
 
   return (
     <VoiceModeContext.Provider value={value}>
       {children}
-      <VoiceModeOverlay open={active} onClose={leave} />
+      {entered ? (
+        // No skeleton: the stage covers the window and arrives in a few
+        // frames from a local chunk. Nothing is the honest picture of a
+        // stage that is not up yet.
+        <Deferred label="Voice mode" fallback={null}>
+          <VoiceModeOverlay open={active} onClose={leave} />
+        </Deferred>
+      ) : null}
     </VoiceModeContext.Provider>
   )
 }

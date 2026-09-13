@@ -37,17 +37,31 @@ export default defineConfig({
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     rolldownOptions: {
       output: {
-        // The rendering stack (markdown, maths, code highlighting) changes
-        // only when a dependency is bumped. Kept in its own chunk so a
-        // remote device keeps it cached across ordinary app changes.
+        // Three chunks for the three parts of the rendering stack, because
+        // they are needed at three different moments: markdown by the first
+        // reply, the highlighter by the first code fence, the maths
+        // typesetter by the first formula - and the last two are fetched on
+        // demand (`Deferred`, `useMath`). Each changes only when a dependency
+        // is bumped, so a remote device keeps them cached across ordinary
+        // app changes. `katex` is listed before `render` so its plugin lands
+        // with the typesetter rather than with the markdown it plugs into.
         codeSplitting: {
           groups: [
             {
+              name: 'katex',
+              test: /node_modules[\/](katex|rehype-katex|remark-math|micromark-extension-math|mdast-util-math)[\/]/,
+            },
+            {
+              name: 'highlight',
+              test: /node_modules[\/](react-syntax-highlighter|refractor|highlight\.js|lowlight)[\/]/,
+            },
+            {
               name: 'render',
-              test: /node_modules[\/](react-markdown|remark-|rehype-|katex|micromark|mdast-|hast-|unified|react-syntax-highlighter|refractor|highlight\.js|lowlight)/,
+              test: /node_modules[\/](react-markdown|remark-|rehype-|micromark|mdast-|hast-|unified)/,
             },
           ],
         },
+
       },
     },
   },
