@@ -1,1 +1,1 @@
-export { Sections, Stats, Timeline, hostOf } from './Sections'
+export { Sections, Stats, Timeline } from './Sections'

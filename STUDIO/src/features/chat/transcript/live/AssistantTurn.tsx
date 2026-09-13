@@ -5,7 +5,7 @@ import { ReadAloud } from '@/features/voice/ReadAloud'
 import {
   classifyFailureKind,
   failureRemedy,
-} from '@/features/chat/transcript/failure-kind'
+} from '@/domain/failures/failure-kind'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import { ToolGroups } from '@/features/chat/transcript/live/ToolGroups'

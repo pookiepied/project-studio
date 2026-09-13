@@ -5,7 +5,7 @@ import { harnessFailureReason, startHarness } from '@/platform/harness'
 import {
   classifyFailureKind,
   failureRemedy,
-} from '@/features/chat/transcript/failure-kind'
+} from '@/domain/failures/failure-kind'
 import type { ConversationPhase } from '@/features/chat/connection/useConversation'
 import type { SeamFailure } from '@/platform/harness'
 

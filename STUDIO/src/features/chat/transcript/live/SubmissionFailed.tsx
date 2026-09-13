@@ -3,7 +3,7 @@ import { Icons } from '@/components/icons'
 import {
   classifyFailureKind,
   failureRemedy,
-} from '@/features/chat/transcript/failure-kind'
+} from '@/domain/failures/failure-kind'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 
 type FailedItem = Extract<TranscriptItem, { kind: 'submission-failed' }>

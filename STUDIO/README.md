@@ -51,6 +51,7 @@ src/
   domain/       types and data. no React
     conversation/ the conversation record, and the gallery's identity
     turn/       turn settings and the context-window arithmetic
+    failures/   what a failed turn's sentence means, and the remedy it earns
     models/     providers, models, effort, recent picks
     permissions/execution modes
     projects/   projects, source folders, marks

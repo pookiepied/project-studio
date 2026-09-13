@@ -1,7 +1,8 @@
 import { Icons } from '@/components/icons'
 import { AnimatedItem, AnimatedList } from '@/features/artifacts/ArtifactMotion'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
-import { Timeline, hostOf } from '@/features/artifacts/sections'
+import { Timeline } from '@/features/artifacts/sections'
+import { hostOf } from '@/lib/url'
 import { isWorking, type Artifact, type ArtifactLink } from '@/domain/artifacts/types'
 
 /**

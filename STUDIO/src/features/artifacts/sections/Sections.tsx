@@ -1,6 +1,7 @@
 import { Icons } from '@/components/icons'
 import { AnimatedItem, AnimatedList } from '@/features/artifacts/ArtifactMotion'
 import { StatusDot } from '@/features/artifacts/sections/StatusDot'
+import { hostOf } from '@/lib/url'
 import type {
   ArtifactFileChange,
   ArtifactSection,
@@ -217,11 +218,3 @@ function FileChanges({ items }: { items: readonly ArtifactFileChange[] }) {
   )
 }
 
-/** The domain, which is what a person recognises in a link. */
-export function hostOf(href: string): string {
-  try {
-    return new URL(href).hostname.replace(/^www\./, '')
-  } catch {
-    return href
-  }
-}
