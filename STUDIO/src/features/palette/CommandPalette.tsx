@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SURFACE } from '@/design/tokens'
+import { motion } from 'framer-motion'
+import { DURATION, EASE_IN, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import type { IconComponent } from '@/components/icons'
+import { Overlay } from '@/components/primitives'
 import { ALL_SECTIONS } from '@/features/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
@@ -42,18 +43,6 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
     setCursor(0)
     field.current?.focus()
   }, [paletteOpen])
-
-  // Escape is bound to the document rather than to the input: bound to the
-  // input it works only while the input has focus, which is every time except
-  // the one that matters — after focus has drifted to a row.
-  useEffect(() => {
-    if (!paletteOpen) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPaletteOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [paletteOpen, setPaletteOpen])
 
   const entries = useMemo<Entry[]>(() => {
     const needle = query.trim().toLowerCase()
@@ -123,88 +112,78 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
   }
 
   return (
-    <AnimatePresence>
-      {paletteOpen ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: DURATION.base, ease: EASE_OUT }}
-          className="studio-blur-scrim absolute inset-0 z-50 flex items-start justify-center bg-scrim pt-[16vh]"
-          onPointerDown={(event) => {
-            if (event.target === event.currentTarget) setPaletteOpen(false)
-          }}
-        >
-          <motion.div
-            role="dialog"
-            aria-modal
-            aria-label="Search and commands"
-            initial={{ opacity: 0, scale: 0.97, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast } }}
-            transition={SPRING_SURFACE}
-            className="studio-blur w-full max-w-[30rem] overflow-hidden rounded-xl border shadow-modal"
-          >
-            <div className="flex items-center gap-2.5 border-b px-3.5 py-2.5">
-              <Icons.search />
-              <input
-                ref={field}
-                value={query}
-                placeholder="Search conversations and settings"
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setCursor(0)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault()
-                    setCursor((current) => Math.min(current + 1, entries.length - 1))
-                  }
-                  if (event.key === 'ArrowUp') {
-                    event.preventDefault()
-                    setCursor((current) => Math.max(current - 1, 0))
-                  }
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    choose(entries[index])
-                  }
-                }}
-                className="w-full bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground/70"
-              />
-            </div>
+    <Overlay open={paletteOpen} onClose={() => setPaletteOpen(false)} anchor="top" className="px-6 pt-[16vh]">
+      <motion.div
+        role="dialog"
+        aria-modal
+        aria-label="Search and commands"
+        initial={{ opacity: 0, scale: 0.97, y: -6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        // Leaves in the scrim's own time and ease, so the two halves of the
+        // dismissal are the same length; see `Dialog` for the mismatch this
+        // replaces.
+        exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.base, ease: EASE_IN } }}
+        transition={SPRING_SURFACE}
+        className="studio-blur w-full max-w-[30rem] overflow-hidden rounded-xl border shadow-modal"
+      >
+        <div className="flex items-center gap-2.5 border-b px-3.5 py-2.5">
+          <Icons.search />
+          <input
+            ref={field}
+            value={query}
+            placeholder="Search conversations and settings"
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setCursor(0)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault()
+                setCursor((current) => Math.min(current + 1, entries.length - 1))
+              }
+              if (event.key === 'ArrowUp') {
+                event.preventDefault()
+                setCursor((current) => Math.max(current - 1, 0))
+              }
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                choose(entries[index])
+              }
+            }}
+            className="w-full bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground/70"
+          />
+        </div>
 
-            <div className="studio-scroll-bounded max-h-[min(22rem,44vh)] overflow-y-auto p-1.5">
-              {entries.length === 0 ? (
-                <p className="px-2.5 py-6 text-center text-ui text-muted-foreground">
-                  Nothing matches that.
-                </p>
-              ) : (
-                entries.map((entry, position) => {
-                  const Glyph = entry.icon
-                  return (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      onPointerEnter={() => setCursor(position)}
-                      onClick={() => choose(entry)}
-                      className={cn(
-                        'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-ui',
-                        position === index ? 'bg-selected text-foreground' : 'text-muted-foreground',
-                      )}
-                    >
-                      <Glyph />
-                      <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                      {entry.hint ? (
-                        <span className="shrink-0 text-micro text-muted-foreground">{entry.hint}</span>
-                      ) : null}
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+        <div className="studio-scroll-bounded max-h-[min(22rem,44vh)] overflow-y-auto p-1.5">
+          {entries.length === 0 ? (
+            <p className="px-2.5 py-6 text-center text-ui text-muted-foreground">
+              Nothing matches that.
+            </p>
+          ) : (
+            entries.map((entry, position) => {
+              const Glyph = entry.icon
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onPointerEnter={() => setCursor(position)}
+                  onClick={() => choose(entry)}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-ui',
+                    position === index ? 'bg-selected text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  <Glyph />
+                  <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                  {entry.hint ? (
+                    <span className="shrink-0 text-micro text-muted-foreground">{entry.hint}</span>
+                  ) : null}
+                </button>
+              )
+            })
+          )}
+        </div>
+      </motion.div>
+    </Overlay>
   )
 }
