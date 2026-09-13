@@ -31,7 +31,7 @@ import {
   shellResource,
   SHELL_DESCRIPTOR,
 } from "../../../src/tools/shell/index.js";
-import { CAN_CONTAIN, itContained } from "../../contained.js";
+import { CAN_CONTAIN, itContained } from "../../helpers/contained.js";
 
 const SCOPE: ExecutionScope = {
   conversationId: "conv-1",

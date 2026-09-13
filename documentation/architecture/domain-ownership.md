@@ -61,14 +61,14 @@ Domain modules that need `StudioDatabase` or `SecureCredentialStore` receive the
 
 | Aspect | Detail |
 |---|---|
-| **Logic** | `StudioUuid` branded string + `createStudioUuid()` (`src/identity/uuid.ts:11,16` → `randomUUID`) + `isStudioUuid` (`src/identity/uuid.ts:20`). |
+| **Logic** | `StudioUuid` branded string + `createStudioUuid()` (`src/contracts/uuid.ts:11,16` → `randomUUID`) + `isStudioUuid` (`src/contracts/uuid.ts:20`). |
 | **State** | **stateless pure function** — no durable or process-local accumulation. |
-| **Invariants** | One Project Studio UUID policy for generated session/approval/grant/task/idempotency identities (`src/identity/uuid.ts:1` comment). Flue-owned opaque ids and stable domain keys (capability, provider, MCP ids) stay outside this generator. UUID v4 format (`src/identity/uuid.ts:13`). Used for `ExecutionContext.requestId` (`src/execution/context.ts:77`), `grant.id` (`src/permissions/grant-store.ts:174`), `broker` pending id (`src/application/approval-broker.ts:39`). |
+| **Invariants** | One Project Studio UUID policy for generated session/approval/grant/task/idempotency identities (`src/contracts/uuid.ts:1` comment). Flue-owned opaque ids and stable domain keys (capability, provider, MCP ids) stay outside this generator. UUID v4 format (`src/contracts/uuid.ts:13`). Used for `ExecutionContext.requestId` (`src/execution/context.ts:77`), `grant.id` (`src/permissions/grant-store.ts:174`), `broker` pending id (`src/application/approval-broker.ts:39`). |
 | **Tables** | none. |
 | **Credential scopes** | none. |
 | **Filesystem** | none. |
 | **Lifecycle** | caller-owned; created on demand, no creator/destroyer. |
-| **Refs** | `src/identity/uuid.ts`, `src/admission/verifier.ts:110`, `src/execution/context.ts:49` |
+| **Refs** | `src/contracts/uuid.ts`, `src/admission/verifier.ts:110`, `src/execution/context.ts:49` |
 
 ## 4 — auth
 

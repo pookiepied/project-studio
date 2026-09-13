@@ -1,5 +1,5 @@
 import { ExtendError } from "../extend/errors.js";
-import type { StudioUuid } from "../identity/uuid.js";
+import type { StudioUuid } from "../contracts/uuid.js";
 
 type ExecutionOutcome = "completed" | "aborted" | "failed" | "unknown";
 

@@ -3,7 +3,7 @@ import {
   type CapabilityId,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
-import { createStudioUuid } from "../identity/uuid.js";
+import { createStudioUuid } from "../contracts/uuid.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { storageErrorFrom } from "../storage/errors.js";
 import { matchesResource, patternSpecificity, type ResourceKind } from "./matcher.js";

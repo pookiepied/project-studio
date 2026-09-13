@@ -1,6 +1,6 @@
 import type { ProjectCreateInput } from "../contracts/conversations.js";
 import type { ProjectIcon } from "../contracts/conversations.js";
-import { createStudioUuid } from "../identity/uuid.js";
+import { createStudioUuid } from "../contracts/uuid.js";
 import { readSandboxLevel, validateFolderPath, type SandboxLevel } from "../sandbox/scope.js";
 import { StorageError, storageErrorFrom } from "../storage/errors.js";
 import type { StudioDatabase } from "../storage/database.js";

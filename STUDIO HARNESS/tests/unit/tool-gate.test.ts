@@ -24,7 +24,7 @@ import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { ToolError } from "../../src/tools/errors.js";
-import { itContained } from "../contained.js";
+import { itContained } from "../helpers/contained.js";
 import { CallGate } from "../../src/tools/gate.js";
 import type { SnapshotHook } from "../../src/snapshots/turn.js";
 import { defineStudioTool, type ToolDefinition } from "../../src/tools/types.js";

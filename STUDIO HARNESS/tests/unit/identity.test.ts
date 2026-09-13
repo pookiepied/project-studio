@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createStudioUuid, isStudioUuid } from "../../src/identity/uuid.js";
+import { createStudioUuid, isStudioUuid } from "../../src/contracts/uuid.js";
 
 describe("Project Studio identity", () => {
   it("creates RFC 4122 version 4 UUIDs", () => {

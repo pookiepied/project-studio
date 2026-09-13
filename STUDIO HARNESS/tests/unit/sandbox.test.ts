@@ -9,7 +9,7 @@ import type {
   CapabilityDescriptor,
   CapabilityEffect,
 } from "../../src/contracts/capabilities.js";
-import { CAN_CONTAIN } from "../contained.js";
+import { CAN_CONTAIN } from "../helpers/contained.js";
 import { SandboxError } from "../../src/sandbox/errors.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { isInsideRoot } from "../../src/sandbox/paths.js";

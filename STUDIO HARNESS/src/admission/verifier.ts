@@ -8,7 +8,7 @@ import {
 } from "./credential.js";
 import { AdmissionError } from "./errors.js";
 import { DEFAULT_SCOPES_BY_CLIENT_TYPE, type AdmissionScope } from "./scopes.js";
-import { createStudioUuid } from "../identity/uuid.js";
+import { createStudioUuid } from "../contracts/uuid.js";
 
 export interface AdmissionSessionOptions {
   readonly credential?: AdmissionCredential;

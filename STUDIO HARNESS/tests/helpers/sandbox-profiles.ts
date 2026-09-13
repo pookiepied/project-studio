@@ -1,10 +1,10 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { createSandboxPolicy } from "../src/sandbox/policy.js";
-import { windowsAppContainer } from "../src/sandbox/isolation/windows/appcontainer.js";
-import { invokeLauncher } from "../src/sandbox/isolation/windows/launcher.js";
-import { readLedger } from "../src/sandbox/isolation/windows/ledger.js";
+import { createSandboxPolicy } from "../../src/sandbox/policy.js";
+import { windowsAppContainer } from "../../src/sandbox/isolation/windows/appcontainer.js";
+import { invokeLauncher } from "../../src/sandbox/isolation/windows/launcher.js";
+import { readLedger } from "../../src/sandbox/isolation/windows/ledger.js";
 
 /**
  * Takes back, at the end of the run, what the run put on the machine.

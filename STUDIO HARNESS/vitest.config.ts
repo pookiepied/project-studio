@@ -13,7 +13,7 @@ export default defineConfig({
     // Windows containment registers an AppContainer profile per workspace, and
     // a test suite mints a new workspace every run. See the file for why this
     // removes a difference rather than a pattern.
-    globalSetup: ["tests/sandbox-profiles.ts"],
+    globalSetup: ["tests/helpers/sandbox-profiles.ts"],
     restoreMocks: true,
     testTimeout: 30_000,
     fileParallelism: false

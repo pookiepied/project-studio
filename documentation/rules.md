@@ -41,28 +41,38 @@ Inside `STUDIO HARNESS/`:
 
 ```
 src/
+  admission/     who is calling; the bearer credential and the session it earns
   agents/        agent definitions
-  application/   wiring and startup
+  application/   wiring and the ports the routes take
   auth/          sign-in
-  contracts/     shared types. capabilities.ts, effects.ts, errors.ts
+  browser/       the browser capability, an MCP server of its own
+  context/       what the model is told: prompts and the capability inventory
+  contracts/     shared types. capabilities.ts, effects.ts, errors.ts, uuid.ts
+  conversations/ plan/ projects/ questions/   the owners of those rows
   credentials/   OS credential store. never a database column
-  models/        model providers and adapters
+  execution/     the turn as it runs
+  extend/        what the user switched on per project; mcp/ is the servers
+  gateway/       every outside provider: language/, media/, retrieval/, connections/, catalog/
+  host/          the process as the desktop Host sees it
   net/           destination rules. outside tools/ so every caller shares them
   observability/ logging, tracing, redaction
   permissions/   the kernel, policy, grant store, modes
   platform/      paths and OS differences
   process/       running subprocesses
-  retrieval/     web search and fetch providers
+  reliability/   retry backoff
   sandbox/       containment
   snapshots/     undo history
   storage/       SQLite
   tools/         the gate, the bounds, and the native tools
+  transport/     the harness's own HTTP API
   vendor/        pinned binaries
-docs/
-  decisions/     ADRs. the real reasoning. numbered, and they amend each other
-  ROADMAP.md STATUS.md KNOWN-ISSUES.md
 tests/unit/      one file per subject
+tests/integration/ helpers/ fixtures/
 ```
+
+The harness README carries the same map with a line for every folder; this
+one is the short form. When they disagree the README is right and this is
+stale.
 
 **Where a thing goes.** A rule that more than one caller must obey lives outside
 the callers — that is why `net/` is not inside `tools/`. A rule only one place

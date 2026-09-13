@@ -94,10 +94,10 @@ describe("startup ordering and adapter boundaries", () => {
     const offenders: string[] = [];
     for (const path of await sourceFiles()) {
       // Separator-agnostic: on Windows this path contains backslashes, so an
-      // `endsWith("src/identity/uuid.ts")` skips nothing and the generator
+      // `endsWith("src/contracts/uuid.ts")` skips nothing and the generator
       // reports itself. Same defect class as the 008.3 checks — `A-003` AF-02.
       const rel = path.split("\\").join("/");
-      if (rel.endsWith("src/identity/uuid.ts")) continue;
+      if (rel.endsWith("src/contracts/uuid.ts")) continue;
 
       const source = await readFile(path, "utf8");
       if (/randomUUID\s*\(/.test(source)) offenders.push(rel);

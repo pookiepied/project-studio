@@ -1,6 +1,6 @@
 import { it } from "vitest";
 
-import { hostIsolation } from "../src/sandbox/isolation/index.js";
+import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 
 /**
  * For tests that need this machine to be able to contain a child.

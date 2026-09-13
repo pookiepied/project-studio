@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { itContained } from "../contained.js";
+import { itContained } from "../helpers/contained.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { McpConnection } from "../../src/extend/mcp/connection.js";
 import { createMcpLauncher } from "../../src/extend/mcp/launcher.js";

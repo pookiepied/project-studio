@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect } from "vitest";
 
-import { itContained } from "../contained.js";
+import { itContained } from "../helpers/contained.js";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { conversationScope, projectScope } from "../../src/extend/selection.js";

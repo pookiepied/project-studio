@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { itContained } from "../contained.js";
+import { itContained } from "../helpers/contained.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient } from "../../src/application/harness-client.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";

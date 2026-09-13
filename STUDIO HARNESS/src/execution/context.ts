@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-import { createStudioUuid, type StudioUuid } from "../identity/uuid.js";
+import { createStudioUuid, type StudioUuid } from "../contracts/uuid.js";
 
 export type ExecutionOperationKind =
   | "request"

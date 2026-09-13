@@ -1,4 +1,4 @@
-import { createStudioUuid } from "../identity/uuid.js";
+import { createStudioUuid } from "../contracts/uuid.js";
 
 import { dispatch, observe, type FlueObservation } from "@flue/runtime";
 

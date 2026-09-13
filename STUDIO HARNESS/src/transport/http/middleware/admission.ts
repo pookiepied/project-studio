@@ -8,7 +8,7 @@ import {
   runWithExecutionContext,
   type ExecutionContext,
 } from "../../../execution/context.js";
-import { isStudioUuid } from "../../../identity/uuid.js";
+import { isStudioUuid } from "../../../contracts/uuid.js";
 
 const AUTH_CONTEXT = "authContext" as const;
 const EXECUTION_CONTEXT = "executionContext" as const;

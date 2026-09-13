@@ -1,5 +1,5 @@
 import type { AuthContext } from "../admission/context.js";
-import { createStudioUuid } from "../identity/uuid.js";
+import { createStudioUuid } from "../contracts/uuid.js";
 import type {
   PendingQuestionStore,
   StoredQuestion,

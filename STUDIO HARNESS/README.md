@@ -28,217 +28,67 @@ workflow functions are not resumable.
 
 ```text
 src/
-  admission/
-    context.ts                AuthContext, client types, session identity
-    credential.ts             Per-launch bearer credential generation and validation
-    errors.ts                 Typed admission errors
-    scopes.ts                 Named admission scopes and their lookup
-    verifier.ts               Timing-safe bearer verification and session construction
-  agents/
-    studio.ts                 First continuing Flue agent
-  application/
-    approval-broker.ts        Durable approval broker over the pending store
-    harness-client.ts         UI-facing send/wait/observe/cancel/history boundary
-    mcp-management.ts         McpAdministration port and service the routes take
-    provider-management.ts    ProviderAdministration port and service the routes take
-    studio-runtime.ts         Runtime composition: MCP registry, supervisor, sandbox
-    tool-name.ts              Stable model-facing tool names across MCP identities
-  app.ts                      Model-provider bootstrap + telemetry init + Flue mount
-  auth/
-    cli.ts                    pnpm auth sign-in / status / sign-out
-    config.ts                 Validated auth service URL and desktop OAuth client id
-    errors.ts                 Typed sign-in errors, never carrying a token or code
-    google-login.ts           PKCE loopback flow against Google
-    auth-client.ts            HTTP boundary for the Studio auth service
-    session.ts                Session storage over the keychain, JWT expiry reading
-    login.ts                  Sign-in/out orchestration
-  context/
-    context-optimizer.ts      Passthrough optimizer and future Headroom port
-  contracts/
-    agents.ts                 Agent identity
-    capabilities.ts           Capability identity, effects, provenance, execution scope
-    effects.ts                What each effect requires; the one table that answers
-    errors.ts                 StudioError base, domain taxonomy, safe report shape
-    models.ts                 Gateway-neutral model references, capability, adapter contract
-    providers.ts              ProviderConnection/ProviderPort contract over language,
-                              media, and retrieval providers
-  credentials/
-    credential-store.ts       SecureCredentialStore port, key/secret validation, typed errors
-    keyring-store.ts          OS keychain implementation; no plaintext fallback
-    memory-store.ts           In-memory store for tests, same validation rules
-  db.ts                       File-backed Flue SQLite adapter
-  execution/
-    context.ts                AsyncLocalStorage execution context and operation ids
-    outcomes.ts               Stop/timeout/cancellation outcome classification
-  extend/
-    errors.ts                 How the extend spine fails
-    inventory.ts              What exists on this machine, and what this project chose
-    reconcile.ts              Making what runs match what the user chose
-    selection.ts              What the user chose to switch on, per project
-    mcp/
-      capabilities.ts         MCP tools presented through the capability contract
-      connection.ts           One MCP connection: framing, JSON-RPC, pending correlation
-      handshake.ts            The first exchange with an MCP server, and the era probe
-      http-channel.ts         HTTP transport channel for MCP servers
-      input-security.ts       Scrubbing secret-shaped fields from server arguments
-      launcher.ts             Launching MCP servers under sandbox containment
-      reconcile.ts            MCP flavor of the reconcile plan
-      registry.ts             Persisted MCP server registry
-      stdio-channel.ts        stdio transport channel for MCP servers
-      supervisor.ts           MCP server lifecycle: start, handshake, retry, stop
-      wire/
-        backoff.ts            Retry backoff for a server that fails to start
-        definition-hash.ts    Stable hash of a tool definition
-        era.ts                Era probe deciding which wire era to speak
-        framing.ts            Newline-delimited JSON framing over stdio
-        jsonrpc.ts            JSON-RPC 2.0 shapes as MCP uses them
-        lifecycle.ts          Connection lifecycle for one MCP server
-        pending.ts            Correlation for JSON-RPC requests over one connection
-  host/
-    harness-launcher.ts       Headless launcher seam the Tauri Host consumes
-    readiness.ts              Structured readiness frames on the launcher channel
-  identity/
-    uuid.ts                   UUIDs for records and operations Project Studio owns
-  models/
-    adapters/
-      test-adapter.ts         Deterministic Pi provider behind the adapter contract
-      local-adapter.ts        Local BYOK source; alias protocol over Pi's Models
-    local/
-      apis.ts                 Supported custom-provider wire protocols
-      config.ts               Default model and user-declared custom providers
-      credential-bridge.ts    OS keychain presented as Pi's CredentialStore
-      runtime.ts              Pi Models collection: built-ins plus custom providers
-      catalog.ts              Pi models to ModelDescriptor and capabilities
-      settings-store.ts       Durable provider settings; the non-secret half of BYOK
-      provider-service.ts     Connect/disconnect/select contracts for settings
-      cli.ts                  pnpm providers list / models / connect / add / select
-    bootstrap.ts              Provider bootstrap coordinator and startup validation
-    model-registry.ts         Model-source resolver and capability aggregator
-    provider-config.ts        Validated model-source configuration
-  net/
-    destination.ts            Destination judgment: loopback, own ports, DNS
-    http.ts                   Typed HTTP client with destination checks and timeouts
-    own-ports.ts              The ports this process listens on
-  observability/
-    config.ts                 Validated exporter and content-capture config
-    error-reporter.ts         The one path a failure takes: log, span, counter
-    errors.ts                 Safe error normalization/serialization
-    flue.ts                   One-time Flue OpenTelemetry registration
-    index.ts                  initialize/shutdown boundary
-    logger.ts                 Structured logger with trace correlation
-    redaction.ts              GenAI content redaction transform
-    redaction-rules.ts        The redaction catalog
-    sdk.ts                    OpenTelemetry Node SDK lifecycle
-    telemetry-errors.ts       Failures in the telemetry subsystem itself
-  permissions/
-    kernel.ts                 The single source of authority for every capability
-    policy.ts                 Verdicts, decision sources, base rules, defaults
-    grant-store.ts            Persisted, listable, revocable user approvals
-    matcher.ts                Matching a call's resource against a permission pattern
-    mode.ts                   What "ask" means right now
-    pending-approvals.ts      Durable pending approval queue
-    scopes.ts                 The choices offered when the user is asked to approve
-    trust.ts                  Per-project trust decisions
-    errors.ts                 Typed permission errors, never carrying arguments
-  platform/
-    paths.ts                  The Studio home, install, and project locations
-    runtime.ts                Which Node the project requires, and which runs it
-  process/
-    environment.ts            What a child may inherit, in one place
-    errors.ts                 Typed process errors
-    exec.ts                   Spawning and killing child processes
-  providers/
-    connection-store.ts       Provider connection records; keychain-first removal
-    model-catalog.ts          Built-in, manual, and overridden models; defaults
-  retrieval/
-    errors.ts                 How a retrieval provider failed
-    http.ts                   The one HTTP call every provider adapter makes
-    registry.ts               Registered search and reader providers
-    service.ts                RetrievalService over providers and settings
-    settings.ts               Persisted retrieval provider settings
-    slots.ts                  Two slots, and the rule for moving between them
-    types.ts                  What a retrieval provider is
-    providers/
-      brave.ts                Brave Search
-      exa.ts                  Exa search
-      firecrawl.ts            Firecrawl reader
-      jina.ts                 Jina reader
-      tavily.ts               Tavily search (the default)
-  sandbox/
-    cli.ts                    pnpm sandbox:prepare / list / release
-    policy.ts                 Closed-by-default containment policy and isolation levels
-    paths.ts                  Path containment: traversal, symlinks, prefixes, Windows
-    local-sandbox.ts          Path containment, and the one door to a contained child
-    isolation/                OS containment: kinds, backends, and the single verdict
-      backend.ts              The backend contract and support probing
-      contain.ts              Asserting availability and containing a command
-      index.ts                The isolation seam
-      kinds.ts                Which children need containment
-      program-roots.ts        Directories a contained program must read to run
-      registry.ts             The registered backends, per platform
-      windows/                AppContainer, via the studio-contain launcher we ship
-        appcontainer.ts       The Windows AppContainer backend
-        launcher.ts           The studio-contain launcher we ship
-        ledger.ts             Persisted record of what was contained
-        traversal.ts          Getting a contained program to its first line
-      linux/                  bwrap and pasta, as the distribution ships them
-        apparmor.ts           One-time machine setup a Linux sandbox needs
-        bwrap.ts              The bubblewrap backend
-        identity.ts           Whose ability is being measured
-        network.ts            The pasta network backend
-    errors.ts                 Typed sandbox errors, never echoing the attempted path
-  snapshots/
-    errors.ts                 Typed snapshot errors
-    index.ts                  The snapshots public surface
-    shadow-repo.ts            Per-project shadow git repositories
-    store.ts                  Snapshot storage under the Studio home
-    turn.ts                   Turn snapshots and restore hooks
-  storage/
-    app-settings.ts           The one owner of the app_setting table
-    database.ts               Application-owned SQLite connection and transactions
-    migrations.ts             Versioned schema, applied once, with a no-secrets guard
-    errors.ts                 Typed storage errors and driver-failure classification
-  tools/
-    bounds.ts                 Per-capability call bounds
-    errors.ts                 Typed tool errors
-    gate.ts                   The call gate: who may call what, and how often
-    types.ts                  Tool definition shape and registration
-    workspace-summary.ts      Typed tool used to prove tool continuation
-    filesystem/               Read, write, and edit tools, and the access log
-    git/                      Git tools: argv building and subcommand classification
-    native/                   Native tools over the product runtime
-    search/                   Glob and ripgrep-backed grep tools
-    shell/                    Shell tools with command resolution
-    web/                      Fetch and web-search tools, untrusted content labeled
+  app.ts                  what starts: providers, telemetry, the HTTP composition, the Flue mount
+  server.ts               the process entry that listens
+  db.ts                   Flue's SQLite adapter and where the file lives
+  virtual-flue-server.d.ts ambient types for the module only the Vite graph can resolve
+
+  admission/     who is calling: the per-launch bearer credential, scopes, the session it earns
+  agents/        the Flue agents: studio (the continuing one), title, improve
+  application/   wiring and the ports the routes take: runtime, brokers, management services
+  auth/          sign-in to the Studio account: PKCE against Google, the session in the keychain
+  browser/       the browser capability, as an MCP server in its own process
+  context/       what the model is told: system, title and improve prompts, the capability inventory
+  contracts/     shared types and the tables that decide: capabilities, effects, errors, models,
+                 providers, conversations, media, and the UUID Studio-owned records carry
+  conversations/ the one owner of conversation rows: store, titling, context usage, export, purge
+  credentials/   the OS credential store behind one port; never a database column
+  execution/     the turn as it runs: AsyncLocalStorage context, closing turns, outcomes
+  extend/        what the user switched on per project, and making what runs match it
+    mcp/         MCP servers: registry, launcher, supervisor, handshake, channels, wire/
+  gateway/       every outside provider, behind one word
+    language/    model providers and adapters; local/ is BYOK over Pi's Models
+    media/       image, speech and transcription providers: adapters, drivers, jobs that outlive a call
+    retrieval/   web search and readers: providers/, two slots, settings
+    connections/ a connection to a provider: credentials, probe, the models it serves, defaults
+    catalog/     the models Studio names itself, and icons/ for the marks providers wear
+  host/          the process as the desktop Host sees it: bootstrap, readiness, shutdown
+  net/           destination rules every caller shares; outside tools/ on purpose
+  observability/ logging, tracing, redaction, safe error reports
+  permissions/   the kernel: policy, grants, modes, trust, pending approvals
+  plan/          the conversation's plan: its shape and its durable rows
+  platform/      paths, the Node this needs, the boot log
+  process/       running a child: exec, background, environment, interpreter
+  projects/      the owner of project and project_folder
+  questions/     a question a run puts to the person, and the durable queue it waits in
+  reliability/   retry backoff and the per-class retry budget
+  sandbox/       containment: policy, presets, scope, isolation/ per platform
+  snapshots/     undo history: the shadow repo and the turn it records
+  storage/       SQLite: database, migrations, app settings, the Flue journal
+  tools/         the gate, the bounds, and one folder per native tool:
+                 ask, discover, filesystem, git, media, native, plan, search, shell, web
   transport/
-    http/
-      create-app.ts           HTTP composition: admission middleware, routes, Flue mount
-      middleware/
-        admission.ts          Bearer verification and scope checking middleware
-      routes/
-        mcp.ts                MCP management routes
-        permissions.ts        Approval routes
-        providers.ts          Provider administration routes
-  vendor/
-    errors.ts                 Typed vendor errors
-    resolver.ts               Resolving shipped or managed binaries
+    http/        the harness's own API: create-app, middleware/, routes/
+  vendor/        pinned binaries: resolving shipped or managed ones
 tests/
-  integration/
-    harness.test.ts           Real server, SQLite, cancellation, and restart tests
-    observability.test.ts     Span hierarchy, metrics, redaction, cancellation
-    credential-keyring.test.ts Real OS credential store; skips where none exists
-    auth-login.test.ts        Full PKCE flow against a mock Google and auth service
-    local-byok.test.ts        Stored key to the wire against a mock OpenAI-compatible server
-  unit/
-    architecture.test.ts      Boundary tests
-    credentials.test.ts       Key namespacing, secret limits, in-memory store
-    local-providers.test.ts   Credential chunking, serialized writes, specifiers
-    model-providers.test.ts   Provider config, adapters, registry, bootstrap
-    observability.test.ts     Config, init-once, logger, errors, redaction
+  unit/          one file per subject; tools/ mirrors src/tools
+  integration/   a real server, real SQLite, real OS stores; skipped where the machine cannot
+  helpers/       what several tests share: can this machine contain a child, where the desktop
+                 Host's sources are, the sandbox profiles global setup
+  fixtures/      declared data tests read
 ```
 
-There are no placeholder directories. New capability folders should be added only when they
-contain an implemented boundary.
+The map stops at folders on purpose. A folder's files change often and each one
+carries its own header saying what it is; the folder line says what belongs
+there and, by omission, what does not.
+
+Two names deserve a word. `plan/` and `questions/` are the durable domain halves;
+`tools/plan/` and `tools/ask/` are the tool surfaces a run calls, and they are
+kept apart because the rows outlive the call. `admission/` decides who is calling
+and `permissions/` decides what a call may do; both have a `scopes.ts`, and they
+are different scopes.
+
+There are no placeholder directories. A folder exists when something is in it.
 
 ## Current Vertical Slice
 

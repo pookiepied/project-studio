@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { HARNESS_INHERITED_VARIABLES } from "../../src/process/environment.js";
-import { desktopHostSource } from "../desktop-host.js";
+import { desktopHostSource } from "../helpers/desktop-host.js";
 
 /**
  * The Harness inherit-list exists twice, and the copies must agree.

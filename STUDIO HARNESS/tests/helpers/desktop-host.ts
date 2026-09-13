@@ -24,7 +24,7 @@ import { join } from "node:path";
 
 /** Sibling directories of the harness, any of which may hold the desktop Host. */
 function workspaceRoot(): string {
-  return join(import.meta.dirname, "..", "..");
+  return join(import.meta.dirname, "..", "..", "..");
 }
 
 /**

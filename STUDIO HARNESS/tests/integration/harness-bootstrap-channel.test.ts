@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { desktopHostSource } from "../desktop-host.js";
+import { desktopHostSource } from "../helpers/desktop-host.js";
 
 /**
  * The Windows bootstrap channel, exercised rather than argued about.
