@@ -12,7 +12,7 @@ import type { StudioAuthConfig } from "./config.js";
 import { isAbortError } from "./auth-client.js";
 import { StudioAuthError } from "./errors.js";
 
-export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
+type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 /** Opens the system browser at the sign-in URL. Injectable for tests. */
 export type BrowserOpener = (url: string) => void | Promise<void>;

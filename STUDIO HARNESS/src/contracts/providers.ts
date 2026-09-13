@@ -25,9 +25,7 @@ export type ProviderKind = v.InferOutput<typeof providerKindSchema>;
  * user-hosted source joins here as "gateway"; this is why the field exists at
  * all rather than being assumed.
  */
-export const providerSourceSchema = v.picklist(["local", "test"]);
-
-export type ProviderSource = v.InferOutput<typeof providerSourceSchema>;
+const providerSourceSchema = v.picklist(["local", "test"]);
 
 /**
  * The wire protocol a language connection speaks.
@@ -110,7 +108,7 @@ export type InvocationShape = v.InferOutput<typeof invocationShapeSchema>;
  * one from the environment, `absent` means nothing was found. The value is
  * intentionally vague — the contract never carries the secret itself.
  */
-export const credentialStatusSchema = v.picklist(["set", "from-env", "absent"]);
+const credentialStatusSchema = v.picklist(["set", "from-env", "absent"]);
 
 export type CredentialStatus = v.InferOutput<typeof credentialStatusSchema>;
 
@@ -121,7 +119,7 @@ export type CredentialStatus = v.InferOutput<typeof credentialStatusSchema>;
  * also what makes the credential key predictable — it must survive the
  * credential store's own id validation unchanged.
  */
-export const providerConnectionIdSchema = v.pipe(
+const providerConnectionIdSchema = v.pipe(
   v.string(),
   v.regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
@@ -144,7 +142,7 @@ export const providerConnectionIdSchema = v.pipe(
  * At least one kind is required: a connection that serves nothing is a
  * secret with no purpose, and the store refuses to hold one.
  */
-export const connectionServesSchema = v.pipe(
+const connectionServesSchema = v.pipe(
   v.object({
     language: v.optional(languageProtocolSchema),
     media: v.optional(mediaProtocolSchema),
@@ -353,7 +351,7 @@ export type ProviderModel = v.InferOutput<typeof providerModelSchema>;
  * fetch retrieves one named page. Adding a slot is a change to this list and
  * nothing else — the defaults schema below is derived from it.
  */
-export const CAPABILITY_SLOTS = [
+const CAPABILITY_SLOTS = [
   "textGeneration",
   "imageGeneration",
   "imageEditing",
@@ -416,16 +414,14 @@ export type DefaultSelection = v.InferOutput<typeof defaultSelectionSchema>;
  * HTTP status, and a probe that never left the process (no address to
  * probe) has no latency to report.
  */
-export const probeResultSchema = v.object({
-  ok: v.boolean(),
-  reachedAt: v.number(),
-  modelCount: v.optional(v.number()),
-  failure: v.optional(v.string()),
-  status: v.optional(v.number()),
-  latencyMs: v.optional(v.number()),
-});
-
-export type ProbeResult = v.InferOutput<typeof probeResultSchema>;
+export interface ProbeResult {
+  readonly ok: boolean;
+  readonly reachedAt: number;
+  readonly modelCount?: number;
+  readonly failure?: string;
+  readonly status?: number;
+  readonly latencyMs?: number;
+}
 
 /** A connection as the caller supplies it: no credential status, but a key. */
 export type ProviderConnectionDraft = Omit<ProviderConnection, "credential"> & {
@@ -471,69 +467,3 @@ export type ProviderConnectionPatch = {
   readonly serves?: ConnectionServesPatch;
   readonly apiKey?: string;
 };
-
-/**
- * this is the ONLY seam the frontend talks to; in-process callers call it
- * directly, and the HTTP surface is a thin adapter over it, not a second API.
- *
- * One interface keeps authorization, validation, and persistence in one place.
- * A second API — even one that mirrors this one over HTTP — would drift, and
- * drift is how a permission check lives in one path and not the other.
- */
-export interface ProviderPort {
-  listConnections(): Promise<readonly ProviderConnection[]>;
-
-  getConnection(id: string): Promise<ProviderConnection | undefined>;
-
-  addConnection(draft: ProviderConnectionDraft): Promise<ProviderConnection>;
-
-  updateConnection(
-    id: string,
-    patch: ProviderConnectionPatch,
-  ): Promise<ProviderConnection>;
-
-  removeConnection(id: string): Promise<void>;
-
-  probeConnection(id: string): Promise<ProbeResult>;
-
-  listModels(filter?: {
-    readonly connectionId?: string;
-    readonly kind?: ProviderKind;
-    readonly capability?: CapabilitySlot;
-  }): Promise<readonly ProviderModel[]>;
-
-  /**
-   * Adds a model the built-in catalog does not know about.
-   *
-   * Separate from setModelOverride on purpose. An override patches something
-   * that already exists; if a rename could also create, then a typo in a
-   * model id becomes a permanent model with no capabilities rather than an
-   * error, and there is no gesture left that means "I meant the one that
-   * exists".
-   */
-  addManualModel(
-    connectionId: string,
-    model: {
-      readonly modelId: string;
-      readonly displayName: string;
-      readonly capability?: Partial<ModelCapability>;
-      readonly pricing?: Partial<ModelPricing>;
-      readonly shape?: InvocationShape;
-    },
-  ): Promise<ProviderModel>;
-
-  setModelOverride(
-    connectionId: string,
-    modelId: string,
-    patch: { readonly displayName?: string; readonly hidden?: boolean },
-  ): Promise<ProviderModel>;
-
-  removeModel(connectionId: string, modelId: string): Promise<void>;
-
-  getDefaults(): Promise<DefaultSelection>;
-
-  setDefault(
-    slot: CapabilitySlot,
-    ref: { readonly connectionId: string; readonly modelId: string } | undefined,
-  ): Promise<void>;
-}

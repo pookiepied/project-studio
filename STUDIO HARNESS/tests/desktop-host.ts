@@ -53,7 +53,7 @@ function candidates(): string[] {
  * one list is the whole hazard, and a silently skipped test is that gap wearing
  * a green tick.
  */
-export function desktopHostHarnessDirectory(): string {
+function desktopHostHarnessDirectory(): string {
   const found = candidates();
 
   if (found.length === 1) return found[0]!;

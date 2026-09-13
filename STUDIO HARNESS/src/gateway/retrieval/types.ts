@@ -12,7 +12,7 @@
  */
 
 /** One result from a web search. */
-export interface SearchHit {
+interface SearchHit {
   readonly title: string;
   readonly url: string;
   /**

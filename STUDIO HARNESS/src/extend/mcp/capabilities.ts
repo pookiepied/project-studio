@@ -6,7 +6,7 @@ import { McpServerRegistry, type McpServerRecord } from "./registry.js";
 
 export type McpTool = ToolDefinition<Record<string, unknown>, unknown>;
 
-export interface McpCallResult {
+interface McpCallResult {
   readonly content: readonly unknown[];
   readonly isError: boolean;
   readonly structuredContent?: unknown;

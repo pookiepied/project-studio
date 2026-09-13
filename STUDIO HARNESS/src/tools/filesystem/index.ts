@@ -10,15 +10,9 @@ import { createWriteTool } from "./write.js";
 export { FileAccessLog } from "./access-log.js";
 export {
   ImageBudget,
-  MAX_CONVERSATION_IMAGE_BYTES,
   MAX_IMAGES_PER_CONVERSATION,
-  MAX_IMAGE_BYTES,
 } from "./image-budget.js";
-export { DELETE_DESCRIPTOR, createDeleteTool } from "./delete.js";
-export { EDIT_DESCRIPTOR, createEditTool } from "./edit.js";
-export { MOVE_DESCRIPTOR, createMoveTool } from "./move.js";
-export { READ_DESCRIPTOR, createReadTool, formatNumbered } from "./read.js";
-export { WRITE_DESCRIPTOR, createWriteTool } from "./write.js";
+export { formatNumbered } from "./read.js";
 
 export interface FilesystemToolOptions {
   /**

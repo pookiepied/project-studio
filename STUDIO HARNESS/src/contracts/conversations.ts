@@ -1,7 +1,7 @@
 import * as v from "valibot";
 
-import { reasoningChoiceSchema } from "./models.js";
-import { executionModeSchema } from "../permissions/mode.js";
+import { reasoningChoiceSchema, type ReasoningChoice } from "./models.js";
+import { executionModeSchema, type ExecutionMode } from "../permissions/mode.js";
 
 /**
  * The conversation index contract.
@@ -31,10 +31,10 @@ import { executionModeSchema } from "../permissions/mode.js";
  * beside three real ones.
  */
 
-export const conversationIdSchema = v.pipe(v.string(), v.minLength(1));
+const conversationIdSchema = v.pipe(v.string(), v.minLength(1));
 
 /** The marks the sidebar's project rail may wear; mirrored in the webview. */
-export const projectIconSchema = v.picklist([
+const projectIconSchema = v.picklist([
   "arc",
   "stack",
   "grid",
@@ -47,22 +47,20 @@ export const projectIconSchema = v.picklist([
 
 export type ProjectIcon = v.InferOutput<typeof projectIconSchema>;
 
-export const conversationRecordSchema = v.object({
-  id: conversationIdSchema,
-  title: v.nullable(v.pipe(v.string(), v.minLength(1))),
-  projectId: v.nullable(conversationIdSchema),
+export interface ConversationRecord {
+  readonly id: string;
+  readonly title: string | null;
+  readonly projectId: string | null;
   /** A renamed conversation has stopped being auto-titled, permanently. */
-  titleManual: v.boolean(),
-  pinned: v.boolean(),
-  archived: v.boolean(),
-  modelId: v.nullable(v.pipe(v.string(), v.minLength(1))),
-  reasoningLevel: v.nullable(reasoningChoiceSchema),
-  permissionMode: executionModeSchema,
-  createdAt: v.number(),
-  lastTurnAt: v.number(),
-});
-
-export type ConversationRecord = v.InferOutput<typeof conversationRecordSchema>;
+  readonly titleManual: boolean;
+  readonly pinned: boolean;
+  readonly archived: boolean;
+  readonly modelId: string | null;
+  readonly reasoningLevel: ReasoningChoice | null;
+  readonly permissionMode: ExecutionMode;
+  readonly createdAt: number;
+  readonly lastTurnAt: number;
+}
 
 /**
  * What creating an index row means.
@@ -117,14 +115,10 @@ export const conversationPatchSchema = v.object({
   lastTurnAt: v.optional(v.number()),
 });
 
-export type ConversationPatch = v.InferOutput<typeof conversationPatchSchema>;
-
 export const projectFolderSpecSchema = v.object({
   name: v.pipe(v.string(), v.minLength(1)),
   path: v.pipe(v.string(), v.minLength(1)),
 });
-
-export type ProjectFolderSpec = v.InferInput<typeof projectFolderSpecSchema>;
 
 export const projectCreateSchema = v.object({
   id: v.optional(v.pipe(v.string(), v.minLength(1))),
@@ -142,5 +136,3 @@ export const projectPatchSchema = v.object({
   description: v.optional(v.pipe(v.string(), v.maxLength(2_000))),
   icon: v.optional(projectIconSchema),
 });
-
-export type ProjectPatch = v.InferOutput<typeof projectPatchSchema>;

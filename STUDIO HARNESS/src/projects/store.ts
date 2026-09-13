@@ -22,7 +22,7 @@ import type { StudioDatabase } from "../storage/database.js";
  * kernel alone.
  */
 
-export interface ProjectFolderRecord {
+interface ProjectFolderRecord {
   readonly id: string;
   readonly name: string;
   readonly path: string;

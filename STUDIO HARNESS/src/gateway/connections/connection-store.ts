@@ -176,7 +176,6 @@ export class ConnectionStore {
     });
   }
 
-
   #rows() {
     try {
       return this.#db
@@ -508,8 +507,6 @@ export class ConnectionStore {
     return next;
   }
 }
-
-export const ProviderConnectionStore = ConnectionStore;
 
 /**
  * A stored connection row as the sync readers see it: the record parsed but

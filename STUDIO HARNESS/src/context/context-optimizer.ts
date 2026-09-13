@@ -4,7 +4,7 @@ export interface ContextEnvelope<T> {
   readonly optimizer: string;
 }
 
-export interface ContextOptimizer {
+interface ContextOptimizer {
   optimize<T>(context: T, signal?: AbortSignal): Promise<ContextEnvelope<T>>;
 }
 

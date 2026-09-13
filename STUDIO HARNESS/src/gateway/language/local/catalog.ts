@@ -90,7 +90,7 @@ export function defaultAliasDescriptor(
  * Capability floor used only when the configured target model cannot be found,
  * which is a misconfiguration the adapter reports separately.
  */
-export const UNDESCRIBED_CAPABILITY: ModelCapability = {
+const UNDESCRIBED_CAPABILITY: ModelCapability = {
   textGeneration: "supported",
   streaming: "supported",
   reasoning: "unknown",

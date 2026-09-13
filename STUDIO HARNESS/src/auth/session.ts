@@ -2,7 +2,6 @@ import type {
   CredentialKey,
   SecureCredentialStore,
 } from "../credentials/credential-store.js";
-import { StudioAuthError } from "./errors.js";
 
 export interface StudioSession {
   readonly accessToken: string;
@@ -62,50 +61,3 @@ export class SessionStore {
   }
 }
 
-/**
- * Reads the `exp` claim from a Studio JWT.
- *
- * The signature is deliberately not verified: the harness is the token's
- * holder, not its verifier. Only the auth service and the API can validate it,
- * and they do. This is used solely to decide when to refresh proactively, so a
- * token whose expiry cannot be read is treated as already expired and gets
- * refreshed rather than trusted.
- */
-export function accessTokenExpiryMs(accessToken: string): number | null {
-  const parts = accessToken.split(".");
-  if (parts.length !== 3) return null;
-
-  try {
-    const payload = parts[1] as string;
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-    const decoded: unknown = JSON.parse(
-      Buffer.from(padded, "base64").toString("utf8"),
-    );
-
-    const exp = (decoded as { exp?: unknown })?.exp;
-    return typeof exp === "number" && Number.isFinite(exp) ? exp * 1000 : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Whether the token should be renewed now. The skew means a token is replaced
- * shortly before it actually expires, so a request does not start with a valid
- * token and arrive with an expired one.
- */
-export function needsRefresh(
-  accessToken: string,
-  skewMs = 60_000,
-  now = Date.now(),
-): boolean {
-  const expiry = accessTokenExpiryMs(accessToken);
-  if (expiry === null) return true;
-  return expiry - skewMs <= now;
-}
-
-export function assertSession(session: StudioSession | null): StudioSession {
-  if (session === null) throw new StudioAuthError("signed_out");
-  return session;
-}

@@ -60,7 +60,7 @@ import type { Context, SimpleStreamOptions } from "@earendil-works/pi-ai";
  */
 
 /** The switch: create this file to trace, delete it to stop. */
-export function promptTraceSwitchPath(): string {
+function promptTraceSwitchPath(): string {
   return join(logsDirectory(), "prompt-trace.on");
 }
 

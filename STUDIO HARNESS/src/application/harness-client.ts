@@ -35,7 +35,7 @@ export interface AcceptedRun {
   readonly offset: string;
 }
 
-export interface HarnessClient {
+interface HarnessClient {
   send(threadId: string, message: string): Promise<AcceptedRun>;
   /**
    * Waits for one admitted submission to settle and reads back its reply.

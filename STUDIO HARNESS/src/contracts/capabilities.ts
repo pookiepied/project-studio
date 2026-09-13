@@ -9,7 +9,7 @@
  */
 
 /** Where a capability came from. Provenance is a trust input, not a label. */
-export type CapabilityOrigin =
+type CapabilityOrigin =
   /** Shipped with Project Studio and reviewed by us. */
   | "native"
   /** Provided by an MCP server, local or remote. */
@@ -205,8 +205,4 @@ export interface ExecutionScope {
  * which of the two files to import from.
  */
 export {
-  allowedWhileUntrusted,
-  hasElevatedEffect,
-  isReadOnly,
-  requiresUndoPoint,
 } from "./effects.js";

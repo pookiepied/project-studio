@@ -16,7 +16,7 @@ import { UNTRUSTED_CONTENT_NOTE } from "./untrusted.js";
  * not code, and the schema the model sees never changes when that setting does.
  */
 
-export const FETCH_DESCRIPTOR: CapabilityDescriptor = {
+const FETCH_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "fetch" },
   title: "Read a web page",
   description:

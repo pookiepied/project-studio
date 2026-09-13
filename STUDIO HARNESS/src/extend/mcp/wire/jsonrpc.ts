@@ -41,7 +41,7 @@ export interface JsonRpcErrorResponse {
   readonly error: JsonRpcErrorObject;
 }
 
-export interface JsonRpcErrorObject {
+interface JsonRpcErrorObject {
   readonly code: number;
   readonly message: string;
   readonly data?: unknown;
@@ -57,8 +57,8 @@ export const JSON_RPC_INTERNAL_ERROR = -32603 as const;
 // MCP reserves -32020 to -32099 for itself (inclusive). The specification
 // defines the range as -32099 <= code <= -32020, which is the same interval
 // written with the lower bound first.
-export const JSON_RPC_MCP_MIN_CODE = -32099 as const;
-export const JSON_RPC_MCP_MAX_CODE = -32020 as const;
+const JSON_RPC_MCP_MIN_CODE = -32099 as const;
+const JSON_RPC_MCP_MAX_CODE = -32020 as const;
 export const MCP_UNSUPPORTED_PROTOCOL_VERSION = -32022 as const;
 
 export function isMcpErrorCode(code: number): boolean {

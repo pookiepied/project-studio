@@ -29,9 +29,9 @@ import type {
  * was split to avoid (ADR 0035 §2). Same tree, same scope, sibling port.
  */
 
-export type RetrievalCredentialStatus = "set" | "absent";
+type RetrievalCredentialStatus = "set" | "absent";
 
-export interface RetrievalProviderStatus {
+interface RetrievalProviderStatus {
   readonly id: string;
   readonly credential: RetrievalCredentialStatus;
 }

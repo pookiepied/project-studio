@@ -28,10 +28,10 @@ import { assertSafeMcpRecord } from "./input-security.js";
  * finally tries to spawn it.
  */
 
-export type McpTransport = "stdio" | "http";
+type McpTransport = "stdio" | "http";
 
 /** How a remote endpoint proves who we are. */
-export type McpAuthKind =
+type McpAuthKind =
   /** Nothing is sent. */
   | "none"
   /** `Authorization: Bearer <secret>`. */

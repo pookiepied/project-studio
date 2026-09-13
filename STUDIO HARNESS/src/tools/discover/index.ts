@@ -1,10 +1,7 @@
 import type { CallGate } from "../gate.js";
 import { createDiscoverTool, type DiscoverToolRegistration } from "./discover.js";
 
-export { DISCOVER_DESCRIPTOR } from "./discover.js";
 export type {
-  DiscoveredServerState,
-  DiscoverInput,
   DiscoverToolRegistration,
 } from "./discover.js";
 

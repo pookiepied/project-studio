@@ -2,9 +2,6 @@ import type { PlanItemWrite, PlanView } from "../../plan/plan.js";
 import type { CallGate } from "../gate.js";
 import { createPlanTool } from "./plan.js";
 
-export { PLAN_TOOL_DESCRIPTOR } from "./plan.js";
-export type { PlanToolDependencies, PlanToolInput, PlanToolReport } from "./plan.js";
-
 /**
  * The plan family: the run's stated intention, as rows a person can tick.
  *

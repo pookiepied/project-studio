@@ -41,7 +41,7 @@ export function legacyProviderCredentialKey(vendorId: string): CredentialKey {
 }
 
 /** The vendor a connection's credential belongs to: the catalog vendor, or itself. */
-export function vendorIdOf(connection: {
+function vendorIdOf(connection: {
   readonly id: string;
   readonly catalogProvider?: string | undefined;
 }): string {

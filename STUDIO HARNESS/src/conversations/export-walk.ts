@@ -35,22 +35,22 @@ export const EXPORT_FORMAT_VERSION = 1;
 export type OrphanPolicy = "include" | "exclude" | "split";
 
 /** One record as it arrived inside a batch's `data` JSON array. */
-export type JournalRecord = Record<string, unknown>;
+type JournalRecord = Record<string, unknown>;
 
 /** Text content, the only content kind this machine's journal holds. */
-export interface ExportTextPart {
+interface ExportTextPart {
   readonly type: "text";
   readonly text: string;
 }
 
-export interface ExportToolResult {
+interface ExportToolResult {
   readonly content: readonly ExportTextPart[];
   readonly isError: boolean;
   /** Whether a `tool_results_committed` record claims this outcome. */
   readonly committed: boolean;
 }
 
-export type ExportBlock =
+type ExportBlock =
   | {
       readonly type: "reasoning";
       readonly text: string;
@@ -66,7 +66,7 @@ export type ExportBlock =
       readonly result: ExportToolResult | null;
     };
 
-export interface ExportUserMessage {
+interface ExportUserMessage {
   readonly role: "user";
   readonly id: string | null;
   readonly timestamp: string | null;
@@ -85,7 +85,7 @@ export interface ExportUserMessage {
   readonly text: string;
 }
 
-export interface ExportAssistantMessage {
+interface ExportAssistantMessage {
   readonly role: "assistant";
   readonly id: string | null;
   readonly timestamp: string | null;
@@ -105,7 +105,7 @@ export interface ExportAssistantMessage {
 export type ExportMessage = ExportUserMessage | ExportAssistantMessage;
 
 /** A non-message thing on the timeline: a retry, a settlement. */
-export interface ExportEvent {
+interface ExportEvent {
   readonly kind: "retry" | "submission_settled";
   readonly timestamp: string | null;
   readonly submissionId: string | null;
@@ -113,11 +113,11 @@ export interface ExportEvent {
 }
 
 /** One timeline slot, in true stream order. */
-export type ExportEntry =
+type ExportEntry =
   | { readonly kind: "message"; readonly message: ExportMessage }
   | { readonly kind: "event"; readonly event: ExportEvent };
 
-export interface ExportSubmission {
+interface ExportSubmission {
   readonly submissionId: string;
   readonly kind: string | null;
   readonly outcome: string | null;

@@ -3,11 +3,6 @@ import type { ClosingTurns } from "../../execution/closing-turns.js";
 import type { CallGate } from "../gate.js";
 import { createAskUserQuestionTool } from "./questions.js";
 
-export { ASK_USER_QUESTION_DESCRIPTOR, clampTimeout } from "./questions.js";
-export { ClosingTurns } from "../../execution/closing-turns.js";
-export type { AskToolDependencies, AskUserQuestionReport } from "./questions.js";
-export type { QuestionReport } from "../../questions/question.js";
-
 /**
  * The ask family: the question the model puts to the person.
  *

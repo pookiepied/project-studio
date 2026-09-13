@@ -17,7 +17,7 @@ import {
   type TelemetrySnapshot,
 } from "./sdk.js";
 
-export type { ObservabilityConfig, ObservabilityConfigInput, TelemetrySnapshot };
+export type { ObservabilityConfigInput };
 export {
   normalizeError,
   safeSerializeError,
@@ -25,15 +25,11 @@ export {
 } from "./errors.js";
 export { registerFlueTurnBoundary } from "./flue.js";
 import { TelemetryError } from "./telemetry-errors.js";
-export { createLogger, type Logger, type LogFields, type LogLevel } from "./logger.js";
+export { createLogger } from "./logger.js";
 export {
-  activeRedactionRuleIds,
   redactGenAiContent,
-  redactSensitiveString,
-  resetRedaction,
 } from "./redaction.js";
 import { configureRedaction, resetRedaction } from "./redaction.js";
-export { REDACTION_RULES, type RedactionRule } from "./redaction-rules.js";
 export { resolveObservabilityConfig } from "./config.js";
 
 export interface ObservabilityHandle {
@@ -118,8 +114,4 @@ export async function shutdownObservability(): Promise<void> {
     resetRedaction();
     handle = undefined;
   }
-}
-
-export function getLogger(): Logger {
-  return getObservability().logger;
 }

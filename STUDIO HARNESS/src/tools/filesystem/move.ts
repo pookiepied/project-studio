@@ -28,7 +28,7 @@ export interface MoveInput {
   readonly overwrite: boolean;
 }
 
-export const MOVE_DESCRIPTOR: CapabilityDescriptor = {
+const MOVE_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "move" },
   title: "Move or rename",
   description:

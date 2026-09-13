@@ -207,7 +207,7 @@ function isLiteralValue(token: string, wasQuoted: boolean): boolean {
  * `gen`. The same tool spelled three ways is one decision for a person to
  * make, not three.
  */
-export function programName(token: string): string {
+function programName(token: string): string {
   const withoutQuotes = token.replace(/^["']|["']$/g, "");
   const base = basename(withoutQuotes.replace(/\\/g, "/"));
   const lowered = base.toLowerCase();

@@ -31,7 +31,7 @@ export interface CustomProviderConfig {
  * beside the vendor's own models so a turn naming it resolves instead of
  * failing; the levels and limits are the user's own word about the model.
  */
-export interface ExtraRuntimeModel {
+interface ExtraRuntimeModel {
   readonly id: string;
   readonly name: string;
   readonly reasoningLevels: readonly ReasoningLevel[];
@@ -192,14 +192,6 @@ function resolveDefaultSelection(
 }
 
 /**
- * Reads the user's custom providers without requiring a default model, so
- * provider management works before a default has been chosen.
- */
-export function resolveCustomProviders(): readonly CustomProviderConfig[] {
-  return readCustomProviders();
-}
-
-/**
  * Combines stored providers with any declared in the environment.
  *
  * Stored providers win on an id collision: settings are what the user edited
@@ -239,7 +231,7 @@ function readCustomProviders(): readonly CustomProviderConfig[] {
   return result.output.map((entry) => normalizeCustomProvider(entry));
 }
 
-export interface CustomProviderInput {
+interface CustomProviderInput {
   readonly id: string;
   readonly name?: string | undefined;
   readonly baseUrl: string;
@@ -255,7 +247,7 @@ export interface CustomProviderInput {
  * Shared by the environment path and the settings store so a provider cannot be
  * accepted through one door under rules the other would reject.
  */
-export function normalizeCustomProvider(
+function normalizeCustomProvider(
   entry: CustomProviderInput,
 ): CustomProviderConfig {
   try {

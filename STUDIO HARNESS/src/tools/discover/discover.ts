@@ -74,7 +74,7 @@ export interface DiscoverInput {
  * enablement decides what may be announced, discovery decides what of that
  * is loaded, and neither adds to what the other said.
  */
-export interface DiscoveredServerState {
+interface DiscoveredServerState {
   readonly record: McpServerRecord;
   readonly resolution: Resolution;
 }
@@ -123,7 +123,7 @@ export interface DiscoverToolRegistration {
   readonly adopt: (tool: McpTool) => void;
 }
 
-export const DISCOVER_DESCRIPTOR: CapabilityDescriptor = {
+const DISCOVER_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "discover" },
   title: "Extension discovery",
   description:

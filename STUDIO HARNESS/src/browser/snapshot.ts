@@ -25,7 +25,7 @@ import { BrowserError } from "./errors.js";
  */
 
 /** The attribute a ref is written into. Namespaced so no real page owns it. */
-export const REF_ATTRIBUTE = "data-studio-ref";
+const REF_ATTRIBUTE = "data-studio-ref";
 
 export interface SnapshotOptions {
   /** Include elements that are not interactive, for reading structure. */
@@ -163,7 +163,7 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
  * against nothing — a timeout reads as "the page is slow", which sends the
  * model somewhere unhelpful.
  */
-export function byRef(page: Page, ref: string): Locator {
+function byRef(page: Page, ref: string): Locator {
   const match = /^ref_(\d+)$/.exec(ref.trim());
   if (match === null) {
     throw new BrowserError("bad_input", {

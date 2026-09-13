@@ -249,7 +249,7 @@ function supportedLevelsForReference(
  * Provider management needs this: a user connects a provider *before* choosing
  * a default model, so the connect flow cannot depend on one already being set.
  */
-export function createModelsCollection(options: {
+function createModelsCollection(options: {
   readonly customProviders: readonly CustomProviderConfig[];
   readonly extraModels?: readonly ExtraProviderModelGroup[];
   readonly credentials: CredentialStore;

@@ -24,7 +24,7 @@ import { SandboxError } from "../../errors.js";
  */
 
 /** Matches `[[bin]] name` in `native/windows-appcontainer/Cargo.toml`. */
-export const LAUNCHER_BINARY = "studio-contain.exe";
+const LAUNCHER_BINARY = "studio-contain.exe";
 
 /**
  * How the launcher joins the child's arguments into one command line.

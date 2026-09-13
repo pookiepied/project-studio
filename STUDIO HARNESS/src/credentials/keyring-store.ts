@@ -14,7 +14,7 @@ import {
  * Credential Manager, Keychain Access, and Seahorse, so it is a user-facing
  * label and should stay stable across releases.
  */
-export const CREDENTIAL_SERVICE = "Project Studio";
+const CREDENTIAL_SERVICE = "Project Studio";
 
 /**
  * Backed by the operating system's own secret store: Windows Credential

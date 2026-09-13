@@ -10,7 +10,7 @@ import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { buildGitArgs } from "./argv.js";
 import { gitResource, isKnownSubcommand } from "./classify.js";
 
-export { buildGitArgs, optionName } from "./argv.js";
+export { buildGitArgs } from "./argv.js";
 export { classifyGit, gitResource, isKnownSubcommand } from "./classify.js";
 
 /**
@@ -32,7 +32,7 @@ export { classifyGit, gitResource, isKnownSubcommand } from "./classify.js";
 /** Output beyond this is a repository dump, not an answer. */
 const MAX_OUTPUT_LINES = 400;
 
-export interface GitInput {
+interface GitInput {
   readonly subcommand: string;
   readonly args: readonly string[];
 }
@@ -156,7 +156,7 @@ function clip(output: string): string {
   ].join("\n");
 }
 
-export function createGitTool(): ToolDefinition<GitInput, string> {
+function createGitTool(): ToolDefinition<GitInput, string> {
   return defineStudioTool({
     descriptor: GIT_DESCRIPTOR,
     resourceKind: "command",
@@ -240,4 +240,3 @@ export function registerGitTools(gate: CallGate): void {
 }
 
 /** Access classification, re-exported for policy authoring. */
-export type { GitAccess } from "./classify.js";

@@ -30,7 +30,7 @@ const GIT_NETWORK_SUBCOMMANDS = new Set([
 export type PermissionVerdict = "allow" | "deny" | "ask";
 
 /** Where a decision came from. Rendered to the user, so it must be truthful. */
-export type DecisionSource =
+type DecisionSource =
   /** A rule that cannot be overridden by a grant. */
   | "policy"
   /** A previously stored user decision. */

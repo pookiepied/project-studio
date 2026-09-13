@@ -9,13 +9,11 @@ export const modelSourceSchema = v.picklist([
 
 export type ModelSource = v.InferOutput<typeof modelSourceSchema>;
 
-export const modelReferenceSchema = v.object({
-  source: modelSourceSchema,
-  provider: v.pipe(v.string(), v.minLength(1)),
-  model: v.pipe(v.string(), v.minLength(1)),
-});
-
-export type ModelReference = v.InferOutput<typeof modelReferenceSchema>;
+export interface ModelReference {
+  readonly source: ModelSource;
+  readonly provider: string;
+  readonly model: string;
+}
 
 /**
  * The reasoning effort levels Pi's runtime can carry, in its own order.
@@ -180,7 +178,7 @@ export const modelIdSchema = v.pipe(
  * confirmed "unsupported". Numeric limits use "unknown" rather than 0 for the
  * same reason.
  */
-export const capabilityStateSchema = v.picklist([
+const capabilityStateSchema = v.picklist([
   "supported",
   "unsupported",
   "unknown",

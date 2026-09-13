@@ -61,7 +61,7 @@ export type EraProbe =
   | { readonly era: "legacy"; readonly why: LegacyReason };
 
 /** Why we concluded a server is legacy. Carried so a failure can say it. */
-export type LegacyReason =
+type LegacyReason =
   /** It does not know `server/discover`. The ordinary legacy answer. */
   | "method_not_found"
   /** It answered with something that is not a JSON-RPC response at all. */
@@ -116,14 +116,3 @@ export function readEraProbe(response: unknown): EraProbe {
 
   return { era: "legacy", why: "not_a_response" };
 }
-
-/**
- * Whether an era, once decided, may be reused.
- *
- * Era is a property of the server, not of a request, so it is cached for the
- * life of a process (stdio) or of an origin (HTTP). Re-probing every call would
- * pay the cost forever to learn something that cannot change while the process
- * is up. A restart re-probes, which is what makes an upgraded server pick up
- * its new era without anyone clearing anything.
- */
-export const ERA_IS_CACHED_PER_CONNECTION = true;

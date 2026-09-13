@@ -4,7 +4,7 @@ import { safeSerializeValue } from "./errors.js";
 import { redactSensitiveString } from "./redaction.js";
 import { currentExecutionContext } from "../execution/context.js";
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LogFields {
   readonly [key: string]: unknown;

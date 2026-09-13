@@ -20,7 +20,7 @@ import type { SandboxScopeMode } from "./scope.js";
  * from what the measurements show breaks or is likely to.
  */
 
-export interface PresetPath {
+interface PresetPath {
   readonly path: string;
   readonly mode: SandboxScopeMode;
 }

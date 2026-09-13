@@ -77,7 +77,7 @@ function count(value: unknown): number {
  * for it would overwrite a real measurement with a claim that the window is
  * empty. Exported for the test, which is the only way to pin that difference.
  */
-export function usageOf(observation: FlueObservation): ConversationUsage | undefined {
+function usageOf(observation: FlueObservation): ConversationUsage | undefined {
   if (observation.type !== "turn") return undefined;
   const usage = observation.response?.usage;
   if (usage === undefined || usage === null) return undefined;

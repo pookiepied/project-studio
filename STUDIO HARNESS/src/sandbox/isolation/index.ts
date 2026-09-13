@@ -19,12 +19,11 @@
  */
 
 export { isolationForKind, type ChildKind } from "./kinds.js";
-export { containCommand, type ContainRequest } from "./contain.js";
+export { containCommand } from "./contain.js";
 export { programRoots } from "./program-roots.js";
 export { invokeLauncher } from "./windows/launcher.js";
-export { recordProgramRoots } from "./windows/ledger.js";
-export { bwrapArgs, linuxBwrap, type BwrapInput } from "./linux/bwrap.js";
-export { unprivilegedIdentity, type ProbeIdentity } from "./linux/identity.js";
+export { bwrapArgs, type BwrapInput } from "./linux/bwrap.js";
+export { unprivilegedIdentity } from "./linux/identity.js";
 export {
   withNarrowedNetwork,
   NETWORK_SETUP,
@@ -34,19 +33,15 @@ export {
 export {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,
-  ensureTraversable,
   grantCorridor,
   holdsRead,
   holdsCorridor,
-  isFullPermissionList,
-  revokeCorridor,
 } from "./windows/traversal.js";
 export {
   assertIsolationAvailable,
   isolationAvailable,
   selectIsolation,
   type ContainedCommand,
-  type ContainmentRequest,
   type IsolationBackend,
   type IsolationSupport,
 } from "./backend.js";

@@ -24,7 +24,7 @@ export interface JobsInput {
   readonly stop: boolean;
 }
 
-export const JOBS_DESCRIPTOR: CapabilityDescriptor = {
+const JOBS_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "jobs" },
   title: "Background commands",
   description:

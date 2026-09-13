@@ -107,7 +107,7 @@ export interface ReadInput {
  * image for a picture. The shapes mirror what the agent loop accepts -
  * structurally, for the same reason `studio-runtime.ts` mirrors them there.
  */
-export type ReadContentBlock =
+type ReadContentBlock =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "image"; readonly data: string; readonly mimeType: string };
 
@@ -281,7 +281,7 @@ const stem = (name: string): string => name.replace(/\.[^.]+$/, "");
  * first, then by distance, because the closest name should be the first one the
  * model retries.
  */
-export function suggestNearMisses(
+function suggestNearMisses(
   base: string,
   entries: readonly string[],
 ): readonly string[] {

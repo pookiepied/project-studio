@@ -8,7 +8,7 @@ import { minimaxMedia } from "./minimax.js";
 import { openaiMedia } from "./openai.js";
 import { openrouterMedia } from "./openrouter.js";
 
-export type { MediaAdapter, MediaAdapters, MediaBytes } from "./types.js";
+export type { MediaAdapters } from "./types.js";
 
 /**
  * The adapters this build ships, by the media wire each speaks.

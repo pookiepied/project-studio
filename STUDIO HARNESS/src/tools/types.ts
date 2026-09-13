@@ -1,6 +1,5 @@
 import type {
   CapabilityDescriptor,
-  CapabilityEffect,
   ExecutionScope,
 } from "../contracts/capabilities.js";
 import type { ResourceKind } from "../permissions/matcher.js";
@@ -77,8 +76,6 @@ export interface ToolDefinition<Input, Output> {
 }
 
 /** Any tool, for storage in the registry where the parameters are unknown. */
-export type AnyTool = ToolDefinition<never, unknown>;
-
 /** Convenience for declaring a tool without widening its types. */
 export function defineStudioTool<Input, Output>(
   definition: ToolDefinition<Input, Output>,
@@ -87,6 +84,3 @@ export function defineStudioTool<Input, Output>(
 }
 
 /** The effects the gate must find a sandbox willing to contain. */
-export function effectsOf(descriptor: CapabilityDescriptor): readonly CapabilityEffect[] {
-  return descriptor.effects;
-}

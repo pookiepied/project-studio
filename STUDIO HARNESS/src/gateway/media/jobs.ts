@@ -50,7 +50,7 @@ import type { Generation, MediaBytes, PolledGeneration } from "./adapters/types.
 
 export type MediaJobState = "queued" | "running" | "done" | "failed" | "stopped";
 
-export interface MediaJobOutput {
+interface MediaJobOutput {
   /** The file's full path on this machine. */
   readonly path: string;
   /** The file's name inside the conversation's artifacts directory. */

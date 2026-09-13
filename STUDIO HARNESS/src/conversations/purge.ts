@@ -89,7 +89,7 @@ export interface PurgeDependencies {
 }
 
 /** What one purge destroyed for one conversation, step by step. */
-export interface PurgeDetail {
+interface PurgeDetail {
   readonly indexRow: boolean;
   readonly tree: boolean;
   readonly journal: boolean;

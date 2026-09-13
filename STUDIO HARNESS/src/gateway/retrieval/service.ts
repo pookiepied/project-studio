@@ -8,10 +8,8 @@ import type { RetrievalCapability, RetrievalSettingsStore } from "./settings.js"
 import { runWithFallback, type ProviderSlots, type SlotOutcome } from "./slots.js";
 import type {
   ProviderFactory,
-  ReaderProvider,
   ReadResult,
   RetrievalProvider,
-  SearchProvider,
   SearchResult,
 } from "./types.js";
 
@@ -138,4 +136,3 @@ export class RetrievalService {
   }
 }
 
-export type { SearchProvider, ReaderProvider };

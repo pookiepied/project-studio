@@ -69,14 +69,14 @@ export class CredentialStoreError extends StudioError {
  * the whole keychain/database split: the row says a secret exists and what it
  * is called, and the store is the only thing that holds what it is.
  */
-export const CREDENTIAL_SCOPES = [
+const CREDENTIAL_SCOPES = [
   "session",
   "provider",
   "provider-connection",
   "mcp",
 ] as const;
 
-export type CredentialScope = (typeof CREDENTIAL_SCOPES)[number];
+type CredentialScope = (typeof CREDENTIAL_SCOPES)[number];
 
 export interface CredentialKey {
   readonly scope: CredentialScope;

@@ -319,7 +319,7 @@ export function startObservabilitySdk(config: ObservabilityConfig): Observabilit
   return getObservabilitySdk();
 }
 
-export function getObservabilitySdk(): ObservabilitySdk {
+function getObservabilitySdk(): ObservabilitySdk {
   const active = state;
   if (!active) {
     throw new TelemetryError("not_initialized", {

@@ -50,7 +50,7 @@
  * whose PATH was granted and correct. It grants nothing on its own: a child
  * with no `PATH` and every extension in the world can still reach nothing.
  */
-export const OS_REQUIRED_VARIABLES = [
+const OS_REQUIRED_VARIABLES = [
   "SystemRoot",
   "windir",
   "TEMP",

@@ -164,6 +164,3 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
 ];
 
 /** Every rule id, for validating configuration against typos. */
-export const REDACTION_RULE_IDS: ReadonlySet<string> = new Set(
-  REDACTION_RULES.map((rule) => rule.id),
-);

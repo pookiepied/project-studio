@@ -55,7 +55,7 @@ const MAX_KEPT_LINES = 400;
 /** A hard ceiling on one job's buffered bytes, before lines are dropped. */
 const MAX_KEPT_BYTES = 256 * 1024;
 
-export type JobState = "running" | "exited" | "stopped" | "failed";
+type JobState = "running" | "exited" | "stopped" | "failed";
 
 export interface JobStatus {
   readonly id: string;

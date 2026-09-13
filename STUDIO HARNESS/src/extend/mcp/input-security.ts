@@ -10,7 +10,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function isSecretFieldName(name: string): boolean {
+function isSecretFieldName(name: string): boolean {
   return SECRET_FIELD.test(name);
 }
 
@@ -46,7 +46,7 @@ export function assertSafeMcpPayload(value: unknown): void {
 }
 
 /** Query strings are configuration too; secret-bearing names cannot be durable. */
-export function assertSafeMcpUrl(url: string): void {
+function assertSafeMcpUrl(url: string): void {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -70,7 +70,7 @@ export function assertSafeMcpUrl(url: string): void {
  * a server could spend a thousand tokens of that position on whatever it
  * liked, on every request, for as long as it stayed installed.
  */
-export const MCP_DESCRIPTION_LIMIT = 300;
+const MCP_DESCRIPTION_LIMIT = 300;
 
 /**
  * Characters that are not text, refused before the sentence is stored.
@@ -98,7 +98,7 @@ const CONTROL_CHARACTER = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
  * shape in the database. The inventory still caps and strips what it renders,
  * because a row can also arrive from a database written by hand.
  */
-export function assertSafeMcpDescription(description: string): void {
+function assertSafeMcpDescription(description: string): void {
   if (description.length > MCP_DESCRIPTION_LIMIT) {
     throw new ExtendError("internal", {
       message: `A server description must be one sentence, at most ${MCP_DESCRIPTION_LIMIT} characters.`,

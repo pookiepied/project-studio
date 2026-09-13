@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { it } from "vitest";
 
 import { hostIsolation } from "../src/sandbox/isolation/index.js";
 
@@ -37,7 +37,5 @@ import { hostIsolation } from "../src/sandbox/isolation/index.js";
 export const CAN_CONTAIN: boolean = hostIsolation().backend !== undefined;
 
 /** `describe`, unless containment is unavailable here. */
-export const describeContained = CAN_CONTAIN ? describe : describe.skip;
-
 /** `it`, unless containment is unavailable here. */
 export const itContained = CAN_CONTAIN ? it : it.skip;

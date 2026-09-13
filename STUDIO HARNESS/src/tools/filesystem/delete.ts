@@ -34,7 +34,7 @@ export interface DeleteInput {
   readonly recursive: boolean;
 }
 
-export const DELETE_DESCRIPTOR: CapabilityDescriptor = {
+const DELETE_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "delete" },
   title: "Delete file",
   description:

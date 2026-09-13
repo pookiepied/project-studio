@@ -14,7 +14,7 @@ import { UNTRUSTED_CONTENT_NOTE } from "./untrusted.js";
  * choose a vendor, and no vendor name appears in this schema — see ADR 0023 §1.
  */
 
-export const WEB_SEARCH_DESCRIPTOR: CapabilityDescriptor = {
+const WEB_SEARCH_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "web_search" },
   title: "Search the web",
   description:

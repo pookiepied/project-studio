@@ -6,7 +6,7 @@ import {
   type ModelSource,
 } from "../../contracts/models.js";
 
-export const providerConfigSchema = v.object({
+const providerConfigSchema = v.object({
   source: modelSourceSchema,
 });
 

@@ -33,7 +33,6 @@ export interface ToolAnswer {
 }
 
 /** The width a frame is scaled to before it is sent. */
-const FRAME_WIDTH = 960;
 const FRAME_QUALITY = 45;
 
 export function text(body: string): Content {
@@ -65,7 +64,7 @@ export async function place(page: Page, tabId: string): Promise<string> {
  * not a reason to fail the click that worked, and reporting it as one would
  * turn a successful action into an error the model then tries to undo.
  */
-export async function frame(page: Page): Promise<Content | undefined> {
+async function frame(page: Page): Promise<Content | undefined> {
   try {
     const shot = await page.screenshot({
       type: "jpeg",
@@ -98,4 +97,3 @@ export async function read(page: Page, tabId: string, body: string): Promise<Too
   return answer(`${await place(page, tabId)}\n\n${body}`);
 }
 
-export { FRAME_WIDTH };

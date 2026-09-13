@@ -3,10 +3,6 @@ import type { CallGate } from "../gate.js";
 import { createFetchTool } from "./fetch.js";
 import { createWebSearchTool } from "./search.js";
 
-export { FETCH_DESCRIPTOR, createFetchTool } from "./fetch.js";
-export { WEB_SEARCH_DESCRIPTOR, createWebSearchTool } from "./search.js";
-export { UNTRUSTED_CONTENT_NOTE } from "./untrusted.js";
-
 /**
  * The web family: search and fetch.
  *

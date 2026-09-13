@@ -33,7 +33,7 @@ import { readDefaultSelectionRow } from "../connections/model-catalog.js";
 import { supportedCustomApis } from "./local/apis.js";
 import { connectionCredentialKey } from "../connections/connection-credentials.js";
 
-export interface LocalBootstrapOverrides {
+interface LocalBootstrapOverrides {
   readonly config?: LocalModelConfig;
   readonly credentials?: SecureCredentialStore;
 }

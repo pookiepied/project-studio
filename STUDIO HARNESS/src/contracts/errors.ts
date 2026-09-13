@@ -175,10 +175,3 @@ export function isStudioError(value: unknown): value is StudioError {
   return value instanceof StudioError;
 }
 
-/** True when the failure is a known kind within a known subsystem. */
-export function isStudioErrorOfDomain(
-  value: unknown,
-  domain: StudioErrorDomain,
-): value is StudioError {
-  return isStudioError(value) && value.domain === domain;
-}

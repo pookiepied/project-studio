@@ -1,4 +1,3 @@
-import type { Page } from "playwright-core";
 
 import { acted, answer, failure, place, read, text, type ToolAnswer } from "./result.js";
 import type { BrowserSession, Tab } from "./session.js";
@@ -801,4 +800,3 @@ export function definitions(): readonly Record<string, unknown>[] {
   }));
 }
 
-export type { Page };

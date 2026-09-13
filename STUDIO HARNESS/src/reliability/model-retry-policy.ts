@@ -29,7 +29,7 @@
 import { getBackoffDelay } from "./backoff.js";
 
 /** What the patched runtime asks when a transient model error wants a retry. */
-export interface TransientModelRetryRequest {
+interface TransientModelRetryRequest {
   /** Consecutive retryable failures so far, counting the current one. */
   readonly attempt: number;
   /** The provider's own sentence for the failure, when it carried one. */
@@ -37,7 +37,7 @@ export interface TransientModelRetryRequest {
 }
 
 /** The budget and wait granted to one failure. */
-export interface TransientModelRetryGrant {
+interface TransientModelRetryGrant {
   /**
    * Retries allowed while failures of this shape keep arriving; the loop gives
    * up once `attempt` exceeds it. Zero means no retry signal at all.

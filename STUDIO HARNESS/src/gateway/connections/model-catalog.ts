@@ -604,8 +604,6 @@ export class ModelCatalog {
   }
 }
 
-export const ProviderModelCatalog = ModelCatalog;
-
 /**
  * The stored textGeneration default, read straight from the table this module
  * owns. Exported for the runtime derivation, which must not construct a whole

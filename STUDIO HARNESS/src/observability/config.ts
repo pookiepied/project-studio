@@ -40,7 +40,7 @@ const observabilityConfigSchema = v.object({
 });
 
 export type ObservabilityConfig = v.InferOutput<typeof observabilityConfigSchema>;
-export type ObservabilityExporter = ObservabilityConfig["exporter"];
+type ObservabilityExporter = ObservabilityConfig["exporter"];
 
 export interface ObservabilityConfigInput {
   readonly serviceName?: string;

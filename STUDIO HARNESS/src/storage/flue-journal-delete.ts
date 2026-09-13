@@ -83,7 +83,7 @@ const REQUIRED_TABLES = [
 ] as const;
 
 /** Rows destroyed for one conversation, per journal table. */
-export interface FlueJournalDeleteCounts {
+interface FlueJournalDeleteCounts {
   readonly streams: number;
   readonly batches: number;
   readonly batchChunks: number;

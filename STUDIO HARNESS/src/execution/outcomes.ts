@@ -1,7 +1,7 @@
 import { ExtendError } from "../extend/errors.js";
 import type { StudioUuid } from "../identity/uuid.js";
 
-export type ExecutionOutcome = "completed" | "aborted" | "failed" | "unknown";
+type ExecutionOutcome = "completed" | "aborted" | "failed" | "unknown";
 
 export type OutcomeReason =
   | "user_stop"

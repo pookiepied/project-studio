@@ -95,7 +95,7 @@ const FIXED_OPTIONS = ["--no-pager", "-c", "core.quotepath=false"] as const;
 const SUBCOMMAND_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 /** The option name, with any `=value` removed. */
-export function optionName(argument: string): string | undefined {
+function optionName(argument: string): string | undefined {
   if (!argument.startsWith("-")) return undefined;
   const equals = argument.indexOf("=");
   return equals === -1 ? argument : argument.slice(0, equals);

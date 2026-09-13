@@ -42,7 +42,7 @@ export interface ExportRunOptions {
   readonly runtime: string;
 }
 
-export interface ExportOutputFile {
+interface ExportOutputFile {
   readonly path: string;
   readonly bytes: number;
 }

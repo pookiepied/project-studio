@@ -140,10 +140,6 @@ export const EFFECT_RULES: Readonly<Record<CapabilityEffect, EffectRule>> = {
   },
 };
 
-export function ruleFor(effect: CapabilityEffect): EffectRule {
-  return EFFECT_RULES[effect];
-}
-
 /** The isolation an effect requires. */
 export function requiredIsolation(effect: CapabilityEffect): IsolationLevel {
   return EFFECT_RULES[effect].isolation;

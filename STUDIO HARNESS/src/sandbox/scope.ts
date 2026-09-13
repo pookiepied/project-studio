@@ -33,10 +33,6 @@ const MODES: readonly SandboxScopeMode[] = ["read", "write"];
 const SOURCES: readonly SandboxScopeSource[] = ["preset", "custom", "question"];
 const LEVELS: readonly SandboxLevel[] = ["contained", "trusted"];
 
-export function isSandboxLevel(value: unknown): value is SandboxLevel {
-  return value === "contained" || value === "trusted";
-}
-
 /**
  * The absolute, normalized form of a scope path.
  *

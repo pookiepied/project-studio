@@ -24,9 +24,9 @@ export interface AdmissionSession {
   readonly verifier: AdmissionVerifier;
 }
 
-export type AdmissionFailureReason = "missing" | "malformed" | "invalid" | "expired";
+type AdmissionFailureReason = "missing" | "malformed" | "invalid" | "expired";
 
-export type AdmissionVerification =
+type AdmissionVerification =
   | { readonly ok: true; readonly context: AuthContext }
   | { readonly ok: false; readonly reason: AdmissionFailureReason };
 
@@ -36,7 +36,7 @@ export interface AdmissionVerifier {
   invalidate(): void;
 }
 
-export interface AdmissionVerifierOptions {
+interface AdmissionVerifierOptions {
   readonly credential: AdmissionCredential;
   readonly context: AuthContext;
 }
@@ -72,7 +72,7 @@ function immutableContext(context: AuthContext): AuthContext {
   });
 }
 
-export function createAdmissionVerifier(
+function createAdmissionVerifier(
   options: AdmissionVerifierOptions,
 ): AdmissionVerifier {
   const context = immutableContext(options.context);

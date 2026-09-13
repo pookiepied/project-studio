@@ -9,8 +9,6 @@ import { createModelsDevSource } from "./sources/models-dev.js";
 import { createLobehubSource } from "./sources/lobehub.js";
 
 export { ProviderIconCatalog } from "./catalog.js";
-export { IconCache } from "./cache.js";
-export type { IconSource, Fetcher } from "./source.js";
 
 /**
  * The provider icon system, assembled.

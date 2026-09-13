@@ -24,7 +24,7 @@ export type ExecutionMode =
   /** Anything the policy left to the default proceeds. */
   | "full-auto";
 
-export const EXECUTION_MODES: readonly ExecutionMode[] = [
+const EXECUTION_MODES: readonly ExecutionMode[] = [
   "manual",
   "auto-edit",
   "full-auto",

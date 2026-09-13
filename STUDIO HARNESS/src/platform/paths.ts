@@ -138,7 +138,7 @@ export function flueDatabasePath(): string {
 }
 
 /** User-authored settings. Backed up, synced, and safe to hand-edit. */
-export function configDirectory(): string {
+function configDirectory(): string {
   return studioPath("config");
 }
 

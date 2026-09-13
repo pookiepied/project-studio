@@ -51,7 +51,7 @@ export const PROFILE_NAME = "studio-bwrap";
  * a file's profiles together. Two files would be two prompts and two ways to end
  * up half-configured.
  */
-export const NETWORK_PROFILE_NAME = "studio-pasta";
+const NETWORK_PROFILE_NAME = "studio-pasta";
 
 /**
  * Where the kernel lists what it is actually enforcing.

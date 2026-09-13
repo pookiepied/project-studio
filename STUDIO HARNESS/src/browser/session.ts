@@ -36,13 +36,13 @@ const IDLE_MS = 5 * 60 * 1000;
 /** How much console and network history one session remembers per tab. */
 const LOG_LIMIT = 200;
 
-export interface ConsoleEntry {
+interface ConsoleEntry {
   readonly level: string;
   readonly text: string;
   readonly at: number;
 }
 
-export interface NetworkEntry {
+interface NetworkEntry {
   readonly id: string;
   readonly method: string;
   readonly url: string;

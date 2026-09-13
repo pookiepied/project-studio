@@ -95,7 +95,7 @@ export function ancestorsOf(path: string): readonly string[] {
  * asked for yet. So the corridor is attempted, and this is the floor that
  * decides whether falling short of it is fatal.
  */
-export function holdsTraverse(path: string, sid: string): boolean {
+function holdsTraverse(path: string, sid: string): boolean {
   if (!launcherInstalled()) return false;
   try {
     invokeLauncher(["check", "--sid", sid, "--path", path, "--mode", "traverse"]);

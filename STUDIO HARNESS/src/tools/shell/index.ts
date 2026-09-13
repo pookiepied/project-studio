@@ -21,7 +21,6 @@ import { createJobsTool } from "./jobs.js";
 import type { BackgroundJobs } from "../../process/background.js";
 
 export { shellResource } from "./resolve.js";
-export { readCommandPrograms, programName } from "./command.js";
 
 /**
  * Running the command line the model wrote.
@@ -64,7 +63,7 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 /** Long enough for a shell to start and exit, short enough not to stall a turn. */
 const PROBE_TIMEOUT_MS = 15_000;
 
-export interface ShellInput {
+interface ShellInput {
   /** A full command line, for the machine's interpreter. */
   readonly command: string;
   /** A directory inside the project. Defaults to the project root. */
@@ -135,7 +134,7 @@ const SHELL_SCHEMA = {
  * An undefined interpreter is a real state - a machine with no shell at all -
  * and it gets the interpreter-independent description rather than a guess.
  */
-export function shellDescriptor(interpreter: Interpreter | undefined): CapabilityDescriptor {
+function shellDescriptor(interpreter: Interpreter | undefined): CapabilityDescriptor {
   const description =
     interpreter === undefined
       ? SHELL_DESCRIPTION
@@ -186,7 +185,7 @@ export const SHELL_DESCRIPTOR: CapabilityDescriptor = shellDescriptor(undefined)
  * both. Re-reading rather than comparing separator lists, because the only
  * question that matters is what this line does, and most lines use none.
  */
-export function demotionRefusal(
+function demotionRefusal(
   input: ShellInput,
   from: Interpreter,
   to: Interpreter,
@@ -295,7 +294,7 @@ export interface ShellToolOptions {
   readonly jobs?: BackgroundJobs;
 }
 
-export function createShellTool(
+function createShellTool(
   options: ShellToolOptions = {},
 ): ToolDefinition<ShellInput, string> {
   return defineStudioTool({

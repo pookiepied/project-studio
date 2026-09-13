@@ -10,8 +10,8 @@ import {
 } from "../../../execution/context.js";
 import { isStudioUuid } from "../../../identity/uuid.js";
 
-export const AUTH_CONTEXT = "authContext" as const;
-export const EXECUTION_CONTEXT = "executionContext" as const;
+const AUTH_CONTEXT = "authContext" as const;
+const EXECUTION_CONTEXT = "executionContext" as const;
 
 export interface AdmissionEnv {
   Variables: {

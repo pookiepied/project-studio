@@ -102,7 +102,7 @@ const VIDEO_DESCRIPTOR: CapabilityDescriptor = {
   idempotent: false,
 };
 
-export interface ImageToolInput {
+interface ImageToolInput {
   readonly prompt: string;
   readonly aspectRatio?: string;
   readonly size?: string;
@@ -117,7 +117,7 @@ type ImageToolOutput = {
   )[];
 };
 
-export interface VideoToolInput {
+interface VideoToolInput {
   readonly prompt: string;
   readonly durationSeconds?: number;
   readonly aspectRatio?: string;
@@ -196,7 +196,7 @@ async function imageAt(path: string, context: ToolContext): Promise<MediaBytes> 
 }
 
 /** The `Artifact:` line the transcript parses; see the file comment. */
-export function artifactLine(job: MediaJobStatus, output: MediaJobStatus["outputs"][number]): string {
+function artifactLine(job: MediaJobStatus, output: MediaJobStatus["outputs"][number]): string {
   return `Artifact: /api/media/artifacts/${job.conversationId}/${output.fileName} (${output.mimeType})`;
 }
 
@@ -209,7 +209,7 @@ function mediaFailure(error: unknown): never {
   throw error;
 }
 
-export function createImageTool(
+function createImageTool(
   registration: MediaToolRegistration,
 ): ToolDefinition<ImageToolInput, ImageToolOutput> {
   return defineStudioTool({
@@ -297,7 +297,7 @@ export function createImageTool(
   });
 }
 
-export function createVideoTool(
+function createVideoTool(
   registration: MediaToolRegistration,
 ): ToolDefinition<VideoToolInput, string> {
   return defineStudioTool({

@@ -33,7 +33,7 @@ const CASE_INSENSITIVE = process.platform === "win32";
  * ways depending on who produced it, and a rule that matched only one spelling
  * would be a rule with a hole in it.
  */
-export function normalizeResource(resource: string, kind: ResourceKind): string {
+function normalizeResource(resource: string, kind: ResourceKind): string {
   const unified = kind === "path" ? resource.replaceAll("\\", "/") : resource;
   return CASE_INSENSITIVE ? unified.toLowerCase() : unified;
 }

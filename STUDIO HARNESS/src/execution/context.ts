@@ -14,7 +14,7 @@ export type ExecutionOperationKind =
   | "provider"
   | "unknown";
 
-export type ExecutionRootSource = "project-studio" | "flue";
+type ExecutionRootSource = "project-studio" | "flue";
 
 /**
  * The Flue identities one operation is linked to.

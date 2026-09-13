@@ -2,8 +2,7 @@ import type { CallGate } from "../gate.js";
 import { createGlobTool } from "./glob.js";
 import { createGrepTool } from "./grep.js";
 
-export { GLOB_DESCRIPTOR, createGlobTool } from "./glob.js";
-export { GREP_DESCRIPTOR, createGrepTool, formatCounts, formatMatches } from "./grep.js";
+export { formatCounts, formatMatches } from "./grep.js";
 export {
   DEFAULT_EXCLUDES,
   buildFilesArgs,

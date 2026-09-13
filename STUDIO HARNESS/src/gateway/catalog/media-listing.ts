@@ -43,7 +43,7 @@ import type { CatalogSourceModel } from "./index.js";
  * until a format exists to show them honestly.
  */
 
-export const LISTING_TIMEOUT_MS = 10_000;
+const LISTING_TIMEOUT_MS = 10_000;
 const CACHE_TTL_MS = 60 * 60 * 1_000;
 
 /** Pricing as every live listing reports it: nothing, because nothing prints it. */
@@ -85,7 +85,7 @@ export function capabilityFor(earned: Partial<ModelCapability>): ModelCapability
 export type MediaListingFetch = (url: string, headers: Record<string, string>) => Promise<string>;
 
 /** The transport under every listing: one GET, ten seconds, the vendor's name on a refusal. */
-export function listingFetch(vendor: string): MediaListingFetch {
+function listingFetch(vendor: string): MediaListingFetch {
   return async (url, headers) => {
     const answered = await requestDirect({
       url,
@@ -102,7 +102,7 @@ export function listingFetch(vendor: string): MediaListingFetch {
 }
 
 /** What one read of the vendor's listing answers. */
-export interface MediaListingAnswer {
+interface MediaListingAnswer {
   readonly models: readonly CatalogSourceModel[];
   /**
    * How many entries the vendor listed that no Studio slot answers. They are
@@ -113,7 +113,7 @@ export interface MediaListingAnswer {
   readonly dropped: number;
 }
 
-export interface MediaListingReadContext {
+interface MediaListingReadContext {
   /** The base without its trailing slashes: where the vendor's answers live. */
   readonly origin: string;
   /** The connection's credential, carried for the outbound header alone. */
@@ -130,7 +130,7 @@ export interface MediaListingOptions {
 }
 
 /** What a test (or a rushed caller) may substitute for one read. */
-export interface MediaListingInvocation {
+interface MediaListingInvocation {
   readonly fetch?: MediaListingFetch;
   readonly now?: () => number;
 }

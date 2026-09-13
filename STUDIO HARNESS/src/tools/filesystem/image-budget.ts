@@ -59,7 +59,7 @@ export const MAX_IMAGES_PER_CONVERSATION = 20;
  * count limit above is reached first for ordinary screenshots; this one is
  * what catches a handful of very large photographs.
  */
-export const MAX_CONVERSATION_IMAGE_BYTES = 15_000_000;
+const MAX_CONVERSATION_IMAGE_BYTES = 15_000_000;
 
 export interface ImageSpend {
   readonly images: number;

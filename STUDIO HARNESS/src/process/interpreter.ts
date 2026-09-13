@@ -38,7 +38,7 @@ import { resolveBinary } from "../vendor/resolver.js";
 export type InterpreterKind = "pwsh" | "bash" | "powershell" | "cmd" | "sh";
 
 /** How a command line is handed to an interpreter, as the launcher joins it. */
-export type LineJoin = "argv" | "command-line";
+type LineJoin = "argv" | "command-line";
 
 /**
  * A token that ends one command and starts another, for the interpreter that

@@ -33,7 +33,7 @@ import { VendorError } from "./errors.js";
 
 export type VendorBinaryName = "git" | "rg" | "bwrap" | "pasta";
 
-export type BinarySource =
+type BinarySource =
   /** Shipped with the application, reviewed and committed. */
   | "shipped"
   /** The user's own installation, found on PATH. */
@@ -136,7 +136,7 @@ export function vendorRoot(options: ResolveBinaryOptions = {}): string {
  * a packaged build — under `Program Files` on Windows, inside an app bundle
  * elsewhere. Anything acquired at runtime has to live somewhere the user owns.
  */
-export function managedRoot(options: ResolveBinaryOptions = {}): string {
+function managedRoot(options: ResolveBinaryOptions = {}): string {
   return options.managedRoot !== undefined
     ? resolve(options.managedRoot)
     : managedBinaryDirectory();

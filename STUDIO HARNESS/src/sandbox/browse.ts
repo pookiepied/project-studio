@@ -29,7 +29,7 @@ import { normalizeScopePath } from "./scope.js";
  * the walk.
  */
 
-export interface BrowsedDirectory {
+interface BrowsedDirectory {
   /** The directory's own last segment, as the file system spells it. */
   readonly name: string;
   /** The absolute path to open when the person walks into it. */

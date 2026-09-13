@@ -85,7 +85,7 @@ export interface SandboxPolicyInput {
  * `PROJECT_STUDIO_ALLOW_EXEC` / `PROJECT_STUDIO_ALLOW_NETWORK` to `off` for a
  * process-wide answer that needs no code change at all.
  */
-export const DEFAULT_CAPABILITY_SWITCHES = {
+const DEFAULT_CAPABILITY_SWITCHES = {
   allowExec: true,
   allowNetwork: true,
 } as const;
