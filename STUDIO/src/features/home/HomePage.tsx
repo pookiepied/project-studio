@@ -13,16 +13,21 @@ import { StartConversation } from '@/features/chat/composer'
  *
  * ---- The line -------------------------------------------------------------
  *
- * A greeting for the time of day, and nothing under it. It has been a prompt
- * ("What are we making?") and a pair of claims ("A quieter way to work. /
- * Everything it can do, none of it in the way."). The prompt asked the
- * person to perform on an empty screen; the claims were the software
- * describing itself to someone who had already opened it, and the second
- * line meant nothing to anyone who had not read the design notes. A
- * greeting is the one line that is about the person rather than the tool,
- * and it is what the calmest screen in a well-made app tends to say. The
- * field's placeholder does the inviting. This is the one display moment in
- * the app, so it carries the serif and the serif goes nowhere else.
+ * Two lines: a statement in the serif and a plainer line under it, the
+ * shape the page has always had. What they say has changed three times. A
+ * prompt ("What are we making?") asked the person to perform on an empty
+ * screen. A pair of claims ("A quieter way to work. / Everything it can
+ * do, none of it in the way.") was the software describing itself, and the
+ * second line meant nothing to anyone who had not read the design notes. A
+ * greeting alone, tried next, left the page feeling unfurnished - one short
+ * line over a field reads as a form.
+ *
+ * So: two lines, the same lengths as before, and both about what the
+ * person can do here rather than what the tool is. The first is an
+ * invitation with no demand in it; the second names the three shapes a
+ * first message takes, so the empty field is not a blank. This is the one
+ * display moment in the app, so it carries the serif and the serif goes
+ * nowhere else.
  *
  * ---- Where the first message goes ------------------------------------------
  *
@@ -31,15 +36,7 @@ import { StartConversation } from '@/features/chat/composer'
  * this surface decides is that a conversation started here belongs to no
  * project.
  */
-/** Morning until noon, afternoon until six, evening after. */
-export function greetingFor(hour: number): string {
-  if (hour < 12) return 'Good morning.'
-  if (hour < 18) return 'Good afternoon.'
-  return 'Good evening.'
-}
-
 export function HomePage() {
-  const greeting = greetingFor(new Date().getHours())
   return (
     <div
       className="flex h-full flex-col items-center justify-center"
@@ -52,7 +49,10 @@ export function HomePage() {
           transition={{ duration: DURATION.slow, ease: EASE_OUT }}
           className="mb-7 text-center"
         >
-          <h1 className="studio-display text-foreground">{greeting}</h1>
+          <h1 className="studio-display text-foreground">Start with anything.</h1>
+          <p className="mt-2 text-ui text-muted-foreground">
+            A question, a task, or a thought to think through.
+          </p>
         </motion.div>
 
         <motion.div

@@ -28,8 +28,17 @@ import { WorkingDots } from '@/components/state'
  *               last two seconds of measured level, newest on the right —
  *               each bar one frame of what the microphone actually heard, so
  *               a silent room shows a still row and only speaking moves it.
- *   processing  transcribing, with an ellipsis that cycles. Motion here is a
- *               state being reported, not decoration — the same licence the
+ *               No words: the strip used to show the transcript's tail
+ *               beside the bars, which pushed the bars into the right half
+ *               and put a preview in a place the person had asked to keep
+ *               clear. The take lands in the field when it ends; until then
+ *               the strip is about the microphone, and only that.
+ *   processing  the same strip, gone still - the mic is off, so the bars
+ *               rest - with "Transcribing" where the clock was. Keeping the
+ *               bars is what stops the stage change from reading as the
+ *               strip emptying to a word at the left edge: the shape holds,
+ *               and one thing in it changes. The dots cycle because a state
+ *               is being reported, not for decoration — the same licence the
  *               thinking sparkle runs on.
  *   blocked     what went wrong, in one line, in the caption voice. It clears
  *               itself (see `useDictation`) rather than demanding a dismissal.
@@ -108,7 +117,6 @@ export function DictationBar({
   elapsedMs,
   denied,
   note,
-  transcript = '',
   onFrame,
 }: {
   stage: DictationStage
@@ -116,13 +124,8 @@ export function DictationBar({
   denied: boolean
   /** A sentence from the transcriber, when the words did not come back. */
   note: string | null
-  /** What this take has put in the field so far; the field itself is out of sight. */
-  transcript?: string
   onFrame: (listener: MicFrameListener) => () => void
 }) {
-  // The tail of the transcript, because the newest words are the ones that
-  // tell the person the transcriber is keeping up. The field holds the whole.
-  const tail = transcript.length > 72 ? `…${transcript.slice(-72).trimStart()}` : transcript
   return (
     // Exactly one line of composer text tall — the same box `ComposerField`'s
     // textarea occupies, so swapping one for the other cannot change the
@@ -140,9 +143,12 @@ export function DictationBar({
       style={{ minHeight: 'calc(var(--text-ui) * var(--leading-ui))' }}
     >
       <AnimatePresence initial={false} mode="wait">
-        {stage === 'recording' ? (
+        {stage === 'recording' || stage === 'processing' ? (
+          // One element for both stages, so the bars are not remounted -
+          // their history would restart empty - and the only change on
+          // stop is the label at the right.
           <motion.div
-            key="recording"
+            key="live"
             initial={{ opacity: 0, x: 6 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -6 }}
@@ -150,30 +156,21 @@ export function DictationBar({
             className="flex w-full min-w-0 items-center gap-3"
           >
             <LevelBars onFrame={onFrame} />
-            {/* The clock is the one number here that is not audio, and it
-                earns its place: it is how the user knows the mic has not
-                silently died. Tabular figures so the seconds tick without
-                the row shifting. */}
-            <span className="shrink-0 tabular-nums text-foreground/80">{formatClock(elapsedMs)}</span>
-            {tail === '' ? (
-              <span className={cn('truncate', 'opacity-70')}>Esc cancels</span>
+            {stage === 'recording' ? (
+              <>
+                {/* The clock is the one number here that is not audio, and it
+                    earns its place: it is how the user knows the mic has not
+                    silently died. Tabular figures so the seconds tick without
+                    the row shifting. */}
+                <span className="shrink-0 tabular-nums text-foreground/80">{formatClock(elapsedMs)}</span>
+                <span className={cn('shrink-0', 'opacity-70')}>Esc cancels</span>
+              </>
             ) : (
-              <span className="min-w-0 max-w-[45%] truncate text-foreground/80" title={transcript}>
-                {tail}
+              <span className="flex shrink-0 items-center gap-2 text-foreground/80">
+                Transcribing
+                <WorkingDots />
               </span>
             )}
-          </motion.div>
-        ) : stage === 'processing' ? (
-          <motion.div
-            key="processing"
-            initial={{ opacity: 0, x: 6 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -6 }}
-            transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-            className="flex items-center gap-2.5"
-          >
-            <WorkingDots className="pl-0.5" />
-            <span>Transcribing</span>
           </motion.div>
         ) : stage === 'requesting' ? (
           <motion.div

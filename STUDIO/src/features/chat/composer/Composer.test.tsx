@@ -147,10 +147,10 @@ describe('the field holds its words until the harness takes them', () => {
 describe('the images a turn carries', () => {
   const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4])
 
-  /** Opens the plus menu's Image item, which wakes the hidden file input. */
+  /** Opens the plus menu's Files item, which wakes the hidden file input. */
   function pickImages(): void {
     fireEvent.click(screen.getByRole('button', { name: 'Add context' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Image/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Files/ }))
   }
 
   function pickerInput(): HTMLInputElement {

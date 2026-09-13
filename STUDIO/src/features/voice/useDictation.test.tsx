@@ -75,41 +75,26 @@ describe('a permission question that is never answered', () => {
   })
 })
 
-describe('the recording face', () => {
-  it('shows the words as they land, and the escape hint until they do', () => {
-    const { rerender } = render(
-      <DictationBar stage="recording" elapsedMs={1200} denied={false} note={null} onFrame={() => () => {}} />,
+describe('the live strip', () => {
+  it('shows the clock and the escape hint while recording, and no words', () => {
+    render(
+      <DictationBar stage="recording" elapsedMs={4200} denied={false} note={null} onFrame={() => () => {}} />,
     )
     expect(screen.getByText('Esc cancels')).toBeTruthy()
-
-    rerender(
-      <DictationBar
-        stage="recording"
-        elapsedMs={4200}
-        denied={false}
-        note={null}
-        transcript="The first sentence landed."
-        onFrame={() => () => {}}
-      />,
-    )
-    expect(screen.getByText('The first sentence landed.')).toBeTruthy()
-    expect(screen.queryByText('Esc cancels')).toBeNull()
+    expect(screen.getByText('0:04')).toBeTruthy()
   })
 
-  it('shows the tail of a long transcript, not its head', () => {
-    const transcript = `${'word '.repeat(40)}the newest words`
-    render(
-      <DictationBar
-        stage="recording"
-        elapsedMs={9000}
-        denied={false}
-        note={null}
-        transcript={transcript}
-        onFrame={() => () => {}}
-      />,
+  it('keeps the bars and swaps the clock for the word when transcribing', () => {
+    const { container, rerender } = render(
+      <DictationBar stage="recording" elapsedMs={4200} denied={false} note={null} onFrame={() => () => {}} />,
     )
-    const shown = screen.getByTitle(transcript)
-    expect(shown.textContent?.endsWith('the newest words')).toBe(true)
-    expect(shown.textContent?.startsWith('…')).toBe(true)
+    const bars = container.querySelector('[aria-hidden]')
+    rerender(
+      <DictationBar stage="processing" elapsedMs={4200} denied={false} note={null} onFrame={() => () => {}} />,
+    )
+    // The same element: the strip did not empty and refill, one thing in it changed.
+    expect(container.querySelector('[aria-hidden]')).toBe(bars)
+    expect(screen.getByText('Transcribing')).toBeTruthy()
+    expect(screen.queryByText('Esc cancels')).toBeNull()
   })
 })

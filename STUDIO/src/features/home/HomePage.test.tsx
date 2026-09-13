@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { VoiceModeProvider } from '@/features/voice'
 
-import { HomePage, greetingFor } from './HomePage'
+import { HomePage } from './HomePage'
 
 /**
  * Where the first message of a conversation goes.
@@ -86,16 +86,5 @@ describe('the composer that starts a conversation', () => {
     // Task 32's rule, kept intact across a page that has no transcript: the
     // field holds the words until a receipt says the harness took them.
     expect(field().value).toBe('this one bounces')
-  })
-})
-
-describe('the greeting', () => {
-  it('turns with the clock, and says nothing about the software', () => {
-    expect(greetingFor(6)).toBe('Good morning.')
-    expect(greetingFor(11)).toBe('Good morning.')
-    expect(greetingFor(12)).toBe('Good afternoon.')
-    expect(greetingFor(17)).toBe('Good afternoon.')
-    expect(greetingFor(18)).toBe('Good evening.')
-    expect(greetingFor(23)).toBe('Good evening.')
   })
 })

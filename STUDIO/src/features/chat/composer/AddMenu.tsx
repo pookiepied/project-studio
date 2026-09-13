@@ -1,34 +1,31 @@
 import { useState } from 'react'
+import { COMPOSER } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
 
 /**
  * The plus menu: what to give the turn beyond the words.
  *
- * Two groups, because they answer different questions. The first adds context
- * — files, folders, an image. The second changes how the turn runs: a goal
- * survives the whole conversation, and plan mode makes the model propose before
- * it acts. Flattening them into one list would put "attach a file" beside
- * "change how the agent behaves", which are not peers.
+ * Two groups, because they answer different questions. The first adds
+ * context; the second changes how the turn runs: a goal survives the whole
+ * conversation, and plan mode makes the model propose before it acts.
+ * Flattening them into one list would put "attach a file" beside "change how
+ * the agent behaves", which are not peers.
  *
- * Dictation lives here rather than as a second glyph in the field. It is a way
- * of entering text, so it belongs with the other ways of adding to the turn —
- * and it keeps the resting field down to one control on each side.
+ * Adding context is one item. It was three - Files, Folder, Image - and the
+ * three were the implementation's view: what the harness could carry today
+ * (images) and what it would carry later (the rest). A person attaching
+ * something does not sort it by our roadmap first; they pick a thing and the
+ * picker says what it can take. So the one item opens the one picker, and
+ * what the picker refuses it names, in the composer, by file.
+ *
+ * The panel opens off the capsule, not off the plus. The button sits inside
+ * the capsule's padding, and a panel placed against the button's edge sat on
+ * the capsule's border. The distance is the padding twice over: once to
+ * reach the capsule's edge, and the same again above it, so the gap outside
+ * the capsule is the gap the button has inside it.
  */
-/**
- * The plus menu: what to give the turn beyond the words.
- *
- * Two groups, because they answer different questions. The first adds context
- * — files, folders, an image. The second changes how the turn runs: a goal
- * survives the whole conversation, and plan mode makes the model propose before
- * it acts. Flattening them into one list would put "attach a file" beside
- * "change how the agent behaves", which are not peers.
- *
- * Dictation lives here rather than as a second glyph in the field. It is a way
- * of entering text, so it belongs with the other ways of adding to the turn —
- * and it keeps the resting field down to one control on each side.
- */
-export function AddMenu({ onImage }: { onImage?: () => void }) {
+export function AddMenu({ onAttach }: { onAttach?: () => void }) {
   const [open, setOpen] = useState(false)
 
   const pick = (run?: () => void) => () => {
@@ -42,6 +39,7 @@ export function AddMenu({ onImage }: { onImage?: () => void }) {
       onOpenChange={setOpen}
       side="top"
       align="start"
+      offset={COMPOSER.paddingBlock * 2}
       className="min-w-56"
       trigger={
         <IconButton
@@ -55,18 +53,12 @@ export function AddMenu({ onImage }: { onImage?: () => void }) {
       }
     >
       <MenuLabel>Add</MenuLabel>
-      <MenuItem icon={<Icons.attach />} onSelect={pick()}>
-        Files
-      </MenuItem>
-      <MenuItem icon={<Icons.project />} onSelect={pick()}>
-        Folder
-      </MenuItem>
       <MenuItem
-        icon={<Icons.image />}
+        icon={<Icons.attach />}
         note="Seen by the model this turn and every turn after."
-        onSelect={pick(onImage)}
+        onSelect={pick(onAttach)}
       >
-        Image
+        Files
       </MenuItem>
 
       <MenuSeparator />

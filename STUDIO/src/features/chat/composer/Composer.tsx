@@ -474,7 +474,7 @@ export function Composer({
         >
           {/* The image picker is this menu's one live item: the dialog it
               opens is the webview's own file input, no plugin. */}
-          <AddMenu onImage={() => picker.current?.click()} />
+          <AddMenu onAttach={() => picker.current?.click()} />
 
           {/* What Studio may do, next to the thing that will make it do it.
               The mode is the one setting whose consequence lands on the user's
@@ -515,7 +515,6 @@ export function Composer({
                   elapsedMs={dictation.elapsedMs}
                   denied={dictation.denied}
                   note={dictation.note}
-                  transcript={dictation.transcript}
                   onFrame={dictation.mic.onFrame}
                 />
               </motion.div>

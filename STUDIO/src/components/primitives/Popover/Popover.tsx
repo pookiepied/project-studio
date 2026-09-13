@@ -68,6 +68,7 @@ export function Popover({
   trigger,
   side = 'bottom',
   align = 'start',
+  offset = OFFSET,
   children,
   className,
 }: {
@@ -76,6 +77,13 @@ export function Popover({
   trigger: ReactNode
   side?: Side
   align?: Align
+  /**
+   * Distance from the trigger's edge. The default suits a bare button; a
+   * trigger sitting inside a bordered surface passes the surface's padding
+   * plus a gap, so the panel opens off the surface's edge rather than off
+   * the button's, where it would sit on the surface's border.
+   */
+  offset?: number
   children: ReactNode
   className?: string
 }) {
@@ -104,14 +112,14 @@ export function Popover({
     // Flip rather than overflow: if the preferred side has no room but the
     // opposite side does, use the opposite side. If neither does, keep the
     // preference and let the clamp below deal with it.
-    const below = window.innerHeight - trigger.bottom - OFFSET - MARGIN
-    const above = trigger.top - OFFSET - MARGIN
+    const below = window.innerHeight - trigger.bottom - offset - MARGIN
+    const above = trigger.top - offset - MARGIN
     let resolved = side
     if (side === 'bottom' && height > below && above > below) resolved = 'top'
     if (side === 'top' && height > above && below > above) resolved = 'bottom'
 
     const top =
-      resolved === 'bottom' ? trigger.bottom + OFFSET : trigger.top - height - OFFSET
+      resolved === 'bottom' ? trigger.bottom + offset : trigger.top - height - offset
 
     const preferred =
       align === 'end'
