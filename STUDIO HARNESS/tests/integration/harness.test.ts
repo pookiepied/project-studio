@@ -1188,7 +1188,18 @@ describe.sequential("Flue harness vertical slice", () => {
           throw new Error(`The first read answered ${String(firstRead.status)}.`);
         }
         const chunks: unknown = await firstRead.json();
-        if (Array.isArray(chunks) && chunks.length > 0) {
+        // Framing alone - the reset and the checkpoint every read is given -
+        // is not "something to hand over": a mid-run reader gets its own.
+        // Only an event of the conversation moves the offset past the start.
+        const substantive =
+          Array.isArray(chunks) &&
+          chunks.some(
+            (chunk) =>
+              isRecordValue(chunk) &&
+              chunk["type"] !== "conversation-reset" &&
+              chunk["type"] !== "stream-checkpoint",
+          );
+        if (substantive) {
           midRunOffset = firstRead.headers.get("Stream-Next-Offset") ?? "";
         }
         if (midRunOffset === "") await new Promise((resolve) => setTimeout(resolve, 100));
