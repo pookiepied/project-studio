@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { Artifact } from '@/domain/artifacts/types'
-import type { BrowserFrame, BrowserStep } from '@/features/chat/transcript/live/browserCall'
+import type { BrowserFrame, BrowserStep } from '@/domain/browser/steps'
 
 /**
  * The side rail's state.
