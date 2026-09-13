@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { Button } from '@/components/primitives'
 import { PlaceholderText } from '@/components/placeholder'
-import { StateNote } from '@/components/state'
+import { RetryButton, StateNote } from '@/components/state'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { ProjectExtensions } from '@/features/projects/ProjectExtensions'
 import { StartConversation } from '@/features/chat/composer'
@@ -32,7 +30,6 @@ import type { Project } from '@/domain/projects/types'
 export function ProjectPage({ project }: { project: Project }) {
   const { conversations, storePhase, ensureStore } = useWorkspace()
   const { openChat } = useNavigation()
-  const [asking, setAsking] = useState(false)
 
   const inProject = conversations
     .filter((conversation) => conversation.projectId === project.id && !conversation.archived)
@@ -102,19 +99,7 @@ export function ProjectPage({ project }: { project: Project }) {
               className="py-2"
               title="Could not read the conversations."
               detail={storePhase.error?.message ?? 'The harness stopped answering.'}
-              action={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  busy={asking}
-                  onClick={() => {
-                    setAsking(true)
-                    void ensureStore().finally(() => setAsking(false))
-                  }}
-                >
-                  Try again
-                </Button>
-              }
+              action={<RetryButton onRetry={ensureStore} />}
             />
           ) : inProject.length === 0 ? (
             <p className="text-ui text-muted-foreground">Nothing here yet.</p>

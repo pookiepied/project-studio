@@ -1,7 +1,5 @@
-import { useState } from 'react'
-import { Button } from '@/components/primitives'
 import { PlaceholderText } from '@/components/placeholder'
-import { StateNote } from '@/components/state'
+import { RetryButton, StateNote } from '@/components/state'
 import type { StorePhase } from '@/stores/workspace'
 
 /**
@@ -83,8 +81,6 @@ export function SidebarUnavailable({
   phase: StorePhase
   onEnsure: () => Promise<boolean>
 }) {
-  const [asking, setAsking] = useState(false)
-
   if (phase.status === 'no-harness') return null
 
   return (
@@ -92,19 +88,7 @@ export function SidebarUnavailable({
       className="px-1 py-3"
       title="Could not read the conversations."
       detail={phase.error?.message ?? 'The harness stopped answering.'}
-      action={
-        <Button
-          variant="secondary"
-          size="sm"
-          busy={asking}
-          onClick={() => {
-            setAsking(true)
-            void onEnsure().finally(() => setAsking(false))
-          }}
-        >
-          Try again
-        </Button>
-      }
+      action={<RetryButton onRetry={onEnsure} />}
     />
   )
 }

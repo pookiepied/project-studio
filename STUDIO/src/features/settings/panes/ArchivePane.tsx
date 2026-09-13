@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
 import { Placeholder, PlaceholderText } from '@/components/placeholder'
-import { StateNote } from '@/components/state'
+import { RetryButton, StateNote } from '@/components/state'
 import type { HarnessFailure } from '@/platform/harness'
 import { useWorkspace } from '@/stores/workspace'
 import { Pane } from '@/features/settings/panes/Pane'
@@ -55,7 +55,6 @@ export function ArchivePane() {
     sweepOrphanTrees,
   } = useWorkspace()
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const [asking, setAsking] = useState(false)
   const [purging, setPurging] = useState(false)
   const [purgeFailures, setPurgeFailures] = useState<Readonly<Record<string, string>>>({})
   const [sweeping, setSweeping] = useState(false)
@@ -108,19 +107,7 @@ export function ArchivePane() {
     }
   }
 
-  const retry = (
-    <Button
-      variant="secondary"
-      size="sm"
-      busy={asking}
-      onClick={() => {
-        setAsking(true)
-        void ensureStore().finally(() => setAsking(false))
-      }}
-    >
-      Try again
-    </Button>
-  )
+  const retry = <RetryButton onRetry={ensureStore} />
 
   return (
     <Pane
