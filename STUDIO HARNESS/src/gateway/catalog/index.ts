@@ -25,8 +25,11 @@ import {
   reasoningLevelsFromPiModel,
 } from "../language/pi-catalog.js";
 import { DECLARED_PROVIDERS, declaredProviderFor, type DeclaredModel } from "./declared-catalog.js";
+import { elevenlabsListing } from "./elevenlabs-media.js";
 import { falListing } from "./fal-media.js";
+import { googleListing } from "./google-media.js";
 import type { MediaListing } from "./media-listing.js";
+import { openaiListing } from "./openai-media.js";
 import { openrouterListing } from "./openrouter-media.js";
 
 /**
@@ -176,16 +179,20 @@ function declaredModelsForSource(
  * draws nothing here; such a connection serves only the models entered by
  * hand. The credential, when given, travels to listings that ask for one,
  * in the outbound header alone. Async because the live listings are read
- * here, and every caller already awaits.
+ * here, and every caller already awaits. `live: false` reads the declared
+ * and language catalogs alone - what a caller wants when the vendor's own
+ * list is not its question and a socket to the vendor would be a side
+ * effect (a test of something else, a store being migrated).
  */
 export async function catalogModelsFor(
   connection: ProviderConnection,
   credential: string | undefined = undefined,
+  options: { readonly live?: boolean } = {},
 ): Promise<readonly CatalogSourceModel[]> {
   const catalogProvider = connection.catalogProvider;
   if (catalogProvider === undefined) return [];
 
-  const live = await liveModelsFor(connection, credential);
+  const live = options.live === false ? [] : await liveModelsFor(connection, credential);
 
   if (connection.serves.language !== undefined && isLanguageCatalogProvider(catalogProvider)) {
     // Pi's language models come first; declared extras and the live listing
@@ -278,18 +285,18 @@ function joinedCatalogModels(
 }
 
 /**
- * The listings, keyed by the media wire they belong to. A vendor lists live
- * when it publishes a catalogue; the three that do not (Deepgram, Fish
+ * The listings, keyed by the media wire they belong to. Five vendors publish
+ * a catalogue and are read through it; the three that do not (Deepgram, Fish
  * Audio, MiniMax) keep their declared lists and their undefined, which is
- * the honest entry for "the vendor has no such reading yet" - the compiler,
- * not a comment, remembers which are left.
+ * the honest entry for "the vendor has no such reading" - the compiler, not
+ * a comment, remembers which are left.
  */
 const MEDIA_LISTINGS: Readonly<Record<MediaProtocol, MediaListing | undefined>> = {
   openrouter: openrouterListing,
   fal: falListing,
-  elevenlabs: undefined,
-  google: undefined,
-  openai: undefined,
+  elevenlabs: elevenlabsListing,
+  google: googleListing,
+  openai: openaiListing,
   deepgram: undefined,
   "fish-audio": undefined,
   minimax: undefined,

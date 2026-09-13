@@ -109,7 +109,9 @@ async function connectOpenAi(): Promise<void> {
     baseUrl: `http://127.0.0.1:${provider.port}/v1`,
     apiKey: "sk-openai-route-secret-9f27",
   });
-  const catalog = new ModelCatalog({ db, connections });
+  // The audio routes are the question, not the vendor's list: with live
+  // listings on, the stand-in would see /models before the audio call.
+  const catalog = new ModelCatalog({ db, connections, liveListings: false });
   await catalog.setDefault("transcription", {
     connectionId: "openai-work",
     modelId: "whisper-1",
@@ -152,7 +154,7 @@ describe("media routes", () => {
     const limited = createAdmissionSession({ scopes: [ADMISSION_SCOPES.PROVIDER_MANAGEMENT] });
     const credentials = new InMemoryCredentialStore();
     const connections = new ConnectionStore({ db, credentials });
-    const catalog = new ModelCatalog({ db, connections });
+    const catalog = new ModelCatalog({ db, connections, liveListings: false });
     const scoped = new Hono<AdmissionEnv>();
     scoped.use("*", createAdmissionMiddleware(limited.verifier));
     scoped.route(
@@ -173,7 +175,7 @@ describe("media routes", () => {
   it("refuses an unset slot before touching the wire, naming the fix", async () => {
     const credentials = new InMemoryCredentialStore();
     const connections = new ConnectionStore({ db, credentials });
-    const catalog = new ModelCatalog({ db, connections });
+    const catalog = new ModelCatalog({ db, connections, liveListings: false });
     app = compose(credentials, connections, catalog);
     provider.audio = Buffer.from([0xff, 0xf3]);
 

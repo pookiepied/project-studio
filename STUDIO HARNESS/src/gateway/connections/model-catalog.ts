@@ -83,6 +83,12 @@ export interface ModelCatalogOptions {
   readonly db: StudioDatabase;
   readonly connections: ConnectionStore;
   readonly reporter?: ErrorReporter;
+  /**
+   * Whether a vendor's own listing is read over the network. On by default;
+   * a test of something other than listings turns it off, so that creating
+   * a vendor connection does not open a socket to the vendor.
+   */
+  readonly liveListings?: boolean;
 }
 
 export class ModelCatalog {
@@ -91,10 +97,12 @@ export class ModelCatalog {
   readonly #edits: ModelEdits;
   readonly #probeState: ProbeStateStore;
   readonly #reporter: ErrorReporter;
+  readonly #liveListings: boolean;
 
   constructor(options: ModelCatalogOptions) {
     this.#db = options.db;
     this.#connections = options.connections;
+    this.#liveListings = options.liveListings ?? true;
     this.#edits = new ModelEdits({ db: options.db, reporter: options.reporter });
     this.#probeState = new ProbeStateStore({ db: options.db });
     this.#reporter = options.reporter ?? createDomainReporter("models");
@@ -471,6 +479,7 @@ export class ModelCatalog {
     const sources = await catalogModelsFor(
       connection,
       await this.#connections.credentialFor(connection.id).catch(() => undefined),
+      { live: this.#liveListings },
     );
     const seen = new Set(models.map((model) => model.modelId));
     for (const source of sources) {

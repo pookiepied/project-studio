@@ -97,7 +97,8 @@ beforeEach(async () => {
   db = openDatabase({ path: ":memory:" });
   credentials = new InMemoryCredentialStore();
   connections = new ConnectionStore({ db, credentials });
-  catalog = new ModelCatalog({ db, connections });
+  // Generation is the question here, not listings: no socket to a vendor.
+  catalog = new ModelCatalog({ db, connections, liveListings: false });
   // The registry writes where the route reads: the conversation's artifacts
   // directory under the Studio home, which the test points at a temp root.
   jobs = new MediaJobs({
@@ -160,7 +161,7 @@ describe("image generation through the service", () => {
       catalogProvider: "fal",
       apiKey: "fal-key-1",
     });
-    await catalog.setDefault("imageGeneration", { connectionId: "fal", modelId: "fal-ai/flux-2/pro" });
+    await catalog.setDefault("imageGeneration", { connectionId: "fal", modelId: "fal-ai/flux-2-pro" });
     const { adapter, recorded } = standIn("fal", () => ({
       shape: "sync",
       result: Promise.resolve([PNG]),

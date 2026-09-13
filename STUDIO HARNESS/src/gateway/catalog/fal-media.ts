@@ -17,10 +17,11 @@ import type { CatalogSourceModel } from "./index.js";
  * adapter already drives any endpoint id - the catalogue was the whole gap,
  * and the listing closes it. The catalogue lives on `api.fal.ai`, not on the
  * queue host the connection's base URL names (`queue.fal.run` answers 405 to
- * a GET, the probe learned this first), which is why the read ignores the
- * connection's origin and names the API host itself: the base URL is where
- * generations go, the listing is where the vendor's own word about what
- * exists is.
+ * a GET, the probe learned this first). So when the connection's origin is
+ * FAL's own queue, the read names the API host itself: the base URL is
+ * where generations go, the listing is where the vendor's own word about
+ * what exists is. Any other origin - a proxy in front of FAL, a stand-in
+ * in a test - is taken to serve both, and the listing is read beside it.
  *
  * The listing is paged: 500 answers a page, the answer carries a cursor and
  * has_more, and 1500 models were 3 pages on the day this was read. Auth is
@@ -37,6 +38,8 @@ import type { CatalogSourceModel } from "./index.js";
 
 /** FAL's API host: the listing's home, beside the queue host the probe already reached. */
 const FAL_LISTING_HOST = "https://api.fal.ai";
+/** FAL's own queue host, the declared base URL; the one origin whose listing lives elsewhere. */
+const FAL_QUEUE_HOST = "https://queue.fal.run";
 
 /** How many answers one page asks for. 500 was honoured whole; three pages covered the catalogue. */
 const FAL_PAGE_LIMIT = 500;
@@ -124,7 +127,8 @@ function pageOf(json: string): FalPage {
 
 export const falListing: MediaListing = createMediaListing({
   vendor: "FAL",
-  read: async ({ credential, fetch }) => {
+  read: async ({ origin, credential, fetch }) => {
+    const listingHost = origin === FAL_QUEUE_HOST ? FAL_LISTING_HOST : origin;
     const models: CatalogSourceModel[] = [];
     let dropped = 0;
     let cursor: string | undefined = undefined;
@@ -134,7 +138,7 @@ export const falListing: MediaListing = createMediaListing({
         cursor === undefined
           ? `?limit=${String(FAL_PAGE_LIMIT)}`
           : `?limit=${String(FAL_PAGE_LIMIT)}&cursor=${encodeURIComponent(cursor)}`;
-      const answered = pageOf(await fetch(`${FAL_LISTING_HOST}/v1/models${query}`, falHeaders(credential)));
+      const answered = pageOf(await fetch(`${listingHost}/v1/models${query}`, falHeaders(credential)));
       for (const entry of answered.models) {
         const classified = entryModel(entry);
         if (classified === "dropped") {

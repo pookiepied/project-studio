@@ -151,13 +151,14 @@ export interface MediaListing {
 
 /**
  * Records what one read of the listing kept and dropped, once per read -
- * a cache hit replays no numbers. The dropped count is the whole point of
- * the second decision: the next slot (image upscaling is the obvious first)
- * is chosen from this number rather than from a feeling, and a number nobody
- * wrote down is a feeling. Zero is logged too, because "we dropped nothing"
- * is also a fact about the vendor, and the observation before observability
- * initializes (a harness still coming up) is simply lost - nothing reads a
- * catalogue before the webview can ask for one.
+ * a cache hit replays no numbers, and a read that threw answered nothing,
+ * so there are no numbers to record. The dropped count is the whole point
+ * of the second decision: the next slot (image upscaling is the obvious
+ * first) is chosen from this number rather than from a feeling, and a
+ * number nobody wrote down is a feeling. Zero is logged too, because "we
+ * dropped nothing" is also a fact about the vendor, and the observation
+ * before observability initializes (a harness still coming up) is simply
+ * lost - nothing reads a catalogue before the webview can ask for one.
  */
 function logListingRead(
   vendor: string,
@@ -166,7 +167,7 @@ function logListingRead(
 ): void {
   if (!isObservabilityInitialized()) return;
   getObservability().logger.info(
-    `${vendor} answered its listing with ${String(answer.models.length)} models; ${String(answer.dropped)} in categories no Studio slot answers`,
+    `${vendor} answered its listing with ${String(answer.models.length)} models; ${String(answer.dropped)} it did not classify`,
     { vendor, origin, kept: answer.models.length, dropped: answer.dropped },
   );
 }
@@ -180,7 +181,15 @@ export function createMediaListing(options: MediaListingOptions): MediaListing {
     async models(baseUrl, credential, invocation) {
       const now = invocation?.now ?? (() => Date.now());
       const origin = baseUrl.replace(/\/+$/, "");
-      const cached = cache.get(origin);
+      // What a key may see is the key's own: ElevenLabs, Google and OpenAI
+      // answer 401/403 to a keyless read, and a keyless read would be
+      // nobody's catalogue. Two connections to one origin with two keys are
+      // two answers, so the credential joins the origin in the key - it
+      // lives in this process's memory only, which is where the credential
+      // store's secret already lives, and never travels into any record,
+      // log line, or result.
+      const key = `${origin}\u0000${credential ?? ""}`;
+      const cached = cache.get(key);
       if (cached !== undefined && now() - cached.at < CACHE_TTL_MS) return cached.models;
 
       const fetch = invocation?.fetch ?? answerFor;
@@ -188,9 +197,10 @@ export function createMediaListing(options: MediaListingOptions): MediaListing {
       // answer is "nothing, and ask again next paint": the caller is a
       // settings screen, which must not wear the failure.
       const answer = await options.read({ origin, credential, fetch }).catch(() => undefined);
-      if (answer === undefined || answer.models.length === 0) return [];
+      if (answer === undefined) return [];
       logListingRead(vendor, origin, answer);
-      cache.set(origin, { at: now(), models: answer.models });
+      if (answer.models.length === 0) return [];
+      cache.set(key, { at: now(), models: answer.models });
       return answer.models;
     },
 
@@ -216,8 +226,9 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * The entries of an OpenAI-shaped listing: `{ data: [...] }`, the envelope
  * OpenAI's own answers use and OpenRouter's repeats. A vendor with another
- * envelope parses its own; three vendors sharing one is why this is here and
- * not copied third.
+ * envelope parses its own - ElevenLabs answers a bare array, Google nests
+ * under `models` - and two vendors sharing one is why this is here and not
+ * copied second.
  */
 export function dataEntries(json: string): readonly Record<string, unknown>[] {
   const parsed = parseListingAnswer(json);
