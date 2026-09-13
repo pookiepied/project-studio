@@ -67,6 +67,7 @@ function stubClient(overrides: {
     removeModel: () => refuse(),
     setModelSelection: () => Promise.resolve(ok(undefined)),
     transcribe: () => refuse(),
+    improveText: () => refuse(),
     speak: () => refuse(),
     listConversations: () => refuse(),
     createConversation: () => refuse(),

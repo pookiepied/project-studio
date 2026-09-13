@@ -42,6 +42,14 @@ export const STUDIO_AGENT_ID = "studio";
 export const TITLE_AGENT_ID = "title";
 
 /**
+ * The dictation-improving agent, named for the same reason and kept off the
+ * HTTP surface the same way. Its module is `agents/improve.ts`; its only
+ * caller is `application/text-improver.ts`, in process, through
+ * `dispatch()`. Its stream prefix is `agents/improve/<take id>`.
+ */
+export const IMPROVE_AGENT_ID = "improve";
+
+/**
  * The turn settings a submission may carry beside its message.
  *
  * A submission body cannot carry these through to the run: Flue parses every

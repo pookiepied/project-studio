@@ -279,6 +279,12 @@ export interface HarnessClient {
     readonly audio: string
     readonly mimeType: string
   }): Promise<HarnessResult<{ readonly text: string }>>
+  /**
+   * A dictated passage, tidied on the default text model: punctuation,
+   * casing, fillers - the words themselves kept. The reply is the whole
+   * replacement for what was sent.
+   */
+  improveText(text: string): Promise<HarnessResult<{ readonly text: string }>>
   /** Read-aloud: text in, audio back as base64 under its mime type. */
   speak(input: {
     readonly text: string
@@ -822,6 +828,11 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       // of its own; 150s here means the composer sees the provider's refusal
       // rather than this client's.
       return json('POST', `${MEDIA_PATH}/transcribe`, recording, parseTranscribeResult, 150_000)
+    },
+
+    improveText(text) {
+      // One model turn; the harness gives the agent thirty seconds.
+      return json('POST', `${MEDIA_PATH}/improve`, { text }, parseTranscribeResult, 40_000)
     },
 
     speak(input) {

@@ -56,6 +56,7 @@ import { RetrievalManagementService } from "./application/retrieval-management.j
 import { RetrievalSettingsStore } from "./gateway/retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
 import { ConversationTitler } from "./conversations/titling.js";
+import { TextImprover } from "./application/text-improver.js";
 import { ContextUsageTracker } from "./conversations/context-usage.js";
 import { ProjectStore } from "./projects/store.js";
 import { WorkspaceTrustStore } from "./permissions/trust.js";
@@ -284,6 +285,9 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       logger: observability.logger,
     });
     titling.start();
+    // The dictation improver: one request, one reply, on the same bus. It
+    // subscribes on its first request and is stopped in the drain below.
+    const improver = new TextImprover();
     // The measured context, from the same process-global bus and for the same
     // reason it is subscribed here rather than deeper: a run's own usage is
     // reported to the observer, not to the transcript, and the webview cannot
@@ -298,6 +302,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         admission?.verifier.invalidate();
         try {
           titling.stop();
+          improver.stop();
           contextUsage.stop();
           // Nothing of ours keeps polling a vendor once Studio has closed;
           // a job with a cancel endpoint is told.
@@ -328,6 +333,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       providers,
       retrieval,
       media,
+      improver,
       approvals,
       questions,
       plans,

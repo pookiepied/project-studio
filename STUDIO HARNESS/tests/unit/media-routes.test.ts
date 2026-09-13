@@ -12,6 +12,7 @@ import { ConnectionStore } from "../../src/gateway/connections/connection-store.
 import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
 import { CapabilityResolver } from "../../src/gateway/connections/capability-defaults.js";
 import { createMediaRoutes } from "../../src/transport/http/routes/media.js";
+import { ImproveError, type TextImproverPort } from "../../src/application/text-improver.js";
 import {
   createAdmissionMiddleware,
   type AdmissionEnv,
@@ -127,13 +128,14 @@ function compose(
   credentials: InMemoryCredentialStore,
   connections: ConnectionStore,
   catalog: ModelCatalog,
+  improver?: TextImproverPort,
 ): Hono<AdmissionEnv> {
   const media = new MediaService({
     resolver: new CapabilityResolver({ connections, catalog, credentials }),
   });
   const routed = new Hono<AdmissionEnv>();
   routed.use("*", createAdmissionMiddleware(session.verifier));
-  routed.route("/api/media", createMediaRoutes(media));
+  routed.route("/api/media", createMediaRoutes(media, improver === undefined ? {} : { improver }));
   return routed;
 }
 
@@ -288,5 +290,68 @@ describe("media routes", () => {
     const body = JSON.parse(await response.text()) as { error: string };
     expect(body.error).toContain("4096");
     expect(provider.requests).toHaveLength(0);
+  });
+});
+
+describe("POST /api/media/improve", () => {
+  async function composeWith(improver?: TextImproverPort): Promise<void> {
+    const credentials = new InMemoryCredentialStore();
+    const connections = new ConnectionStore({ db, credentials });
+    const catalog = new ModelCatalog({ db, connections, liveListings: false });
+    app = compose(credentials, connections, catalog, improver);
+    await Promise.resolve();
+  }
+
+  it("hands the passage to the improver and answers its text", async () => {
+    const asked: string[] = [];
+    await composeWith({
+      improve: async (text) => {
+        asked.push(text);
+        return "Tidied.";
+      },
+    });
+    const response = await authorized("/api/media/improve", {
+      method: "POST",
+      body: JSON.stringify({ text: "um tidied" }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ text: "Tidied." });
+    expect(asked).toEqual(["um tidied"]);
+  });
+
+  it("is a 400 for a body outside the shape, and for input the improver refuses", async () => {
+    await composeWith({
+      improve: () => Promise.reject(new ImproveError("bad-input", "There is nothing to improve.")),
+    });
+    const shapeless = await authorized("/api/media/improve", { method: "POST", body: JSON.stringify({}) });
+    expect(shapeless.status).toBe(400);
+    const refused = await authorized("/api/media/improve", {
+      method: "POST",
+      body: JSON.stringify({ text: "   " }),
+    });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: string }).error).toContain("nothing to improve");
+  });
+
+  it("is a 502 with the improver's sentence when the model failed", async () => {
+    await composeWith({
+      improve: () => Promise.reject(new ImproveError("model-failed", "The model did not finish.")),
+    });
+    const response = await authorized("/api/media/improve", {
+      method: "POST",
+      body: JSON.stringify({ text: "x" }),
+    });
+    expect(response.status).toBe(502);
+    expect(((await response.json()) as { error: string }).error).toBe("The model did not finish.");
+  });
+
+  it("says so when no improver is wired", async () => {
+    await composeWith(undefined);
+    const response = await authorized("/api/media/improve", {
+      method: "POST",
+      body: JSON.stringify({ text: "x" }),
+    });
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error: string }).error).toContain("Nothing in this harness improves");
   });
 });

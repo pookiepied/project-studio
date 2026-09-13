@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { IconButton } from '@/components/primitives'
+import { Button, IconButton } from '@/components/primitives'
 import {
   MAX_IMAGES_PER_TURN,
   pickImageFiles,
@@ -15,6 +15,7 @@ import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
+import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
 import { DictationBar, useDictation } from '@/features/voice'
 import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
 import { useWorkspace } from '@/stores/workspace'
@@ -182,20 +183,34 @@ export function Composer({
   // so the composer answers the origin it is actually on.
   const voiceAvailable = voiceInputAvailable()
 
+  // The offer to tidy what a take dictated: it collects the take's words
+  // as they land and, once the take ends, offers Improve for exactly those.
+  const improveOffer = useImproveOffer({ text, setText })
+
   const dictation = useDictation({
     // Appended, not assigned: dictation is one input among several, and a
     // sentence typed before speaking is not made wrong by being spoken after.
-    onText: (spoken) =>
-      setText((current) => (current.trim().length > 0 ? `${current.trimEnd()} ${spoken}` : spoken)),
+    onText: (spoken) => {
+      improveOffer.record(spoken)
+      setText((current) => (current.trim().length > 0 ? `${current.trimEnd()} ${spoken}` : spoken))
+    },
   })
 
   // Coming out of dictation, the caret goes back where it was — the field
   // remounts as the strip leaves, so the focus has to wait for the return
-  // rather than firing from the hook's completion.
+  // rather than firing from the hook's completion. The take's edges are
+  // the offer's too: a take starting withdraws the last offer, a take
+  // ending makes the next.
   const wasDictating = useRef(false)
   useEffect(() => {
-    if (dictation.stage === 'idle' && wasDictating.current) field.current?.focus()
+    if (dictation.stage === 'requesting') improveOffer.begin()
+    if (dictation.stage === 'idle' && wasDictating.current) {
+      field.current?.focus()
+      improveOffer.finish()
+    }
     wasDictating.current = dictation.stage !== 'idle'
+    // The offer's callbacks are stable; the stage is the one input here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dictation.stage])
 
   const focus = useCallback(() => field.current?.focus(), [])
@@ -397,6 +412,30 @@ export function Composer({
           pick's honest remainder — a file the rules refused, named where the
           person can still do something about it. */}
       <PendingImages images={images} onRemove={removeImage} />
+      {/* What the last take put in the field, offered for tidying while it is
+          still exactly those words. The row leaves with the words: a
+          keystroke, a send or another take takes the offer with it. */}
+      {improveOffer.offer !== null && !dictating ? (
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-muted-foreground" role="status">
+          <span>{improveOffer.offer.state === 'improved' ? 'Dictated, then improved' : 'Dictated'}</span>
+          <span aria-hidden>-</span>
+          {improveOffer.offer.state === 'improved' ? (
+            <Button variant="ghost" size="xs" onClick={improveOffer.undo}>
+              Undo
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={improveOffer.offer.state === 'working'}
+              onClick={() => void improveOffer.improve()}
+            >
+              {improveOffer.offer.state === 'working' ? 'Improving' : 'Improve'}
+            </Button>
+          )}
+          {improveOffer.offer.note !== null ? <span>{improveOffer.offer.note}</span> : null}
+        </div>
+      ) : null}
       {refusals.length > 0 ? (
         <div className="mb-2" role="status">
           {refusals.map((entry, at) => (

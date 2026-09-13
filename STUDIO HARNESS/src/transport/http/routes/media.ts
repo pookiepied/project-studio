@@ -13,6 +13,7 @@ import {
 import { StudioError } from "../../../contracts/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { MediaAdministration } from "../../../gateway/media/service.js";
+import { ImproveError, type TextImproverPort } from "../../../application/text-improver.js";
 import { conversationArtifactsDirectory } from "../../../platform/paths.js";
 
 /**
@@ -93,9 +94,38 @@ function failure(error: unknown): { error: string; code: string } {
   return { error: report.message, code: report.code };
 }
 
-export function createMediaRoutes(media: MediaAdministration): Hono<AdmissionEnv> {
+/** The body of `POST /improve`: the dictated passage, and nothing else. */
+const improveRequestSchema = v.object({ text: v.pipe(v.string(), v.minLength(1)) });
+
+export function createMediaRoutes(
+  media: MediaAdministration,
+  options: {
+    /**
+     * Tidies a dictated passage on the default model. Optional for tests of
+     * the other routes; absent, `POST /improve` answers that nothing is
+     * wired, which is also what a harness built without one would say.
+     */
+    readonly improver?: TextImproverPort;
+  } = {},
+): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.PROJECT));
+
+  routes.post("/improve", async (context) => {
+    try {
+      const parsed = v.safeParse(improveRequestSchema, await body(context));
+      if (!parsed.success) {
+        throw new MediaRouteError('The improve body must be { "text": "..." }.');
+      }
+      if (options.improver === undefined) {
+        throw new MediaRouteError("Nothing in this harness improves text.");
+      }
+      const text = await options.improver.improve(parsed.output.text);
+      return context.json({ text }, 200);
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
 
   routes.post("/transcribe", async (context) => {
     try {
@@ -203,5 +233,7 @@ function bytesOf(base64: string): Uint8Array {
  * the other is the provider behind it.
  */
 function statusOf(error: unknown): 400 | 502 {
-  return error instanceof MediaRouteError ? 400 : 502;
+  if (error instanceof MediaRouteError) return 400;
+  if (error instanceof ImproveError && error.kind === "bad-input") return 400;
+  return 502;
 }

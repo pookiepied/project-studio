@@ -22,6 +22,7 @@ import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMediaRoutes } from "./routes/media.js";
+import type { TextImproverPort } from "../../application/text-improver.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 import { createQuestionRoutes } from "./routes/questions.js";
@@ -55,6 +56,8 @@ export interface CreateHttpAppOptions {
    * so it mounts beside the conversation routes rather than the tools.
    */
   readonly media: MediaAdministration;
+  /** Tidies a dictated passage on the default model; optional for tests. */
+  readonly improver?: TextImproverPort;
   readonly approvals: PermissionApprovalBroker;
   /**
    * The ask-a-question channel, beside - never inside - the approval one. The
@@ -155,7 +158,10 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/mcp", createMcpRoutes(options.servers));
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
-  app.route("/api/media", createMediaRoutes(options.media));
+  app.route(
+    "/api/media",
+    createMediaRoutes(options.media, options.improver === undefined ? {} : { improver: options.improver }),
+  );
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
   if (options.questions !== undefined) {
     app.route("/api/questions", createQuestionRoutes(options.questions));
