@@ -143,7 +143,7 @@ export function Popover({
     )
 
     setPosition({ top: clampedTop, left, side: resolved })
-  }, [align, side])
+  }, [align, offset, side])
 
   useLayoutEffect(() => {
     if (!open) {
