@@ -17,6 +17,7 @@ import { MediaCard } from './MediaCard'
 import { readMediaCall } from './mediaCall'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
+import { isRecord } from '@/lib/guards'
 
 /**
  * A turn's tool calls, one row per event the reader follows.
@@ -753,10 +754,6 @@ function askSubject(input: Record<string, unknown>): string | null {
   const header = first['header']
   if (typeof header !== 'string' || header.length === 0) return null
   return questions.length > 1 ? `${header} +${questions.length - 1}` : header
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function Detail({

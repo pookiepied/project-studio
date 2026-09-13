@@ -1,4 +1,5 @@
 import type { ToolCallView } from '@/features/chat/transcript/projection'
+import { isRecord } from '@/lib/guards'
 
 /**
  * Reading a generation call - `studio_image`, `studio_video` - out of the
@@ -30,10 +31,6 @@ export interface MediaCallView {
   readonly artifacts: readonly MediaArtifact[]
   /** The job a video call started, from its answer. */
   readonly jobId: string | null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** `image` or `video` for one of ours, else null. */

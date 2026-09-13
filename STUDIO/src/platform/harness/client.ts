@@ -94,6 +94,7 @@ import {
   type SandboxScopeSource,
 } from './contracts'
 import { harnessTransport } from './transport'
+import { isRecord } from '@/lib/guards'
 
 /**
  * Long enough that the slowest honest answer still arrives.
@@ -460,11 +461,6 @@ const PENDING_QUESTIONS_PATH = '/api/questions/pending'
 const QUESTION_STOP_PATH = '/api/questions/stop'
 const PLANS_PATH = '/api/plans'
 const SANDBOX_PATH = '/api/sandbox'
-
-/** The media routes' answers, parsed with the same skepticism as every other. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function parseTranscribeResult(value: unknown): { text: string } | null {
   if (!isRecord(value) || typeof value['text'] !== 'string') return null

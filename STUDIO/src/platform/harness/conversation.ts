@@ -88,6 +88,7 @@ import {
   type WireStreamEvent,
 } from './contracts'
 import type { PermissionMode } from '@/domain/permissions/modes'
+import { isRecord } from '@/lib/guards'
 
 // The seam types live in `stream.ts` beside the two implementations that
 // satisfy them, and are re-exported here because this module's own options
@@ -126,10 +127,6 @@ export type SeamFailure =
 const NO_HARNESS: SeamFailure = {
   kind: 'no-harness',
   message: 'The harness is not running, so the conversation cannot be reached.',
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function nonEmpty(value: unknown): string | null {

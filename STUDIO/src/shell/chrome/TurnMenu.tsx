@@ -31,6 +31,7 @@ import { CatalogStateNote } from '@/features/models/CatalogStateNote'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
+import { capital } from '@/lib/text'
 
 /**
  * The turn settings: one pill, one menu, and a library on its own page.
@@ -314,10 +315,6 @@ function reasoningLabel(
   if (model === undefined && choice === null) return null
   const shown = choice ?? restingFor(model)
   return shown === null ? null : capital(shown)
-}
-
-function capital(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1)
 }
 
 /** The dial's resting level for one model: medium when it has it, otherwise

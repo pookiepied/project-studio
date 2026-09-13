@@ -36,14 +36,11 @@
 
 import type { PermissionMode } from '@/domain/permissions/modes'
 import type { ArtifactStatus } from '@/domain/artifacts/types'
+import { isRecord } from '@/lib/guards'
 
 /* -------------------------------------------------------------------------- */
 /* Primitive guards                                                            */
 /* -------------------------------------------------------------------------- */
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /**
  * Membership as a narrowing, without a cast.

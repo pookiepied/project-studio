@@ -2,6 +2,7 @@ import type { ToolCallView } from '@/features/chat/transcript/projection'
 
 import { parseFileToolOutcome } from './editOutcome'
 import { diffLines, type LineDiff } from './diffLines'
+import { isRecord } from '@/lib/guards'
 
 /**
  * The net of a same-file run: the diff between the file the run started with
@@ -104,10 +105,6 @@ function createdOf(call: ToolCallView): boolean {
   if (output === null || !output.present || typeof output.value !== 'string') return false
   const outcome = parseFileToolOutcome(output.value)
   return outcome?.status.startsWith('Created') ?? false
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**

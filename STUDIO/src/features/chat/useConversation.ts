@@ -17,6 +17,7 @@ import {
 } from '@/platform/harness'
 import { isTauri } from '@/platform/tauri/window'
 import { firstAdmission, forgetFirstAdmission } from '@/features/chat/first-attach'
+import { isRecord } from '@/lib/guards'
 
 /**
  * The facts a retry signal carries, verbatim from the wire. Which attempt
@@ -224,18 +225,6 @@ export const defaultListen: LifecycleListen = (handler) => {
   return Promise.all(subscriptions).then((unlisten) => () =>
     unlisten.forEach((off) => off()),
   )
-}
-
-/**
- * Narrows a command's answer before anything reads a field off it.
- *
- * `invoke` is typed by its caller, not by the command, so a type argument
- * here would be an assertion wearing a signature. The platform contracts
- * parse rather than assert for exactly this reason; a status read is no
- * different for being small.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
 }
 
 /**

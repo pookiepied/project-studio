@@ -9,6 +9,7 @@ import {
 } from '@/domain/models/types'
 import { contextFull, priceFull } from './format'
 import { cn } from '@/lib/cn'
+import { capital } from '@/lib/text'
 
 /**
  * A model's own page: everything the wire record says, in reading order.
@@ -156,6 +157,3 @@ function Capability({
   )
 }
 
-function capital(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1)
-}

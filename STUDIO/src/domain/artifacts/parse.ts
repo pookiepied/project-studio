@@ -1,4 +1,5 @@
 import type { Artifact, ArtifactSection, ArtifactStatus } from '@/domain/artifacts/types'
+import { isRecord } from '@/lib/guards'
 
 /**
  * Turning the text inside an ```artifact fence into an artifact.
@@ -61,10 +62,6 @@ const SECTION_TYPES = new Set([
   'timeline',
   'file_changes',
 ])
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined

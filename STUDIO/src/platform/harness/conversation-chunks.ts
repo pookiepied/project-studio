@@ -1,3 +1,4 @@
+import { isRecord } from '@/lib/guards'
 /**
  * The conversation content wire contract, mirrored by hand.
  *
@@ -29,10 +30,6 @@
 /* -------------------------------------------------------------------------- */
 /* Primitive guards                                                            */
 /* -------------------------------------------------------------------------- */
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /** A non-empty string, which is what every `minLength(1)` on the harness means. */
 function text(value: unknown): string | null {

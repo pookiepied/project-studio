@@ -65,6 +65,7 @@
  * because silence under a COMPLETED settlement touches nothing at all.
  */
 
+import { isRecord } from '@/lib/guards'
 import type {
   ChunkFacts,
   ChunkPosition,
@@ -117,10 +118,6 @@ export interface ToolGroupView {
 
 /** The tools whose effect is mutating the file their path names. */
 const FILE_MUTATING: ReadonlySet<string> = new Set(['edit', 'write'])
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /** The path a mutating call acts on, or null -- read by field name, never guessed. */
 function fileOf(toolName: string, input: Present<unknown> | null): string | null {

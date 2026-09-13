@@ -16,6 +16,7 @@
  */
 
 import { isAttachmentReference } from '@/platform/harness'
+import { isRecord } from '@/lib/guards'
 
 /** The name the model calls, which encodes the server id and the tool name. */
 const BROWSER_TOOL = /studio_browser_([a-z_]+)/
@@ -83,10 +84,6 @@ export interface BrowserCallView {
   readonly frame: BrowserFrame | null
   /** What the tool said it did, without the two lines of place beneath it. */
   readonly said: string | null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** The bare action, or null when this is not one of ours. */
