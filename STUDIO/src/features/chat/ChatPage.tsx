@@ -422,8 +422,20 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       />
       {/* The open's wait, in the empty page. Out of the flow, over the
           words that are laid out but not yet shown, so its leaving moves
-          nothing under them. */}
-      <AnimatePresence initial={false}>
+          nothing under it.
+
+          No `initial={false}` here, and that is load-bearing. The phase
+          machine opens in `attaching`, so the wait is present on this
+          component's very first render -- and a first-render child of an
+          `AnimatePresence initial={false}` mounts with the presence context
+          saying the initial animation is over, which blocks the entering
+          animation of the whole subtree. The wait then snapped in at full
+          opacity, SHOW_AFTER included, and because its later renders hand
+          Framer the very keyframes it mounted with, nothing ever looked
+          changed: the dots stood at their rest pose for the whole wait.
+          (Every other `initial={false}` in the app gates a child that
+          arrives on a later render, where the entrance plays.) */}
+      <AnimatePresence>
         {!revealed && (live.phase.status === 'attaching' || hasWords) ? (
           <TranscriptWait
             key="loading"
