@@ -44,6 +44,8 @@ export interface MediaArtifactRef {
 export interface MediaCallView {
   readonly kind: 'image' | 'video'
   readonly prompt: string | null
+  /** The title the model gave the result, when it gave one. */
+  readonly title: string | null
   /** What the call asked for, in the tool's own spellings. */
   readonly aspectRatio: string | null
   readonly size: string | null
@@ -85,6 +87,7 @@ export function readMediaCall(call: ToolCallView): MediaCallView | null {
   return {
     kind,
     prompt: inputString(input, 'prompt'),
+    title: inputString(input, 'title'),
     aspectRatio: inputString(input, 'aspect_ratio'),
     size: inputString(input, 'size'),
     count: Number.isInteger(count) && count > 0 ? count : 1,
@@ -107,10 +110,13 @@ export type FollowedJob = MediaJob | 'unknown' | null
 const TITLE_LENGTH = 72
 
 /**
- * A title from the prompt: its first clause, cut at a natural break when it
- * runs long. The whole prompt then stands under the frames as the caption -
- * but only when it says more than the title already has, because the same
- * sentence twice on one card is the card padding itself.
+ * A title from the prompt, for a call that named none: its first clause,
+ * cut at a natural break when it runs long. The tool asks the model for a
+ * title of its own - a few words the way a caption names a picture - and
+ * that is used when it comes; this is the fallback, not the design. The
+ * whole prompt then stands under the frames as the caption - but only when
+ * it says more than the title already has, because the same sentence twice
+ * on one card is the card padding itself.
  */
 export function titleOf(prompt: string | null, kind: 'image' | 'video'): string {
   if (prompt === null) return kind === 'image' ? 'An image' : 'A video'
@@ -172,7 +178,7 @@ export function mediaCallArtifact(
     status = 'running'
   }
 
-  const title = titleOf(view.prompt, view.kind)
+  const title = view.title ?? titleOf(view.prompt, view.kind)
   const caption = view.prompt !== null && view.prompt.trim() !== title ? view.prompt : undefined
   const model = job !== null && job !== 'unknown' ? job.modelId : view.model
   const detail = job !== null && job !== 'unknown' && job.state === 'running' ? job.detail : null

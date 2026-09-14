@@ -54,6 +54,13 @@ const IMAGE_DESCRIPTOR: CapabilityDescriptor = {
     type: "object",
     properties: {
       prompt: { type: "string", minLength: 1 },
+      title: {
+        type: "string",
+        maxLength: 80,
+        description:
+          "A short title for the result, a few words the way a caption names a picture - " +
+          "\"Cover for the reading note\", not the prompt again. Shown above it.",
+      },
       aspect_ratio: {
         type: "string",
         description: 'A ratio such as "1:1", "16:9" or "9:16". Omit for the model\'s default.',
@@ -89,6 +96,13 @@ const VIDEO_DESCRIPTOR: CapabilityDescriptor = {
     type: "object",
     properties: {
       prompt: { type: "string", minLength: 1 },
+      title: {
+        type: "string",
+        maxLength: 80,
+        description:
+          "A short title for the result, a few words the way a caption names a picture - " +
+          "\"Cover for the reading note\", not the prompt again. Shown above it.",
+      },
       duration_seconds: { type: "integer", minimum: 1, maximum: 60 },
       aspect_ratio: { type: "string", description: 'A ratio such as "16:9" or "9:16".' },
       resolution: { type: "string", description: '"720p" or "1080p", when the model takes one.' },
@@ -104,6 +118,7 @@ const VIDEO_DESCRIPTOR: CapabilityDescriptor = {
 
 interface ImageToolInput {
   readonly prompt: string;
+  readonly title?: string;
   readonly aspectRatio?: string;
   readonly size?: string;
   readonly count?: number;
@@ -119,6 +134,7 @@ type ImageToolOutput = {
 
 interface VideoToolInput {
   readonly prompt: string;
+  readonly title?: string;
   readonly durationSeconds?: number;
   readonly aspectRatio?: string;
   readonly resolution?: string;
@@ -229,9 +245,11 @@ function createImageTool(
       }
       const aspectRatio = optionalString(value.aspect_ratio, "aspect_ratio", RATIO);
       const size = optionalString(value.size, "size", SIZE);
+      const title = optionalString(value.title, "title");
       const count = optionalInteger(value.count, "count", 1, 4);
       return {
         prompt: prompt(value.prompt),
+        ...(title === undefined ? {} : { title }),
         ...(aspectRatio === undefined ? {} : { aspectRatio }),
         ...(size === undefined ? {} : { size }),
         ...(count === undefined ? {} : { count }),
@@ -310,9 +328,11 @@ function createVideoTool(
       const duration = optionalInteger(value.duration_seconds, "duration_seconds", 1, 60);
       const aspectRatio = optionalString(value.aspect_ratio, "aspect_ratio", RATIO);
       const resolution = optionalString(value.resolution, "resolution", /^\d{3,4}p$|^[1-9]K$/i);
+      const title = optionalString(value.title, "title");
       const imagePath = optionalString(value.image_path, "image_path");
       return {
         prompt: prompt(value.prompt),
+        ...(title === undefined ? {} : { title }),
         ...(duration === undefined ? {} : { durationSeconds: duration }),
         ...(aspectRatio === undefined ? {} : { aspectRatio }),
         ...(resolution === undefined ? {} : { resolution }),

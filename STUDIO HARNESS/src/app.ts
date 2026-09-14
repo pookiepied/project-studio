@@ -52,6 +52,7 @@ import { builtinMediaAdapters } from "./gateway/media/adapters/index.js";
 import { MediaJobs } from "./gateway/media/jobs.js";
 import { MediaService } from "./gateway/media/service.js";
 import { conversationArtifactsDirectory, studioPath } from "./platform/paths.js";
+import { FaviconStore } from "./web/favicons.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
 import { RetrievalSettingsStore } from "./gateway/retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
@@ -334,6 +335,9 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       retrieval,
       media,
       improver,
+      // Site icons, fetched by the harness once per host and kept in the
+      // cache directory; the window asks here and never the site.
+      favicons: new FaviconStore({ directory: studioPath("cache", "favicons") }),
       approvals,
       questions,
       plans,

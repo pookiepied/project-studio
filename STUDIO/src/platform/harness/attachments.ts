@@ -238,7 +238,14 @@ export function attachmentDataUrl(
  * narrowed to something an element can show, because it ends up inside
  * the URL.
  */
-export function harnessBytesDataUrl(path: string, mimeType: string): Promise<string | null> {
+export function harnessBytesDataUrl(
+  path: string,
+  mimeType: string,
+  // A caller that cannot know the kind ahead - a site's icon is whatever the
+  // site keeps - asks for the bytes to be sniffed, and the kind they declare
+  // themselves to be is used when they declare one.
+  options: { readonly sniff?: boolean } = {},
+): Promise<string | null> {
   const key = path
   const settled = resolved.get(key)
   if (settled !== undefined) return Promise.resolve(settled)
@@ -254,7 +261,8 @@ export function harnessBytesDataUrl(path: string, mimeType: string): Promise<str
     try {
       const transport = bytesTransport ?? (isTauri() ? throughTauri : throughBrowser)
       const bytes = await transport(path)
-      const url = `data:${mimeType};base64,${base64Of(bytes)}`
+      const kind = options.sniff === true ? (sniffImageKind(bytes) ?? mimeType) : mimeType
+      const url = `data:${kind};base64,${base64Of(bytes)}`
       remember(key, url)
       return url
     } catch {
@@ -268,4 +276,23 @@ export function harnessBytesDataUrl(path: string, mimeType: string): Promise<str
   })()
   pending.set(key, request)
   return request
+}
+
+/**
+ * The image kind bytes declare by their first few - ICO, PNG, GIF, JPEG,
+ * WebP, or an SVG document - or null for bytes that begin no other way.
+ * The same witness the harness's icon store uses, on this side of the wire.
+ */
+export function sniffImageKind(bytes: ArrayBuffer): string | null {
+  const view = new Uint8Array(bytes)
+  if (view.length < 4) return null
+  if (view[0] === 0x00 && view[1] === 0x00 && view[2] === 0x01 && view[3] === 0x00) return 'image/x-icon'
+  if (view[0] === 0x89 && view[1] === 0x50 && view[2] === 0x4e && view[3] === 0x47) return 'image/png'
+  if (view[0] === 0x47 && view[1] === 0x49 && view[2] === 0x46) return 'image/gif'
+  if (view[0] === 0xff && view[1] === 0xd8 && view[2] === 0xff) return 'image/jpeg'
+  const ascii = (from: number, to: number) => String.fromCharCode(...view.subarray(from, to))
+  if (view.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp'
+  const head = new TextDecoder().decode(view.subarray(0, 512)).trimStart()
+  if (/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(head)) return 'image/svg+xml'
+  return null
 }

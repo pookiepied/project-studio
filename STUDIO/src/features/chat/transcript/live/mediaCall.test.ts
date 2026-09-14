@@ -102,6 +102,7 @@ describe('the call as the transcript sees it', () => {
     expect(view).toEqual({
       kind: 'image',
       prompt: 'a red bicycle',
+      title: null,
       aspectRatio: '1:1',
       size: null,
       count: 2,
@@ -133,6 +134,7 @@ describe('the call as the transcript sees it', () => {
     expect(view).toEqual({
       kind: 'image',
       prompt: 'x',
+      title: null,
       aspectRatio: null,
       size: null,
       count: 1,
@@ -250,5 +252,17 @@ describe('the artifact a call becomes', () => {
     const forgotten = mediaCallArtifact(started, view, 'unknown', 'conv-1')
     expect(forgotten.status).toBe('cancelled')
     expect(forgotten.data?.error).toMatch(/restarted/)
+  })
+})
+
+describe('a title the model gave', () => {
+  it('is the artifact title, with the whole prompt as the caption beneath', () => {
+    const named = call({ input: present({ prompt: 'a red bicycle leaning on a wall at dusk', title: 'Bicycle at dusk' }) })
+    const view = readMediaCall(named)
+    if (view === null) throw new Error('not a media call')
+    expect(view.title).toBe('Bicycle at dusk')
+    const artifact = mediaCallArtifact(named, view, null, 'conv-1')
+    expect(artifact.title).toBe('Bicycle at dusk')
+    expect(artifact.data?.prompt).toBe('a red bicycle leaning on a wall at dusk')
   })
 })

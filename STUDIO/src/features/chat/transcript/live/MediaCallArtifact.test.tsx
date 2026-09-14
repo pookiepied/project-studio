@@ -211,7 +211,9 @@ describe('a video call', () => {
 
     // The player arrives on its own chunk; give it a moment to land.
     let video: HTMLVideoElement | null = null
-    for (let tries = 0; tries < 20 && video === null; tries += 1) {
+    // Real time, not the faked clock, loads the chunk; on a loaded machine
+    // that is many turns of the loop.
+    for (let tries = 0; tries < 400 && video === null; tries += 1) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10)
       })

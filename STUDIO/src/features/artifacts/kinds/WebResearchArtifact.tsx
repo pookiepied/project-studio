@@ -3,6 +3,7 @@ import { Icons } from '@/components/icons'
 import { WorkingDots } from '@/components/state'
 import { AnimatedItem, AnimatedList } from '@/features/artifacts/ArtifactMotion'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
+import { SiteMark } from '@/features/artifacts/kinds/SiteMark'
 import { StatusDot } from '@/features/artifacts/sections/StatusDot'
 import { Timeline } from '@/features/artifacts/sections'
 import { hostOf } from '@/lib/url'
@@ -28,13 +29,13 @@ import { isWorking, type Artifact } from '@/domain/artifacts/types'
  * query stand; the rest are one line away, per query, and the count on the
  * heading tells the whole before it is opened.
  *
- * ---- The favicon question -------------------------------------------------
+ * ---- The mark beside a source -----------------------------------------------
  *
- * Real favicons would mean a network request per result, to a third-party
- * domain, from a desktop app, on every render of a transcript. That is a
- * tracking surface and a source of layout shift for a 16px decoration. A
- * letter in a disc identifies the source just as well at this size and asks
- * nothing of anyone.
+ * The site's own icon, the way a tab shows it, asked of the harness and
+ * never of the site (see `SiteMark`): a request per result to a hundred
+ * third-party hosts from a desktop app would say what a person is reading,
+ * on every render. The letter in a disc stands until the icon lands, and
+ * stays for a site that has none.
  */
 
 const HITS_SHOWN = 5
@@ -235,7 +236,7 @@ function Result({ hit, titled = true }: { hit: ResearchHit; titled?: boolean }) 
       rel="noreferrer noopener"
       className="group/result flex items-start gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors duration-fast hover:bg-tint"
     >
-      <Initial href={hit.url} />
+      <SiteMark href={hit.url} />
       <span className="min-w-0 flex-1">
         {titled ? (
           <>
@@ -254,17 +255,3 @@ function Result({ hit, titled = true }: { hit: ResearchHit; titled?: boolean }) 
   )
 }
 
-function Initial({ href }: { href: string }) {
-  const host = hostOf(href)
-  return (
-    // The outer box is one line of the result's title tall, so the disc
-    // centres on that line instead of being nudged down toward it. The disc
-    // keeps its own size on the inside — it is a shape, not a glyph, and it
-    // should not resize with the line it happens to sit on.
-    <span aria-hidden className="flex h-[1lh] shrink-0 items-center text-ui">
-      <span className="flex size-5 items-center justify-center rounded-full bg-selected text-micro font-semibold text-muted-foreground">
-        {host.charAt(0).toUpperCase()}
-      </span>
-    </span>
-  )
-}

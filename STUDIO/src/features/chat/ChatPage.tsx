@@ -281,7 +281,15 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       setSending(true)
       try {
         const sent = await live.submit(text, turnSettingsToWire(effective), images)
-        if (sent.ok) touch(conversation.id)
+        if (sent.ok) {
+          touch(conversation.id)
+          // Sending is a return to the end. A message written from halfway
+          // up the history belongs at the bottom, and the reply it earns
+          // lands there too; leaving the reader where they were made both
+          // arrive out of sight, which is the one place a sent message
+          // should never be.
+          scrollToBottom()
+        }
         return sent
       } finally {
         // Released whatever the answer was. A receipt hands the fact to the
@@ -294,7 +302,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     // The method, not the object it hangs off: `live` is rebuilt every
     // render and only `submit` is called here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [conversation, catalog.models, live.submit, settings, touch],
+    [conversation, catalog.models, live.submit, settings, touch, scrollToBottom],
   )
 
   /**

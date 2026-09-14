@@ -31,6 +31,8 @@ import { createProjectRoutes } from "./routes/projects.js";
 import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
 import { createSandboxRoutes } from "./routes/sandbox.js";
+import { createWebRoutes } from "./routes/web.js";
+import type { FaviconSource } from "../../web/favicons.js";
 
 export interface CreateHttpAppOptions {
   /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
@@ -58,6 +60,12 @@ export interface CreateHttpAppOptions {
   readonly media: MediaAdministration;
   /** Tidies a dictated passage on the default model; optional for tests. */
   readonly improver?: TextImproverPort;
+  /**
+   * Site icons for the transcript's search results and page reads. Optional
+   * the way `improver` is: a composition without it answers no icon routes
+   * and the window draws every site as its letter.
+   */
+  readonly favicons?: FaviconSource;
   readonly approvals: PermissionApprovalBroker;
   /**
    * The ask-a-question channel, beside - never inside - the approval one. The
@@ -163,6 +171,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
     createMediaRoutes(options.media, options.improver === undefined ? {} : { improver: options.improver }),
   );
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
+  if (options.favicons !== undefined) {
+    app.route("/api/web", createWebRoutes(options.favicons));
+  }
   if (options.questions !== undefined) {
     app.route("/api/questions", createQuestionRoutes(options.questions));
   }
