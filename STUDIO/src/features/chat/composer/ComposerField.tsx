@@ -75,6 +75,13 @@ function measure(element: HTMLTextAreaElement, width: number): number {
  * from beside the text to a footer row under it. The frame cannot work that
  * out for itself — it would have to measure the same element twice.
  *
+ * Every measurement is taken at the width the field will END at, not the
+ * width it has now. The slot around it is animating its insets whenever the
+ * arrangement changes, so the live width is a moving number for a quarter
+ * of a second; a height measured against it would be retargeted on every
+ * frame of that, and the height animation would never settle into one run.
+ * The slot's full width and the insets are known, so the end is known.
+ *
  * Enter sends, Shift+Enter breaks. IME composition is excluded: during a
  * Japanese or Chinese conversion Enter commits the candidate and must not also
  * send the message.
@@ -86,6 +93,7 @@ export function ComposerField({
   onMultilineChange,
   onPaste,
   multiline,
+  inset,
   placeholder,
   handleRef,
 }: {
@@ -103,24 +111,15 @@ export function ComposerField({
   /**
    * Whether the frame currently holds the footer arrangement. The field is
    * wider there than beside the controls, and the decision has to stay
-   * consistent across that difference — see `besideWidth`.
+   * consistent across that difference — see `remeasure`.
    */
   multiline: boolean
+  /** The room the clusters take on either side while they sit beside the field. */
+  inset: { readonly left: number; readonly right: number }
   placeholder: string
   handleRef?: Ref<ComposerFieldHandle>
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
-
-  // The width the field has while the controls sit beside it. Multiline is
-  // decided against *this* width, not against the width the field has once
-  // the controls have dropped to the footer and the text runs the full
-  // frame. The two differ by the width of the controls, and that gap is an
-  // oscillation waiting to happen: a line that fits the full frame but not
-  // the narrower column would flip to the footer, unwrap now that it has
-  // room, flip back to the capsule, wrap again, and keep going. Deciding
-  // both directions against the one width makes the choice stable — the
-  // footer leaves exactly when the line fits where the capsule will put it.
-  const besideWidth = useRef<number | null>(null)
 
   /**
    * The height this element was last told to go to.
@@ -142,26 +141,38 @@ export function ComposerField({
     const element = field.current
     if (!element) return
 
-    // While the controls are beside the field, remember the width they leave
-    // it. This is the width the capsule would give the text again if the
-    // footer left, so it is the width the decision below must be made
-    // against — recorded here because only this arrangement can measure it.
-    //
-    // The border-box width, to match what `measure` sets on the stand-in.
-    // `clientWidth` excludes the reserved scrollbar gutter and includes the
-    // padding, so measuring against it asked the question at a width about
-    // 20px narrower than the capsule really offers — the two directions were
-    // being decided against different widths, which is the oscillation this
-    // whole mechanism exists to prevent.
-    if (!multiline) besideWidth.current = element.getBoundingClientRect().width
+    // The slot's full width is the field's once the clusters have gone to
+    // the footer; beside them, the field has that less their insets. Both
+    // are end states, not the live width - see the docblock.
+    const slot = element.closest('[data-composer-slot]')
+    const full = (slot ?? element).getBoundingClientRect().width
+    const beside = full - inset.left - inset.right
 
-    // How tall the text is at the width the decision cares about, and how
-    // tall it is here. In the footer arrangement those are different widths.
-    const here = element.getBoundingClientRect().width
-    const natural = measure(element, here)
-    const decisive = multiline && besideWidth.current !== null
-      ? measure(element, besideWidth.current)
-      : natural
+    // How tall the text is here, and how tall it would be beside the
+    // clusters. Multiline is decided against the SECOND width in both
+    // directions, never the width the footer arrangement gives. The two
+    // differ by the clusters, and that gap is an oscillation waiting to
+    // happen: a line that fits the full frame but not the narrower column
+    // would flip to the footer, unwrap now that it has room, flip back to
+    // the capsule, wrap again, and keep going. One width makes the choice
+    // stable - the footer leaves exactly when the line fits where the
+    // capsule will put it.
+    const natural = measure(element, multiline ? full : beside)
+    const decisive = multiline ? measure(element, beside) : natural
+
+    // One line plus a pixel of slack, rather than comparing to a hardcoded
+    // height: the line box changes with the user's text-size preference.
+    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
+    const next = decisive > lineHeight * 1.6
+    if (next !== multiline) {
+      // The arrangement is about to change, and with it the width this
+      // height was measured at. Nothing is committed from this pass: the
+      // frame re-renders with the new arrangement before it paints, this
+      // runs again with the right width, and the height gets one target
+      // instead of two a frame apart.
+      onMultilineChange(next)
+      return
+    }
 
     const clamped = Math.min(natural, COMPOSER.maxHeight)
     element.style.overflowY = natural > COMPOSER.maxHeight ? 'auto' : 'hidden'
@@ -176,23 +187,19 @@ export function ComposerField({
       committed.current = clamped
       element.style.height = `${clamped}px`
     }
-
-    // One line plus a pixel of slack, rather than comparing to a hardcoded
-    // height: the line box changes with the user's text-size preference.
-    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
-    onMultilineChange(decisive > lineHeight * 1.6)
-  }, [multiline, onMultilineChange])
+  }, [inset.left, inset.right, multiline, onMultilineChange])
 
   // `value` is the trigger, not an input: the measurement reads the element,
   // which has already re-rendered with the new text by the time this runs.
   useLayoutEffect(remeasure, [value, remeasure])
 
-  // Wrapping depends on the field's width, which typing cannot change but two
-  // other things can: the window being resized, and this field's own move
-  // between the capsule and the footer. Without this, a resize left the
-  // height at what it was until the next keystroke corrected it. Width only
-  // — the observer also fires for the height this code writes itself, and
-  // those notifications must not loop back into another measure.
+  // Wrapping depends on the field's width, which typing cannot change but the
+  // window being resized can. Without this, a resize left the height at what
+  // it was until the next keystroke corrected it. Width only — the observer
+  // also fires for the height this code writes itself, and those
+  // notifications must not loop back into another measure. It also fires on
+  // every frame of the insets' transition; each of those measures at the
+  // same end width and commits nothing new.
   useLayoutEffect(() => {
     const element = field.current
     if (!element) return

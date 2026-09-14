@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT, LOOP } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -41,6 +41,20 @@ import { cn } from '@/lib/cn'
  */
 const SHAPE_MOTION = { duration: DURATION.slow, ease: EASE_OUT }
 const TRACK_TRANSITION = `grid-template-rows ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
+/**
+ * The field's side insets, on the same clock. The field spans the whole
+ * frame in both arrangements; what changes is how much of each side it
+ * leaves to the clusters beside it - their widths on one line, nothing once
+ * they have dropped to the footer. Padding is a length CSS interpolates, so
+ * the text's left edge and its wrapping width glide from one to the other
+ * as the clusters descend, instead of the field jumping columns and its
+ * text re-wrapping on the first frame while the rest of the frame was
+ * still moving. A grid column is not a length, and that jump was the
+ * moment that read as the composer distorting before it animated.
+ */
+const INSET_TRANSITION = `padding ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
+/** The grid's column gap (`gap-x-2`), which the insets have to include. */
+const CLUSTER_GAP = 8
 /**
  * The footer track: the air above the controls plus the control row itself,
  * as one number. Carrying the air *in the track* — rather than as a row gap
@@ -163,6 +177,31 @@ export function Composer({
   const picker = useRef<HTMLInputElement>(null)
   const [focused, setFocused] = useState(false)
   const [multiline, setMultiline] = useState(false)
+  // How much room each cluster takes beside the field on one line. Measured
+  // from the clusters themselves rather than summed from tokens, because the
+  // right one changes width - Improve arrives, the voice reason stands in.
+  const leftCluster = useRef<HTMLDivElement>(null)
+  const rightCluster = useRef<HTMLDivElement>(null)
+  const [inset, setInset] = useState({ left: 0, right: 0 })
+  useLayoutEffect(() => {
+    const left = leftCluster.current
+    const right = rightCluster.current
+    if (!left || !right) return
+    const read = () => {
+      const next = {
+        left: left.getBoundingClientRect().width + CLUSTER_GAP,
+        right: right.getBoundingClientRect().width + CLUSTER_GAP,
+      }
+      setInset((current) =>
+        current.left === next.left && current.right === next.right ? current : next,
+      )
+    }
+    read()
+    const observer = new ResizeObserver(read)
+    observer.observe(left)
+    observer.observe(right)
+    return () => observer.disconnect()
+  }, [])
   // True from send to receipt. Without it a refused send left `busy` false
   // for the whole round trip, so a second click could start a second POST
   // while the first was still being judged.
@@ -447,16 +486,22 @@ export function Composer({
           the frame — the capsule-to-box radius and the footer cannot
           disagree about which state the field is in.
 
+          The field itself spans all three columns in both arrangements and
+          sits in the first row with the clusters; on one line it leaves them
+          their room through its side insets (`INSET_TRANSITION`), which go
+          to nothing as they drop. So the field never changes column: its
+          text edge and wrapping width move as lengths, on the clock.
+
           The reshape is animated on the one clock, in two halves that meet.
-          The track and the field's own height are CSS transitions, so the
-          frame grows continuously. The controls are `layout="position"`:
-          Framer glides them from where they were to where the grid has just
-          slotted them, and — on the same curve — that glide cancels the
-          instant re-slotting underneath it. Position only, never a full
-          `layout`: size changes would be scale, and a scaled field stretches
-          the text it holds while its width moves. Reduced motion collapses
-          both halves to the end state, one via MotionConfig and one via the
-          global media query. */}
+          The track, the insets and the field's own height are CSS
+          transitions, so the frame grows continuously. The controls are
+          `layout="position"`: Framer glides them from where they were to
+          where the grid has just slotted them, and — on the same curve —
+          that glide cancels the instant re-slotting underneath it. Position
+          only, never a full `layout`: size changes would be scale, and a
+          scaled control stretches its mark while it moves. Reduced motion
+          collapses both halves to the end state, one via MotionConfig and
+          one via the global media query. */}
       <div
         style={{
           gridTemplateRows: multiline ? FOOTER_TRACK : 'auto 0px',
@@ -465,6 +510,7 @@ export function Composer({
         className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0"
       >
         <motion.div
+          ref={leftCluster}
           layout="position"
           transition={SHAPE_MOTION}
           className={cn(
@@ -488,13 +534,14 @@ export function Composer({
           <PermissionControl conversationId={conversationId} />
         </motion.div>
 
-        <motion.div
-          layout="position"
-          transition={SHAPE_MOTION}
-          className={cn(
-            'row-start-1 min-w-0',
-            multiline ? 'col-start-1 col-span-3' : 'col-start-2',
-          )}
+        <div
+          data-composer-slot
+          className="col-start-1 col-span-3 row-start-1 min-w-0"
+          style={{
+            paddingLeft: multiline ? 0 : inset.left,
+            paddingRight: multiline ? 0 : inset.right,
+            transition: INSET_TRANSITION,
+          }}
         >
           {/* While dictation is live the field steps aside and the strip of
               real level takes its place — same slot, same line height, so
@@ -553,18 +600,20 @@ export function Composer({
                     ingestFiles(files)
                   }}
                   multiline={multiline}
+                  inset={inset}
                   placeholder={placeholder}
                 />
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
 
         <motion.div
+          ref={rightCluster}
           layout="position"
           transition={SHAPE_MOTION}
           className={cn(
-            'flex items-center gap-1',
+            'relative flex items-center gap-1',
             multiline ? 'col-start-3 row-start-2 self-end' : 'col-start-3 row-start-1',
           )}
         >
@@ -625,9 +674,18 @@ export function Composer({
 
           {/* While the microphone owns the field there is nothing to send and
               no voice mode to offer — the strip is the message in progress,
-              and the mic beside it is its only control. */}
+              and the mic beside it is its only control.
+
+              `popLayout`, because the last slot is one button that changes
+              face: voice mode until there are words, send once there are.
+              Without it the leaving face and the arriving one were both in
+              the row for the length of the crossfade, and the cluster was a
+              button wider for that long - the mic slid left on the first
+              keystroke and back right when the old face had gone. Off the
+              flow, the leaving face fades where it stood and the row never
+              changes width. */}
           {!dictating && (
-          <AnimatePresence initial={false}>
+          <AnimatePresence initial={false} mode="popLayout">
             {canSend || busy ? (
               <motion.div
                 key="send"
