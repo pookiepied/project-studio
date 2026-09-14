@@ -368,11 +368,15 @@ never styled like a failure. A read that has not come back may not be
 answered with "nothing", because an empty list and a broken one are both a
 blank column to the person waiting.
 
-**Loading is one wait, late and quiet.** `Loading`: three dots bobbing in
-turn (`BobbingDots`) where the content will be, faded in only once the wait
-has lasted 150ms - a read to this machine usually lands before that, and an
-indicator that flashes for a fast read says "loading" about something
-already loaded. The breathing dots (`WorkingDots`) stay beside a label -
+**Loading draws nothing, except in the conversation.** A list, a pane or
+a column that is still being read shows its frame and no rows, announces
+itself (`Loading`, a status region and nothing visible), and the rows
+arrive - a read to this machine usually lands in a few frames, and anything
+drawn for those frames says "loading" about something already loaded. The
+conversation is the one surface with a drawn wait (`TranscriptWait`: three
+dots bobbing in turn, `BobbingDots`, faded in only once the wait has lasted
+150ms), because a history can be long and an empty page that says nothing
+looks stopped. The breathing dots (`WorkingDots`) stay beside a label -
 "Searching…" - where a line is already saying what runs; the ring
 (`WorkingRing`) is the composer's halo round the stop control and nothing
 else. Rules:
@@ -388,7 +392,7 @@ else. Rules:
 - Something *true* may stand in instead: the plain code a highlighter will
   colour, the poster a player will play. Content is not a stand-in.
 - Announced once, quietly: `role="status"` with a spoken label on the region,
-  the dots themselves `aria-hidden`.
+  anything drawn `aria-hidden`.
 - A background re-read never replaces content with loading. What is on screen
   stays until the new truth arrives; the refresh is visible in the rows that
   change, not in a wait that erases the page.

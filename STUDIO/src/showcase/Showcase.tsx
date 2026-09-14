@@ -27,7 +27,7 @@ import {
   TextField,
   Tooltip,
 } from '@/components/primitives'
-import { Loading, StateNote } from '@/components/state'
+import { StateNote } from '@/components/state'
 
 /**
  * The parts, on one page.
@@ -392,12 +392,9 @@ function StatesSection() {
   return (
     <Section
       title="States"
-      note="Loading is the one wait, late and quiet. Failure names the cause verbatim and offers the remedy as a control. Empty says so plainly."
+      note="Loading draws nothing outside the conversation; the rows arrive. Failure names the cause verbatim and offers the remedy as a control. Empty says so plainly."
     >
       <Card>
-        <Specimen label="loading">
-          <Loading label="A row, loading" immediate className="w-72" />
-        </Specimen>
         <Specimen label="failed">
           <StateNote
             title="Could not read the providers."

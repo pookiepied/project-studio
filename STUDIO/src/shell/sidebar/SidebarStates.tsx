@@ -12,9 +12,10 @@ import type { StorePhase } from '@/stores/workspace'
  * nothing -- a broken harness and an empty sidebar were one blank column, and
  * the store's own answer to that ambiguity was never shown.
  *
- * - **loading** is the app's one wait, in the list's place. It held the
- *   rows' shape for a while, as bars; bars shaped like titles are a picture
- *   of a list nobody has read, and were refused for it.
+ * - **loading** draws nothing and announces itself (`Loading`); the rows
+ *   arrive. It held the rows' shape for a while, as bars, and then the
+ *   app's dots; both were refused here for what they were, a widget where
+ *   the list should be.
  * - **failed** keeps whatever local rows exist (the gallery is always among
  *   them) and says, above them, why the rest is not here. A column that
  *   renders nothing makes the app look empty; a column that names the read
@@ -30,7 +31,7 @@ import type { StorePhase } from '@/stores/workspace'
  */
 
 export function SidebarLoading() {
-  return <Loading label="Loading conversations" className="py-4" />
+  return <Loading label="Loading conversations" />
 }
 
 /**

@@ -88,7 +88,7 @@ export function ProjectPage({ project }: { project: Project }) {
 
         <Section title="Conversations">
           {storePhase.status === 'loading' ? (
-            <Loading label="Loading conversations" className="py-3" />
+            <Loading label="Loading conversations" />
           ) : storePhase.status === 'failed' ? (
             <StateNote
               className="py-2"

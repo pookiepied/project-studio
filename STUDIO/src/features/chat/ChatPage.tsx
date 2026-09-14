@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { Loading } from '@/components/state'
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
@@ -11,6 +10,7 @@ import { useAutoScroll } from '@/features/chat/transcript'
 import { galleryItems } from '@/features/chat/gallery/items'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
+import { TranscriptWait } from '@/features/chat/transcript/live/TranscriptWait'
 import { useConversationTranscript } from '@/features/chat/connection/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/connection/useConversation'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
@@ -425,10 +425,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           nothing under them. */}
       <AnimatePresence initial={false}>
         {!revealed && (live.phase.status === 'attaching' || hasWords) ? (
-          <Loading
+          <TranscriptWait
             key="loading"
-            label="Loading the conversation"
-            className="absolute inset-x-0 z-10 py-24"
+            className="absolute inset-x-0 z-10 flex justify-center py-24"
             style={{ top: SHELL.topStrip.height + 20 }}
           />
         ) : null}

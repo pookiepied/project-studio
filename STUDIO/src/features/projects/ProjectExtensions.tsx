@@ -46,7 +46,7 @@ export function ProjectExtensions({ projectId }: { projectId: string }) {
 
   if (view.status === 'loading') {
     return (
-      <Loading label="Loading extensions" className="py-3" />
+      <Loading label="Loading extensions" />
     )
   }
 

@@ -192,7 +192,7 @@ export function ModelLibraryDialog({
       }
     >
       {catalog.phase.status === 'loading' ? (
-        <Loading label="Loading the model library" className="h-full" />
+        <Loading label="Loading the model library" />
       ) : catalog.phase.status === 'ready' ? (
         <div className="flex h-full min-h-0">
           <LibraryIndex
