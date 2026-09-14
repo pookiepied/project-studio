@@ -206,6 +206,10 @@ function FieldItems({
         disabled={!hasSelection}
         onSelect={() => {
           void copyText(selected)
+          // The caret goes back where it was. The menu's row had the focus,
+          // and a row that unmounts leaves it on the page, where the next
+          // Ctrl+A selects the whole window instead of the field's text.
+          field?.focus()
           close()
         }}
       >

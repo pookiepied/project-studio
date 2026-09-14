@@ -6,13 +6,15 @@
 //! inside Studio's frame, a borrowed control in a window that draws its own
 //! chrome. This answers for it, on every webview the app creates, through the
 //! plugin in `lib.rs` whose only work is calling `attach` from
-//! `on_webview_ready`, so no builder can forget it: the microphone on Studio's
-//! own origin is allowed, every other kind denied, and a page that asks anyway
-//! gets its answer without a prompt. Nothing in the app reads the clipboard
-//! through the webview (`lib/clipboard.ts` writes only) and paste is the
-//! textarea's own, so the denials cost nothing. Windows's own microphone
-//! privacy setting still rules: when it refuses, `getUserMedia` rejects with
-//! `NotAllowedError` and the dictation strip's blocked face says so.
+//! `on_webview_ready`, so no builder can forget it: the microphone and the
+//! clipboard's text on Studio's own origin are allowed, every other kind
+//! denied, and a page that asks anyway gets its answer without a prompt.
+//! The clipboard read is the right-click menu's Paste (`lib/clipboard.ts`
+//! `readClipboardText`); Ctrl+V is the textarea's own and never asks. Before
+//! the read was allowed, Paste in that menu read nothing and inserted
+//! nothing, silently. Windows's own microphone privacy setting still rules:
+//! when it refuses, `getUserMedia` rejects with `NotAllowedError` and the
+//! dictation strip's blocked face says so.
 
 /// The hosts this app's own documents come from: the bundled shell
 /// (`tauri.localhost`, either scheme) and the dev server the config names
@@ -24,6 +26,8 @@ const OWN_HOSTS: [&str; 3] = ["tauri.localhost", "localhost", "127.0.0.1"];
 use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2PermissionRequestedEventArgs;
 #[cfg(windows)]
 use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_PERMISSION_KIND;
+#[cfg(windows)]
+use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ;
 #[cfg(windows)]
 use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_PERMISSION_KIND_MICROPHONE;
 #[cfg(windows)]
@@ -37,7 +41,7 @@ use webview2_com::take_pwstr;
 #[cfg(windows)]
 use windows::core::PWSTR;
 
-/// Grants the microphone to this webview, before any page asks.
+/// Grants the microphone and the clipboard read to this webview, before any page asks.
 ///
 /// `with_webview` runs on the main thread, where the controller lives. The
 /// registration has no matching removal: the handler lives exactly as long as
@@ -80,13 +84,14 @@ fn answer(args: &ICoreWebView2PermissionRequestedEventArgs) -> windows::core::Re
   let mut kind = COREWEBVIEW2_PERMISSION_KIND::default();
   unsafe { args.PermissionKind(&mut kind)? };
 
-  // Allow only the microphone, and only from our own documents; everything
-  // else is answered, not prompted for. The origin read is the one thing that
+  // Allow only the microphone and the clipboard read, and only from our own
+  // documents; everything else is answered, not prompted for. The origin read is the one thing that
   // can fail here, and its failure mode is the generous one: the only
   // document this webview loads is our own, so an unreadable origin means
   // "ours, we just cannot spell it", and a stall is the thing this handler
   // exists to prevent.
-  let ours = kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE && {
+  let granted = kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE || kind == COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ;
+  let ours = granted && {
     let mut uri = PWSTR::null();
     unsafe { args.Uri(&mut uri)? };
     own_document(take_pwstr(uri).as_str())
