@@ -137,7 +137,7 @@ export function ArtifactsSection() {
   return (
     <Section
       title="Artifacts"
-      note="A generation drawn as the object it made: frames reserved at the ratio asked for, filled as files land, sized by ratio in rows of two under one height cap. Same renderer as the transcript."
+      note="A generation drawn as the object it made - frames reserved at the ratio asked for, filled as files land, sized by ratio in rows of two under one height cap - and research drawn as its steps. Same renderers as the transcript."
     >
       <div className="flex items-center gap-2">
         <span className="text-micro text-muted-foreground">Stage</span>
@@ -158,10 +158,151 @@ export function ArtifactsSection() {
               {renderArtifact(four(stage))}
               {renderArtifact(mixed(stage))}
               {renderArtifact(video(stage))}
+              {renderArtifact(oneSearch(stage))}
+              {renderArtifact(burst(stage))}
+              {renderArtifact(page(stage))}
             </div>
           </RailProvider>
         </WorkspaceProvider>
       </NavigationProvider>
     </Section>
   )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Research                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const HITS = [
+  {
+    title: 'DWM window corner preference',
+    url: 'https://learn.microsoft.com/windows/apps/desktop/modernize/apply-rounded-corners',
+    snippet: 'DWMWA_WINDOW_CORNER_PREFERENCE, and why a maximised window ignores it.',
+  },
+  {
+    title: 'Tauri — window decorations',
+    url: 'https://tauri.app/v2/reference/config/#windowconfig',
+    snippet: 'decorations: false, transparency, and the platform caveats.',
+  },
+  {
+    title: 'Why your transparent window has square corners',
+    url: 'https://github.com/tauri-apps/tauri/issues/9749',
+    snippet: 'The overflow that paints through a rounded edge.',
+  },
+  { title: 'Rounded corners on Windows 11 with WinUI', url: 'https://github.com/microsoft/microsoft-ui-xaml/issues/6421' },
+  { title: 'Electron: transparent frameless corners', url: 'https://github.com/electron/electron/issues/28932' },
+  { title: 'Windows App SDK release notes', url: 'https://learn.microsoft.com/windows/apps/windows-app-sdk/release-channels' },
+  { title: 'Fluent design: geometry', url: 'https://learn.microsoft.com/windows/apps/design/signature-experiences/geometry' },
+]
+
+function stepStatus(stage: Stage, done: 'done' | 'failed' = 'done'): Stage {
+  return stage === 'running' ? 'running' : stage === 'failed' ? 'failed' : done
+}
+
+function oneSearch(stage: Stage): Artifact {
+  return {
+    kind: 'web_research',
+    id: 'show-search',
+    title: 'tauri frameless window rounded corners windows 11',
+    status: stage,
+    source: { server: 'Brave' },
+    data: {
+      steps: [
+        {
+          kind: 'search',
+          id: 's1',
+          status: stage,
+          query: 'tauri frameless window rounded corners windows 11',
+          provider: 'Brave',
+          hits: stage === 'done' ? HITS : [],
+          ...(stage === 'failed' ? { error: 'No search provider is set. Choose one in Settings › Providers.' } : {}),
+        },
+      ],
+    },
+  }
+}
+
+function burst(stage: Stage): Artifact {
+  const running = stage === 'running'
+  return {
+    kind: 'web_research',
+    id: 'show-burst',
+    title: 'tauri rounded corners and 3 more',
+    status: stage,
+    data: {
+      steps: [
+        {
+          kind: 'search',
+          id: 'b1',
+          status: stage === 'failed' ? 'failed' : 'done',
+          query: 'tauri rounded corners',
+          provider: 'Brave',
+          hits: stage === 'failed' ? [] : HITS.slice(0, 3),
+          ...(stage === 'failed' ? { error: 'No search provider is set.' } : {}),
+        },
+        {
+          kind: 'search',
+          id: 'b2',
+          status: running ? 'running' : stage === 'failed' ? 'failed' : 'done',
+          query: 'DWMWA_WINDOW_CORNER_PREFERENCE maximised',
+          provider: 'Brave',
+          hits: running || stage === 'failed' ? [] : HITS.slice(3, 5),
+          ...(stage === 'failed' ? { error: 'The search timed out.' } : {}),
+        },
+        {
+          kind: 'search',
+          id: 'b3',
+          status: running ? 'running' : stage === 'failed' ? 'failed' : 'done',
+          query: 'electron transparent window square corners',
+          provider: 'Brave',
+          hits: running || stage === 'failed' ? [] : [],
+          ...(stage === 'failed' ? { error: 'The search timed out.' } : {}),
+        },
+        {
+          kind: 'read',
+          id: 'b4',
+          status: running ? 'pending' : stepStatus(stage),
+          url: 'https://learn.microsoft.com/windows/apps/desktop/modernize/apply-rounded-corners',
+          ...(stage === 'done'
+            ? {
+                title: 'Apply rounded corners in desktop apps',
+                provider: 'Jina',
+                excerpt:
+                  'Windows 11 rounds the corners of top-level windows. DwmSetWindowAttribute takes a preference of DWMWCP_DEFAULT, DWMWCP_DONOTROUND, DWMWCP_ROUND or DWMWCP_ROUNDSMALL. A maximised window is squared by the shell regardless of the preference…',
+              }
+            : {}),
+          ...(stage === 'failed' ? { error: 'learn.microsoft.com is not an allowed destination.' } : {}),
+        },
+      ],
+    },
+  }
+}
+
+function page(stage: Stage): Artifact {
+  return {
+    kind: 'web_research',
+    id: 'show-page',
+    title: stage === 'done' ? 'Window customization' : 'tauri.app',
+    status: stage,
+    source: { server: 'Jina' },
+    data: {
+      steps: [
+        {
+          kind: 'read',
+          id: 'p1',
+          status: stage,
+          url: 'https://tauri.app/v2/guides/window/customization',
+          provider: 'Jina',
+          ...(stage === 'done'
+            ? {
+                title: 'Window customization',
+                excerpt:
+                  'Tauri provides lots of options for customizing the look and feel of your app window. You can create custom titlebars, have transparent windows, enforce size constraints, and more.',
+              }
+            : {}),
+          ...(stage === 'failed' ? { error: 'tauri.app could not be reached.' } : {}),
+        },
+      ],
+    },
+  }
 }

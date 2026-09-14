@@ -2,6 +2,7 @@ import type { ToolCallView } from '@/features/chat/transcript/projection'
 import type { MediaJob } from '@/platform/harness'
 import type { Artifact, ArtifactStatus } from '@/domain/artifacts/types'
 import { isRecord } from '@/lib/guards'
+import { answerText, inputString } from './callText'
 
 /**
  * Reading a generation call - `studio_image`, `studio_video` - out of the
@@ -60,24 +61,6 @@ export function mediaKind(toolName: string): 'image' | 'video' | null {
   return match?.[1] === 'image' || match?.[1] === 'video' ? match[1] : null
 }
 
-function blocks(output: unknown): readonly unknown[] {
-  if (Array.isArray(output)) return output
-  if (!isRecord(output)) return []
-  const content = output['content']
-  if (Array.isArray(content)) return content
-  const inner = output['value'] ?? output['result']
-  return inner === undefined ? [] : blocks(inner)
-}
-
-function textOf(output: unknown): string {
-  if (typeof output === 'string') return output
-  return blocks(output)
-    .filter((block): block is Record<string, unknown> => isRecord(block))
-    .filter((block) => block['type'] === 'text' && typeof block['text'] === 'string')
-    .map((block) => block['text'] as string)
-    .join('\n')
-}
-
 /** Every `Artifact:` line in a text, in order. */
 export function artifactsIn(text: string): readonly MediaArtifactRef[] {
   const found: MediaArtifactRef[] = []
@@ -89,23 +72,17 @@ export function artifactsIn(text: string): readonly MediaArtifactRef[] {
   return found
 }
 
-function stringAt(input: unknown, key: string): string | null {
-  return isRecord(input) && typeof input[key] === 'string' && input[key].trim() !== ''
-    ? input[key]
-    : null
-}
-
 export function readMediaCall(call: ToolCallView): MediaCallView | null {
   const kind = mediaKind(call.toolName)
   if (kind === null) return null
   const input = call.input?.present ? call.input.value : null
   const count = isRecord(input) && typeof input['count'] === 'number' ? input['count'] : 1
-  const answered = call.output?.present ? textOf(call.output.value) : ''
+  const answered = call.output?.present ? answerText(call.output.value) : ''
   return {
     kind,
-    prompt: stringAt(input, 'prompt'),
-    aspectRatio: stringAt(input, 'aspect_ratio'),
-    size: stringAt(input, 'size'),
+    prompt: inputString(input, 'prompt'),
+    aspectRatio: inputString(input, 'aspect_ratio'),
+    size: inputString(input, 'size'),
     count: Number.isInteger(count) && count > 0 ? count : 1,
     artifacts: artifactsIn(answered),
     model: MODEL.exec(answered)?.[1] ?? null,

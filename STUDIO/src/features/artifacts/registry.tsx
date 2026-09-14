@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { GenericArtifact } from '@/features/artifacts/kinds/GenericArtifact'
 import { MediaArtifact } from '@/features/artifacts/kinds/MediaArtifact'
-import { WebSearchArtifact } from '@/features/artifacts/kinds/WebSearchArtifact'
+import { WebResearchArtifact } from '@/features/artifacts/kinds/WebResearchArtifact'
 import type { Artifact } from '@/domain/artifacts/types'
 
 /**
@@ -25,8 +25,9 @@ import type { Artifact } from '@/domain/artifacts/types'
 type Renderer = (artifact: Artifact) => ReactNode
 
 const RENDERERS: Readonly<Record<string, Renderer>> = {
-  web_search: (artifact) => <WebSearchArtifact artifact={artifact} />,
-  web_research: (artifact) => <WebSearchArtifact artifact={artifact} />,
+  web_search: (artifact) => <WebResearchArtifact artifact={artifact} />,
+  web_research: (artifact) => <WebResearchArtifact artifact={artifact} />,
+  web_fetch: (artifact) => <WebResearchArtifact artifact={artifact} />,
 
   // Aliases rather than a normalisation step, because the alias list *is* the
   // knowledge — hiding it inside a rewrite makes it harder to find, not

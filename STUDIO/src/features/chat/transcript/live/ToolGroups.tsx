@@ -13,6 +13,8 @@ import { RollingCount } from './RollingCount'
 import { BrowserReport } from './BrowserReport'
 import { MediaCallArtifact } from './MediaCallArtifact'
 import { readMediaCall } from './mediaCall'
+import { researchArtifact, webKind } from './webCall'
+import { WebResearchArtifact } from '@/features/artifacts/kinds/WebResearchArtifact'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { isRecord } from '@/lib/guards'
@@ -80,35 +82,20 @@ export function ToolGroups({
       break
     }
   }
-  // The browser's calls are one story, not a row each (ADR 0049 §7). When the
-  // segment holds any, they all lift into one report - latest frame on top,
-  // every call a step beneath - placed where the first of them stood, and the
-  // rows that are not the browser's keep the ordinary rendering unchanged.
-  const browserCalls = groups
-    .flatMap((group) => group.calls)
-    .filter((call) => browserAction(call.toolName) !== null)
-  if (browserCalls.length === 0) {
-    return (
-      <div className="my-1 flex flex-col gap-0.5">
-        {groups.map((group) =>
-          group.file !== null && group.calls.length > 1 ? (
-            <FileRunRow
-              key={group.id}
-              group={group}
-              live={live}
-              receiving={live && group.id === receivingId}
-            />
-          ) : (
-            group.calls.map((call) => (
-              <CallRow key={call.toolCallId} call={call} live={live} conversationId={conversationId} />
-            ))
-          ),
-        )}
-      </div>
-    )
-  }
+  // Two families lift out of the row-per-call rule, each into one object
+  // placed where its first call stood. The browser's calls are one story,
+  // not a row each (ADR 0049 §7): latest frame on top, every call a step
+  // beneath. The web's calls - a search, a page read - are one piece of
+  // research: three searches fired together are three dots on one card,
+  // not three disclosure rows of prose. Everything else keeps the ordinary
+  // rendering, in the wire's order, around them.
+  const calls = groups.flatMap((group) => group.calls)
+  const browserCalls = calls.filter((call) => browserAction(call.toolName) !== null)
+  const webCalls = calls.filter((call) => webKind(call.toolName) !== null)
+
   const rows: ReactNode[] = []
   let reportPlaced = false
+  let researchPlaced = false
   for (const group of groups) {
     if (group.file !== null && group.calls.length > 1) {
       rows.push(
@@ -132,6 +119,15 @@ export function ToolGroups({
               live={live}
               conversationId={conversationId}
             />,
+          )
+        }
+        continue
+      }
+      if (webKind(call.toolName) !== null) {
+        if (!researchPlaced) {
+          researchPlaced = true
+          rows.push(
+            <WebResearchArtifact key={`research:${call.toolCallId}`} artifact={researchArtifact(webCalls)} />,
           )
         }
         continue
@@ -181,8 +177,6 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   git: { mark: Icons.branch, running: 'Running', done: 'Ran' },
   glob: { mark: Icons.search, running: 'Searching', done: 'Searched' },
   grep: { mark: Icons.search, running: 'Searching', done: 'Searched' },
-  web_search: { mark: Icons.search, running: 'Searching', done: 'Searched' },
-  fetch: { mark: Icons.browserUse, running: 'Fetching', done: 'Fetched' },
   plan: { mark: Icons.plan, running: 'Planning', done: 'Planned' },
   ask_user_question: { mark: Icons.ask, running: 'Asking', done: 'Asked' },
   // Discovery wears MCP's own mark rather than a magnifying glass: what it
