@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { Loading } from '@/components/state'
+import { LoadingLine } from '@/components/state'
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
@@ -348,7 +348,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         className="studio-scroll-inset studio-no-anchor min-h-0 flex-1 overflow-y-auto"
       >
         <div
-          className="relative mx-auto w-full"
+          className="mx-auto w-full"
           style={{
             maxWidth: SHELL.measure,
             paddingInline: SHELL.gutter,
@@ -359,25 +359,13 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           {/* The open, in parts that this page and the scroll hook pace
               between them (see "The open" in `useAutoScroll`). While the
               replay is still coming, or the words have come but the minimum
-              wait has not passed, the wait stands in the empty page. Then it
-              fades out under the words as they rise into place at the top of
-              the viewport - keyed to the conversation, so every open reveals
-              and not only the first - and only then does the journey to the
-              bottom begin. Before this the first frame of content was the
+              wait has not passed, the page stays empty and the wait runs
+              along the top strip's edge (`LoadingLine`, below). Then the
+              words rise into place at the top of the viewport - keyed to the
+              conversation, so every open reveals and not only the first - and
+              only then does the journey to the bottom begin. Before this the first frame of content was the
               first frame of travel, and a conversation looked like a page
               that appeared already leaving. */}
-          <AnimatePresence initial={false}>
-            {!revealed && (live.phase.status === 'attaching' || hasWords) ? (
-              // Out of the flow, over the words that are laid out but not yet
-              // shown, so its leaving moves nothing under them.
-              <Loading
-                key="loading"
-                label="Loading the conversation"
-                className="absolute inset-x-0 py-24"
-                style={{ top: SHELL.topStrip.height + 20 }}
-              />
-            ) : null}
-          </AnimatePresence>
           {!revealed && !hasWords ? null : (
             <motion.div
               key={conversation.id}
@@ -423,6 +411,18 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         className="pointer-events-none absolute inset-x-0 z-20 h-5 bg-gradient-to-b from-surface to-transparent"
         style={{ top: SHELL.topStrip.height }}
       />
+      {/* The open's wait, on the strip's lower edge: where the words will
+          arrive from, and out of the page they arrive into. */}
+      <AnimatePresence initial={false}>
+        {!revealed && (live.phase.status === 'attaching' || hasWords) ? (
+          <LoadingLine
+            key="loading"
+            label="Loading the conversation"
+            className="absolute inset-x-0 z-30"
+            style={{ top: SHELL.topStrip.height }}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <div className="relative shrink-0">
         {/* Behind the composer, not over it.

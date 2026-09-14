@@ -372,7 +372,11 @@ blank column to the person waiting.
 where the content will be, the same dots a running step shows, faded in only
 once the wait has lasted 150ms - a read to this machine usually lands before
 that, and an indicator that flashes for a fast read says "loading" about
-something already loaded. Rules:
+something already loaded. A whole surface about to be filled - a
+conversation opening - keeps its page empty and carries the wait in its
+chrome instead, as a hairline with a travelling light on the edge the
+content arrives under (`LoadingLine`); a widget in the middle of an empty
+page reads as the page waiting for a widget. Rules:
 
 - Never a skeleton. Bars shaped like the content to come held its space
   well, and were refused (2026-09-14) for what they are: a picture of content

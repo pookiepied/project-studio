@@ -21,6 +21,10 @@ import { cn } from '@/lib/cn'
  * wait is long enough to be one. And it leaves quickly, fading under the
  * content that replaces it when it is inside an `AnimatePresence`.
  *
+ * A whole surface about to be filled keeps its page empty and shows the
+ * wait on its chrome instead (`LoadingLine`); the dots are for a list or a
+ * pane, a part of a page that is waiting.
+ *
  * The region announces itself once, through `role="status"` and the label;
  * the dots themselves are decoration. A caller that already owns the status
  * region passes no label and gets the dots alone.
