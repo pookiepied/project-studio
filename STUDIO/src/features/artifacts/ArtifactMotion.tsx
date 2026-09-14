@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT, LOOP, staggerDelay } from '@/design/tokens'
 import { cn } from '@/lib/cn'
@@ -37,10 +37,13 @@ export function AnimatedItem({
   index = 0,
   children,
   className,
+  style,
 }: {
   index?: number
   children: ReactNode
   className?: string
+  /** Layout the parent computes per item - a frame's share of its row. */
+  style?: CSSProperties
 }) {
   return (
     <motion.div
@@ -52,6 +55,7 @@ export function AnimatedItem({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION.base, ease: EASE_OUT, delay: staggerDelay(index) }}
       className={cn('min-w-0', className)}
+      style={style}
     >
       {children}
     </motion.div>

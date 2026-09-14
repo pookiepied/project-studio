@@ -3,6 +3,8 @@ import { DURATION, EASE_IN, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton, Overlay } from '@/components/primitives'
 import { Deferred, lazyNamed } from '@/components/state'
+import { useMediaSource } from '@/features/artifacts/media/source'
+import type { MediaOutput } from '@/domain/artifacts/media'
 
 const VideoPlayer = lazyNamed(
   () => import('@/features/artifacts/media/VideoPlayer'),
@@ -33,17 +35,18 @@ export function MediaLightbox({
   title,
   caption,
   video,
-  src,
-  poster,
+  output,
 }: {
   open: boolean
   onClose: () => void
   title: string
   caption?: string
   video: boolean
-  src?: string
-  poster?: string
+  /** The output opened, resolved here the way the frame resolved it. */
+  output: MediaOutput | null
 }) {
+  const src = useMediaSource(output, video)
+  const poster = output?.poster
   // Raised above the dialog layer: a lightbox can be opened from inside one.
   return (
     <Overlay open={open} onClose={onClose} raised className="p-8">

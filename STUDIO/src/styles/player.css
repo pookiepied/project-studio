@@ -91,3 +91,35 @@
   padding-inline: 6px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------------------
+   The centred play control
+
+   The invitation on a still frame. It is the one control drawn over the
+   middle of the picture, and it is drawn only while the clip is not moving:
+   media-chrome reflects the element's state as `mediapaused`, so its absence
+   is the clip playing, and the glyph leaves in the app's own duration. The
+   pointer keeps passing through to the controller underneath while hidden.
+   --------------------------------------------------------------------------- */
+.studio-player .studio-player-centre {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border-radius: 999px;
+  background: oklch(0.16 0 0 / 55%);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 4px 16px -4px oklch(0 0 0 / 45%);
+  --media-button-icon-width: 22px;
+  --media-button-icon-height: 22px;
+  --media-control-hover-background: oklch(0.16 0 0 / 70%);
+  transition:
+    opacity var(--duration-base) var(--ease-out-quint),
+    transform var(--duration-base) var(--ease-out-quint);
+}
+
+.studio-player .studio-player-centre:not([mediapaused]) {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.92);
+}

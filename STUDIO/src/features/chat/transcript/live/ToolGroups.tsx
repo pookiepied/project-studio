@@ -1,6 +1,4 @@
 import { useState, type ReactNode } from 'react'
-import { motion } from 'framer-motion'
-import { ENTER } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { cn } from '@/lib/cn'
@@ -13,7 +11,7 @@ import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
 import { RollingCount } from './RollingCount'
 import { BrowserReport } from './BrowserReport'
-import { MediaCard } from './MediaCard'
+import { MediaCallArtifact } from './MediaCallArtifact'
 import { readMediaCall } from './mediaCall'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
@@ -145,13 +143,14 @@ export function ToolGroups({
 }
 
 /**
- * One call standing alone: a generation is shown as the thing it made, every
- * other call as a row with its working-out behind a disclosure.
+ * One call standing alone: a generation is the artifact it made, drawn by
+ * the same component the gallery uses; every other call is a row with its
+ * working-out behind a disclosure.
  */
 function CallRow({ call, live, conversationId }: { call: ToolCallView; live: boolean; conversationId: string }) {
   const media = readMediaCall(call)
   if (media === null) return <ToolCallRow call={call} live={live} />
-  return <MediaRow call={call} view={media} live={live} conversationId={conversationId} />
+  return <MediaCallArtifact call={call} view={media} conversationId={conversationId} />
 }
 
 /* -------------------------------------------------------------------------- */
@@ -183,8 +182,6 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   glob: { mark: Icons.search, running: 'Searching', done: 'Searched' },
   grep: { mark: Icons.search, running: 'Searching', done: 'Searched' },
   web_search: { mark: Icons.search, running: 'Searching', done: 'Searched' },
-  studio_image: { mark: Icons.image, running: 'Generating an image', done: 'Generated an image' },
-  studio_video: { mark: Icons.video, running: 'Generating a video', done: 'Started a video' },
   fetch: { mark: Icons.browserUse, running: 'Fetching', done: 'Fetched' },
   plan: { mark: Icons.plan, running: 'Planning', done: 'Planned' },
   ask_user_question: { mark: Icons.ask, running: 'Asking', done: 'Asked' },
@@ -366,44 +363,6 @@ function GroupCallRow({
 /* -------------------------------------------------------------------------- */
 /* A generation                                                                */
 /* -------------------------------------------------------------------------- */
-
-/**
- * A generation call: the verb as a row label, and the output standing open
- * beneath it rather than behind the chevron, because a picture folded away
- * is a picture nobody asked for a second time.
- */
-function MediaRow({
-  call,
-  view,
-  live,
-  conversationId,
-}: {
-  call: ToolCallView
-  view: ReturnType<typeof readMediaCall> & object
-  live: boolean
-  conversationId: string
-}) {
-  const action = ACTIONS[call.toolName]
-  const answered = answeredOf(call)
-  const running = call.errorText === null && !answered
-  const verb = action === undefined ? call.toolName : running ? action.running : action.done
-  return (
-    <motion.div
-      className="flex flex-col gap-1.5 py-1"
-      initial={live ? ENTER.initial : false}
-      animate={ENTER.animate}
-      transition={ENTER.transition}
-    >
-      <span className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
-        {action === undefined ? null : <action.mark size="sm" />}
-        <span className={cn(call.errorText !== null && 'text-danger')}>
-          {call.errorText !== null ? 'failed' : verb}
-        </span>
-      </span>
-      <MediaCard view={view} conversationId={conversationId} failed={call.errorText} running={running} />
-    </motion.div>
-  )
-}
 
 /* -------------------------------------------------------------------------- */
 /* The single call                                                             */

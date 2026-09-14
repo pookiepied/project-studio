@@ -211,3 +211,25 @@ export const COMPOSER = {
   /** Every round control inside the field — the same step as the chrome's. */
   controlSize: CONTROL.md,
 } as const
+
+/**
+ * A generated picture or clip in the transcript.
+ *
+ * A frame takes the reply's full measure when its ratio allows, and no more
+ * height than this whatever the ratio is: a portrait at the full measure
+ * would be a tower the reader scrolls past, so its width is derived from
+ * the cap instead - width is `min(measure, maxHeight * ratio)`, and the
+ * height follows. Frames sharing a row share one height by construction,
+ * so the cap bounds the row rather than each frame separately.
+ *
+ * The default ratio is the reservation for a frame whose picture has not
+ * arrived and whose call named no ratio. 4:3 is the least wrong guess: most
+ * models' default is square or near it, and a 4:3 box turning into a square
+ * moves the transcript less than a 16:9 one would.
+ */
+export const MEDIA_FRAME = {
+  maxHeight: 480,
+  defaultRatio: 4 / 3,
+  /** Between frames in one artifact, and between rows of them. */
+  gap: SPACE.sm,
+} as const

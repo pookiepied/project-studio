@@ -28,6 +28,8 @@ import {
   Tooltip,
 } from '@/components/primitives'
 import { StateNote } from '@/components/state'
+import { ArtifactsSection } from './ArtifactsSection'
+import { Section } from './Section'
 
 /**
  * The parts, on one page.
@@ -103,6 +105,7 @@ function ShowcasePage() {
         <TypeSection />
         <ElevationSection />
         <MotionSection />
+        <ArtifactsSection />
 
         <footer className="pb-4">
           <p className="text-micro text-muted-foreground">
@@ -113,18 +116,6 @@ function ShowcasePage() {
         </footer>
       </div>
     </div>
-  )
-}
-
-function Section({ title, note, children }: { title: string; note: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-title text-foreground">{title}</h2>
-        <p className="text-caption text-muted-foreground">{note}</p>
-      </div>
-      {children}
-    </section>
   )
 }
 

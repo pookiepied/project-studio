@@ -1,4 +1,5 @@
 import 'media-chrome'
+import type { SyntheticEvent } from 'react'
 
 /**
  * The video player.
@@ -13,6 +14,15 @@ import 'media-chrome'
  * box on hover, and a row of six icons. That is the wrong object for a
  * generated clip sitting inside a chat message. So the appearance is entirely
  * ours, in `styles/player.css` under `.studio-player`, and this file is structure.
+ *
+ * ---- Two controls that play ----------------------------------------------
+ *
+ * A play glyph in the middle of the picture, and the pill along the bottom.
+ * The centred one is the invitation: a still frame with nothing on it reads
+ * as a picture, and a reader who does not know it moves never finds the
+ * small button in the pill. It leaves the moment the clip plays - a glyph
+ * over a moving picture is a watermark - and the pill stays, fading with the
+ * pointer, for the scrubbing and the sound.
  *
  * ---- Where the black came from -------------------------------------------
  *
@@ -35,12 +45,22 @@ export function VideoPlayer({
   poster,
   title,
   autoPlay = false,
+  onRatio,
 }: {
   src: string
   poster?: string
   title: string
   autoPlay?: boolean
+  /** The clip's own width over height, once its metadata has loaded. */
+  onRatio?: (ratio: number) => void
 }) {
+  const measured = (event: SyntheticEvent<HTMLVideoElement>) => {
+    const video = event.currentTarget
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      onRatio?.(video.videoWidth / video.videoHeight)
+    }
+  }
+
   return (
     <media-controller
       class="studio-player"
@@ -57,7 +77,10 @@ export function VideoPlayer({
         playsInline
         preload="metadata"
         aria-label={title}
+        onLoadedMetadata={measured}
       />
+
+      <media-play-button slot="centered-chrome" class="studio-player-centre" />
 
       <media-control-bar>
         <media-play-button />
