@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
-import { WorkingDots } from '@/components/state'
+import { WorkingRing } from '@/components/state'
 
 /**
  * The top of what is loaded.
@@ -11,8 +11,8 @@ import { WorkingDots } from '@/components/state'
  * the scroll compensation in `useTranscriptWindow` would be correcting for two
  * things at once and get neither right.
  *
- * The wait is the app's one wait, the dots. Anything else here — a spinner,
- * a "loading…" label, a skeleton row — would be a second vocabulary for one
+ * The wait is the app's one wait, the ring. Anything else here — a
+ * "loading…" label, a skeleton row — would be a second vocabulary for one
  * idea, and a skeleton in particular pretends to be content, which at the
  * top of a history is a lie about what you are about to read. The brand mark
  * stood here for a while; it is the app's face, not its hourglass.
@@ -35,7 +35,7 @@ export function EarlierBoundary({
             exit={{ opacity: 0 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
           >
-            <WorkingDots size="md" className="text-muted-foreground" />
+            <WorkingRing size={16} className="text-muted-foreground" />
           </motion.div>
         ) : (
           <motion.span

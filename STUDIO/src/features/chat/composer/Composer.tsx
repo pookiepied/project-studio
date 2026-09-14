@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { COMPOSER, DURATION, EASE_OUT, LOOP } from '@/design/tokens'
+import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
+import { WorkingRing } from '@/components/state'
 import {
   MAX_IMAGES_PER_TURN,
   pickImageFiles,
@@ -702,7 +703,7 @@ export function Composer({
                 >
                   {busy ? (
                     <>
-                      <WorkingRing />
+                      <TurnRing />
                       {/* `size="md"`, like every other mark in this row. It
                           was written without one, so it fell back to the
                           text-relative step and painted 10.4px inside a 22px
@@ -786,7 +787,7 @@ export function Composer({
 }
 
 /**
- * The turn is in flight: a ring travelling around the stop control.
+ * The turn is in flight: the ring travelling around the stop control.
  *
  * The button stays the stop button — that is the one thing it must remain
  * while a turn is running, and a spinner that replaced it would take away the
@@ -799,70 +800,17 @@ export function Composer({
  * was happening lived in the transcript. A person who has just pressed send
  * is looking at the button they pressed.
  *
- * Indeterminate on purpose: nothing here knows how long the model will take,
- * so the ring reports activity and never progress. A bar that filled would be
- * inventing a fraction of a duration nobody has measured.
- *
- * ---- Why an arc rather than a bordered box ---------------------------------
- *
- * It was a `rounded-full` span with one lit border edge, hung on a wrapper
- * around the mark. Two things were wrong with that and they compounded. It
- * measured itself from the GLYPH — 10.4px of icon plus 5px of inset, landing
- * at 18px inside a 22px control — so it traced neither the mark nor the
- * button, and an arc that matches no edge on screen reads as a loose ring
- * rather than as the control's outline. And a border arc on a rounded box is
- * drawn by the box model: its ends are mitre cuts, and at this diameter the
- * curve is visibly a rounded rectangle pretending to be a circle.
- *
- * A stroked circle fixes both. `pathLength` normalises the circumference to
- * 100 so the dash is a plain percentage of the way round, round caps give the
- * arc ends instead of mitres, and `non-scaling-stroke` holds the line at
- * ~1.4px at every `--ui-size`, the way the icon set holds its own weight.
- *
- * ---- Outside the button, not inside it -------------------------------------
- *
- * It first went just INSIDE the rim, on the reasoning that a ring tracing the
- * edge reads as the button's own outline. On screen it does not: inside the
- * rim the arc shares its space with the mark, crowding a glyph that is
- * centred to the pixel into looking off-centre, and the control ends up with
- * something drawn on top of it rather than around it.
- *
- * Outside, it is unambiguously a halo: the button is untouched, the mark has
- * its whole circle back, and the moving part is clearly separate from the
- * thing you click. Nothing in the composer clips it — the frame, the grid and
- * the cell are all `overflow: visible` — so the few pixels it needs are there.
+ * Outside the button, not inside it. Inside the rim the arc shares its
+ * space with the mark, crowding a glyph that is centred to the pixel into
+ * looking off-centre. Outside, it is unambiguously a halo: the button is
+ * untouched, the mark has its whole circle back, and the moving part is
+ * clearly separate from the thing you click. Nothing in the composer clips
+ * it — the frame, the grid and the cell are all `overflow: visible`. The
+ * box is the button plus 3px on every side, so the button's own rim sits at
+ * r=10.24 in the ring's units and the ring's 10.9 clears it with a little
+ * air. Hung on the IconButton, which is positioned for exactly this; not a
+ * flex item, so it cannot shift the mark it travels around.
  */
-function WorkingRing() {
-  return (
-    <motion.svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      // Hung on the IconButton, which is positioned for exactly this, and
-      // grown past its edge. Not a flex item, so it cannot shift the mark it
-      // travels around.
-      className="pointer-events-none absolute -inset-[3px]"
-      animate={{ rotate: 360 }}
-      transition={LOOP.spin}
-    >
-      <circle
-        cx="12"
-        cy="12"
-        // The box is the button plus 3px on every side, so the button's own
-        // rim sits at r=10.24 in these units. This clears it with a little
-        // air and still leaves room for the stroke inside the box.
-        r="10.9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.4}
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-        pathLength={100}
-        // A quarter of the way round, with a gap for the rest. Long enough to
-        // read as travelling, short enough that the gap is what the eye
-        // follows.
-        strokeDasharray="25 75"
-        opacity={0.75}
-      />
-    </motion.svg>
-  )
+function TurnRing() {
+  return <WorkingRing className="absolute -inset-[3px]" />
 }

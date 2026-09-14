@@ -1,6 +1,6 @@
 export { StateNote } from './StateNote'
 export { WorkingDots } from './WorkingDots'
 export { Loading } from './Loading'
-export { LoadingLine } from './LoadingLine'
+export { WorkingRing } from './WorkingRing'
 export { RetryButton } from './RetryButton'
 export { Deferred, lazyNamed } from './Deferred'

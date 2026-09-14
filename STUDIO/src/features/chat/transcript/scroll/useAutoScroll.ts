@@ -43,16 +43,16 @@ const THRESHOLD = 48
 export const FLIGHT_BELT_MS = 1_600
 
 /**
- * How long the open holds at the top once there is content, before the
- * journey down begins. Short on purpose: the transcript is still rising
- * into place (`DURATION.slow`) when the travel starts, so the two read as
- * one motion - the page arrives and is already on its way. It was the
- * reveal plus a beat at first, and a page that sits still at the top of a
- * long conversation looks finished; the reader starts reading, and then it
- * leaves. Counted from the first frame with something to scroll, not from
- * mount - the replay's first delivery may be a while coming.
+ * How long the open holds at the top once the words are shown, before the
+ * journey down begins: the reveal's own length (`DURATION.slow`) and a
+ * little over, so the words are fully there and seen before they move. A
+ * breath shorter than the reveal was tried and read as too fast - the page
+ * appeared already leaving; a beat longer again read as finished, and then
+ * it left. This is the width between the two, and it is meant to be
+ * noticed: the pause is what makes the move look intended. Counted from the
+ * first frame with something to scroll, not from mount.
  */
-export const OPEN_HOLD_MS = DURATION.fast * 1000
+export const OPEN_HOLD_MS = DURATION.slow * 1000 + 120
 
 /**
  * ---- The open ------------------------------------------------------------
@@ -81,11 +81,10 @@ export const OPEN_HOLD_MS = DURATION.fast * 1000
  * and reveals itself there when the page says it is ready (`ChatPage`
  * decides when, and passes `ready`; until then the loop holds without
  * moving, whatever has been laid out); the journey to the bottom starts
- * a breath into that reveal (`OPEN_HOLD_MS`) and runs at the open's own,
- * gentler rate (`OPEN_STIFFNESS`), so the arriving and the travelling are
- * one motion. Without the breath the first frame of content and the first
- * frame of travel were the same frame, and the page appeared already
- * leaving; with a long one it looked finished, and then left.
+ * once the reveal has landed and been seen (`OPEN_HOLD_MS`) and runs at the
+ * open's own, gentler rate (`OPEN_STIFFNESS`). Without the hold the first
+ * frame of content and the first frame of travel were the same frame, and
+ * the page appeared already leaving.
 
 /** Keys that scroll. Without these, paging up during a stream fights the follow. */
 const SCROLL_KEYS = new Set([

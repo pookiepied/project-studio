@@ -368,21 +368,21 @@ never styled like a failure. A read that has not come back may not be
 answered with "nothing", because an empty list and a broken one are both a
 blank column to the person waiting.
 
-**Loading is one wait, late and quiet.** `Loading`: three dots breathing
-where the content will be, the same dots a running step shows, faded in only
-once the wait has lasted 150ms - a read to this machine usually lands before
-that, and an indicator that flashes for a fast read says "loading" about
-something already loaded. A whole surface about to be filled - a
-conversation opening - keeps its page empty and carries the wait in its
-chrome instead, as a hairline with a travelling light on the edge the
-content arrives under (`LoadingLine`); a widget in the middle of an empty
-page reads as the page waiting for a widget. Rules:
+**Loading is one wait, late and quiet.** `Loading`: the ring
+(`WorkingRing`) turning where the content will be, the same ring the
+composer wears round the stop control while a turn is in flight, faded in
+only once the wait has lasted 150ms - a read to this machine usually lands
+before that, and an indicator that flashes for a fast read says "loading"
+about something already loaded. The three dots (`WorkingDots`) stay beside
+a label - "Searching…" - where a line is already saying what runs; alone in
+a page they read as a generic widget. Rules:
 
 - Never a skeleton. Bars shaped like the content to come held its space
   well, and were refused (2026-09-14) for what they are: a picture of content
   nobody has seen. The placeholder primitives are gone; do not rebuild them.
 - Never the brand mark. It is the app's face, not its hourglass.
-- Never a spinner. It measures a wait the reader did not ask to measure.
+- The ring reports activity, never progress. A bar that fills is inventing
+  a fraction of a duration nobody measured.
 - Something *true* may stand in instead: the plain code a highlighter will
   colour, the poster a player will play. Content is not a stand-in.
 - Announced once, quietly: `role="status"` with a spoken label on the region,

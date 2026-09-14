@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { WorkingDots } from '@/components/state'
+import { WorkingRing } from '@/components/state'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
 import { MediaLightbox } from '@/features/artifacts/media'
 import { Timeline } from '@/features/artifacts/sections'
@@ -128,7 +128,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
  * rectangle where an image will be reads as a *failed* image, and worse, it
  * sets an expectation about the colours of something that has not been made
  * yet. A neutral field holding the medium's icon predicts nothing, and while
- * the model is still working the app's one wait breathes under the icon.
+ * the model is still working the app's one wait turns under the icon.
  * The field used to carry a travelling sweep - the first skeleton in the
  * app, and the last to go.
  */
@@ -138,7 +138,7 @@ function Frame({ active, video }: { active: boolean; video: boolean }) {
       <span className="text-muted-foreground/60">
         {video ? <Icons.video /> : <Icons.image />}
       </span>
-      {active ? <WorkingDots size="md" className="text-muted-foreground/60" /> : null}
+      {active ? <WorkingRing size={16} className="text-muted-foreground/60" /> : null}
     </span>
   )
 }
