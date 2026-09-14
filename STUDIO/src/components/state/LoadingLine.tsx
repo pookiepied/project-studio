@@ -18,7 +18,10 @@ import { cn } from '@/lib/cn'
  *
  * Same manners as the dots: invisible until the wait has lasted
  * `SHOW_AFTER`, gone quickly when the content comes. The light is the house
- * sweep (`LOOP.sweep`), in the foreground colour at a whisper.
+ * sweep (`LOOP.sweep`) in the foreground colour, on a faint track the full
+ * width of the edge. Two pixels, not one, and the light near full strength:
+ * the first cut was a single pixel at a whisper and could not be seen at
+ * all in light mode - a hairline has to be visible to be a hairline.
  */
 export function LoadingLine({
   label,
@@ -34,7 +37,7 @@ export function LoadingLine({
     <motion.div
       role="status"
       aria-label={label}
-      className={cn('pointer-events-none h-px overflow-hidden', className)}
+      className={cn('pointer-events-none h-0.5 overflow-hidden bg-hairline', className)}
       style={style}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -43,12 +46,12 @@ export function LoadingLine({
     >
       <motion.span
         aria-hidden
-        className="block h-full w-2/5"
+        className="block h-full w-1/3"
         style={{
           background:
-            'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 45%, transparent) 50%, transparent)',
+            'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 85%, transparent) 50%, transparent)',
         }}
-        animate={{ x: ['-100%', '250%'] }}
+        animate={{ x: ['-100%', '300%'] }}
         transition={{ ...LOOP.sweep, ease: 'easeInOut' }}
       />
     </motion.div>

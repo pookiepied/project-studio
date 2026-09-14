@@ -209,14 +209,24 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(items, conversation.id, revealed)
 
+  // Nothing is shown while the replay is still coming. It arrives a
+  // delivery at a time, and the first delivery is usually one message that
+  // fits the viewport: judged on its own it would be revealed at once, and
+  // the rest of the history would then pour in under a page that had
+  // already said it was ready. The whole history is held until the harness
+  // says it is up to date; a message this window is sending is its own
+  // words and does not wait on anything.
+  const replaying = !gallery && live.phase.status === 'attaching' && live.pending === null
+
   // The words are laid out before they are shown (opacity, not absence), so
   // the page can ask the one question the minimum wait turns on: is there
   // anywhere to travel to? A transcript that fits the viewport is revealed
-  // the moment it exists; one that does not waits out `OPEN_MIN_WAIT_MS`
-  // from the open, then is revealed, and the scroll hook takes it from
-  // there. Layout effect, so the answer is read before the frame paints.
+  // the moment it is complete; one that does not waits out
+  // `OPEN_MIN_WAIT_MS` from the open, then is revealed, and the scroll hook
+  // takes it from there. Layout effect, so the answer is read before the
+  // frame paints.
   useLayoutEffect(() => {
-    if (revealed || !hasWords) return
+    if (revealed || !hasWords || replaying) return
     const element = viewport.current
     const travels = element !== null && element.scrollHeight - element.clientHeight > 0
     const remaining = travels ? OPEN_MIN_WAIT_MS - (performance.now() - openedAt.current) : 0
@@ -226,7 +236,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     }
     const timer = setTimeout(() => setRevealedFor(conversation.id), remaining)
     return () => clearTimeout(timer)
-  }, [revealed, hasWords, conversation.id, viewport])
+  }, [revealed, hasWords, replaying, conversation.id, viewport])
 
   // Branch from one answer: everything up to and including it becomes the
   // first message of a new conversation, named for its source.
