@@ -16,9 +16,11 @@ import type { SeamFailure } from '@/platform/harness'
  * Only the states that need words get them. `live`, `idle` and `streaming`
  * render nothing — a connected conversation narrates itself through its
  * content, and a permanent "connected" strip is exactly the kind of chrome
- * that teaches people to stop reading. The four that remain are states where
- * silence would be read as something else: no harness, a harness coming up,
- * a read that broke, or a turn that failed.
+ * that teaches people to stop reading. `attaching` renders nothing here
+ * either: the wait for a replay is drawn where the transcript will be, as
+ * its skeleton (`TranscriptSkeleton`), not announced under it. The four
+ * that remain are states where silence would be read as something else: no
+ * harness, a harness coming up, a read that broke, or a turn that failed.
  *
  * `refused` is a submission failure — a POST the harness would not take.
  * It is not a phase (a send can be refused while an earlier turn streams),
@@ -61,8 +63,6 @@ function PhaseNotice({ phase, onResume }: { phase: ConversationPhase; onResume: 
       )
     case 'harness-starting':
       return <Notice>Starting the harness…</Notice>
-    case 'attaching':
-      return <Notice>Reaching the conversation…</Notice>
     case 'interrupted':
       return (
         <Notice>

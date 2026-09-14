@@ -40,6 +40,18 @@
  */
 const STIFFNESS = 12
 
+/**
+ * The open's own stiffness. The chase's 12 is tuned for a line-wrap: it has
+ * to be over before the next one. The open is one journey the reader is
+ * meant to see, from the top of a conversation they have just been shown
+ * to its end, and at 12 it was over in a fifth of a second - a flick, read
+ * as the page jumping. At this rate half the distance goes in about 100ms
+ * and a long transcript takes a little over a second to settle, fast at
+ * the start and slowing as it lands, which is the shape of a thing coming
+ * to rest rather than a thing stopping.
+ */
+export const OPEN_STIFFNESS = 7
+
 /** Below this the animation is over; anything less is sub-pixel. */
 const EPSILON = 0.5
 
@@ -71,6 +83,8 @@ interface StepOptions {
    * watch, fast at the start, settling as it lands.
    */
   readonly teleport?: boolean
+  /** How quickly the gap closes; the streaming chase's own rate by default. */
+  readonly stiffness?: number
 }
 
 export function createFollower(): Follower {
@@ -110,7 +124,7 @@ export function createFollower(): Follower {
       // Frame-rate independent exponential approach. The delta is clamped
       // because a backgrounded tab delivers one frame worth several seconds,
       // and `exp` of that is 1 — which would teleport on the way back.
-      const fraction = 1 - Math.exp(-STIFFNESS * Math.min(deltaSeconds, 0.05))
+      const fraction = 1 - Math.exp(-(options?.stiffness ?? STIFFNESS) * Math.min(deltaSeconds, 0.05))
       position += distance * fraction
 
       element.scrollTop = position

@@ -10,6 +10,7 @@ import { useAutoScroll } from '@/features/chat/transcript'
 import { galleryItems } from '@/features/chat/gallery/items'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
+import { TranscriptSkeleton } from '@/features/chat/transcript/live/TranscriptSkeleton'
 import { useConversationTranscript } from '@/features/chat/connection/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/connection/useConversation'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
@@ -306,14 +307,34 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             paddingBottom: 20,
           }}
         >
-          <LiveTranscript
-            items={items}
-            pending={gallery ? null : live.pending}
-            phase={gallery ? { status: 'idle' } : live.phase}
-            viewport={viewport}
-            conversationId={conversation.id}
-            onBranch={gallery ? undefined : onBranch}
-          />
+          {/* The open, in two parts that the scroll hook paces (see "The
+              open" in `useAutoScroll`). While the replay is still coming and
+              nothing has arrived, the skeleton stands where the words will.
+              When they arrive, the transcript rises into place at the top of
+              the viewport - keyed to the conversation, so every open reveals
+              and not only the first - and only after that does the journey to
+              the bottom begin. Before this the first frame of content was the
+              first frame of travel, and a conversation looked like a page
+              that appeared already leaving. */}
+          {!gallery && live.phase.status === 'attaching' && items.length === 0 ? (
+            <TranscriptSkeleton />
+          ) : (
+            <motion.div
+              key={conversation.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DURATION.slow, ease: EASE_OUT }}
+            >
+              <LiveTranscript
+                items={items}
+                pending={gallery ? null : live.pending}
+                phase={gallery ? { status: 'idle' } : live.phase}
+                viewport={viewport}
+                conversationId={conversation.id}
+                onBranch={gallery ? undefined : onBranch}
+              />
+            </motion.div>
+          )}
         </div>
       </div>
 

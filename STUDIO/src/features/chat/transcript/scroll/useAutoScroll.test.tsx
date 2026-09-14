@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { type ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FLIGHT_BELT_MS, useAutoScroll } from './useAutoScroll'
+import { FLIGHT_BELT_MS, OPEN_HOLD_MS, useAutoScroll } from './useAutoScroll'
 
 /**
  * The scroll contract of the transcript viewport, and specifically of its
@@ -47,6 +47,11 @@ vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number 
 vi.stubGlobal('cancelAnimationFrame', (id: number): void => {
   rafQueue.splice(id - 1, 1)
 })
+
+/** Frames worth the open's hold at the top, plus one to be past it. */
+const HOLD_FRAMES = Math.ceil(OPEN_HOLD_MS / 16) + 1
+/** Frames enough for the open's whole journey, hold included. */
+const OPEN_FRAMES = HOLD_FRAMES + 160
 
 let ticks = 0
 function flushFrames(count = 3): void {
@@ -127,17 +132,23 @@ afterEach(() => {
 })
 
 describe('the open', () => {
-  it('glides before it lands, a journey instead of a jump', () => {
+  it('holds at the top, then glides before it lands, a journey instead of a jump', () => {
     mountTranscript()
     measure(4000, 500)
-    // One frame in, the open has covered part of the distance and is still
+    // The content has just appeared, and the open lets it be seen where it
+    // is: for the length of the hold nothing moves, and the pin holds.
+    act(() => flushFrames(HOLD_FRAMES - 2))
+    expect(geometry.top).toBe(0)
+    expect(latest?.pinned).toBe(true)
+
+    // Past the hold, the open has covered part of the distance and is still
     // travelling: the reader watches the transcript go by, fast at the
     // start, settling as it arrives. A teleport here would be the bug.
-    act(() => flushFrames(1))
+    act(() => flushFrames(3))
     expect(geometry.top).toBeGreaterThan(0)
     expect(geometry.top).toBeLessThan(3500)
 
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     expect(geometry.top).toBeCloseTo(3500, 0)
     expect(latest?.pinned).toBe(true)
   })
@@ -160,7 +171,7 @@ describe('the open', () => {
     // The correction is not a reader. The pin survives it, and the chase
     // that is still owed finishes the journey.
     expect(latest?.pinned).toBe(true)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     expect(geometry.top).toBeCloseTo(3500, 0)
   })
 
@@ -177,7 +188,7 @@ describe('the open', () => {
   it('reads scrolls by classification again once the open has landed', () => {
     mountTranscript()
     measure(4000, 500)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     expect(geometry.top).toBeCloseTo(3500, 0)
 
     // A clamp from a content swap after arrival: classified as it always
@@ -192,7 +203,7 @@ describe('the open', () => {
   it('opens the next conversation at its bottom when the page is reused', () => {
     const view = mountTranscript(1, 'cnv_a')
     measure(4000, 500)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     expect(geometry.top).toBeCloseTo(3500, 0)
 
     // The reader scrolled up in conversation A and stayed there.
@@ -203,7 +214,7 @@ describe('the open', () => {
     // the bottom all over again.
     measure(6000, 500)
     view.rerender(<Probe dependency={2} navigation="cnv_b" />)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
 
     expect(geometry.top).toBeCloseTo(5500, 0)
     expect(latest?.pinned).toBe(true)
@@ -222,7 +233,7 @@ describe('the jump to latest', () => {
   it('settles on the echo that reaches the bottom, scrollend or not', () => {
     mountTranscript()
     measure(4000, 500)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     // The reader is away from the bottom, arrow in view; they click it.
     act(() => {
       viewportElement().scrollTop = 2000
@@ -249,7 +260,7 @@ describe('the jump to latest', () => {
   it('does not pin on a scrollend that lands short of the bottom', () => {
     mountTranscript()
     measure(4000, 500)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     act(() => {
       viewportElement().scrollTop = 2000
     })
@@ -270,7 +281,7 @@ describe('the jump to latest', () => {
   it('interrupts a flight the reader pressed to stop', () => {
     mountTranscript()
     measure(4000, 500)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     act(() => {
       viewportElement().scrollTop = 2000
     })
@@ -297,7 +308,7 @@ describe('the jump to latest', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     mountTranscript()
     measure(4000, 500)
-    act(() => flushFrames(60))
+    act(() => flushFrames(OPEN_FRAMES))
     act(() => {
       viewportElement().scrollTop = 2000
     })

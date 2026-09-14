@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createFollower } from '@/features/chat/transcript/scroll/followEngine'
+import { DURATION } from '@/design/tokens'
+import { OPEN_STIFFNESS, createFollower } from '@/features/chat/transcript/scroll/followEngine'
 
 /**
  * Follow streaming output, and stop the moment the reader takes over.
@@ -42,6 +43,14 @@ const THRESHOLD = 48
 export const FLIGHT_BELT_MS = 1_600
 
 /**
+ * How long the open holds at the top once there is content, before the
+ * journey down begins: the reveal's own duration, then a moment to have
+ * seen it. Counted from the first frame with something to scroll, not from
+ * mount - the replay's first delivery may be a while coming.
+ */
+export const OPEN_HOLD_MS = DURATION.slow * 1000 + 200
+
+/**
  * ---- The open ------------------------------------------------------------
  *
  * Arriving in a conversation is not the same act as following one. The page
@@ -63,6 +72,13 @@ export const FLIGHT_BELT_MS = 1_600
  * gestures — wheel, press, key — end it immediately, because the one thing
  * this file will not do is yank someone who has already said where they want
  * to be.
+ *
+ * The open is also paced. The transcript arrives at the top of the viewport
+ * and reveals itself there (`ChatPage`); the journey to the bottom waits
+ * for that reveal and a beat more (`OPEN_HOLD_MS`) before it starts, and
+ * then runs at the open's own, gentler rate (`OPEN_STIFFNESS`). Without the
+ * hold the first frame of content and the first frame of travel were the
+ * same frame, and the reader saw a page that appeared already leaving.
 
 /** Keys that scroll. Without these, paging up during a stream fights the follow. */
 const SCROLL_KEYS = new Set([
@@ -80,6 +96,8 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown) {
   const [pinned, setPinned] = useState(true)
   /** True from mount (or a change of conversation) until the open lands. */
   const boarding = useRef(true)
+  /** When the open first saw content, from which the hold is counted. */
+  const openSeen = useRef<number | null>(null)
 
   const follower = useRef(createFollower())
   const frame = useRef(0)
@@ -137,11 +155,29 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown) {
       last = now
 
       driving.current = true
+
+      // The open waits at the top. The first frame with content starts the
+      // clock; until it runs out the loop keeps its turn - the flag stays
+      // up, so the layout's scrolls are still nobody's - and moves nothing.
+      if (boarding.current && element.scrollHeight - element.clientHeight > 0) {
+        openSeen.current ??= now
+        if (now - openSeen.current < OPEN_HOLD_MS) {
+          lastTop.current = element.scrollTop
+          frame.current = requestAnimationFrame(step)
+          return
+        }
+      }
+
       // The open glides: its whole distance is a journey the reader watches,
       // and the teleport that spares a mid-stream reader a flight through
-      // several screens would also spare them the arrival. Past the open,
-      // the streaming follow keeps its own judgement.
-      const moved = follower.current.step(element, delta, { teleport: !boarding.current })
+      // several screens would also spare them the arrival. It runs at its
+      // own rate, too. Past the open, the streaming follow keeps its own
+      // judgement on both.
+      const moved = follower.current.step(
+        element,
+        delta,
+        boarding.current ? { teleport: false, stiffness: OPEN_STIFFNESS } : undefined,
+      )
 
       if (moved === null) {
         // Arrived. The flag drops so the next scroll event is read as the
@@ -349,6 +385,7 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown) {
    */
   useEffect(() => {
     boarding.current = true
+    openSeen.current = null
     if (frame.current) {
       cancelAnimationFrame(frame.current)
       frame.current = 0
