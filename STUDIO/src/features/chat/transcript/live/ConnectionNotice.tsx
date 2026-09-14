@@ -18,7 +18,7 @@ import type { SeamFailure } from '@/platform/harness'
  * content, and a permanent "connected" strip is exactly the kind of chrome
  * that teaches people to stop reading. `attaching` renders nothing here
  * either: the wait for a replay is drawn where the transcript will be, as
- * its skeleton (`TranscriptSkeleton`), not announced under it. The four
+ * the mark, busy (`TranscriptLoading`), not announced under it. The four
  * that remain are states where silence would be read as something else: no
  * harness, a harness coming up, a read that broke, or a turn that failed.
  *

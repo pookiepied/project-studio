@@ -10,7 +10,7 @@ import { useAutoScroll } from '@/features/chat/transcript'
 import { galleryItems } from '@/features/chat/gallery/items'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
-import { TranscriptSkeleton } from '@/features/chat/transcript/live/TranscriptSkeleton'
+import { TranscriptLoading } from '@/features/chat/transcript/live/TranscriptLoading'
 import { useConversationTranscript } from '@/features/chat/connection/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/connection/useConversation'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
@@ -309,16 +309,19 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         >
           {/* The open, in two parts that the scroll hook paces (see "The
               open" in `useAutoScroll`). While the replay is still coming and
-              nothing has arrived, the skeleton stands where the words will.
-              When they arrive, the transcript rises into place at the top of
-              the viewport - keyed to the conversation, so every open reveals
-              and not only the first - and only after that does the journey to
-              the bottom begin. Before this the first frame of content was the
+              nothing has arrived, the mark breathes in the empty page. When
+              the words arrive it fades out under them as the transcript rises
+              into place at the top of the viewport - keyed to the
+              conversation, so every open reveals and not only the first - and
+              only after that does the journey to the bottom begin. Before this the first frame of content was the
               first frame of travel, and a conversation looked like a page
               that appeared already leaving. */}
-          {!gallery && live.phase.status === 'attaching' && items.length === 0 ? (
-            <TranscriptSkeleton />
-          ) : (
+          <AnimatePresence initial={false}>
+            {!gallery && live.phase.status === 'attaching' && items.length === 0 ? (
+              <TranscriptLoading key="loading" />
+            ) : null}
+          </AnimatePresence>
+          {!gallery && live.phase.status === 'attaching' && items.length === 0 ? null : (
             <motion.div
               key={conversation.id}
               initial={{ opacity: 0, y: 12 }}
