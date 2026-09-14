@@ -40,17 +40,6 @@
  */
 const STIFFNESS = 12
 
-/**
- * The open's own stiffness. The chase's 12 is tuned for a line-wrap: it has
- * to be over before the next one. The open is one journey the reader is
- * meant to see, from the top of a conversation they have just been shown
- * to its end, and at 12 it was over in a fifth of a second - a flick, read
- * as the page jumping. At this rate half the distance goes in about 100ms
- * and a long transcript takes a little over a second to settle, fast at
- * the start and slowing as it lands, which is the shape of a thing coming
- * to rest rather than a thing stopping.
- */
-export const OPEN_STIFFNESS = 7
 
 /** Below this the animation is over; anything less is sub-pixel. */
 const EPSILON = 0.5
@@ -78,13 +67,16 @@ interface StepOptions {
   /**
    * Take a navigation-sized distance instantly rather than gliding through
    * it. True by default -- a jump this large mid-stream is disorientation
-   * the reader did not ask for. The one caller that passes false is the
-   * open: arriving in a conversation is a journey the reader is meant to
-   * watch, fast at the start, settling as it lands.
+   * the reader did not ask for.
    */
   readonly teleport?: boolean
-  /** How quickly the gap closes; the streaming chase's own rate by default. */
-  readonly stiffness?: number
+  /**
+   * Take the whole distance now, whatever it is. The open passes this while
+   * the words are not yet shown: the page lands at its bottom behind the
+   * wait, and the words are revealed already there, so there is no journey
+   * for anyone to watch and no reason to draw one.
+   */
+  readonly instant?: boolean
 }
 
 export function createFollower(): Follower {
@@ -115,7 +107,7 @@ export function createFollower(): Follower {
         return null
       }
 
-      if ((options?.teleport ?? true) && distance > element.clientHeight * TELEPORT_SCREENS) {
+      if (options?.instant || ((options?.teleport ?? true) && distance > element.clientHeight * TELEPORT_SCREENS)) {
         position = target
         element.scrollTop = target
         return target
@@ -124,7 +116,7 @@ export function createFollower(): Follower {
       // Frame-rate independent exponential approach. The delta is clamped
       // because a backgrounded tab delivers one frame worth several seconds,
       // and `exp` of that is 1 — which would teleport on the way back.
-      const fraction = 1 - Math.exp(-(options?.stiffness ?? STIFFNESS) * Math.min(deltaSeconds, 0.05))
+      const fraction = 1 - Math.exp(-STIFFNESS * Math.min(deltaSeconds, 0.05))
       position += distance * fraction
 
       element.scrollTop = position

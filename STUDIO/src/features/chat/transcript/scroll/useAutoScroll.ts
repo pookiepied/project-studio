@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DURATION } from '@/design/tokens'
-import { OPEN_STIFFNESS, createFollower } from '@/features/chat/transcript/scroll/followEngine'
+import { createFollower } from '@/features/chat/transcript/scroll/followEngine'
 
 /**
  * Follow streaming output, and stop the moment the reader takes over.
@@ -43,18 +42,6 @@ const THRESHOLD = 48
 export const FLIGHT_BELT_MS = 1_600
 
 /**
- * How long the open holds at the top once the words are shown, before the
- * journey down begins: the reveal's own length (`DURATION.slow`) and a
- * little over, so the words are fully there and seen before they move. A
- * breath shorter than the reveal was tried and read as too fast - the page
- * appeared already leaving; a beat longer again read as finished, and then
- * it left. This is the width between the two, and it is meant to be
- * noticed: the pause is what makes the move look intended. Counted from the
- * first frame with something to scroll, not from mount.
- */
-export const OPEN_HOLD_MS = DURATION.slow * 1000 + 120
-
-/**
  * ---- The open ------------------------------------------------------------
  *
  * Arriving in a conversation is not the same act as following one. The page
@@ -77,14 +64,16 @@ export const OPEN_HOLD_MS = DURATION.slow * 1000 + 120
  * this file will not do is yank someone who has already said where they want
  * to be.
  *
- * The open is also paced. The transcript arrives at the top of the viewport
- * and reveals itself there when the page says it is ready (`ChatPage`
- * decides when, and passes `ready`; until then the loop holds without
- * moving, whatever has been laid out); the journey to the bottom starts
- * once the reveal has landed and been seen (`OPEN_HOLD_MS`) and runs at the
- * open's own, gentler rate (`OPEN_STIFFNESS`). Without the hold the first
- * frame of content and the first frame of travel were the same frame, and
- * the page appeared already leaving.
+ * The open happens behind the wait. The page lays the words out unseen
+ * (`ChatPage` passes `ready` false until it shows them), and while they are
+ * unseen every step of the chase is instant: the viewport lands at the
+ * bottom of whatever has arrived the moment it arrives, with no journey,
+ * because there is nobody watching one. `landed` reports the first arrival
+ * at real content, which is the page's cue that the words may be shown -
+ * already at the bottom, rising into place there. A glide from the top
+ * was tried, with holds of every length before it, and every version read
+ * as either a page leaving as it arrived or a page finished and then
+ * leaving; a page that opens at its end has neither problem.
 
 /** Keys that scroll. Without these, paging up during a stream fights the follow. */
 const SCROLL_KEYS = new Set([
@@ -99,14 +88,14 @@ const SCROLL_KEYS = new Set([
 
 export function useAutoScroll(dependency: unknown, navigation?: unknown, ready = true) {
   const viewport = useRef<HTMLDivElement>(null)
-  /** Whether the open may travel yet; the page holds it while the wait is shown. */
+  /** Whether the words are shown; while they are not, every step lands at once. */
   const readyRef = useRef(ready)
   readyRef.current = ready
+  /** True once the open has arrived at real content, or the reader has taken over. */
+  const [landed, setLanded] = useState(false)
   const [pinned, setPinned] = useState(true)
   /** True from mount (or a change of conversation) until the open lands. */
   const boarding = useRef(true)
-  /** When the open first saw content, from which the hold is counted. */
-  const openSeen = useRef<number | null>(null)
 
   const follower = useRef(createFollower())
   const frame = useRef(0)
@@ -165,34 +154,8 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
 
       driving.current = true
 
-      // The open waits at the top. The first frame with content the page
-      // has revealed starts the clock; until it runs out the loop keeps its
-      // turn - the flag stays up, so the layout's scrolls are still
-      // nobody's - and moves nothing.
-      if (boarding.current && element.scrollHeight - element.clientHeight > 0) {
-        if (!readyRef.current) {
-          lastTop.current = element.scrollTop
-          frame.current = requestAnimationFrame(step)
-          return
-        }
-        openSeen.current ??= now
-        if (now - openSeen.current < OPEN_HOLD_MS) {
-          lastTop.current = element.scrollTop
-          frame.current = requestAnimationFrame(step)
-          return
-        }
-      }
-
-      // The open glides: its whole distance is a journey the reader watches,
-      // and the teleport that spares a mid-stream reader a flight through
-      // several screens would also spare them the arrival. It runs at its
-      // own rate, too. Past the open, the streaming follow keeps its own
-      // judgement on both.
-      const moved = follower.current.step(
-        element,
-        delta,
-        boarding.current ? { teleport: false, stiffness: OPEN_STIFFNESS } : undefined,
-      )
+      // Unseen words are landed on at once; shown ones are followed.
+      const moved = follower.current.step(element, delta, { instant: !readyRef.current })
 
       if (moved === null) {
         // Arrived. The flag drops so the next scroll event is read as the
@@ -202,7 +165,10 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
         // not the open landing — the transcript has not come yet, and the
         // boarding must outlive it. The first arrival at real content is the
         // open's own end; from there the ordinary contract takes over.
-        if (element.scrollHeight - element.clientHeight > 0) boarding.current = false
+        if (element.scrollHeight - element.clientHeight > 0) {
+          boarding.current = false
+          setLanded(true)
+        }
         lastTop.current = element.scrollTop
         return
       }
@@ -268,6 +234,7 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     const flying = smoothing.current
     const element = viewport.current
     boarding.current = false
+    setLanded(true)
     smoothing.current = false
     if (flightBelt.current !== null) {
       clearTimeout(flightBelt.current)
@@ -400,7 +367,7 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
    */
   useEffect(() => {
     boarding.current = true
-    openSeen.current = null
+    setLanded(false)
     if (frame.current) {
       cancelAnimationFrame(frame.current)
       frame.current = 0
@@ -420,6 +387,20 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     setPinned(true)
   }, [navigation])
 
+  // A page whose words fit the viewport never scrolls, so the chase never
+  // "arrives at real content" - and the open would never land. Any content
+  // at all that has nowhere to go is landed on the spot.
+  useEffect(() => {
+    const element = viewport.current
+    if (!element || landed || !boarding.current) return
+    const content = element.firstElementChild
+    if (!content || content.getBoundingClientRect().height === 0) return
+    if (element.scrollHeight - element.clientHeight <= 0) {
+      boarding.current = false
+      setLanded(true)
+    }
+  }, [dependency, landed])
+
   useEffect(() => {
     if (pinned) drive()
   }, [dependency, pinned, ready, drive])
@@ -432,5 +413,5 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     [],
   )
 
-  return { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom }
+  return { viewport, pinned, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom }
 }

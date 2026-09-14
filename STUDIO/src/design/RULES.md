@@ -368,21 +368,23 @@ never styled like a failure. A read that has not come back may not be
 answered with "nothing", because an empty list and a broken one are both a
 blank column to the person waiting.
 
-**Loading is one wait, late and quiet.** `Loading`: the ring
-(`WorkingRing`) turning where the content will be, the same ring the
-composer wears round the stop control while a turn is in flight, faded in
-only once the wait has lasted 150ms - a read to this machine usually lands
-before that, and an indicator that flashes for a fast read says "loading"
-about something already loaded. The three dots (`WorkingDots`) stay beside
-a label - "Searching…" - where a line is already saying what runs; alone in
-a page they read as a generic widget. Rules:
+**Loading is one wait, late and quiet.** `Loading`: three dots bobbing in
+turn (`BobbingDots`) where the content will be, faded in only once the wait
+has lasted 150ms - a read to this machine usually lands before that, and an
+indicator that flashes for a fast read says "loading" about something
+already loaded. The breathing dots (`WorkingDots`) stay beside a label -
+"Searching…" - where a line is already saying what runs; the ring
+(`WorkingRing`) is the composer's halo round the stop control and nothing
+else. Rules:
 
 - Never a skeleton. Bars shaped like the content to come held its space
   well, and were refused (2026-09-14) for what they are: a picture of content
   nobody has seen. The placeholder primitives are gone; do not rebuild them.
 - Never the brand mark. It is the app's face, not its hourglass.
-- The ring reports activity, never progress. A bar that fills is inventing
+- The wait reports activity, never progress. A bar that fills is inventing
   a fraction of a duration nobody measured.
+- A surface that opens at its end - the transcript - is landed on unseen
+  and revealed where it stands. No journey from the top is drawn.
 - Something *true* may stand in instead: the plain code a highlighter will
   colour, the poster a player will play. Content is not a stand-in.
 - Announced once, quietly: `role="status"` with a spoken label on the region,

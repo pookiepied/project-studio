@@ -18,10 +18,10 @@ import { cn } from '@/lib/cn'
  * enough to read as travelling, short enough that the gap is what the eye
  * follows.
  *
- * It began as the composer's halo round the stop control while a turn is
- * in flight, and that is still where it is most seen; the composer hangs
- * this same ring outside the button's rim. Standing alone it is the wait
- * for a page or a pane (`Loading`).
+ * The composer's halo round the stop control while a turn is in flight,
+ * hung outside the button's rim. Only that: it stood alone as the app's
+ * wait for one commit and turned unevenly there; the wait is the bobbing
+ * dots (`Loading`).
  */
 export function WorkingRing({ className, size }: { className?: string; size?: number }) {
   return (

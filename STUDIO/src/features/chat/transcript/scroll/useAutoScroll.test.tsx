@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { type ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FLIGHT_BELT_MS, OPEN_HOLD_MS, useAutoScroll } from './useAutoScroll'
+import { FLIGHT_BELT_MS, useAutoScroll } from './useAutoScroll'
 
 /**
  * The scroll contract of the transcript viewport, and specifically of its
@@ -48,10 +48,8 @@ vi.stubGlobal('cancelAnimationFrame', (id: number): void => {
   rafQueue.splice(id - 1, 1)
 })
 
-/** Frames worth the open's hold at the top, plus one to be past it. */
-const HOLD_FRAMES = Math.ceil(OPEN_HOLD_MS / 16) + 1
-/** Frames enough for the open's whole journey, hold included. */
-const OPEN_FRAMES = HOLD_FRAMES + 160
+/** Frames enough for any chase to settle. */
+const OPEN_FRAMES = 160
 
 let ticks = 0
 function flushFrames(count = 3): void {
@@ -88,8 +86,16 @@ type Auto = ReturnType<typeof useAutoScroll>
 let latest: Auto | null = null
 
 /** The page wiring, exactly as ChatPage hangs it on the viewport. */
-function Probe({ dependency, navigation }: { dependency: number; navigation: string }): ReactElement {
-  const auto = useAutoScroll(dependency, navigation)
+function Probe({
+  dependency,
+  navigation,
+  ready = true,
+}: {
+  dependency: number
+  navigation: string
+  ready?: boolean
+}): ReactElement {
+  const auto = useAutoScroll(dependency, navigation, ready)
   latest = auto
   return (
     <div
@@ -132,21 +138,48 @@ afterEach(() => {
 })
 
 describe('the open', () => {
-  it('holds at the top, then glides before it lands, a journey instead of a jump', () => {
-    mountTranscript()
+  it('lands at the bottom at once while the words are unseen, and says so', () => {
+    const view = render(<Probe dependency={1} navigation="cnv_a" ready={false} />)
+    const viewport = latest?.viewport.current
+    if (!viewport) throw new Error('the probe never mounted a viewport')
+    installGeometry(viewport)
     measure(4000, 500)
-    // The content has just appeared, and the open lets it be seen where it
-    // is: for the length of the hold nothing moves, and the pin holds.
-    act(() => flushFrames(HOLD_FRAMES - 2))
-    expect(geometry.top).toBe(0)
+    expect(latest?.landed).toBe(false)
+
+    // One frame: the whole distance, no journey - nobody is watching one.
+    act(() => flushFrames(2))
+    expect(geometry.top).toBeCloseTo(3500, 0)
+    expect(latest?.landed).toBe(true)
     expect(latest?.pinned).toBe(true)
 
-    // Past the hold, the open has covered part of the distance and is still
-    // travelling: the reader watches the transcript go by, fast at the
-    // start, settling as it arrives. A teleport here would be the bug.
-    act(() => flushFrames(3))
+    // Shown, the follow is the ordinary chase again.
+    view.rerender(<Probe dependency={1} navigation="cnv_a" ready />)
+    act(() => flushFrames(2))
+    expect(geometry.top).toBeCloseTo(3500, 0)
+  })
+
+  it('lands on words that fit the viewport without scrolling', () => {
+    const view = mountTranscript()
+    const content = viewportElement().firstElementChild
+    if (content) {
+      Object.defineProperty(content, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({ height: 300 }),
+      })
+    }
+    // The delivery lands: content shorter than the viewport, nowhere to go.
+    measure(300, 500)
+    view.rerender(<Probe dependency={2} navigation="cnv_a" />)
+    expect(latest?.landed).toBe(true)
+  })
+
+  it('follows shown words as a chase, a journey instead of a jump', () => {
+    mountTranscript()
+    measure(4000, 500)
+    // One frame in, the chase has covered part of the distance and is still
+    // travelling - the streaming follow's own glide.
+    act(() => flushFrames(1))
     expect(geometry.top).toBeGreaterThan(0)
-    expect(geometry.top).toBeLessThan(3500)
 
     act(() => flushFrames(OPEN_FRAMES))
     expect(geometry.top).toBeCloseTo(3500, 0)

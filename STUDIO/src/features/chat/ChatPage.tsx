@@ -62,16 +62,15 @@ import type { Conversation } from '@/domain/conversation/types'
  * behind it and no composer under it — nothing sent there could be answered.
  */
 /**
- * The least an open with something to scroll may take, from arriving on the
- * page to the words being shown.
+ * The least an open with a history behind it may take, from arriving on
+ * the page to the words being shown.
  *
- * A short conversation that loads in a few frames appears at once, as it
- * should. A long one that loads just as fast used to appear at once too,
- * and then travel - the wait shown for a frame, the words for a breath,
- * then a page-long journey, three things in the time of one. So an open
- * that will have to travel is given a moment first: the wait stands for at
- * least this long, then the words rise, then they move. Only when there is
- * somewhere to travel to; nothing is delayed that does not need the room.
+ * A conversation that fits the viewport appears the moment it is complete.
+ * A longer one is landed on at its bottom behind the wait (see "The open"
+ * in `useAutoScroll`), and the wait is kept for at least this long before
+ * the words rise into place there, so an open that would otherwise be a
+ * flash - the wait for a frame, then everything - is a wait, then the words.
+ * Nothing is delayed that has no history to arrive.
  */
 const OPEN_MIN_WAIT_MS = 700
 
@@ -206,7 +205,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // nothing in it.
   const hasWords = items.length > 0 || (!gallery && live.pending !== null)
 
-  const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
+  const { viewport, pinned, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(items, conversation.id, revealed)
 
   // Nothing is shown while the replay is still coming. It arrives a
@@ -218,25 +217,25 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // words and does not wait on anything.
   const replaying = !gallery && live.phase.status === 'attaching' && live.pending === null
 
-  // The words are laid out before they are shown (opacity, not absence), so
-  // the page can ask the one question the minimum wait turns on: is there
-  // anywhere to travel to? A transcript that fits the viewport is revealed
-  // the moment it is complete; one that does not waits out
-  // `OPEN_MIN_WAIT_MS` from the open, then is revealed, and the scroll hook
-  // takes it from there. Layout effect, so the answer is read before the
-  // frame paints.
+  // The words are laid out before they are shown (opacity, not absence),
+  // and the scroll hook lands the viewport at their bottom while they are
+  // unseen. Once it has landed and the history is complete, the page asks
+  // whether there was anywhere to land: a transcript that fits the viewport
+  // is revealed at once; one that scrolled waits out `OPEN_MIN_WAIT_MS`
+  // from the open, then is revealed where it stands, at the bottom. Layout
+  // effect, so the answer is read before the frame paints.
   useLayoutEffect(() => {
-    if (revealed || !hasWords || replaying) return
+    if (revealed || !hasWords || replaying || !landed) return
     const element = viewport.current
-    const travels = element !== null && element.scrollHeight - element.clientHeight > 0
-    const remaining = travels ? OPEN_MIN_WAIT_MS - (performance.now() - openedAt.current) : 0
+    const scrolled = element !== null && element.scrollTop > 0
+    const remaining = scrolled ? OPEN_MIN_WAIT_MS - (performance.now() - openedAt.current) : 0
     if (remaining <= 0) {
       setRevealedFor(conversation.id)
       return
     }
     const timer = setTimeout(() => setRevealedFor(conversation.id), remaining)
     return () => clearTimeout(timer)
-  }, [revealed, hasWords, replaying, conversation.id, viewport])
+  }, [revealed, hasWords, replaying, landed, conversation.id, viewport])
 
   // Branch from one answer: everything up to and including it becomes the
   // first message of a new conversation, named for its source.
@@ -366,16 +365,16 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             paddingBottom: 20,
           }}
         >
-          {/* The open, in parts that this page and the scroll hook pace
-              between them (see "The open" in `useAutoScroll`). While the
-              replay is still coming, or the words have come but the minimum
-              wait has not passed, the wait turns in the empty page. Then it
-              fades out under the words as they rise into place at the top of
-              the viewport - keyed to the conversation, so every open reveals
-              and not only the first - and only then does the journey to the
-              bottom begin. Before this the first frame of content was the
-              first frame of travel, and a conversation looked like a page
-              that appeared already leaving. */}
+          {/* The open, between this page and the scroll hook (see "The
+              open" in `useAutoScroll`). While the replay is still coming, or
+              the words have come but the minimum wait has not passed, the
+              wait stands in the empty page and the words are laid out
+              unseen, with the viewport already landed at their bottom. Then
+              the wait fades and the words rise into place where they are -
+              keyed to the conversation, so every open reveals and not only
+              the first. No journey from the top: every paced version of one
+              read as a page leaving as it arrived, or finished and then
+              leaving. */}
           {!revealed && !hasWords ? null : (
             <motion.div
               key={conversation.id}
