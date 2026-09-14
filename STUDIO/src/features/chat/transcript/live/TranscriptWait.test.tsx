@@ -3,7 +3,7 @@
  */
 import { AnimatePresence } from 'framer-motion'
 import { act, cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { TranscriptWait } from './TranscriptWait'
 
@@ -20,27 +20,38 @@ import { TranscriptWait } from './TranscriptWait'
  * therefore exactly the shipped one: `AnimatePresence` with no
  * `initial={false}`, the wait present on the very first render.
  *
- * The two postures of this bug (without, and with, the prop) play their
- * animations in ONE test, sequentially, because a jsdom + fake-clock + test
- * pairing keeps exactly one sure-footed animation per file: a second
- * animating test in the same file was sampled standing still no matter what
- * it rendered. The first test here is the one that animates, and the one
- * after it reads the settled markup and needs no clocks.
+ * ---- One clock for the whole file, never taken away ----------------------
+ *
+ * Framer's frame pump is not the test's clock: the batcher captures
+ * `requestAnimationFrame` once, at module evaluation, and jsdom's
+ * pretendToBeVisual pump schedules its 16ms tick through whatever
+ * `setInterval` is global at the FIRST wake - which is inside the first
+ * test, under the one faked clock. Restore that clock (`useRealTimers`)
+ * and its queue dies with the pump's outstanding tick still owed: the
+ * pump's own "scheduled" flag stays set, and no later test - under fakes
+ * OR under real clocks, whichever comes after - ever pumps another frame.
+ * Every试验 after the first then reads three dots standing still, whatever
+ * they were built from. So the clock is installed once, above, and is
+ * NEVER taken away: the pump's timers survive into every later test of
+ * this file, each of which waits out its own intervals against the shared,
+ * cumulative, fake now. (Vitest gives each file a fresh environment, so
+ * the promised restoration at the end of the file is the runner's, not
+ * ours.) Everything here is therefore phase-independent on purpose: every
+ * test samples RELATIVE to its own mount, never against an absolute now.
+ *
+ * The second test carries its own witness - a shipped-posture mount that
+ * must rise - precisely because a wedged pump and a correctly-still wait
+ * look the same. A stillness that also survives the witness is evidence;
+ * a stillness with nothing living beside it is not.
  */
+
+beforeAll(() => {
+  vi.useFakeTimers()
+})
 
 afterEach(() => {
   cleanup()
-  vi.useRealTimers()
 })
-
-/** The three dots, and only them: the wrapper they hang from is `aria-hidden`. */
-function dots(): HTMLElement[] {
-  return Array.from(document.querySelectorAll('span[aria-hidden] > span'))
-}
-
-function dotTransforms(): string[] {
-  return dots().map((el) => el.style.transform)
-}
 
 function waitOpacity(): string {
   const wait = document.querySelector('[role="status"]')
@@ -53,69 +64,73 @@ function risen(transform: string): number {
   return match === null ? 0 : Number(match[1])
 }
 
+/** Advances the shared clock in 200ms steps. */
+async function passMs(total: number): Promise<void> {
+  for (let passed = 0; passed < total; passed += 200) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+  }
+}
+
 describe('TranscriptWait', () => {
   it('arrives late, and its dots bob - in the posture ChatPage ships', async () => {
-    vi.useFakeTimers()
-
-    // The shipped posture: the wait is the first-render child, and the
-    // presence carries no initial={false} (see the note above). Fifty
-    // forgiven the SHOW_AFTER delay; a second and a fifth covers the rest
-    // of the entrance and the first full bob.
-    const { unmount } = render(
+    render(
       <AnimatePresence>
         <TranscriptWait key="loading" />
       </AnimatePresence>,
     )
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(50)
-    })
     // Fifty milliseconds in, the wait has not begun to arrive: SHOW_AFTER
     // holds it unseen. This is the half of the bug that was silent - the
     // prop's block also swallowed this delay, and the dots snapped in.
+    await passMs(50)
     expect(waitOpacity()).not.toBe('1')
 
-    for (let i = 0; i < 6; i += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(200)
-      })
-    }
-    // The entrance has finished, and the wait stands.
+    // A second and a fifth: past the SHOW_AFTER delay, past the entrance
+    // itself, and into the second bob. The wait stands, and the dots have
+    // travelled - the third of them (a fifth-second stagger) having risen
+    // and come back.
+    await passMs(1200)
     expect(waitOpacity()).toBe('1')
-
-    // And the bob: all three dots have travelled, the last of them (a
-    // fifth-second stagger) having risen and come back.
-    const transforms = dotTransforms()
+    const transforms = Array.from(document.querySelectorAll('span[aria-hidden] > span'))
     expect(transforms).toHaveLength(3)
-    expect(Math.max(...transforms.map(risen))).toBeGreaterThan(1)
+    expect(Math.max(...transforms.map((el) => risen((el as HTMLElement).style.transform)))).toBeGreaterThan(1)
+  })
 
-    unmount()
-    cleanup()
+  it('the dead posture: blocked at mount, still for the whole wait', async () => {
+    // The witness, first: the shipped posture, alive on the shared clock a
+    // second time. If the pump wedged anywhere along the way, this fails
+    // rather than the stillness below passing unnoticed.
+    const living = render(
+      <AnimatePresence>
+        <TranscriptWait key="loading" />
+      </AnimatePresence>,
+    )
+    await passMs(1200)
+    expect(
+      Math.max(...Array.from(document.querySelectorAll('span[aria-hidden] > span')).map((el) => risen((el as HTMLElement).style.transform))),
+    ).toBeGreaterThan(1)
+    living.unmount()
 
-    // The bug, kept as documentation: the same posture with
-    // `initial={false}` - what ChatPage shipped - is the dead one. The
-    // presence blocks the entering animation of the whole subtree, and the
-    // keyframes that never look changed never start it again.
-    vi.useFakeTimers()
-    const { unmount: unmountBlocked } = render(
+    // And the blocked posture - what ChatPage shipped - in the same living
+    // clock. The presence says the entrance is over, so the wait is at full
+    // opacity at once, and no keyframes that never look changed ever start:
+    // stillness with a witness standing beside it.
+    render(
       <AnimatePresence initial={false}>
         <TranscriptWait key="loading" />
       </AnimatePresence>,
     )
-    // Blocked, the entrance is skipped: full opacity at once.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(50)
-    })
+    await passMs(50)
     expect(waitOpacity()).toBe('1')
 
-    for (let i = 0; i < 6; i += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(200)
-      })
-    }
-    expect(dotTransforms().map(risen)).toEqual([0, 0, 0])
-
-    unmountBlocked()
+    await passMs(1200)
+    const transforms = Array.from(document.querySelectorAll('span[aria-hidden] > span')).map(
+      (el) => risen((el as HTMLElement).style.transform),
+    )
+    expect(transforms).toHaveLength(3)
+    expect(Math.max(...transforms)).toBe(0)
   })
 
   it('announces itself once, quietly', () => {
