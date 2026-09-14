@@ -194,7 +194,11 @@ describe("studio_video", () => {
     build(media);
     const answer = (await video({ prompt: "waves" })) as string;
     const id = /media_[a-z0-9]+/.exec(answer)?.[0] ?? "";
-    await jobs.finished("conv-1", id);
+    // Nobody waits for a video the way the image tool waits for a picture;
+    // the job ends on its own and the next notice is the first to tell it.
+    while (jobs.list("conv-1").find((job) => job.id === id)?.state !== "done") {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
 
     const first = mediaJobLines(media, "conv-1");
     expect(first.running).toEqual([]);

@@ -1,5 +1,6 @@
 import { memo, useState } from 'react'
 import { Icons } from '@/components/icons'
+import { Arrive, Arriving } from '@/components/motion/Arrive'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
 import { ReadAloud } from '@/features/voice/ReadAloud'
 import {
@@ -84,15 +85,20 @@ export const AssistantTurn = memo(function AssistantTurn({
       onPointerLeave={() => setHovered(false)}
       className="studio-message flex min-w-0 flex-col"
     >
-      {item.segments.map((segment, index) => (
-        <Segment
-          key={segment.id}
-          segment={segment}
-          growing={live && index === lastIndex && segment.kind === 'text'}
-          live={live}
-          conversationId={conversationId}
-        />
-      ))}
+      {/* Everything this turn lands - words, a thought, a tool row, an
+          artifact inside the words - arrives on the one entrance, and only
+          while the turn is live; a replayed turn was already here. */}
+      <Arriving live={live}>
+        {item.segments.map((segment, index) => (
+          <Segment
+            key={segment.id}
+            segment={segment}
+            growing={live && index === lastIndex && segment.kind === 'text'}
+            live={live}
+            conversationId={conversationId}
+          />
+        ))}
+      </Arriving>
       {/* An ending is reported once there is one to report.
           `end` is `stopped` from `message-started` until `message-completed`
           arrives, and that default is right: how a message ended comes from
@@ -184,7 +190,7 @@ function TextSegment({
   const revealing = shown.length < segment.text.length
 
   return (
-    <div className="studio-prose min-w-0">
+    <Arrive className="studio-prose min-w-0">
       <StreamedMarkdown text={shown} streaming={growing || revealing} />
       {growing || revealing ? (
         <span
@@ -192,7 +198,7 @@ function TextSegment({
           className="ml-0.5 inline-block h-[0.95em] w-[2px] translate-y-[0.15em] animate-pulse rounded-full bg-foreground/70 align-baseline"
         />
       ) : null}
-    </div>
+    </Arrive>
   )
 }
 

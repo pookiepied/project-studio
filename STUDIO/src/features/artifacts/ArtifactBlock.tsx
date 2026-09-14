@@ -1,4 +1,5 @@
 import { Icons } from '@/components/icons'
+import { Arrive } from '@/components/motion/Arrive'
 import { WorkingHalo } from '@/features/artifacts/ArtifactMotion'
 import { renderArtifact } from '@/features/artifacts/registry'
 import { parseArtifact } from '@/domain/artifacts/parse'
@@ -52,7 +53,7 @@ export function ArtifactBlock({ source }: { source: string }) {
  */
 function Arriving() {
   return (
-    <div className="my-4 w-full min-w-0 rounded-xl bg-surface-sunken p-3">
+    <Arrive className="my-4 w-full min-w-0 rounded-xl bg-surface-sunken p-3">
       <div className="flex items-start gap-2.5">
         <WorkingHalo working>
           <Icons.artifact />
@@ -62,6 +63,6 @@ function Arriving() {
           <div className="mt-1.5 h-[1em] w-24 rounded bg-selected/70" />
         </div>
       </div>
-    </div>
+    </Arrive>
   )
 }

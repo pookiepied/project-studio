@@ -203,11 +203,19 @@ export class MediaJobs {
       .map((job) => statusOf(job));
   }
 
-  /** The status once the job has ended. Undefined if there is no such job. */
+  /**
+   * The status once the job has ended. Undefined if there is no such job.
+   *
+   * Waiting for the end is reporting it: the caller answers with the
+   * outputs itself, so the job is marked told here and the drained notice
+   * on the same call's way back does not list the same files a second
+   * time - which put every generated image in the transcript twice.
+   */
   async finished(conversationId: string, id: string): Promise<MediaJobStatus | undefined> {
     const job = this.#jobs.get(id);
     if (job === undefined || job.conversationId !== conversationId) return undefined;
     await job.settled;
+    job.reported = true;
     return statusOf(job);
   }
 

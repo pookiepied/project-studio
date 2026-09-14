@@ -6,6 +6,7 @@ import { MediaGrid } from '@/features/artifacts/media/MediaGrid'
 import { Timeline } from '@/features/artifacts/sections'
 import { mediaOf } from '@/domain/artifacts/media'
 import { isWorking, type Artifact } from '@/domain/artifacts/types'
+import { cn } from '@/lib/cn'
 
 /**
  * Generated media — an image or a video.
@@ -65,6 +66,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
       artifact={artifact}
       mark={working ? <Icons.generate /> : video ? <Icons.video /> : <Icons.image />}
       status={status}
+      rail={false}
     >
       {failed && media.outputs.length === 0 ? null : (
         <MediaGrid
@@ -87,12 +89,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
         video={video}
       />
 
-      {media.prompt ? (
-        <p className="mt-2.5 text-caption text-muted-foreground">
-          <span className="font-medium text-foreground">Prompt </span>
-          {media.prompt}
-        </p>
-      ) : null}
+      {media.prompt ? <Prompt text={media.prompt} /> : null}
 
       {timeline?.type === 'timeline' ? (
         <div className="mt-3">
@@ -103,3 +100,30 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
   )
 }
 
+
+/**
+ * The prompt, one line of it.
+ *
+ * A prompt to an image model runs to a paragraph, and the whole of it under
+ * every picture made the card mostly words about a picture that is right
+ * there. One line, cut with an ellipsis, says what was asked; the line
+ * opens to the whole on a click, for the reader who wants the wording.
+ */
+function Prompt({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen((value) => !value)}
+      aria-expanded={open}
+      className={cn(
+        'mt-2.5 block w-full min-w-0 text-left text-caption text-muted-foreground outline-none',
+        'rounded-md focus-visible:ring-2 focus-visible:ring-ring',
+        open ? '' : 'truncate',
+      )}
+    >
+      <span className="font-medium text-foreground">Prompt </span>
+      {text}
+    </button>
+  )
+}

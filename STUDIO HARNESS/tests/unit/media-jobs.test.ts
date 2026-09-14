@@ -258,8 +258,9 @@ describe("the registry", () => {
     expect(jobs.list("conv-1").map((job) => job.id)).toEqual([started.id]);
   });
 
-  it("reports each ended job once", async () => {
-    const started = jobs.start({
+  it("reports each ended job once, to whoever asks first", async () => {
+    // Nobody waited: the end is drained once, then never again.
+    const unwatched = jobs.start({
       conversationId: "conv-1",
       slot: "imageGeneration",
       description: "x",
@@ -267,8 +268,23 @@ describe("the registry", () => {
       generation: { shape: "sync", result: Promise.resolve([PNG]) },
     });
     expect(jobs.drainFinished("conv-1")).toEqual([]);
-    await jobs.finished("conv-1", started.id);
-    expect(jobs.drainFinished("conv-1").map((job) => job.id)).toEqual([started.id]);
+    while (jobs.list("conv-1").find((job) => job.id === unwatched.id)?.state !== "done") {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    expect(jobs.drainFinished("conv-1").map((job) => job.id)).toEqual([unwatched.id]);
+    expect(jobs.drainFinished("conv-1")).toEqual([]);
+
+    // Somebody waited for the end: they report it, and the drain does not
+    // say it again - the image tool answers with its files, and the notice
+    // on the same call's way back must not list them a second time.
+    const watched = jobs.start({
+      conversationId: "conv-1",
+      slot: "imageGeneration",
+      description: "y",
+      modelId: "m",
+      generation: { shape: "sync", result: Promise.resolve([PNG]) },
+    });
+    await jobs.finished("conv-1", watched.id);
     expect(jobs.drainFinished("conv-1")).toEqual([]);
   });
 

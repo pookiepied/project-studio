@@ -61,15 +61,19 @@ export function mediaKind(toolName: string): 'image' | 'video' | null {
   return match?.[1] === 'image' || match?.[1] === 'video' ? match[1] : null
 }
 
-/** Every `Artifact:` line in a text, in order. */
+/**
+ * Every `Artifact:` line in a text, in order, each file once. An answer
+ * can carry a file twice - the tool's own line and a job notice appended
+ * to the same result - and one file is one frame whatever said it.
+ */
 export function artifactsIn(text: string): readonly MediaArtifactRef[] {
-  const found: MediaArtifactRef[] = []
+  const found = new Map<string, MediaArtifactRef>()
   for (const match of text.matchAll(ARTIFACT_LINE)) {
     const path = match[1]
     const mimeType = match[2]
-    if (path !== undefined && mimeType !== undefined) found.push({ path, mimeType })
+    if (path !== undefined && mimeType !== undefined && !found.has(path)) found.set(path, { path, mimeType })
   }
-  return found
+  return [...found.values()]
 }
 
 export function readMediaCall(call: ToolCallView): MediaCallView | null {

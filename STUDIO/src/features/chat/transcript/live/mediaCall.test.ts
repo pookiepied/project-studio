@@ -57,6 +57,17 @@ describe('recognising a generation call', () => {
 })
 
 describe('the Artifact line', () => {
+  it('names a file once however many lines carry it', () => {
+    const text = [
+      'Generated 1 image with openai/gpt-image-2.',
+      'Artifact: /api/media/artifacts/conv-1/media_abc1-1.png (image/png)',
+      'Generation job has ended while you were working:',
+      'media_abc1 finished: a red bicycle',
+      'Artifact: /api/media/artifacts/conv-1/media_abc1-1.png (image/png)',
+    ].join('\n')
+    expect(artifactsIn(text)).toHaveLength(1)
+  })
+
   it('is read wherever it stands, and nothing that only resembles it is', () => {
     const text = [
       'Generated 2 images with openai/gpt-image-2.',

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Arriving } from '@/components/motion/Arrive'
 import { Segmented } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
 import { GENERATED_IMAGE, GENERATED_VIDEO, GENERATED_VIDEO_POSTER } from '@/features/chat/gallery/marks'
@@ -152,6 +153,7 @@ export function ArtifactsSection() {
       <NavigationProvider>
         <WorkspaceProvider>
           <RailProvider>
+            <Arriving live>
             <div className="studio-prose flex flex-col">
               {renderArtifact(one(stage))}
               {renderArtifact(portrait(stage))}
@@ -162,6 +164,7 @@ export function ArtifactsSection() {
               {renderArtifact(burst(stage))}
               {renderArtifact(page(stage))}
             </div>
+            </Arriving>
           </RailProvider>
         </WorkspaceProvider>
       </NavigationProvider>

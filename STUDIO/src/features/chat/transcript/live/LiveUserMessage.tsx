@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { DURATION, EASE_OUT } from '@/design/tokens'
+import { ENTER } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
@@ -22,9 +22,9 @@ export const LiveUserMessage = memo(function LiveUserMessage({
   const [hovered, setHovered] = useState(false)
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: DURATION.base, ease: EASE_OUT }}
+      initial={ENTER.initial}
+      animate={ENTER.animate}
+      transition={ENTER.transition}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
       className="flex flex-col items-end"

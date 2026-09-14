@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
-import { DURATION, EASE_OUT } from '@/design/tokens'
+import { Arrive } from '@/components/motion/Arrive'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { WorkingDots } from '@/components/state'
@@ -40,6 +39,7 @@ export function ArtifactShell({
   status,
   children,
   footer,
+  rail = true,
 }: {
   artifact: Artifact
   /** The kind's own mark, drawn inside the shared bubble. */
@@ -48,6 +48,13 @@ export function ArtifactShell({
   status: ReactNode
   children?: ReactNode
   footer?: ReactNode
+  /**
+   * Whether the artifact can be opened in the rail. On by default; a kind
+   * whose body is already the thing at full size - a picture with its own
+   * lightbox, a clip with its own player - turns it off, because a second
+   * "larger" that is the same size is a control that does nothing.
+   */
+  rail?: boolean
 }) {
   const working = isWorking(artifact.status)
   const failed = artifact.status === 'failed'
@@ -65,12 +72,7 @@ export function ArtifactShell({
       : null
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION.base, ease: EASE_OUT }}
-      className="group/artifact my-4 w-full min-w-0 overflow-hidden rounded-xl bg-surface-sunken p-3"
-    >
+    <Arrive className="group/artifact my-4 w-full min-w-0 overflow-hidden rounded-xl bg-surface-sunken p-3">
       <div className="flex items-start gap-2.5">
         <WorkingHalo working={working}>{mark}</WorkingHalo>
 
@@ -91,7 +93,7 @@ export function ArtifactShell({
         {/* Reserved space, revealed on hover — the same rule the code block's
             controls follow, so a reply full of blocks does not twitch as the
             pointer crosses it. */}
-        {conversation && !working ? (
+        {rail && conversation && !working ? (
           <span className="shrink-0 opacity-0 transition-opacity duration-fast group-hover/artifact:opacity-100">
             <IconButton
               label="Open larger"
@@ -119,7 +121,7 @@ export function ArtifactShell({
           is worth naming because it answers "what reached out on my behalf",
           which is a question people actually have. */}
       {footer ?? (artifact.source?.server ? <Provenance server={artifact.source.server} /> : null)}
-    </motion.div>
+    </Arrive>
   )
 }
 
