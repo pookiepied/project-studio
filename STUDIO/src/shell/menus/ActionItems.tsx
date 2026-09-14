@@ -1,8 +1,8 @@
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator } from '@/components/primitives'
 import { writeDraft } from '@/features/chat/composer/drafts'
-import { improveDictation } from '@/features/voice/improve'
 import { copyText, readClipboardText } from '@/lib/clipboard'
+import { fieldAt } from '@/lib/field'
 import { useNavigation } from '@/stores/navigation'
 
 /**
@@ -16,11 +16,16 @@ import { useNavigation } from '@/stores/navigation'
  * about that thing:
  *
  *   field      the caret is in a text field. Cut, Copy, Paste, Select all -
- *              what a text field does - and Fix wording for a selection,
- *              which is the one thing the webview's own menu had that this
- *              one lacked. That menu offered the spell-checker's guesses;
- *              this one hands the selected words to the same model Improve
- *              uses and puts its version back in their place.
+ *              what a text field does, and nothing that is not. The
+ *              webview's own menu also offered the spell-checker's
+ *              corrections; this one cannot. WebView2 hands the host the
+ *              rows of the menu it would have shown, and the spelling rows
+ *              arrive with their labels empty, so the words are not there
+ *              to draw. A "Fix wording" row that sent the selection to the
+ *              model stood in for a while and was removed: seconds of model
+ *              time for what a checker does in none is a different feature
+ *              wearing the checker's name. The red underline is still the
+ *              webview's; a misspelt word is retyped.
  *   selection  text is selected on the page. Copy it, widen it, or ask
  *              about it in a new conversation.
  *   page       nothing in particular. The app's verbs: a new conversation,
@@ -34,15 +39,6 @@ import { useNavigation } from '@/stores/navigation'
  */
 
 export type ActionKind = 'field' | 'selection' | 'page'
-
-/** A text field the right-click landed in, or null. */
-export function fieldAt(target: EventTarget | null): HTMLTextAreaElement | HTMLInputElement | null {
-  if (!(target instanceof HTMLElement)) return null
-  const field = target.closest('textarea, input')
-  if (field instanceof HTMLTextAreaElement) return field
-  if (field instanceof HTMLInputElement && !field.readOnly) return field
-  return null
-}
 
 export function ActionItems({
   kind,
@@ -225,32 +221,6 @@ function FieldItems({
         }}
       >
         Paste
-      </MenuItem>
-      <MenuSeparator />
-      <MenuItem
-        icon={<Icons.generate />}
-        disabled={!hasSelection}
-        onSelect={() => {
-          close()
-          if (!field) return
-          // The range is remembered, because the menu closing and the wait
-          // for the model both happen before the answer, and the field may
-          // have lost its selection to either. The answer goes exactly where
-          // the question came from; if the person has typed meanwhile, the
-          // field is theirs and the answer is dropped rather than pasted
-          // over new words.
-          const from = field.selectionStart ?? 0
-          const to = field.selectionEnd ?? 0
-          void improveDictation(selected).then((outcome) => {
-            if (outcome.kind !== 'ok') return
-            if (field.value.slice(from, to) !== selected) return
-            field.focus()
-            field.setSelectionRange(from, to)
-            insert(outcome.text)
-          })
-        }}
-      >
-        Fix wording
       </MenuItem>
       <MenuItem
         icon={<Icons.check />}

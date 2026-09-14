@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fieldAt } from '@/shell/menus/ActionItems'
+import { fieldAt } from '@/lib/field'
 import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**

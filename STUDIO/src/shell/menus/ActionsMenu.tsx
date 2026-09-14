@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fieldAt } from '@/shell/menus/ActionItems'
+import { fieldAt } from '@/lib/field'
 import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
@@ -28,8 +28,8 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * edge that is off screen.
  */
 
-/** The tallest list - the field's five rows and a rule - so the clamp keeps every list on screen. */
-const MENU_MAX_HEIGHT = 176
+/** The tallest list - the page's four rows and a rule - so the clamp keeps every list on screen. */
+const MENU_MAX_HEIGHT = 144
 
 export function ActionsMenu() {
   const menuRef = useRef<HTMLDivElement>(null)

@@ -19,11 +19,13 @@ import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/compo
  * picker says what it can take. So the one item opens the one picker, and
  * what the picker refuses it names, in the composer, by file.
  *
- * The rows are their labels, with no second line. Each verb here is one a
- * person already knows - attach files, set a goal, plan first, extensions -
- * and a sentence under it explaining what it means read as the menu
- * doubting its own words. Explanation belongs where the thing happens, if
- * it is needed at all.
+ * Each row has one short line under it, and every row has one. The lines
+ * were once sentences - "Seen by the model this turn and every turn after" -
+ * and a menu of four verbs read like a page of prose. They were then removed
+ * altogether, which left "Set a goal" and "Plan first" as bare phrases a new
+ * person has to guess at. A few words is the size that says what the row
+ * does without asking to be read: the same length on every row, so none of
+ * them looks like the important one.
  *
  * The panel opens off the capsule, not off the plus. The button sits inside
  * the capsule's padding, and a panel placed against the button's edge sat on
@@ -59,21 +61,21 @@ export function AddMenu({ onAttach }: { onAttach?: () => void }) {
       }
     >
       <MenuLabel>Add</MenuLabel>
-      <MenuItem icon={<Icons.attach />} onSelect={pick(onAttach)}>
+      <MenuItem icon={<Icons.attach />} note="Shared with the model" onSelect={pick(onAttach)}>
         Files
       </MenuItem>
 
       <MenuSeparator />
       <MenuLabel>Mode</MenuLabel>
-      <MenuItem icon={<Icons.goal />} onSelect={pick()}>
+      <MenuItem icon={<Icons.goal />} note="For the whole conversation" onSelect={pick()}>
         Set a goal
       </MenuItem>
-      <MenuItem icon={<Icons.plan />} onSelect={pick()}>
+      <MenuItem icon={<Icons.plan />} note="Steps before any change" onSelect={pick()}>
         Plan first
       </MenuItem>
 
       <MenuSeparator />
-      <MenuItem icon={<Icons.mcp />} onSelect={pick()}>
+      <MenuItem icon={<Icons.mcp />} note="Connected tools" onSelect={pick()}>
         Extensions
       </MenuItem>
     </Popover>
