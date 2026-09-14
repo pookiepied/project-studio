@@ -151,7 +151,7 @@ function BrowserStepRow({
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="shrink-0 tabular-nums text-muted-foreground/70">{ordinal}</span>
             <span className={step.failed ? 'shrink-0 text-danger' : 'shrink-0'}>
-              {step.failed ? 'failed' : step.verb}
+              {step.failed ? 'Failed' : step.verb}
             </span>
             {step.subject === null ? null : <span className="truncate">{step.subject}</span>}
           </span>

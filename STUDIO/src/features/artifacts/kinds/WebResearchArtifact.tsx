@@ -121,7 +121,7 @@ function StepHeading({ step }: { step: ResearchStep }) {
   const label = step.kind === 'search' ? step.query : `Read ${step.title ?? hostOf(step.url)}`
   const trailing =
     step.status === 'failed'
-      ? 'failed'
+      ? 'Failed'
       : running
         ? null
         : step.kind === 'search'
@@ -157,7 +157,7 @@ function StepBody({ step, indented = false }: { step: ResearchStep; indented?: b
   if (step.status === 'failed') {
     // A step of several says its own failure; alone, the shell already has.
     return indented && step.error !== undefined ? (
-      <p className={cn('mt-1 text-caption text-danger', inset)}>{step.error}</p>
+      <p className={cn('mt-0.5 text-caption text-muted-foreground', inset)}>{step.error}</p>
     ) : null
   }
   return step.kind === 'search' ? (

@@ -47,7 +47,7 @@ function one(stage: Stage): Artifact {
     title: 'A quiet abstract field, soft light from the upper left',
     status: stage,
     data: {
-      model: 'studio-image-2',
+      model: 'gpt-image-2',
       aspectRatio: '16:9',
       prompt:
         'A quiet abstract field, soft light from the upper left, muted blues and warm sand, no text anywhere in the frame.',
@@ -64,7 +64,7 @@ function portrait(stage: Stage): Artifact {
     title: 'Poster study, tall',
     status: stage,
     data: {
-      model: 'studio-image-2',
+      model: 'gpt-image-2',
       aspectRatio: '9:16',
       ...(stage === 'done' ? { outputs: [{ url: still('9:16') }] } : {}),
       ...(stage === 'failed' ? { error: 'The provider refused the prompt.' } : {}),
@@ -79,7 +79,7 @@ function four(stage: Stage): Artifact {
     title: 'Four variations on the cover',
     status: stage,
     data: {
-      model: 'studio-image-2',
+      model: 'gpt-image-2',
       aspectRatio: '1:1',
       count: 4,
       detail: stage === 'running' ? 'Rendering' : undefined,
@@ -98,7 +98,7 @@ function mixed(stage: Stage): Artifact {
     title: 'Two sizes from one call',
     status: stage,
     data: {
-      model: 'studio-image-2',
+      model: 'gpt-image-2',
       count: 3,
       ...(stage === 'done'
         ? {
@@ -121,7 +121,7 @@ function video(stage: Stage): Artifact {
     title: 'Six-second loop for the splash',
     status: stage,
     data: {
-      model: 'studio-motion-1',
+      model: 'veo-3.1',
       aspectRatio: '16:9',
       prompt: 'Slow drift across a gradient horizon, no camera shake, seamless loop.',
       detail: stage === 'running' ? 'Encoding' : undefined,

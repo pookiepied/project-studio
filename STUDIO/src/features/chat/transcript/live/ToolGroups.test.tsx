@@ -441,7 +441,7 @@ describe('failure and pending', () => {
     render(
       <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'edit', calls: [call({ errorText: 'boom' })] })} />,
     )
-    const failed = screen.getByText('failed')
+    const failed = screen.getByText('Failed')
     expect(failed.className).toContain('text-danger')
   })
 
@@ -770,7 +770,7 @@ describe('the file run', () => {
     )
     render(<ToolGroups conversationId="conv" groups={[run]} />)
     fireEvent.click(screen.getByText('Edited'))
-    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.getByText('Failed')).toBeTruthy()
   })
 
   it('keeps a single mutating call a chip, never a run of one', () => {

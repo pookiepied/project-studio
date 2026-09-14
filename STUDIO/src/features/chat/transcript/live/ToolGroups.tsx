@@ -334,7 +334,7 @@ function GroupCallRow({
           <span className={cn('shrink-0', failed && 'text-danger')}>
             {/* A refused call is an event that happened: named, counted in
                 nothing, its working-out below. */}
-            {failed ? 'failed' : verb}
+            {failed ? 'Failed' : verb}
           </span>
           {diff !== null ? (
             <span className="shrink-0 font-mono">
@@ -415,7 +415,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
             </span>
           ) : null}
           {call.errorText !== null ? (
-            <span className="shrink-0 text-danger">failed</span>
+            <span className="shrink-0 text-danger">Failed</span>
           ) : running && !live ? (
             // The turn is over and the answer never came. The shimmer is the
             // running claim and it belongs to a live turn only; what is known

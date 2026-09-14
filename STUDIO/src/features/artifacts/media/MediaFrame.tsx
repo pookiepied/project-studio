@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from 'react'
 import { motion } from 'framer-motion'
-import { DURATION, EASE_OUT } from '@/design/tokens'
+import { DURATION, EASE_OUT, MEDIA_FRAME } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { BobbingDots, Deferred, lazyNamed } from '@/components/state'
 import { useMediaSource } from '@/features/artifacts/media/source'
@@ -74,15 +74,18 @@ export function MediaFrame({
 
   return (
     <div
-      className="relative overflow-hidden rounded-block-inner bg-selected"
+      className="relative w-full overflow-hidden rounded-block-inner bg-selected"
       // The aspect ratio is reserved *before* the media exists, so the
       // finished frame drops into a space already the right size. Without it
       // the transcript jumps by the height of an image the moment one
       // resolves, which is the single most visible layout shift in a chat.
-      style={{ aspectRatio: String(ratio) }}
+      // The cap wins over the ratio: a tall picture's box is as tall as the
+      // cap and as wide as its row, and the picture stands in the middle of
+      // it over a blurred copy of itself - the box is never empty ground.
+      style={{ aspectRatio: String(ratio), maxHeight: MEDIA_FRAME.maxHeight }}
     >
       {shown === null ? (
-        <Waiting active={working || output !== null} video={video} />
+        <Waiting active={working || output !== null} />
       ) : video ? (
         <motion.div
           className="absolute inset-0"
@@ -99,27 +102,34 @@ export function MediaFrame({
             fallback={
               poster ? (
                 <span aria-hidden className="block size-full">
-                  <img src={poster} alt="" className="size-full object-cover opacity-60" />
+                  <Backdrop src={poster} />
+                  <img src={poster} alt="" className="relative size-full object-contain opacity-60" />
                 </span>
               ) : (
-                <Waiting active video={video} />
+                <Waiting active />
               )
             }
           >
+            {poster ? <Backdrop src={poster} /> : null}
             <VideoPlayer src={shown} poster={poster} title={title} onRatio={onRatio} />
           </Deferred>
         </motion.div>
       ) : (
-        <motion.img
-          src={shown}
-          alt={title}
-          draggable={false}
-          onLoad={measured}
-          className="absolute inset-0 size-full object-cover"
+        <motion.div
+          className="absolute inset-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION.base, ease: EASE_OUT }}
-        />
+        >
+          <Backdrop src={shown} />
+          <img
+            src={shown}
+            alt={title}
+            draggable={false}
+            onLoad={measured}
+            className="relative size-full object-contain"
+          />
+        </motion.div>
       )}
 
       {/* A picture is opened by clicking it - the whole frame is the target,
@@ -172,20 +182,37 @@ export function MediaFrame({
 }
 
 /**
- * The frame while there is nothing to show in it: the medium's mark, and
- * the app's one wait bobbing under it for as long as something is coming.
+ * The frame while there is nothing to show in it: the app's one wait, alone
+ * on the neutral field, for as long as something is coming. It used to hold
+ * the medium's mark above the dots, and the two together read as a broken
+ * picture with a caption; the dots alone read as a wait.
  */
-function Waiting({ active, video }: { active: boolean; video: boolean }) {
+function Waiting({ active }: { active: boolean }) {
   return (
-    <span
-      aria-hidden
-      className="absolute inset-0 flex flex-col items-center justify-center gap-2"
-    >
-      <span className="text-muted-foreground/60">
-        {video ? <Icons.video /> : <Icons.image />}
-      </span>
+    <span aria-hidden className="absolute inset-0 flex items-center justify-center">
       {active ? <BobbingDots size={4} className="text-muted-foreground/60" /> : null}
     </span>
+  )
+}
+
+/**
+ * The same picture, blurred and dimmed, filling the box behind the picture.
+ *
+ * A frame is the shape of its row, not of its picture, and the two agree
+ * except when the cap or a lone last row makes the box wider than the
+ * picture wants. What fills the difference is the picture's own colour,
+ * out of focus - the way a photo sits in a message on the phone - rather
+ * than a band of the surface, which reads as a picture that failed to fill.
+ */
+function Backdrop({ src }: { src: string }) {
+  return (
+    <img
+      aria-hidden
+      src={src}
+      alt=""
+      draggable={false}
+      className="absolute inset-0 size-full scale-110 object-cover opacity-60 blur-2xl"
+    />
   )
 }
 

@@ -7,19 +7,21 @@ import type { MediaOutput } from '@/domain/artifacts/media'
 /**
  * The outputs of one generation, laid out together.
  *
- * ---- One rule for one picture and for four --------------------------------
+ * ---- The row is always full ------------------------------------------------
  *
- * A frame's width is what its ratio allows under the height cap: a landscape
- * takes the whole measure, a portrait takes `maxHeight × ratio` and stands
- * beside empty space rather than becoming a tower. That is the whole rule
- * for a single picture, and the grid is the same rule applied to rows.
+ * Rows hold two, and a row is always the whole measure: inside it each
+ * frame grows in proportion to its ratio and starts from nothing, so the
+ * two share one height by construction - a 16:9 beside a 9:16 is a wide
+ * box and a narrow one of the same height - and together they reach both
+ * edges. A picture alone on its row takes the whole measure too. Nothing
+ * is ever a box beside empty ground, which was the first draft of this and
+ * read as a gallery with holes in it.
  *
- * Rows hold two. Inside a row each frame grows in proportion to its ratio
- * and starts from nothing, so the two share one height by construction —
- * a 16:9 beside a 9:16 is a wide box and a narrow one of the same height,
- * not two boxes of the same width with one cropped. The cap still applies
- * per frame, which is what keeps a pair of portraits from filling the
- * measure at the height of the window.
+ * The height cap is the frame's (see `MEDIA_FRAME`): a tall picture's box
+ * is as tall as the cap and as wide as its share, and the picture stands
+ * in the middle of it over a blurred copy of itself. So a row of two
+ * portraits is two full-height boxes side by side, and a portrait alone is
+ * one wide box with the picture centred - never a tower, never a gap.
  *
  * ---- Ratios move once ------------------------------------------------------
  *
@@ -65,37 +67,39 @@ export function MediaGrid({
 
   return (
     <div className="flex flex-col" style={{ gap: MEDIA_FRAME.gap }}>
-      {rows.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex w-full min-w-0" style={{ gap: MEDIA_FRAME.gap }}>
-          {row.map((frame) => (
-            <AnimatedItem
-              key={frame.index}
-              index={frame.index}
-              style={{
-                flexGrow: frame.ratio,
-                flexBasis: 0,
-                maxWidth: `min(100%, ${String(Math.round(MEDIA_FRAME.maxHeight * frame.ratio))}px)`,
-              }}
-            >
-              <MediaFrame
-                output={frame.output}
-                video={video}
-                title={count > 1 ? `${title} (${String(frame.index + 1)} of ${String(count)})` : title}
-                working={working}
-                ratio={frame.ratio}
-                onRatio={(real) =>
-                  setMeasured((previous) =>
-                    previous[frame.index] === real ? previous : { ...previous, [frame.index]: real },
-                  )
-                }
-                {...(onOpen !== undefined && frame.output !== null
-                  ? { onOpen: () => onOpen(frame.index) }
-                  : {})}
-              />
-            </AnimatedItem>
-          ))}
-        </div>
-      ))}
+      {rows.map((row, rowIndex) => {
+        // Shares of the row, summing to one. Flexbox hands out only that
+        // fraction of the free space when the factors sum to less - a lone
+        // portrait with a factor of 0.56 took half the row and left the rest.
+        const total = row.reduce((sum, frame) => sum + frame.ratio, 0)
+        return (
+          <div key={rowIndex} className="flex w-full min-w-0" style={{ gap: MEDIA_FRAME.gap }}>
+            {row.map((frame) => (
+              <AnimatedItem
+                key={frame.index}
+                index={frame.index}
+                style={{ flexGrow: frame.ratio / total, flexBasis: 0 }}
+              >
+                <MediaFrame
+                  output={frame.output}
+                  video={video}
+                  title={count > 1 ? `${title} (${String(frame.index + 1)} of ${String(count)})` : title}
+                  working={working}
+                  ratio={frame.ratio}
+                  onRatio={(real) =>
+                    setMeasured((previous) =>
+                      previous[frame.index] === real ? previous : { ...previous, [frame.index]: real },
+                    )
+                  }
+                  {...(onOpen !== undefined && frame.output !== null
+                    ? { onOpen: () => onOpen(frame.index) }
+                    : {})}
+                />
+              </AnimatedItem>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }

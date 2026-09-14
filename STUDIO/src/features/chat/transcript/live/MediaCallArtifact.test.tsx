@@ -131,7 +131,8 @@ describe('an image call', () => {
     expect(screen.getByText('2 images ready · openai/gpt-image-2')).toBeTruthy()
 
     // The second picture turns out to be portrait: its cell narrows to its
-    // ratio and the row keeps one height, instead of cropping it square.
+    // ratio and the row keeps one height and its full width, instead of
+    // cropping it square or leaving ground beside it.
     const second = images[1] as HTMLImageElement
     Object.defineProperty(second, 'naturalWidth', { value: 900 })
     Object.defineProperty(second, 'naturalHeight', { value: 1600 })
@@ -140,9 +141,14 @@ describe('an image call', () => {
     })
     const cells = [...document.querySelectorAll('[style*="flex-grow"]')] as HTMLElement[]
     expect(cells).toHaveLength(2)
-    expect(cells[0]?.style.flexGrow).toBe('1')
-    expect(Number(cells[1]?.style.flexGrow)).toBeCloseTo(900 / 1600)
-    expect(cells[1]?.style.maxWidth).toBe('min(100%, 270px)')
+    // Shares of the row: a square and a 9:16 portrait, summing to one.
+    expect(Number(cells[0]?.style.flexGrow)).toBeCloseTo(1 / (1 + 900 / 1600))
+    expect(Number(cells[1]?.style.flexGrow)).toBeCloseTo(900 / 1600 / (1 + 900 / 1600))
+    expect(cells[1]?.style.maxWidth).toBe('')
+    // Every frame is capped, so a tall box is never a tower.
+    for (const frame of document.querySelectorAll('[style*="aspect-ratio"]')) {
+      expect((frame as HTMLElement).style.maxHeight).toBe('480px')
+    }
   })
 
   it("shows the refusal in the harness's words and no frame", () => {

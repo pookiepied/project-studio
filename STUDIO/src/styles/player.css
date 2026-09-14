@@ -20,7 +20,7 @@
      whenever the clip's ratio did not match the frame -- outside the panel's
      fill, so outside the rounded shape. */
   --media-background-color: transparent;
-  --media-object-fit: cover;
+  --media-object-fit: contain;
 
   --media-primary-color: oklch(1 0 0);
   --media-secondary-color: oklch(1 0 0 / 26%);
@@ -54,7 +54,7 @@
 .studio-player video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   /* The panel already rounds; matching here keeps the picture inside the curve
      even while the element is transformed during the lightbox's entrance. */
   border-radius: inherit;

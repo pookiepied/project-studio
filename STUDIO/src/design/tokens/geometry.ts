@@ -215,12 +215,11 @@ export const COMPOSER = {
 /**
  * A generated picture or clip in the transcript.
  *
- * A frame takes the reply's full measure when its ratio allows, and no more
- * height than this whatever the ratio is: a portrait at the full measure
- * would be a tower the reader scrolls past, so its width is derived from
- * the cap instead - width is `min(measure, maxHeight * ratio)`, and the
- * height follows. Frames sharing a row share one height by construction,
- * so the cap bounds the row rather than each frame separately.
+ * A frame is as wide as its share of the row and no taller than this,
+ * whatever its ratio: a portrait at the full measure would be a tower the
+ * reader scrolls past. Under the cap the box is wider than the picture,
+ * and the picture stands centred in it over a blurred copy of itself, so
+ * the box is never empty ground beside a picture.
  *
  * The default ratio is the reservation for a frame whose picture has not
  * arrived and whose call named no ratio. 4:3 is the least wrong guess: most
