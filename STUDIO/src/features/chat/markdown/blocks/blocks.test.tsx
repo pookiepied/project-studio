@@ -64,14 +64,18 @@ describe('CodeBlock', () => {
     expect(container.querySelector('svg.lucide-code')).toBeNull()
   })
 
-  it('colors the languages the set commits to, including through an alias', async () => {
+  it('colors the languages the set commits to, including through an alias', { timeout: 20_000 }, async () => {
     // The nine mainstream grammars joined after a reader who asked for Java
     // got a block wearing the Java mark and no color. This pins one of the
     // nine and one fence spelling that resolves through the alias table.
     // The highlighter is a chunk that arrives on demand, so the colour lands
     // a moment after the block does.
     // A generous wait: under the whole suite's load the chunk can take
-    // longer than the library's one-second default to import.
+    // longer than the library's one-second default to import. And the
+    // generosity has to reach the test itself: this test schedules two of
+    // those eight-second waits, and vitest's default five would cut it dead
+    // before either could take its time - which is what it did, once every
+    // few runs, on a loaded machine.
     const { container } = render(<CodeBlock code={'public class A {}'} fence="java" />)
     await waitFor(() => expect(container.querySelector('.hljs-keyword')).not.toBeNull(), CHUNK)
 
