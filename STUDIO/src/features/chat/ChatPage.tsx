@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { Loading } from '@/components/state'
@@ -61,6 +61,20 @@ import type { Conversation } from '@/domain/conversation/types'
  * components from a fixed list of items (`galleryItems`), with no harness
  * behind it and no composer under it — nothing sent there could be answered.
  */
+/**
+ * The least an open with something to scroll may take, from arriving on the
+ * page to the words being shown.
+ *
+ * A short conversation that loads in a few frames appears at once, as it
+ * should. A long one that loads just as fast used to appear at once too,
+ * and then travel - the wait shown for a frame, the words for a breath,
+ * then a page-long journey, three things in the time of one. So an open
+ * that will have to travel is given a moment first: the wait stands for at
+ * least this long, then the words rise, then they move. Only when there is
+ * somewhere to travel to; nothing is delayed that does not need the room.
+ */
+const OPEN_MIN_WAIT_MS = 700
+
 export function ChatPage({ conversation }: { conversation: Conversation }) {
   const { touch, settings, catalog } = useWorkspace()
   const { markRunning, markContextReport } = useLiveWork()
@@ -176,8 +190,43 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     markContextReport(conversation.id, contextReport(live.items, measuredContext, running))
   }, [gallery, conversation.id, live.items, measuredContext, running, markContextReport])
 
+  // When the open began, per conversation, for the minimum wait below.
+  const openedFor = useRef<string | null>(null)
+  const openedAt = useRef(0)
+  if (openedFor.current !== conversation.id) {
+    openedFor.current = conversation.id
+    openedAt.current = performance.now()
+  }
+  /** The conversation whose words have been revealed; the gallery's always are. */
+  const [revealedFor, setRevealedFor] = useState<string | null>(null)
+  const revealed = gallery || revealedFor === conversation.id
+  // Something to show: an item from the log, or the message this window
+  // just sent and is waiting to see echoed. A first send in a new
+  // conversation is words too, and must not wait on a replay that has
+  // nothing in it.
+  const hasWords = items.length > 0 || (!gallery && live.pending !== null)
+
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
-    useAutoScroll(items, conversation.id)
+    useAutoScroll(items, conversation.id, revealed)
+
+  // The words are laid out before they are shown (opacity, not absence), so
+  // the page can ask the one question the minimum wait turns on: is there
+  // anywhere to travel to? A transcript that fits the viewport is revealed
+  // the moment it exists; one that does not waits out `OPEN_MIN_WAIT_MS`
+  // from the open, then is revealed, and the scroll hook takes it from
+  // there. Layout effect, so the answer is read before the frame paints.
+  useLayoutEffect(() => {
+    if (revealed || !hasWords) return
+    const element = viewport.current
+    const travels = element !== null && element.scrollHeight - element.clientHeight > 0
+    const remaining = travels ? OPEN_MIN_WAIT_MS - (performance.now() - openedAt.current) : 0
+    if (remaining <= 0) {
+      setRevealedFor(conversation.id)
+      return
+    }
+    const timer = setTimeout(() => setRevealedFor(conversation.id), remaining)
+    return () => clearTimeout(timer)
+  }, [revealed, hasWords, conversation.id, viewport])
 
   // Branch from one answer: everything up to and including it becomes the
   // first message of a new conversation, named for its source.
@@ -299,7 +348,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         className="studio-scroll-inset studio-no-anchor min-h-0 flex-1 overflow-y-auto"
       >
         <div
-          className="mx-auto w-full"
+          className="relative mx-auto w-full"
           style={{
             maxWidth: SHELL.measure,
             paddingInline: SHELL.gutter,
@@ -307,25 +356,33 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             paddingBottom: 20,
           }}
         >
-          {/* The open, in two parts that the scroll hook paces (see "The
-              open" in `useAutoScroll`). While the replay is still coming and
-              nothing has arrived, the wait stands in the empty page. When the
-              words arrive it fades out under them as the transcript rises
-              into place at the top of the viewport - keyed to the
-              conversation, so every open reveals and not only the first - and
-              only after that does the journey to the bottom begin. Before this the first frame of content was the
+          {/* The open, in parts that this page and the scroll hook pace
+              between them (see "The open" in `useAutoScroll`). While the
+              replay is still coming, or the words have come but the minimum
+              wait has not passed, the wait stands in the empty page. Then it
+              fades out under the words as they rise into place at the top of
+              the viewport - keyed to the conversation, so every open reveals
+              and not only the first - and only then does the journey to the
+              bottom begin. Before this the first frame of content was the
               first frame of travel, and a conversation looked like a page
               that appeared already leaving. */}
           <AnimatePresence initial={false}>
-            {!gallery && live.phase.status === 'attaching' && items.length === 0 ? (
-              <Loading key="loading" label="Loading the conversation" className="py-24" />
+            {!revealed && (live.phase.status === 'attaching' || hasWords) ? (
+              // Out of the flow, over the words that are laid out but not yet
+              // shown, so its leaving moves nothing under them.
+              <Loading
+                key="loading"
+                label="Loading the conversation"
+                className="absolute inset-x-0 py-24"
+                style={{ top: SHELL.topStrip.height + 20 }}
+              />
             ) : null}
           </AnimatePresence>
-          {!gallery && live.phase.status === 'attaching' && items.length === 0 ? null : (
+          {!revealed && !hasWords ? null : (
             <motion.div
               key={conversation.id}
               initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
+              animate={revealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
               transition={{ duration: DURATION.slow, ease: EASE_OUT }}
             >
               <LiveTranscript

@@ -78,7 +78,9 @@ export const OPEN_HOLD_MS = DURATION.fast * 1000
  * to be.
  *
  * The open is also paced. The transcript arrives at the top of the viewport
- * and reveals itself there (`ChatPage`); the journey to the bottom starts
+ * and reveals itself there when the page says it is ready (`ChatPage`
+ * decides when, and passes `ready`; until then the loop holds without
+ * moving, whatever has been laid out); the journey to the bottom starts
  * a breath into that reveal (`OPEN_HOLD_MS`) and runs at the open's own,
  * gentler rate (`OPEN_STIFFNESS`), so the arriving and the travelling are
  * one motion. Without the breath the first frame of content and the first
@@ -96,8 +98,11 @@ const SCROLL_KEYS = new Set([
   ' ',
 ])
 
-export function useAutoScroll(dependency: unknown, navigation?: unknown) {
+export function useAutoScroll(dependency: unknown, navigation?: unknown, ready = true) {
   const viewport = useRef<HTMLDivElement>(null)
+  /** Whether the open may travel yet; the page holds it while the wait is shown. */
+  const readyRef = useRef(ready)
+  readyRef.current = ready
   const [pinned, setPinned] = useState(true)
   /** True from mount (or a change of conversation) until the open lands. */
   const boarding = useRef(true)
@@ -161,10 +166,16 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown) {
 
       driving.current = true
 
-      // The open waits at the top. The first frame with content starts the
-      // clock; until it runs out the loop keeps its turn - the flag stays
-      // up, so the layout's scrolls are still nobody's - and moves nothing.
+      // The open waits at the top. The first frame with content the page
+      // has revealed starts the clock; until it runs out the loop keeps its
+      // turn - the flag stays up, so the layout's scrolls are still
+      // nobody's - and moves nothing.
       if (boarding.current && element.scrollHeight - element.clientHeight > 0) {
+        if (!readyRef.current) {
+          lastTop.current = element.scrollTop
+          frame.current = requestAnimationFrame(step)
+          return
+        }
         openSeen.current ??= now
         if (now - openSeen.current < OPEN_HOLD_MS) {
           lastTop.current = element.scrollTop
@@ -412,7 +423,7 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown) {
 
   useEffect(() => {
     if (pinned) drive()
-  }, [dependency, pinned, drive])
+  }, [dependency, pinned, ready, drive])
 
   useEffect(
     () => () => {

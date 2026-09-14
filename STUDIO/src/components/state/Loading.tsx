@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { motion } from 'framer-motion'
 import { WorkingDots } from '@/components/state/WorkingDots'
 import { DURATION, EASE_OUT } from '@/design/tokens'
@@ -31,11 +32,13 @@ export const SHOW_AFTER = 0.15
 export function Loading({
   label,
   className,
+  style,
   immediate = false,
 }: {
   /** What is loading, spoken: "Loading conversations". Omit inside a region that already says so. */
   label?: string
   className?: string
+  style?: CSSProperties
   /** Show at once - for a wait already known to be long, or a specimen. */
   immediate?: boolean
 }) {
@@ -45,6 +48,7 @@ export function Loading({
       aria-label={label}
       aria-hidden={label === undefined ? true : undefined}
       className={cn('flex items-center justify-center py-6 text-muted-foreground', className)}
+      style={style}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
