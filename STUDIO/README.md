@@ -51,8 +51,7 @@ src/
     icons/      the registry -- one glyph, one concept, enforced
     brand/      the Studio mark
     primitives/ Popover, Dialog, Tooltip, IconButton, Segmented, Button, Field
-    placeholder/ the neutral shapes a thing takes before it has arrived
-    state/      Deferred, StateNote, RetryButton, WorkingDots: how waiting and failure look
+    state/      Loading, Deferred, StateNote, RetryButton, WorkingDots: how waiting and failure look
   domain/       types and data. no React, nothing from components/
     conversation/ the conversation record, and the gallery's identity
     turn/       turn settings and the context-window arithmetic

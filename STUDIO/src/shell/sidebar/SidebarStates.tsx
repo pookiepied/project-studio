@@ -1,5 +1,4 @@
-import { PlaceholderText } from '@/components/placeholder'
-import { RetryButton, StateNote } from '@/components/state'
+import { Loading, RetryButton, StateNote } from '@/components/state'
 import type { StorePhase } from '@/stores/workspace'
 
 /**
@@ -13,9 +12,9 @@ import type { StorePhase } from '@/stores/workspace'
  * nothing -- a broken harness and an empty sidebar were one blank column, and
  * the store's own answer to that ambiguity was never shown.
  *
- * - **loading** holds the rows' shape -- same padding, same rhythm, widths
- *   varied the way titles vary -- so the arrival of the real list is a change
- *   of fill, not a jump.
+ * - **loading** is the app's one wait, in the list's place. It held the
+ *   rows' shape for a while, as bars; bars shaped like titles are a picture
+ *   of a list nobody has read, and were refused for it.
  * - **failed** keeps whatever local rows exist (the gallery is always among
  *   them) and says, above them, why the rest is not here. A column that
  *   renders nothing makes the app look empty; a column that names the read
@@ -30,39 +29,8 @@ import type { StorePhase } from '@/stores/workspace'
  * know.
  */
 
-/** Row widths, varied on purpose: a column of equal bars reads as a pattern. */
-const GROUP_WIDTHS = [
-  ['42%', '61%', '38%', '55%'],
-  ['36%', '52%', '44%'],
-] as const
-
-export function SidebarSkeleton() {
-  return (
-    <div role="status" aria-label="Loading conversations" className="pt-1.5">
-      <div className="flex flex-col gap-3">
-        {GROUP_WIDTHS.map((rows, group) => (
-          <div key={group} className="flex flex-col">
-            <SkeletonRow width={rows[0]} header />
-            <div className="ml-3 flex flex-col gap-1">
-              {rows.slice(1).map((width) => (
-                <SkeletonRow key={width} width={width} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function SkeletonRow({ width, header = false }: { width: string; header?: boolean }) {
-  return (
-    <div
-      className={`flex items-center rounded-md py-1 text-ui ${header ? 'pl-1.5' : 'pl-2'}`}
-    >
-      <PlaceholderText width={width} />
-    </div>
-  )
+export function SidebarLoading() {
+  return <Loading label="Loading conversations" className="py-4" />
 }
 
 /**

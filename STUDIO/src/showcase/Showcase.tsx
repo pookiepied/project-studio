@@ -27,8 +27,7 @@ import {
   TextField,
   Tooltip,
 } from '@/components/primitives'
-import { PlaceholderMark, PlaceholderText } from '@/components/placeholder'
-import { StateNote } from '@/components/state'
+import { Loading, StateNote } from '@/components/state'
 
 /**
  * The parts, on one page.
@@ -393,21 +392,11 @@ function StatesSection() {
   return (
     <Section
       title="States"
-      note="Loading holds the shape of what is coming. Failure names the cause verbatim and offers the remedy as a control. Empty says so plainly."
+      note="Loading is the one wait, late and quiet. Failure names the cause verbatim and offers the remedy as a control. Empty says so plainly."
     >
       <Card>
         <Specimen label="loading">
-          <div
-            role="status"
-            aria-label="A row, loading"
-            className="flex w-72 items-center gap-2.5"
-          >
-            <PlaceholderMark size={28} />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5" aria-hidden>
-              <PlaceholderText className="w-1/3" />
-              <PlaceholderText className="w-2/3" />
-            </div>
-          </div>
+          <Loading label="A row, loading" immediate className="w-72" />
         </Specimen>
         <Specimen label="failed">
           <StateNote

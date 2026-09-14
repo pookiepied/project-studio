@@ -7,7 +7,7 @@ import { IconButton, NavRow, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
 import { SettingsTree } from '@/shell/sidebar/SettingsTree'
-import { SidebarSkeleton, SidebarUnavailable } from '@/shell/sidebar/SidebarStates'
+import { SidebarLoading, SidebarUnavailable } from '@/shell/sidebar/SidebarStates'
 import { startWindowDrag } from '@/platform/tauri'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
@@ -244,7 +244,7 @@ export function Sidebar({
             <>
               {/* A store that cannot be read says so, above the column it
                   failed -- the note is the column's state, and the rows below
-                  it are whatever local rows exist. The loading skeleton lives
+                  it are whatever local rows exist. The loading state lives
                   further down, holding the rows' own place. The states and
                   their argument live in `SidebarStates`. */}
               {storePhase.status === 'no-harness' || storePhase.status === 'failed' ? (
@@ -286,12 +286,10 @@ export function Sidebar({
                 {sectionOpen ? (
                   <motion.div {...COLLAPSE} className="overflow-hidden">
                     {storePhase.status === 'loading' ? (
-                      // The rows' shape, where the rows will be. Above the
-                      // header would be a state claiming to be the column; in
-                      // here it is only the list holding its own place.
-                      <div className="pt-1">
-                        <SidebarSkeleton />
-                      </div>
+                      // The wait, where the rows will be. Above the header
+                      // would be a state claiming to be the column; in here
+                      // it is only the list holding its own place.
+                      <SidebarLoading />
                     ) : (
                       <div className="flex flex-col gap-3">
                         {projects.map((project) => (

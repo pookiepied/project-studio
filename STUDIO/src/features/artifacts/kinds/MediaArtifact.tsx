@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { Placeholder } from '@/components/placeholder'
+import { WorkingDots } from '@/components/state'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
 import { MediaLightbox } from '@/features/artifacts/media'
 import { Timeline } from '@/features/artifacts/sections'
@@ -60,7 +60,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
         {still && !working ? (
           <img src={still} alt={artifact.title} className="size-full object-cover" />
         ) : (
-          <Shimmer active={working} video={video} />
+          <Frame active={working} video={video} />
         )}
 
         {/* The whole frame is the target, not a small button in the corner of
@@ -122,25 +122,23 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
 }
 
 /**
- * The placeholder while it renders.
+ * The frame while it renders.
  *
  * Deliberately not a coloured gradient standing in for the picture. A tinted
  * rectangle where an image will be reads as a *failed* image, and worse, it
  * sets an expectation about the colours of something that has not been made
- * yet. A neutral field with a slow sweep says "working" and predicts nothing.
- *
- * This was the first surface in the app to draw that field, and its recipe --
- * neutral ground, foreground-tinted sweep, no colour -- is now the shared
- * placeholder system's. `Placeholder` owns the sweep; this file keeps only the
- * part that is genuinely local: the field fills the reserved frame and holds
- * the medium's icon.
+ * yet. A neutral field holding the medium's icon predicts nothing, and while
+ * the model is still working the app's one wait breathes under the icon.
+ * The field used to carry a travelling sweep - the first skeleton in the
+ * app, and the last to go.
  */
-function Shimmer({ active, video }: { active: boolean; video: boolean }) {
+function Frame({ active, video }: { active: boolean; video: boolean }) {
   return (
-    <Placeholder sweep={active} className="size-full">
+    <span aria-hidden className="flex size-full flex-col items-center justify-center gap-2 bg-selected">
       <span className="text-muted-foreground/60">
         {video ? <Icons.video /> : <Icons.image />}
       </span>
-    </Placeholder>
+      {active ? <WorkingDots size="md" className="text-muted-foreground/60" /> : null}
+    </span>
   )
 }

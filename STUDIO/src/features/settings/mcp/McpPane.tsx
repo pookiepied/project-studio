@@ -1,3 +1,4 @@
+import { Loading } from '@/components/state'
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
@@ -109,7 +110,7 @@ function Body({
 }) {
   const { view } = servers
 
-  if (view.status === 'loading') return <ListSkeleton />
+  if (view.status === 'loading') return <Loading label="Loading extensions" />
 
   if (view.status === 'no-harness') {
     return (
@@ -331,24 +332,3 @@ function describe(server: McpServerRecord): string {
   }
 }
 
-/**
- * The list before it arrives.
- *
- * Three rows because the list is usually short, and a skeleton longer than the
- * content it replaces makes the pane jump when the real list lands.
- */
-function ListSkeleton() {
-  return (
-    <div className="flex flex-col divide-y" aria-hidden>
-      {[0, 1, 2].map((row) => (
-        <div key={row} className="flex items-center justify-between gap-6 py-3.5">
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="h-3 w-32 rounded bg-tint" />
-            <div className="h-2.5 w-48 rounded bg-tint" />
-          </div>
-          <div className="h-7 w-24 shrink-0 rounded-lg bg-tint" />
-        </div>
-      ))}
-    </div>
-  )
-}

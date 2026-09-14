@@ -356,39 +356,36 @@ get a fourth look.
 ## 10. States
 
 A surface has a life before its data arrives and after it fails to. Every
-state in that life is designed, once, in `components/placeholder` and
-`components/state`; a page that invents its own loading treatment is a page
-inventing a second vocabulary.
+state in that life is designed, once, in `components/state`; a page that
+invents its own loading treatment is a page inventing a second vocabulary.
 
 **The lifecycle is named, not boolean.** `loading | ready | no-harness |
 failed` — the same four answers a local process honestly gives. A surface
-shows its truth: `loading` holds the shape of what is coming, `failed` says
+shows its truth: `loading` is the one wait, `failed` says
 what went wrong with the remedy beside it, `no-harness` says what is absent,
 and `ready` may say *empty* — an absence naming itself ("Nothing archived."),
 never styled like a failure. A read that has not come back may not be
 answered with "nothing", because an empty list and a broken one are both a
 blank column to the person waiting.
 
-**Loading is structural, never a spinner.** A spinner measures a wait the
-reader did not ask to measure; a sentence that does not move is better; a
-skeleton is better still, because it holds the exact space the content will
-occupy so the handover is a change of fill, not a jump. Rules for bones:
+**Loading is one wait, late and quiet.** `Loading`: three dots breathing
+where the content will be, the same dots a running step shows, faded in only
+once the wait has lasted 150ms - a read to this machine usually lands before
+that, and an indicator that flashes for a fast read says "loading" about
+something already loaded. Rules:
 
-- Neutral only. `--selected` ground, a foreground-tinted sweep at 7%. Colour
-  claims something about content nobody has seen.
-- Composed where the content is composed — a row's skeleton is built from the
-  row's own padding, roles and cast (mark, line, hint), so the skeleton cannot
-  drift from the layout it stands in for. Primitives: `Placeholder`,
-  `PlaceholderText`, `PlaceholderMark`.
+- Never a skeleton. Bars shaped like the content to come held its space
+  well, and were refused (2026-09-14) for what they are: a picture of content
+  nobody has seen. The placeholder primitives are gone; do not rebuild them.
+- Never the brand mark. It is the app's face, not its hourglass.
+- Never a spinner. It measures a wait the reader did not ask to measure.
+- Something *true* may stand in instead: the plain code a highlighter will
+  colour, the poster a player will play. Content is not a stand-in.
 - Announced once, quietly: `role="status"` with a spoken label on the region,
-  `aria-hidden` on every bone. A skeleton never pretends to be content.
-- **The transcript is exempt, by written decision** (`EarlierBoundary`): text
-  the reader is about to read does not get stand-ins. Small transient menus
-  keep their sentence too — a popover that lives for a moment wants a word,
-  not a wireframe.
+  the dots themselves `aria-hidden`.
 - A background re-read never replaces content with loading. What is on screen
   stays until the new truth arrives; the refresh is visible in the rows that
-  change, not in a spinner that erases the page.
+  change, not in a wait that erases the page.
 
 **Failure repeats the wire, verbatim.** The cause sentence is the harness's
 own words, not a paraphrase, and the remedy is a control, not advice —

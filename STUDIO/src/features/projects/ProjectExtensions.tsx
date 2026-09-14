@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { StateNote } from '@/components/state'
-import { PlaceholderText } from '@/components/placeholder'
+import { Loading, StateNote } from '@/components/state'
 import { ScopeToggle, inheritSentence } from '@/features/settings/mcp/ScopeToggle'
 import { useMcpServers } from '@/features/settings/mcp/useMcpServers'
 import type { HarnessFailure, McpScopeReading, McpServerRecord } from '@/platform/harness'
@@ -47,11 +46,7 @@ export function ProjectExtensions({ projectId }: { projectId: string }) {
 
   if (view.status === 'loading') {
     return (
-      <div role="status" aria-label="Loading extensions" className="flex flex-col gap-2 py-1 text-ui">
-        {['58%', '41%'].map((width) => (
-          <PlaceholderText key={width} width={width} />
-        ))}
-      </div>
+      <Loading label="Loading extensions" className="py-3" />
     )
   }
 

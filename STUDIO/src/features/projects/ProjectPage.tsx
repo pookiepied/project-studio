@@ -1,7 +1,6 @@
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { PlaceholderText } from '@/components/placeholder'
-import { RetryButton, StateNote } from '@/components/state'
+import { Loading, RetryButton, StateNote } from '@/components/state'
 import { ProjectIconMark } from './ProjectIconMark'
 import { ProjectExtensions } from '@/features/projects/ProjectExtensions'
 import { StartConversation } from '@/features/chat/composer'
@@ -89,11 +88,7 @@ export function ProjectPage({ project }: { project: Project }) {
 
         <Section title="Conversations">
           {storePhase.status === 'loading' ? (
-            <div role="status" aria-label="Loading conversations" className="flex flex-col gap-2 py-1 text-ui">
-              {['58%', '41%', '66%'].map((width) => (
-                <PlaceholderText key={width} width={width} />
-              ))}
-            </div>
+            <Loading label="Loading conversations" className="py-3" />
           ) : storePhase.status === 'failed' ? (
             <StateNote
               className="py-2"

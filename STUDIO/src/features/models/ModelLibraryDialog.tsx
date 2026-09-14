@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { surfaceVariants, type SurfaceMove } from '@/design/tokens'
 import { Button, Dialog, TextField } from '@/components/primitives'
 import { Icons } from '@/components/icons'
-import { StateNote } from '@/components/state'
+import { Loading, StateNote } from '@/components/state'
 import type { HarnessFailure } from '@/platform/harness'
 import { findCatalogModel } from '@/domain/models/catalog'
 import { familyCatalog, familyName } from '@/domain/models/families'
@@ -14,7 +14,6 @@ import { FamilyGrid } from './library/FamilyGrid'
 import { FamilyModels } from './library/FamilyModels'
 import { SearchResults } from './library/SearchResults'
 import { ModelDetail } from './library/ModelDetail'
-import { LibrarySkeleton } from './library/LibrarySkeleton'
 import type { CatalogState } from './CatalogStateNote'
 import type { ReasoningChoice } from '@/domain/models/types'
 
@@ -193,7 +192,7 @@ export function ModelLibraryDialog({
       }
     >
       {catalog.phase.status === 'loading' ? (
-        <LibrarySkeleton />
+        <Loading label="Loading the model library" className="h-full" />
       ) : catalog.phase.status === 'ready' ? (
         <div className="flex h-full min-h-0">
           <LibraryIndex

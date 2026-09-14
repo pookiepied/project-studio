@@ -1,4 +1,5 @@
 export { StateNote } from './StateNote'
 export { WorkingDots } from './WorkingDots'
+export { Loading } from './Loading'
 export { RetryButton } from './RetryButton'
 export { Deferred, lazyNamed } from './Deferred'

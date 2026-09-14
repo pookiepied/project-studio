@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
-import { StudioMark } from '@/components/brand'
+import { WorkingDots } from '@/components/state'
 
 /**
  * The top of what is loaded.
@@ -11,11 +11,11 @@ import { StudioMark } from '@/components/brand'
  * the scroll compensation in `useTranscriptWindow` would be correcting for two
  * things at once and get neither right.
  *
- * The mark is the app's own, busy. Anything else here — a spinner, a
- * "loading…" label, a skeleton row — would be a second vocabulary for the one
- * idea the brand already expresses, and a skeleton in particular pretends to be
- * content, which at the top of a history is a lie about what you are about to
- * read.
+ * The wait is the app's one wait, the dots. Anything else here — a spinner,
+ * a "loading…" label, a skeleton row — would be a second vocabulary for one
+ * idea, and a skeleton in particular pretends to be content, which at the
+ * top of a history is a lie about what you are about to read. The brand mark
+ * stood here for a while; it is the app's face, not its hourglass.
  */
 export function EarlierBoundary({
   loading,
@@ -35,7 +35,7 @@ export function EarlierBoundary({
             exit={{ opacity: 0 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
           >
-            <StudioMark busy size={16} className="text-foreground/40" />
+            <WorkingDots size="md" className="text-muted-foreground" />
           </motion.div>
         ) : (
           <motion.span

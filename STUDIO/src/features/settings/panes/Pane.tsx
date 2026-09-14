@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { Placeholder, PlaceholderText } from '@/components/placeholder/Placeholder'
 
 /**
  * The shape every settings pane takes.
@@ -91,42 +90,3 @@ export function PlaceholderPane({
   )
 }
 
-/**
- * A pane that is on its way: the frame with bones where the title, the
- * description and the first rows will be.
- *
- * Composed from `Pane` and `Row`'s own spacing, so the skeleton has exactly
- * the geometry of the pane it becomes and the handover is a change of fill.
- * The widths vary on purpose; a column of equal bars reads as a pattern.
- * `Pane`'s header is a real `h1`, so the bone stands in for the text inside
- * the same elements rather than beside them.
- */
-export function PaneSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-[36rem]" aria-hidden>
-      <header className="mb-5">
-        <p className="studio-heading">
-          <PlaceholderText width="34%" />
-        </p>
-        <p className="mt-1 text-ui">
-          <PlaceholderText width="62%" />
-        </p>
-      </header>
-      <div className="flex flex-col divide-y">
-        {(['46%', '38%', '52%'] as const).map((width, index) => (
-          <div key={index} className="flex items-start justify-between gap-6 py-3.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-ui">
-                <PlaceholderText width={width} />
-              </p>
-              <p className="mt-0.5 text-caption">
-                <PlaceholderText width="70%" />
-              </p>
-            </div>
-            <Placeholder className="h-7 w-24 shrink-0 rounded-md" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}

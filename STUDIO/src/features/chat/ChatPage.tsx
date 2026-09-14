@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
+import { Loading } from '@/components/state'
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
@@ -10,7 +11,6 @@ import { useAutoScroll } from '@/features/chat/transcript'
 import { galleryItems } from '@/features/chat/gallery/items'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
-import { TranscriptLoading } from '@/features/chat/transcript/live/TranscriptLoading'
 import { useConversationTranscript } from '@/features/chat/connection/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/connection/useConversation'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
@@ -309,8 +309,8 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         >
           {/* The open, in two parts that the scroll hook paces (see "The
               open" in `useAutoScroll`). While the replay is still coming and
-              nothing has arrived, the mark breathes in the empty page. When
-              the words arrive it fades out under them as the transcript rises
+              nothing has arrived, the wait stands in the empty page. When the
+              words arrive it fades out under them as the transcript rises
               into place at the top of the viewport - keyed to the
               conversation, so every open reveals and not only the first - and
               only after that does the journey to the bottom begin. Before this the first frame of content was the
@@ -318,7 +318,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
               that appeared already leaving. */}
           <AnimatePresence initial={false}>
             {!gallery && live.phase.status === 'attaching' && items.length === 0 ? (
-              <TranscriptLoading key="loading" />
+              <Loading key="loading" label="Loading the conversation" className="py-24" />
             ) : null}
           </AnimatePresence>
           {!gallery && live.phase.status === 'attaching' && items.length === 0 ? null : (

@@ -19,13 +19,27 @@ import { cn } from '@/lib/cn'
  * travelling left to right rather than three things blinking near each
  * other. The pace itself is unhurried on purpose -- this is a wait.
  */
-export function WorkingDots({ className }: { className?: string }) {
+export function WorkingDots({
+  className,
+  size = 'sm',
+}: {
+  className?: string
+  /** `sm` sits inside a line of text; `md` stands alone as a wait (`Loading`). */
+  size?: 'sm' | 'md'
+}) {
   return (
-    <span aria-hidden className={cn('inline-flex items-center gap-[3px] align-middle', className)}>
+    <span
+      aria-hidden
+      className={cn(
+        'inline-flex items-center align-middle',
+        size === 'sm' ? 'gap-[3px]' : 'gap-[5px]',
+        className,
+      )}
+    >
       {[0, 1, 2].map((index) => (
         <motion.span
           key={index}
-          className="size-[3px] rounded-full bg-current"
+          className={cn('rounded-full bg-current', size === 'sm' ? 'size-[3px]' : 'size-1.5')}
           animate={{ opacity: [0.25, 0.85, 0.25] }}
           transition={{ ...LOOP.pulse, delay: index * (LOOP.pulse.duration / 3) }}
         />

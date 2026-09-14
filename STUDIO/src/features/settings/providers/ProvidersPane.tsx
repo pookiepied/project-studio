@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
 import { Button, MenuItem, Popover } from '@/components/primitives'
-import { Placeholder, PlaceholderMark, PlaceholderText } from '@/components/placeholder'
-import { StateNote } from '@/components/state'
+import { Loading, StateNote } from '@/components/state'
 import {
   capabilityServesKind,
   connectionKinds,
@@ -87,7 +86,7 @@ function PaneBody({ providers, kind }: { providers: Providers; kind: ProviderKin
   const { view } = providers
 
   if (view.status === 'loading') {
-    return <ProviderListSkeleton />
+    return <Loading label="Loading connections" />
   }
 
   if (view.status === 'no-harness') return <NoHarness />
@@ -122,41 +121,6 @@ function NoHarness() {
   )
 }
 
-/**
- * The connection rows, before the connections arrive.
- *
- * This used to be one line of prose, on the argument that a spinner flashing
- * for 30ms is worse than a line of text that does not move -- an argument with
- * the right conclusion and the wrong shape. The bones keep the same virtue and
- * add the missing one: the mark, the two text lines and the check button hold
- * the exact space the rows will occupy, so nothing jumps when they do. No
- * spinner, still: a spinner measures nothing here, where the honest
- * expectation is that a request to this machine is already done.
- */
-function ProviderListSkeleton() {
-  const widths = [
-    { title: '38%', detail: '52%' },
-    { title: '31%', detail: '44%' },
-    { title: '42%', detail: '58%' },
-  ]
-  return (
-    <div role="status" aria-label="Loading connections" className="py-1 text-ui">
-      {widths.map((row) => (
-        <div key={row.title} className="flex items-start gap-2.5 py-3">
-          <PlaceholderMark />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <PlaceholderText width={row.title} />
-            {/* Caption-sized: the second line of a real row is a caption, and
-                the skeleton holds its leading too, so the arrival of the rows
-                moves nothing. */}
-            <PlaceholderText width={row.detail} className="mt-0.5 h-[1.375em]" />
-          </div>
-          <Placeholder className="mt-0.5 h-7 w-16 shrink-0 rounded-md" />
-        </div>
-      ))}
-    </div>
-  )
-}
 
 function ProviderList({ providers, kind }: { providers: Providers; kind: ProviderKind }) {
   const { view } = providers

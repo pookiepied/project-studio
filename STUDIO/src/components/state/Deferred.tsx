@@ -9,6 +9,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from 'react'
+import { Loading } from '@/components/state/Loading'
 import { RetryButton } from '@/components/state/RetryButton'
 import { StateNote } from '@/components/state/StateNote'
 
@@ -29,13 +30,14 @@ import { StateNote } from '@/components/state/StateNote'
  * not be fetched. Both are drawn here rather than at each seam, so every
  * lazy surface waits and fails the same way.
  *
- * Waiting is a skeleton, after a pause. The chunk is usually local and lands
- * in a few frames; a skeleton that flashed for those frames would be the
- * only thing the person saw of it. So nothing is drawn for `DELAY_MS`, then
- * the caller's skeleton - which is composed from the placeholder primitives
- * where the content is composed, so the handover is a change of fill rather
- * than a jump (`Placeholder`). The region announces itself once, through
- * `role="status"` and the label the caller gives it.
+ * Waiting is the app's one wait (`Loading`), after a pause. The chunk is
+ * usually local and lands in a few frames; an indicator that flashed for
+ * those frames would be the only thing the person saw of it. So nothing is
+ * drawn for `DELAY_MS`, then the dots. A caller with something truer to show
+ * meanwhile - the plain code a highlighter will colour, the poster a player
+ * will play - passes it as `fallback`; that is content, not a stand-in. The
+ * region announces itself once, through `role="status"` and the label the
+ * caller gives it.
  *
  * Failing is a `StateNote` with a retry. A chunk that cannot be fetched is
  * ordinary at the moment an update replaces the files under a running app,
@@ -43,16 +45,16 @@ import { StateNote } from '@/components/state/StateNote'
  * re-mounts the boundary, which asks React to import the chunk again.
  */
 
-/** How long a wait is invisible before the skeleton shows. */
+/** How long a wait is invisible before the dots show. */
 const DELAY_MS = 150
 
 export function Deferred({
-  fallback,
+  fallback = <Loading immediate />,
   label,
   children,
 }: {
-  /** The skeleton of the content, composed where the content is composed. */
-  fallback: ReactNode
+  /** Something true to show meanwhile; the dots when there is nothing. */
+  fallback?: ReactNode
   /** What is loading, for the status region: "Settings", "Video player". */
   label: string
   children: ReactNode

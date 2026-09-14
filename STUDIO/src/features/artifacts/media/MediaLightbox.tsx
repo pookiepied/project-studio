@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { DURATION, EASE_IN, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton, Overlay } from '@/components/primitives'
-import { Placeholder } from '@/components/placeholder/Placeholder'
 import { Deferred, lazyNamed } from '@/components/state'
 
 const VideoPlayer = lazyNamed(
@@ -74,17 +73,19 @@ export function MediaLightbox({
           {video && src ? (
             // The player's chrome is a chunk of its own: most sessions never
             // open a video. While it arrives the poster stands where the
-            // frame will be, under the house sweep, so the box does not jump
-            // when the controls land.
+            // frame will be, dimmed, so the box does not jump when the
+            // controls land; with no poster, the app's one wait.
             <Deferred
               label="Video player"
-              fallback={
-                <Placeholder className="size-full">
-                  {poster ? (
-                    <img src={poster} alt="" className="size-full object-contain opacity-60" />
-                  ) : null}
-                </Placeholder>
-              }
+              {...(poster
+                ? {
+                    fallback: (
+                      <span aria-hidden className="block size-full bg-selected">
+                        <img src={poster} alt="" className="size-full object-contain opacity-60" />
+                      </span>
+                    ),
+                  }
+                : {})}
             >
               <VideoPlayer src={src} poster={poster} title={title} autoPlay />
             </Deferred>

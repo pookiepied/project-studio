@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
-import { Placeholder, PlaceholderText } from '@/components/placeholder'
-import { RetryButton, StateNote } from '@/components/state'
+import { Loading, RetryButton, StateNote } from '@/components/state'
 import type { HarnessFailure } from '@/platform/harness'
 import { useWorkspace } from '@/stores/workspace'
 import { Pane } from '@/features/settings/panes/Pane'
@@ -115,7 +114,7 @@ export function ArchivePane() {
       description="Kept for as long as you want them. Nothing here expires."
     >
       {storePhase.status === 'loading' ? (
-        <ArchiveSkeleton />
+        <Loading label="Loading the archive" />
       ) : storePhase.status === 'no-harness' ? (
         <StateNote
           title="The harness is not running."
@@ -239,24 +238,3 @@ export function ArchivePane() {
   )
 }
 
-/**
- * The archive's rows, before the archive arrives: checkbox, title, restore --
- * the real row's exact cast, holding its shape.
- */
-function ArchiveSkeleton() {
-  return (
-    <div
-      role="status"
-      aria-label="Loading the archive"
-      className="flex flex-col divide-y"
-    >
-      {['44%', '61%', '38%', '52%'].map((width) => (
-        <div key={width} className="flex items-center gap-2.5 py-2.5">
-          <Placeholder className="size-4 shrink-0 rounded-xs" />
-          <PlaceholderText width={width} className="text-ui" />
-          <Placeholder className="h-7 w-16 shrink-0 rounded-md" />
-        </div>
-      ))}
-    </div>
-  )
-}

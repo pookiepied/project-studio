@@ -44,11 +44,15 @@ export const FLIGHT_BELT_MS = 1_600
 
 /**
  * How long the open holds at the top once there is content, before the
- * journey down begins: the reveal's own duration, then a moment to have
- * seen it. Counted from the first frame with something to scroll, not from
+ * journey down begins. Short on purpose: the transcript is still rising
+ * into place (`DURATION.slow`) when the travel starts, so the two read as
+ * one motion - the page arrives and is already on its way. It was the
+ * reveal plus a beat at first, and a page that sits still at the top of a
+ * long conversation looks finished; the reader starts reading, and then it
+ * leaves. Counted from the first frame with something to scroll, not from
  * mount - the replay's first delivery may be a while coming.
  */
-export const OPEN_HOLD_MS = DURATION.slow * 1000 + 200
+export const OPEN_HOLD_MS = DURATION.fast * 1000
 
 /**
  * ---- The open ------------------------------------------------------------
@@ -74,11 +78,12 @@ export const OPEN_HOLD_MS = DURATION.slow * 1000 + 200
  * to be.
  *
  * The open is also paced. The transcript arrives at the top of the viewport
- * and reveals itself there (`ChatPage`); the journey to the bottom waits
- * for that reveal and a beat more (`OPEN_HOLD_MS`) before it starts, and
- * then runs at the open's own, gentler rate (`OPEN_STIFFNESS`). Without the
- * hold the first frame of content and the first frame of travel were the
- * same frame, and the reader saw a page that appeared already leaving.
+ * and reveals itself there (`ChatPage`); the journey to the bottom starts
+ * a breath into that reveal (`OPEN_HOLD_MS`) and runs at the open's own,
+ * gentler rate (`OPEN_STIFFNESS`), so the arriving and the travelling are
+ * one motion. Without the breath the first frame of content and the first
+ * frame of travel were the same frame, and the page appeared already
+ * leaving; with a long one it looked finished, and then left.
 
 /** Keys that scroll. Without these, paging up during a stream fights the follow. */
 const SCROLL_KEYS = new Set([

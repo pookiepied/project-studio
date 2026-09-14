@@ -3,7 +3,7 @@ import { Deferred, lazyNamed } from '@/components/state'
 import { AppearancePane } from '@/features/settings/panes/AppearancePane'
 import { ArchivePane } from '@/features/settings/panes/ArchivePane'
 import { GeneralPane } from '@/features/settings/panes/GeneralPane'
-import { PaneSkeleton, PlaceholderPane } from '@/features/settings/panes/Pane'
+import { PlaceholderPane } from '@/features/settings/panes/Pane'
 import { PLACEHOLDERS } from '@/features/settings/panes/placeholders'
 
 // The four heavy panes arrive when first opened. General, appearance and
@@ -23,7 +23,7 @@ const DevicesPane = lazyNamed(() => import('@/features/settings/devices/DevicesP
 
 function deferred(label: string, pane: ReactNode): () => ReactNode {
   return () => (
-    <Deferred label={label} fallback={<PaneSkeleton />}>
+    <Deferred label={label}>
       {pane}
     </Deferred>
   )
