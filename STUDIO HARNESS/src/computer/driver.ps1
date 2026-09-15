@@ -52,6 +52,7 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
 '@
 
 [void][Studio.Native]::SetProcessDPIAware()
@@ -251,10 +252,44 @@ function Send-Mouse([uint32]$flags, [int]$data) {
   Send-Inputs ([Studio.Native+INPUT[]]@((New-Input 0 $u))) "mouse input"
 }
 
+# A move is an input event, not a teleport. SetCursorPos puts the pointer
+# somewhere without telling the window under it that anything moved, and a
+# canvas that draws on the move stream between a press and a release sees
+# down, then up, then nothing in between: measured on 2026-09-15 as Paint
+# committing "0 x 0px" shapes for half of all drags, and dropping an instant
+# click on the canvas while the ribbon took the same click every time. So a
+# move is injected (absolute, on the virtual desktop), and SetCursorPos then
+# pins the exact pixel that the 16-bit scale may have rounded.
+function Send-MouseTo([int]$ax, [int]$ay, [uint32]$extraFlags) {
+  $vx = [Studio.Native]::GetSystemMetrics(76); $vy = [Studio.Native]::GetSystemMetrics(77)
+  $vw = [Studio.Native]::GetSystemMetrics(78); $vh = [Studio.Native]::GetSystemMetrics(79)
+  $mi = New-Object Studio.Native+MOUSEINPUT
+  $mi.dx = [int][Math]::Round((($ax - $vx) * 65535.0) / [Math]::Max(1, $vw - 1))
+  $mi.dy = [int][Math]::Round((($ay - $vy) * 65535.0) / [Math]::Max(1, $vh - 1))
+  $mi.dwFlags = [uint32](0x0001 -bor 0x8000 -bor 0x4000 -bor $extraFlags)
+  $u = New-Object Studio.Native+INPUTUNION
+  $u.mi = $mi
+  Send-Inputs ([Studio.Native+INPUT[]]@((New-Input 0 $u))) "pointer move"
+}
+
 function Move-Pointer($display, $x, $y) {
   $a = To-Absolute $display $x $y
+  Send-MouseTo $a.x $a.y 0
   [void][Studio.Native]::SetCursorPos($a.x, $a.y)
   Start-Sleep -Milliseconds 20
+}
+
+# Whether a point of a display lies inside the window being worked in. A
+# drag that starts seven pixels above a canvas draws nothing and says so
+# nowhere; this lets the answer say it.
+function Outside-Target($display, $x, $y) {
+  if ($script:Target -eq 0) { return $false }
+  $h = [IntPtr]$script:Target
+  if (-not [Studio.Native]::IsWindow($h)) { return $false }
+  $r = New-Object Studio.Native+RECT
+  [void][Studio.Native]::GetWindowRect($h, [ref]$r)
+  $a = To-Absolute $display $x $y
+  return ($a.x -lt $r.Left -or $a.x -ge $r.Right -or $a.y -lt $r.Top -or $a.y -ge $r.Bottom)
 }
 
 $ButtonFlags = @{
@@ -270,30 +305,41 @@ function Press-Button($button, $direction) {
 }
 
 function Click-At($display, $x, $y, $button, $count, $modifiers) {
-  if ((Given $x)) { Move-Pointer $display $x $y }
+  # The move, then a beat for the window to take it, so the press lands on
+  # a control that knows the pointer is over it. 50 ms is what a person's
+  # hand gives it; a press in the same instant as the move is what a canvas
+  # drops.
+  if ((Given $x)) { Move-Pointer $display $x $y; Start-Sleep -Milliseconds 50 }
   $b = if (-not (Given $button)) { "left" } else { $button }
   $n = if (-not (Given $count)) { 1 } else { [int]$count }
   $held = Press-Modifiers $modifiers $true
   try {
     for ($i = 0; $i -lt $n; $i++) {
-      Press-Button $b "down"; Start-Sleep -Milliseconds 30; Press-Button $b "up"
+      Press-Button $b "down"; Start-Sleep -Milliseconds 40; Press-Button $b "up"
       if ($i -lt $n - 1) { Start-Sleep -Milliseconds 60 }
     }
   } finally { Press-Modifiers $held $false | Out-Null }
 }
 
+# A drag the way a hand does it: arrive, settle, press, settle, move in
+# steps with time between them, arrive at the end, settle, release. Every
+# position is an injected move (see Move-Pointer), so the window sees the
+# whole stream and not just its two ends.
 function Drag-Pointer($display, $from, $to) {
-  Move-Pointer $display $from[0] $from[1]
+  $fx = [int]$from[0]; $fy = [int]$from[1]; $tx = [int]$to[0]; $ty = [int]$to[1]
+  Move-Pointer $display $fx $fy
+  Start-Sleep -Milliseconds 60
   Press-Button "left" "down"
   Start-Sleep -Milliseconds 80
-  # A few intermediate positions, because a drop target that watches
-  # WM_MOUSEMOVE never sees a pointer that teleports.
-  $fx = [int]$from[0]; $fy = [int]$from[1]; $tx = [int]$to[0]; $ty = [int]$to[1]
-  for ($s = 1; $s -le 8; $s++) {
-    Move-Pointer $display ($fx + ($tx - $fx) * $s / 8) ($fy + ($ty - $fy) * $s / 8)
-    Start-Sleep -Milliseconds 25
+  $steps = [Math]::Max(6, [Math]::Min(24, [int]([Math]::Sqrt(($tx - $fx) * ($tx - $fx) + ($ty - $fy) * ($ty - $fy)) / 25)))
+  for ($s = 1; $s -le $steps; $s++) {
+    Move-Pointer $display ([int]($fx + ($tx - $fx) * $s / $steps)) ([int]($fy + ($ty - $fy) * $s / $steps))
+    Start-Sleep -Milliseconds 20
   }
+  Move-Pointer $display $tx $ty
+  Start-Sleep -Milliseconds 60
   Press-Button "left" "up"
+  Start-Sleep -Milliseconds 60
 }
 
 function Scroll-At($display, $x, $y, $direction, $amount) {
@@ -938,8 +984,26 @@ while ($true) {
       "wait_window" { Answer $id (Wait-ForWindow $a.text $a.seconds) }
       "cursor" { Answer $id (Get-Cursor) }
       "move" { Move-Pointer $a.display $a.x $a.y; Answer $id (Get-Cursor) }
-      "click" { Click-At $a.display $a.x $a.y $a.button $a.count $a.modifiers; Start-Sleep -Milliseconds 80; Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow())); Answer $id (Get-Cursor) }
-      "drag" { Drag-Pointer $a.display $a.from $a.to; Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow())); Answer $id (Get-Cursor) }
+      "click" {
+        $outside = (Given $a.x) -and (Outside-Target $a.display $a.x $a.y)
+        Click-At $a.display $a.x $a.y $a.button $a.count $a.modifiers
+        # A beat for the window to act on the click before the picture that
+        # rides along is taken, or the picture shows the moment before.
+        Start-Sleep -Milliseconds 150
+        Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow()))
+        $c = Get-Cursor; if ($outside) { $c.outside = "The point was outside the window being worked in before the click; whatever is there took it instead." }
+        Answer $id $c
+      }
+      "drag" {
+        $note = $null
+        if (Outside-Target $a.display $a.from[0] $a.from[1]) { $note = "The drag started outside the window being worked in, so that window saw none of it." }
+        elseif (Outside-Target $a.display $a.to[0] $a.to[1]) { $note = "The drag ended outside the window being worked in." }
+        Drag-Pointer $a.display $a.from $a.to
+        Start-Sleep -Milliseconds 150
+        Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow()))
+        $c = Get-Cursor; if ($null -ne $note) { $c.outside = $note }
+        Answer $id $c
+      }
       "button" { Press-Button $(if ($a.button) { $a.button } else { "left" }) $a.action; Answer $id ([ordered]@{ done = $true }) }
       "scroll" { Scroll-At $a.display $a.x $a.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true }) }
       "type" { Assert-Target "type"; Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length; front = (Front-Note) }) }

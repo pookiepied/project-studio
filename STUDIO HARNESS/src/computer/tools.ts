@@ -187,8 +187,13 @@ async function acted(session: ComputerSession, said: string, display: number | u
  * characters" stand for text that reached nothing.
  */
 function withFront(said: string, sent: unknown): string {
-  const front = isRecord(sent) && typeof sent["front"] === "string" ? sent["front"] : "";
-  return front === "" ? said : `${said} ${front}`;
+  return withNote(said, sent, "front");
+}
+
+/** What was said, plus a named note from the driver's answer when there is one. */
+function withNote(said: string, sent: unknown, key: string): string {
+  const note = isRecord(sent) && typeof sent[key] === "string" ? sent[key] : "";
+  return note === "" ? said : `${said} ${note}`;
 }
 
 /** One window, as status and arrange describe it: name, app, display, place, state. */
@@ -359,7 +364,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (count < 1 || count > 3) {
         throw new ComputerError("bad_input", { message: "count must be 1, 2 or 3." });
       }
-      await session.request("click", {
+      const sent = await session.request("click", {
         ...displayArg(input),
         x: requiredNumber(input, "x"),
         y: requiredNumber(input, "y"),
@@ -368,7 +373,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         modifiers: str(input, "modifiers") ?? "",
       });
       const what = count === 1 ? "Clicked" : count === 2 ? "Double-clicked" : "Triple-clicked";
-      return acted(session, `${what}.`, num(input, "display"));
+      return acted(session, withNote(`${what}.`, sent, "outside"), num(input, "display"));
     },
   },
 
@@ -391,8 +396,8 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (!isPoint(from) || !isPoint(to)) {
         throw new ComputerError("bad_input", { message: "Give from and to as [x, y]." });
       }
-      await session.request("drag", { ...displayArg(input), from, to });
-      return acted(session, "Dragged.", num(input, "display"));
+      const sent = await session.request("drag", { ...displayArg(input), from, to });
+      return acted(session, withNote("Dragged.", sent, "outside"), num(input, "display"));
     },
   },
 
