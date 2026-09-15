@@ -154,16 +154,21 @@ async function stopHarness(child: ChildProcess): Promise<void> {
 }
 
 async function readDump(dumpPath: string): Promise<DumpedTelemetry> {
+  // Wait for a dump that parses, not merely one that exists: the exporter
+  // writes the file in place, and a read that lands between the open and the
+  // last byte sees "Unexpected end of JSON input" (measured under a full run
+  // on 2026-09-15).
+  let dump: DumpedTelemetry | null = null;
   await waitUntil(async () => {
     try {
-      await readFile(dumpPath, "utf8");
+      dump = JSON.parse(await readFile(dumpPath, "utf8")) as DumpedTelemetry;
       return true;
     } catch {
       return false;
     }
   }, 10_000);
-
-  return JSON.parse(await readFile(dumpPath, "utf8")) as DumpedTelemetry;
+  if (dump === null) throw new Error(`No telemetry dump was written at ${dumpPath}.`);
+  return dump;
 }
 
 function metricNames(dump: DumpedTelemetry): string[] {
