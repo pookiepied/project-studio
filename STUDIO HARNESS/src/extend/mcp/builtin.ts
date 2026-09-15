@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { platform } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,10 +9,9 @@ import type { McpServerInput, McpServerRegistry } from "./registry.js";
 /**
  * The capabilities Studio ships as MCP servers of its own.
  *
- * There is one so far — the browser — and the shape exists because a second is
- * a matter of time, and because the alternative is a special case for the
- * browser threaded through the registry, the settings screen and the
- * reconciler.
+ * There are two — the browser and the computer — and the shape exists because
+ * the alternative is a special case for each threaded through the registry,
+ * the settings screen and the reconciler.
  *
  * **They are rows like any other**, and that is the point of doing it this way.
  * A built-in server appears in settings, can be switched off per project or per
@@ -27,6 +27,9 @@ import type { McpServerInput, McpServerRegistry } from "./registry.js";
 /** The browser's stable id. Referred to by name in the UI and in tests. */
 export const BROWSER_SERVER_ID = "studio-browser";
 
+/** The computer-use server's stable id. */
+export const COMPUTER_SERVER_ID = "studio-computer";
+
 /**
  * Where the built bundle is, from wherever this code is running.
  *
@@ -37,13 +40,22 @@ export const BROWSER_SERVER_ID = "studio-browser";
  * which is the right behaviour for a developer who has only built half of it.
  */
 export function browserServerPath(): string | undefined {
+  return bundledEntry("browser.mjs");
+}
+
+/** Where the computer server's bundle is, by the same search. */
+export function computerServerPath(): string | undefined {
+  return bundledEntry("computer.mjs");
+}
+
+function bundledEntry(file: string): string | undefined {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    // Bundled: this file is inside dist/, and so is the browser entry.
-    join(here, "browser.mjs"),
+    // Bundled: this file is inside dist/, and so is the entry.
+    join(here, file),
     // From source, under vitest: src/extend/mcp/ → the sibling dist.
-    resolve(here, "..", "..", "..", "dist", "browser.mjs"),
-    resolve(here, "..", "..", "dist", "browser.mjs"),
+    resolve(here, "..", "..", "..", "dist", file),
+    resolve(here, "..", "..", "dist", file),
   ];
   return candidates.find((path) => existsSync(path));
 }
@@ -83,6 +95,34 @@ function browserRecord(entry: string): McpServerInput {
 }
 
 /**
+ * What the computer server's row says.
+ *
+ * The sentence names the jobs, not the mechanism, like the browser's. On a
+ * machine that is not Windows the row still exists - the person can see the
+ * capability and what it needs - but it is switched off by default, because
+ * a default that fails on first use is a default that lies. `needsNetwork`
+ * is false: the desktop is local, and the flag is not what governs the
+ * boundary anyway (a system server is not contained).
+ */
+function computerRecord(entry: string): McpServerInput {
+  return {
+    id: COMPUTER_SERVER_ID,
+    title: "Computer",
+    description:
+      "Uses this computer's screen, mouse and keyboard: see what is on a display, open and " +
+      "arrange windows, read an application's controls and press them, type, and use the " +
+      "clipboard. For anything a desktop application does that a web page cannot.",
+    provenance: "system",
+    transport: "stdio",
+    command: process.execPath,
+    args: [entry],
+    env: {},
+    auth: "none",
+    needsNetwork: false,
+  };
+}
+
+/**
  * Puts the built-in servers in the registry, and switches them on by default.
  *
  * Called once at start. Both halves are idempotent, which they have to be: the
@@ -101,11 +141,22 @@ export function registerBuiltInServers(
   registry: McpServerRegistry,
   selection: ExtensionSelectionStore,
 ): void {
-  const entry = browserServerPath();
-  if (entry === undefined) return;
+  const browser = browserServerPath();
+  if (browser !== undefined) install(registry, selection, browserRecord(browser), true);
 
-  const record = browserRecord(entry);
-  const existing = registry.get(BROWSER_SERVER_ID);
+  const computer = computerServerPath();
+  if (computer !== undefined) {
+    install(registry, selection, computerRecord(computer), platform() === "win32");
+  }
+}
+
+function install(
+  registry: McpServerRegistry,
+  selection: ExtensionSelectionStore,
+  record: McpServerInput,
+  onByDefault: boolean,
+): void {
+  const existing = registry.get(record.id);
 
   // Written every start, so that a moved installation or a rebuilt bundle
   // updates the path rather than leaving a row pointing at a file that is not
@@ -118,6 +169,6 @@ export function registerBuiltInServers(
     registry.save(record);
   }
 
-  const key = { kind: "mcp", extensionId: BROWSER_SERVER_ID, scope: GLOBAL_SCOPE } as const;
-  if (selection.decisionAt(key) === undefined) selection.set(key, true);
+  const key = { kind: "mcp", extensionId: record.id, scope: GLOBAL_SCOPE } as const;
+  if (selection.decisionAt(key) === undefined) selection.set(key, onByDefault);
 }

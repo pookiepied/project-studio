@@ -75,7 +75,11 @@ function studioServerEntry(): PluginOption {
             // which is what the isolation is for, and a separate build would
             // buy nothing but a third `pnpm install` and a third staleness
             // check in `start.ps1`.
-            browser: "src/browser/server.ts"
+            browser: "src/browser/server.ts",
+            // The computer-use capability, the second server of Studio's
+            // own (ADR 0055). Its PowerShell driver travels inside this
+            // bundle as a string (`?raw`) and is written out at first use.
+            computer: "src/computer/server.ts"
           },
           // Playwright resolves its own driver files by path at runtime and
           // cannot survive being bundled. It stays a real dependency, resolved

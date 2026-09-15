@@ -478,6 +478,14 @@ describe("nothing the model chose reaches a process uncontained", () => {
       [join("src", "host", "harness-launcher.ts"), "starts the trusted process"],
       // Opens the user's browser for sign-in. Not an agent action at all.
       [join("src", "auth", "google-login.ts"), "opens the user's browser"],
+      // The computer-use driver (ADR 0055): Windows PowerShell running a
+      // script Studio wrote, inside the computer server's own process, which
+      // is itself a system-provenance MCP server the harness launched
+      // uncontained on purpose (ADR 0049's amendment). Nothing here is a
+      // program the model chose - the model chooses a tool, and the gate
+      // and the kernel decide that call like any other. A driver the
+      // sandbox contained could not move the pointer, which is its job.
+      [join("src", "computer", "session.ts"), "drives the desktop, and is ours"],
     ]);
 
     const importers: string[] = [];

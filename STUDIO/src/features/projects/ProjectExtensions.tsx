@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icons } from '@/components/icons'
+import { extensionMark } from '@/components/icons/extensionMark'
 import { Loading, StateNote } from '@/components/state'
 import { ScopeToggle, inheritSentence } from '@/features/settings/mcp/ScopeToggle'
 import { useMcpServers } from '@/features/settings/mcp/useMcpServers'
@@ -127,9 +127,7 @@ function ScopeRow({
 
   return (
     <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
-      <span className="shrink-0">
-        <Icons.mcp />
-      </span>
+      <span className="shrink-0">{extensionMark(server)}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-ui text-foreground">{server.title}</p>
         {server.description === '' ? null : (

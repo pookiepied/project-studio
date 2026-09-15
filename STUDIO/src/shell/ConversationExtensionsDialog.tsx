@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icons } from '@/components/icons'
+import { extensionMark } from '@/components/icons/extensionMark'
 import { Dialog } from '@/components/primitives'
 import { StateNote } from '@/components/state/StateNote'
 import { ScopeToggle, inheritSentence } from '@/features/settings/mcp/ScopeToggle'
@@ -163,9 +163,7 @@ function ConversationScopeRow({
   return (
     <div className="flex items-start justify-between gap-4 py-3">
       <div className="flex min-w-0 flex-1 items-start gap-2.5">
-        <span className="mt-0.5 shrink-0">
-          <Icons.mcp />
-        </span>
+        <span className="mt-0.5 shrink-0">{extensionMark(server)}</span>
         <div className="min-w-0">
           <p className="truncate text-ui text-foreground">{server.title}</p>
           {server.description === '' ? null : (

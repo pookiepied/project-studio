@@ -29,7 +29,7 @@ import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
-  MoreHorizontal, Moon, MessageCircleQuestionMark, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
+  MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
@@ -232,6 +232,10 @@ const REGISTRY = {
   skill: { mark: WandSparkles },
   hook: { mark: Webhook },
   browserUse: { mark: Globe },
+  // The desktop, driven: a pointer mid-click. Not `themeSystem`'s monitor,
+  // which means "follow the OS", and not `devices`, which is the same Studio
+  // on two screens. This is Studio acting on the screen.
+  computerUse: { mark: MousePointerClick },
   // Commands the model left running. `run` is already a terminal and means the
   // act of running something; this means the things that are still running, so
   // it is the same idea in the plural and takes a different mark rather than a

@@ -99,6 +99,14 @@ export type StudioErrorDomain =
    * person at all.
    */
   | "browser"
+  /**
+   * The computer-use capability: the desktop, driven through what Windows
+   * already has. The browser's reasoning applies unchanged - "this is not
+   * Windows" is answered by a person and "that element is gone" by the
+   * model - and the failures travel the same way, as the text of a tool
+   * result over MCP.
+   */
+  | "computer"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

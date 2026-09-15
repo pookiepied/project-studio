@@ -6,6 +6,8 @@ import { ExtensionInventory } from "../../src/extend/inventory.js";
 import {
   BROWSER_SERVER_ID,
   browserServerPath,
+  COMPUTER_SERVER_ID,
+  computerServerPath,
   registerBuiltInServers,
 } from "../../src/extend/mcp/builtin.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
@@ -77,6 +79,23 @@ describe("Studio's own capabilities become ordinary rows", () => {
     selection.set(KEY, false);
     registerBuiltInServers(registry, selection);
     expect(selection.decisionAt(KEY)).toBe(false);
+  });
+
+  it("installs the computer beside it, on by default only where it can work", () => {
+    // ADR 0055. The row exists everywhere so a person can see the capability
+    // and what it needs; the default is on only on Windows, because a default
+    // that fails on first use is a default that lies.
+    if (computerServerPath() === undefined) return;
+    registerBuiltInServers(registry, selection);
+    const record = registry.get(COMPUTER_SERVER_ID);
+    expect(record?.provenance).toBe("system");
+    expect(record?.transport).toBe("stdio");
+    expect(record?.command).toBe(process.execPath);
+    expect(record?.args[0]).toMatch(/computer\.mjs$/);
+    expect(record?.needsNetwork).toBe(false);
+    expect((record?.description ?? "").length).toBeGreaterThan(40);
+    const key = { kind: "mcp", extensionId: COMPUTER_SERVER_ID, scope: GLOBAL_SCOPE } as const;
+    expect(selection.decisionAt(key)).toBe(process.platform === "win32");
   });
 
   it("is idempotent, because the harness restarts constantly", () => {

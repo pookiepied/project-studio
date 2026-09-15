@@ -3,8 +3,9 @@ import { Hono } from "hono";
 import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
 import { authContext, requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
 import { engineReport } from "../../../browser/resolve.js";
+import { computerReport } from "../../../computer/resolve.js";
 import { ExtendError } from "../../../extend/errors.js";
-import { BROWSER_SERVER_ID } from "../../../extend/mcp/builtin.js";
+import { BROWSER_SERVER_ID, COMPUTER_SERVER_ID } from "../../../extend/mcp/builtin.js";
 import { assertSafeMcpPayload } from "../../../extend/mcp/input-security.js";
 import type { McpServerInput } from "../../../extend/mcp/registry.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
@@ -174,6 +175,14 @@ function readContext(context: { req: { query(name: string): string | undefined }
   };
 }
 
+/** The computer row's line, in the same shape the browser row uses. */
+function computerReportForRow(): { seen?: { name: string; at: string }; alsoSeen: string[]; summary: string } {
+  const report = computerReport();
+  return report.available
+    ? { seen: { name: "Windows PowerShell", at: "" }, alsoSeen: [], summary: report.summary }
+    : { alsoSeen: [], summary: report.summary };
+}
+
 export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.EXTENSION_MANAGEMENT));
@@ -181,13 +190,18 @@ export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> 
   routes.get("/servers", (context) =>
     context.json(
       servers.list(readContext(context)).map((record) =>
-        // The browser server starts fine on a machine with no browser - the
-        // failure lives in the first tool call, which is the worst place for
-        // a person to learn about it. So the row that shows the server also
-        // says which browser it would drive, or that none was seen and what
-        // to install, read fresh on every list so an install shows up on the
-        // next look without a restart.
-        record.id === BROWSER_SERVER_ID ? { ...record, engine: engineReport() } : record,
+        // A built-in server starts fine on a machine that cannot do its job -
+        // the failure lives in the first tool call, which is the worst place
+        // for a person to learn about it. So the row that shows the server
+        // also says what the first call would find: which browser would be
+        // driven, or whether this desktop can be driven at all. Read fresh on
+        // every list so an install shows up on the next look without a
+        // restart.
+        record.id === BROWSER_SERVER_ID
+          ? { ...record, engine: engineReport() }
+          : record.id === COMPUTER_SERVER_ID
+            ? { ...record, engine: computerReportForRow() }
+            : record,
       ),
     ),
   );

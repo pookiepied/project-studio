@@ -2,6 +2,7 @@ import { Loading } from '@/components/state'
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
+import { extensionMark } from '@/components/icons/extensionMark'
 import { Button, IconButton, Segmented } from '@/components/primitives'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Pane } from '@/features/settings/panes/Pane'
@@ -186,9 +187,7 @@ function ServerRow({
   return (
     <div className="flex items-start justify-between gap-6 py-3.5">
       <div className="flex min-w-0 flex-1 items-start gap-2.5">
-        <span className="mt-0.5 shrink-0">
-          <Icons.mcp />
-        </span>
+        <span className="mt-0.5 shrink-0">{extensionMark(server)}</span>
         <div className="min-w-0">
           <p className="truncate text-ui text-foreground">{server.title}</p>
           {/* Above the reach, and only when there is one. This is the sentence

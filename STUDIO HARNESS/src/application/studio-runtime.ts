@@ -881,6 +881,7 @@ export class StudioRuntime implements AgentHost {
       id: McpServerRegistry.namespaceOf(record.id),
       description: record.description,
       toolNames: names.get(McpServerRegistry.namespaceOf(record.id)) ?? [],
+      builtIn: record.provenance === "system",
     }));
   }
 

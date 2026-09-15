@@ -57,12 +57,12 @@ function fakeTool(name: string, description: string, inputSchema: Record<string,
  * the id and the description are read; the rest of the record exists because
  * the type says a record has it, and a saved row always does.
  */
-function fakeRecord(id: string, description: string): McpServerRecord {
+function fakeRecord(id: string, description: string, provenance: McpServerRecord["provenance"] = "user"): McpServerRecord {
   return {
     id,
     title: id,
     description,
-    provenance: "user",
+    provenance,
     transport: "stdio",
     command: process.platform === "win32" ? "C:/tools/program.exe" : "/tools/program",
     args: [],
@@ -77,6 +77,28 @@ interface FakeExtension {
   readonly description: string;
   readonly resolution: Resolution;
   readonly tools: readonly McpTool[];
+  readonly provenance?: McpServerRecord["provenance"];
+}
+
+/** A capability Studio wrote, as the browser and the computer are registered. */
+function studioComputer(): FakeExtension {
+  const tool = fakeTool("studio_computer_screenshot", "See what is on a display.", { type: "object", properties: {} });
+  return {
+    id: "studio-computer",
+    description: "Uses this computer's screen, mouse and keyboard.",
+    resolution: { enabled: true },
+    provenance: "system",
+    tools: [
+      {
+        ...tool,
+        descriptor: {
+          ...tool.descriptor,
+          id: { namespace: "mcp:studio-computer", name: "studio_computer_screenshot" },
+          provenance: { origin: "mcp", sourceId: "studio-computer", author: "studio" },
+        },
+      },
+    ],
+  };
 }
 
 function blender(overrides: Partial<FakeExtension> = {}): FakeExtension {
@@ -116,7 +138,7 @@ function world(extensions: readonly FakeExtension[], entries: readonly Capabilit
       return extension === undefined
         ? undefined
         : {
-            record: fakeRecord(extension.id, extension.description),
+            record: fakeRecord(extension.id, extension.description, extension.provenance),
             resolution: extension.resolution,
           };
     },
@@ -185,6 +207,22 @@ describe("the discovery's answers", () => {
       answer.indexOf("Blender scene and object manipulation."),
     );
     expect(adopted).toEqual([]);
+  });
+
+  it("describes a capability Studio wrote in Studio's voice, with no third-party framing", async () => {
+    // ADR 0055: the browser and the computer are Studio's own. Telling the
+    // model to distrust their descriptions would be telling it to distrust
+    // the harness, so the note is for a third party's words alone.
+    const { discover } = world([studioComputer()], [
+      { id: "mcp:studio-computer", description: "Uses this computer's screen, mouse and keyboard.", toolNames: ["studio_computer_screenshot"], builtIn: true },
+    ]);
+    const listing = await answered(discover, { scope: "mcp:studio-computer" });
+    expect(listing).toContain("Built into Studio.");
+    expect(listing).not.toContain("extension's own words");
+
+    const definition = await answered(discover, { scope: "mcp:studio-computer/studio_computer_screenshot" });
+    expect(definition).toContain("mcp:studio-computer/studio_computer_screenshot");
+    expect(definition).not.toContain("extension's own words");
   });
 
   it("returns one tool's definition, and adopts exactly the tool it promised", async () => {

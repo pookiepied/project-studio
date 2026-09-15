@@ -141,6 +141,45 @@ describe("what the inventory says about a server", () => {
   });
 });
 
+describe("a capability Studio wrote is announced as Studio's own", () => {
+  it("puts built-in capabilities in their own section, in Studio's voice", () => {
+    // ADR 0055: the browser and the computer are as native as read or shell
+    // and live behind discovery only because their schemas are many. A model
+    // told to distrust their sentences would be told to distrust the harness.
+    const block = capabilityInventoryBlock([
+      entry({ id: "mcp:studio-browser", description: "Opens web pages.", builtIn: true }),
+      entry({ id: "mcp:blender" }),
+    ]);
+    const builtIn = block.indexOf("## Built into Studio");
+    const extensions = block.indexOf("## Extensions");
+    expect(builtIn).toBeGreaterThan(-1);
+    expect(extensions).toBeGreaterThan(builtIn);
+    // The entry lines, not the intro's example ids, which mention mcp:blender.
+    const browserLine = block.indexOf("mcp:studio-browser - Opens web pages.");
+    const blenderLine = block.indexOf("mcp:blender - Blender scene");
+    expect(browserLine).toBeGreaterThan(builtIn);
+    expect(browserLine).toBeLessThan(extensions);
+    expect(blenderLine).toBeGreaterThan(extensions);
+    expect(block).toContain("as native as the tools already in");
+    expect(block).toContain("The sentences below are Studio's.");
+  });
+
+  it("carries no extensions section, and no third-party warning, when only built-ins are on", () => {
+    const block = capabilityInventoryBlock([
+      entry({ id: "mcp:studio-computer", description: "Uses this computer.", builtIn: true }),
+    ]);
+    expect(block).toContain("## Built into Studio");
+    expect(block).not.toContain("## Extensions");
+    expect(block).not.toContain("whoever wrote");
+  });
+
+  it("still explains discovery once, for both kinds", () => {
+    const block = capabilityInventoryBlock([entry({ id: "mcp:studio-browser", builtIn: true })]);
+    expect(block).toContain("discover tool");
+    expect(block).toContain("not yet a tool you can call");
+  });
+});
+
 describe("the inventory treats every word in it as a third party's", () => {
   it("says whose words they are before any of them appear", () => {
     // `capabilities.ts` prefixes every MCP tool RESULT with the same kind of
