@@ -53,21 +53,10 @@ function tileMotion(index: number, busy: boolean, entrance: boolean): TileMotion
 
   // The trough stays well above invisible: this is a shimmer travelling down
   // the mark, not tiles disappearing and returning.
-  //
-  // The loop begins at rest and mirrors, rather than running a closed
-  // 0.62 -> 1 -> 0.62 cycle: a keyframe list starts on its first value, and
-  // a mark handed `busy` while fully drawn - the splash, once its entrance is
-  // over and the store is still loading - jumped to the trough on the first
-  // frame. Starting from 1 makes the switch a continuation of the entrance.
   return {
     initial: { opacity: 1, scale: 1 },
-    animate: { opacity: [1, 0.62], scale: [1, 0.94] },
-    transition: {
-      ...LOOP.pulse,
-      duration: LOOP.pulse.duration / 2,
-      repeatType: 'mirror',
-      delay: index * (LOOP.pulse.duration / 10),
-    },
+    animate: { opacity: [0.62, 1, 0.62], scale: [0.94, 1, 0.94] },
+    transition: { ...LOOP.pulse, delay: index * (LOOP.pulse.duration / 10) },
   }
 }
 

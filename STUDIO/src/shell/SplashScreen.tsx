@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { StudioMark } from '@/components/brand'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
 
 /**
- * How long the mark's entrance takes: the last tile's delay plus its own
- * duration (`tileMotion` in `StudioMark`). After this the entrance is over,
- * and a splash still waiting has nothing left to play unless told to.
+ * One pass of the preload animation: the tiles assembling (`StudioMark`'s
+ * entrance, the last tile's delay plus its duration) and a moment complete.
+ * A splash still waiting when a pass ends plays it again.
  */
-const ENTRANCE_MS = 1_200
+const PASS_MS = 1_800
 
 /**
  * The preload screen: the brand, arriving.
@@ -24,22 +24,22 @@ export function SplashScreen({
   waiting = false,
 }: {
   /**
-   * The store has not answered yet. The mark's entrance plays once and then
-   * stops, and a splash held past it with a still mark read as a window that
-   * had hung - the harness was starting under it, and nothing said so. Once
-   * the entrance is done, a waiting splash hands the mark its busy shimmer,
-   * the same one the strip shows while a turn runs, so the wait is visibly a
-   * wait. It is the same mark throughout: the shimmer is the entrance's
-   * tiles continuing to move, not a spinner arriving beside them.
+   * The store has not answered yet. The preload animation plays once and
+   * then stood still for as long as the store was loading, and a still mark
+   * over a harness that was starting read as a window that had hung. While
+   * waiting, the same animation plays again: each pass the assembled mark
+   * leaves and the tiles assemble once more, until the store answers and the
+   * splash lifts on the pass it is in. Nothing new is drawn for the wait -
+   * the preload animation is the wait.
    */
   waiting?: boolean
 }) {
-  const [entered, setEntered] = useState(false)
+  const [pass, setPass] = useState(0)
   useEffect(() => {
-    const timer = window.setTimeout(() => setEntered(true), ENTRANCE_MS)
-    return () => window.clearTimeout(timer)
-  }, [])
-  const busy = waiting && entered
+    if (!waiting) return
+    const timer = window.setInterval(() => setPass((current) => current + 1), PASS_MS)
+    return () => window.clearInterval(timer)
+  }, [waiting])
 
   return (
     <motion.div
@@ -72,7 +72,18 @@ export function SplashScreen({
             as a poster rather than a boot state. One step down keeps the
             staircase legible while giving the mark the same margin of quiet
             around it the home greeting has. */}
-        <StudioMark entrance={!busy} busy={busy} size={88} />
+        {/* Keyed by the pass: a new key is the animation from the start,
+            and `wait` lets the finished mark leave before the next pass
+            assembles, so the replay reads as the animation looping rather
+            than the tiles snapping back to nothing. */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={pass}
+            exit={{ opacity: 0, transition: { duration: 0.22, ease: EASE_OUT } }}
+          >
+            <StudioMark entrance size={88} />
+          </motion.div>
+        </AnimatePresence>
       </motion.div>
     </motion.div>
   )
