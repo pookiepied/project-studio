@@ -57,6 +57,17 @@ export interface ConversationRoutesOptions {
     get(conversationId: string, id: string): JobStatus | undefined;
     stop(conversationId: string, id: string): boolean;
   };
+  /**
+   * The person's stop for a conversation's browser (ADR 0049 §4).
+   *
+   * Not a background command: the process belongs to the browser server, so
+   * the stop is a call to it rather than a signal from here. Absent in a
+   * composition with no runtime, and the route then answers "nothing was
+   * running", which is true.
+   */
+  readonly browser?: {
+    stop(conversationId: string): Promise<boolean>;
+  };
 }
 
 /**
@@ -176,6 +187,14 @@ export function createConversationRoutes(
     }
     const job = options.backgroundJobs?.get(context.req.param("id"), context.req.param("jobId"));
     return context.json({ job: job ?? null });
+  });
+
+  // Whether a browser was actually running is the whole answer: "I pressed
+  // stop and nothing happened" and "there was nothing to stop" look the same
+  // from a button, and only one of them is a bug.
+  routes.post("/:id/browser/stop", async (context) => {
+    const stopped = (await options.browser?.stop(context.req.param("id"))) ?? false;
+    return context.json({ stopped });
   });
 
   routes.post("/", async (context) => {

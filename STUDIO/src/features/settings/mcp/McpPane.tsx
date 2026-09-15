@@ -203,6 +203,7 @@ function ServerRow({
             </p>
           )}
           <p className="mt-0.5 truncate text-caption text-muted-foreground">{reach(server)}</p>
+          <EngineLine server={server} />
           <StatusLine server={server} />
         </div>
       </div>
@@ -261,6 +262,28 @@ function reach(server: McpServerRecord): string {
   if (server.transport === 'http') return server.url ?? 'No address set'
   const command = server.command ?? 'No command set'
   return server.args.length === 0 ? command : `${command} ${server.args.join(' ')}`
+}
+
+/**
+ * Which browser the bundled browser would drive, for the one row that has one.
+ *
+ * Quiet when a browser was seen: it is a fact, not an event. The danger tone
+ * is for none seen, because that row is the only place a person learns the
+ * capability will fail before a conversation finds out - the server itself
+ * starts fine, and the failure lives in the first tool call.
+ */
+function EngineLine({ server }: { server: McpServerRecord }) {
+  const engine = server.engine
+  if (engine === undefined) return null
+  const none = engine.seen === undefined
+  return (
+    <p
+      className={`mt-0.5 text-caption ${none ? 'text-danger' : 'text-muted-foreground'}`}
+      title={engine.seen?.at}
+    >
+      {engine.summary}
+    </p>
+  )
 }
 
 /** What the server is doing, when that is anything worth saying. */

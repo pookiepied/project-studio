@@ -162,6 +162,38 @@ export interface McpServerRecord {
   readonly project?: McpScopeReading
   readonly conversation?: McpScopeReading
   readonly status?: McpServerStatus
+  /**
+   * For the bundled browser only: which browser on this machine it would
+   * drive, or that none was seen.
+   *
+   * The server process starts fine without a browser - the failure lives in
+   * the first tool call - so the row is where a person learns about it before
+   * a conversation does. Read fresh by the harness on every list, so an
+   * install shows up on the next look.
+   */
+  readonly engine?: McpEngineReport
+}
+
+export interface McpEngineReport {
+  /** The browser that will be tried first among those seen. */
+  readonly seen?: { readonly name: string; readonly at: string }
+  readonly alsoSeen: readonly string[]
+  /** One sentence for the row. */
+  readonly summary: string
+}
+
+function parseEngine(value: unknown): McpEngineReport | null {
+  if (!isRecord(value)) return null
+  const summary = value['summary']
+  if (typeof summary !== 'string') return null
+  const alsoSeen = value['alsoSeen']
+  if (!Array.isArray(alsoSeen) || !alsoSeen.every((name) => typeof name === 'string')) return null
+  const seen = value['seen']
+  if (seen === undefined) return { alsoSeen, summary }
+  if (!isRecord(seen) || typeof seen['name'] !== 'string' || typeof seen['at'] !== 'string') {
+    return null
+  }
+  return { seen: { name: seen['name'], at: seen['at'] }, alsoSeen, summary }
 }
 
 export function stringMap(value: unknown): Readonly<Record<string, string>> | null {
@@ -299,6 +331,7 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
   if (project === null || conversation === null) return null
 
   const status = value['status'] === undefined ? undefined : parseMcpStatus(value['status'])
+  const engine = value['engine'] === undefined ? undefined : parseEngine(value['engine'])
 
   // Rebuilt field by field, never spread from the response.
   return {
@@ -319,6 +352,7 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
     ...(authHeader.value === undefined ? {} : { authHeader: authHeader.value }),
     ...(authEnvVar.value === undefined ? {} : { authEnvVar: authEnvVar.value }),
     ...(status === undefined || status === null ? {} : { status }),
+    ...(engine === undefined || engine === null ? {} : { engine }),
   }
 }
 

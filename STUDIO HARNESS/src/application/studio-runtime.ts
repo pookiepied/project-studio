@@ -24,7 +24,7 @@ import {
 } from "../context/capability-inventory.js";
 import { McpCapabilityCatalog } from "../extend/mcp/capabilities.js";
 import type { McpTool } from "../extend/mcp/capabilities.js";
-import { registerBuiltInServers } from "../extend/mcp/builtin.js";
+import { BROWSER_SERVER_ID, registerBuiltInServers } from "../extend/mcp/builtin.js";
 import { createMcpLauncher } from "../extend/mcp/launcher.js";
 import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
@@ -998,6 +998,36 @@ export class StudioRuntime implements AgentHost {
    */
   get backgroundJobs(): BackgroundJobs {
     return this.#jobs;
+  }
+
+  /**
+   * Ends one conversation's browser, at the person's request.
+   *
+   * ADR 0049 §4: the browser is visible and it can be stopped. It is not a
+   * background command - the process belongs to the browser server, not to
+   * the harness - so the stop is the same call the model's own
+   * `studio_browser_quit` makes, addressed to the same conversation, and
+   * deliberately not a different path. A server that is not connected has no
+   * browser to end, and this must not start one to ask: `ensure` is only
+   * reached behind a `ready` status. Answers whether a browser was running.
+   */
+  async stopBrowser(conversationId: string): Promise<boolean> {
+    const record = this.#registry.get(BROWSER_SERVER_ID);
+    if (record === undefined) return false;
+    if (this.#supervisor.status(record.id)?.state !== "ready") return false;
+    const connection = await this.#supervisor.ensure(record);
+    const result = await connection.request("tools/call", {
+      name: "studio_browser_quit",
+      arguments: {},
+      _meta: { "studio/conversation": conversationId },
+    });
+    const text =
+      typeof result === "object" && result !== null && Array.isArray((result as { content?: unknown }).content)
+        ? ((result as { content: { text?: unknown }[] }).content
+            .map((entry) => (typeof entry.text === "string" ? entry.text : ""))
+            .join(" "))
+        : "";
+    return text.includes("is closed");
   }
 
   /** Whether one conversation runs uncontained. Trusted is per project. */

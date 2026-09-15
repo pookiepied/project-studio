@@ -85,6 +85,13 @@ export interface ConversationIndexClient {
    * leave "the port is still held after I pressed stop".
    */
   stopConversationJob(id: string, jobId: string): Promise<HarnessResult<BackgroundJob | null>>
+  /**
+   * Ends the conversation's browser, at the person's request (ADR 0049 §4).
+   *
+   * Answers whether a browser was actually running: the difference between
+   * "there was nothing to stop" and "I pressed stop and nothing happened".
+   */
+  stopConversationBrowser(id: string): Promise<HarnessResult<boolean>>
 }
 
 function conversationPath(id: string, suffix = ''): string {
@@ -171,6 +178,18 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
 
     conversationJobs(id) {
       return json('GET', conversationPath(id, '/jobs'), undefined, parseBackgroundJobs)
+    },
+
+    stopConversationBrowser(id) {
+      return json(
+        'POST',
+        conversationPath(id, '/browser/stop'),
+        undefined,
+        (value) =>
+          typeof value === 'object' && value !== null
+            ? (value as Record<string, unknown>)['stopped'] === true
+            : false,
+      )
     },
 
     stopConversationJob(id, jobId) {

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { CHANNELS, knownLocations, noBrowserMessage } from "../../src/browser/resolve.js";
+import { candidates, CHANNELS, engineReport, knownLocations, noBrowserMessage } from "../../src/browser/resolve.js";
 import { definitions, TOOLS, toolByName } from "../../src/browser/tools.js";
 
 /**
@@ -91,26 +91,27 @@ describe("finding a browser, and refusing well", () => {
     // ADR 0047's shape, and the deliverable of ADR 0049's step 2: a refusal
     // that names the fix is actionable, and a bare failure is a bug report.
     const message = noBrowserMessage("spawn ENOENT");
-    for (const channel of CHANNELS) expect(message).toContain(channel);
+    expect(message).toContain("Microsoft Edge and Google Chrome");
+    expect(message).toMatch(/not something to retry/);
+    expect(message).toMatch(/Firefox and Safari will not do/);
     expect(message).toContain("never downloads");
-    expect(message).toMatch(/Install Microsoft Edge or Google Chrome/);
+    expect(message).toMatch(/To fix it: Install /);
     expect(message).toContain("spawn ENOENT");
   });
 
   it("looks in places that are real paths on this platform", () => {
     const locations = knownLocations();
     expect(locations.length).toBeGreaterThan(0);
-    for (const location of locations) expect(location).toMatch(/edge|chrome/i);
+    for (const location of locations) expect(location).toMatch(/edge|chrom|brave/i);
   });
 
-  it("can only launch through a named channel, so it can never download", () => {
+  it("can never download, because nothing but a candidate reaches the launch", () => {
     // `resolve.ts` says this has to be pinned by a test, and this is it. The
     // library's own default is a downloaded browser; the two things that
     // would bring it back are the full `playwright` package (whose install
-    // step fetches browsers) and an `executablePath` in the launch call (the
-    // step before which is finding one, and the step after which is fetching
-    // one). Read from the sources rather than from a launch, because a launch
-    // is what a unit test must not do.
+    // step fetches browsers) and a launch option that did not come from the
+    // candidate list. Read from the sources rather than from a launch,
+    // because a launch is what a unit test must not do.
     const manifest = JSON.parse(readFileSync(MANIFEST, "utf8")) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
@@ -119,11 +120,48 @@ describe("finding a browser, and refusing well", () => {
     expect(manifest.dependencies?.["playwright"]).toBeUndefined();
     expect(manifest.devDependencies?.["playwright"]).toBeUndefined();
 
-    // The comment beside the launch names `executablePath` to say it is
-    // refused, so the pin is on code: the option is never *passed*.
+    // One launch call, and its options are the candidate's spread plus
+    // headless. An `executablePath:` written anywhere in session.ts would be
+    // a path from somewhere other than `resolve.ts`, which is the one place
+    // allowed to name one.
     const session = readFileSync(SESSION_SOURCE, "utf8");
+    expect(session.match(/chromium\.launch\(/g)).toHaveLength(1);
+    expect(session).toMatch(/chromium\.launch\(\{\s*\.\.\.candidate\.launch,\s*headless: true\s*\}\)/);
     expect(session).not.toMatch(/executablePath\s*:/);
-    expect(session).toMatch(/chromium\.launch\(\{\s*channel/);
+  });
+
+  it("names a path only when it is on the known list and exists", () => {
+    // The found-path tier is the amended rule's whole exposure: a path is an
+    // instruction, so every one handed to the launch must be a real file at
+    // a place this file wrote down. A channel needs neither.
+    const known = new Set(knownLocations());
+    for (const candidate of candidates()) {
+      if ("executablePath" in candidate.launch) {
+        expect(known.has(candidate.launch.executablePath)).toBe(true);
+        expect(existsSync(candidate.launch.executablePath)).toBe(true);
+        expect(candidate.seenAt).toBe(candidate.launch.executablePath);
+      } else {
+        expect(CHANNELS).toContain(candidate.launch.channel);
+      }
+    }
+    // Every channel is always tried, seen or not.
+    const channels = candidates().flatMap((candidate) =>
+      "channel" in candidate.launch ? [candidate.launch.channel] : [],
+    );
+    expect([...channels].sort()).toEqual([...CHANNELS].sort());
+  });
+
+  it("tells a settings row which browser it would drive, or what to install", () => {
+    const report = engineReport();
+    if (report.seen === undefined) {
+      expect(report.summary).toMatch(/No browser found/);
+      expect(report.summary).toMatch(/never downloads/);
+      expect(report.alsoSeen).toEqual([]);
+    } else {
+      expect(existsSync(report.seen.at)).toBe(true);
+      expect(report.summary).toContain(`Drives ${report.seen.name}`);
+      for (const name of report.alsoSeen) expect(report.summary).toContain(name);
+    }
   });
 });
 

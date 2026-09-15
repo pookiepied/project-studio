@@ -124,6 +124,10 @@ export interface BoundClient {
     list: (conversationId: string) => Promise<HarnessResult<readonly BackgroundJob[]>>
     stop: (conversationId: string, jobId: string) => Promise<HarnessResult<BackgroundJob | null>>
   }
+  /** The person's stop for a conversation's browser (ADR 0049 §4). */
+  readonly browser: {
+    stop: (conversationId: string) => Promise<HarnessResult<boolean>>
+  }
   /** The generation jobs - images and videos - bound the same way. */
   readonly mediaJobs: {
     list: (conversationId: string) => Promise<HarnessResult<readonly MediaJob[]>>

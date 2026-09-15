@@ -1,7 +1,7 @@
 import type { Browser, BrowserContext, ConsoleMessage, Page, Request, Response } from "playwright-core";
 import { chromium } from "playwright-core";
 
-import { likelyChannels, noBrowserMessage, type BrowserChannel } from "./resolve.js";
+import { candidates, noBrowserMessage } from "./resolve.js";
 import { BrowserError } from "./errors.js";
 
 /**
@@ -76,7 +76,7 @@ interface Tab {
 export class BrowserSession {
   #browser: Browser | undefined;
   #context: BrowserContext | undefined;
-  #channel: BrowserChannel | undefined;
+  #driving: string | undefined;
   readonly #tabs = new Map<string, Tab>();
   #active: string | undefined;
   #counter = 0;
@@ -91,9 +91,9 @@ export class BrowserSession {
    */
   constructor(readonly key: string) {}
 
-  /** Which browser is running, for the status a person reads. */
-  get channel(): BrowserChannel | undefined {
-    return this.#channel;
+  /** Which browser is running, by the name a person knows it by. */
+  get driving(): string | undefined {
+    return this.#driving;
   }
 
   get running(): boolean {
@@ -111,10 +111,12 @@ export class BrowserSession {
   /**
    * Launches, or says plainly why it cannot.
    *
-   * Every channel is tried in turn, because a machine with Chrome and no Edge
-   * is ordinary and refusing it would be absurd. Only when all of them fail
-   * does the refusal appear, and it carries the last real error alongside the
-   * three facts, because "Edge is not installed" and "Edge is installed and
+   * Every candidate is tried in turn - the channels the library knows by
+   * name, then any browser found at a place `resolve.ts` knows - because a
+   * machine with Chrome and no Edge is ordinary, a Linux machine with only
+   * Chromium is ordinary, and refusing either would be absurd. Only when all
+   * of them fail does the refusal appear, and it carries the last real error
+   * alongside the three facts, because "Edge is not installed" and "Edge is installed and
    * crashed" need different actions from the person reading it.
    */
   async #launch(): Promise<Browser> {
@@ -122,14 +124,15 @@ export class BrowserSession {
     if (existing !== undefined) return existing;
 
     let lastError = "";
-    for (const channel of likelyChannels()) {
+    for (const candidate of candidates()) {
       try {
-        // No `executablePath`, ever. A channel names a browser the person
-        // installed; a path would be one we found, and the step after finding
-        // one is downloading one when we cannot. That step does not exist.
-        const browser = await chromium.launch({ channel, headless: true });
+        // The launch options are the candidate's and nothing else. A channel
+        // names a browser the library finds; a path is one `resolve.ts` found
+        // at a place it knows. Neither is ever a download - the library's
+        // default - and the test pins that no other option reaches here.
+        const browser = await chromium.launch({ ...candidate.launch, headless: true });
         this.#browser = browser;
-        this.#channel = channel;
+        this.#driving = candidate.name;
         this.#context = await browser.newContext({
           viewport: { width: 1280, height: 800 },
           // Ours, disposable, and never the person's: a fresh in-memory
@@ -281,7 +284,7 @@ export class BrowserSession {
     this.#idle = undefined;
     this.#browser = undefined;
     this.#context = undefined;
-    this.#channel = undefined;
+    this.#driving = undefined;
     this.#tabs.clear();
     this.#active = undefined;
   }

@@ -80,6 +80,12 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
           client.stopConversationJob(conversationId, jobId),
         ),
     },
+    browser: {
+      stop: (conversationId) =>
+        call('The harness is not running, so there is no browser to stop.', (client) =>
+          client.stopConversationBrowser(conversationId),
+        ),
+    },
     mediaJobs: {
       list: (conversationId) =>
         call('The harness is not running, so there are no generations to list.', (client) =>

@@ -354,3 +354,47 @@ consequences — a tool that no named job needs is a schema every turn pays for:
   to the machine and to the app under test. Not taken here.
 - *WebSocket traffic* is absent from the network log; the console usually
   carries the failure.
+
+## Amendment, 2026-09-15 — "never download" is the rule; "never a path" was not
+
+§1 said "no `executablePath`, ever", and gave the reason: a path would be one
+we found, and the step after finding one is downloading one when we cannot.
+That reasoning conflated the rule with one way of breaking it. The rule is
+that Studio drives a browser the person installed and keeps up to date, and
+**never fetches one**. A browser found at the place its installer put it is
+exactly that browser; naming its path is no more a download than naming a
+channel is.
+
+What made this matter is Linux. `playwright-core` knows Edge and Chrome by
+name and nothing else, and the browser a Linux machine usually has is
+**Chromium** — Debian, Ubuntu, Fedora, Arch, the snap, the flatpak — which is
+not a channel. Under §1 as written, a Linux user with a working browser got
+the refusal, and the refusal told them to install one they had. The same
+gap covers Brave on every platform.
+
+**Decided.** Two tiers, in `resolve.ts`, tried in order: every channel the
+library knows, seen or not; then a browser found at a known location, and
+only if it exists. A path reaches the launch only from that list. The test
+that pins the rule now pins *that* — one launch call, its options the
+candidate's and nothing else, no `executablePath:` written anywhere in
+`session.ts` — rather than the absence of a word.
+
+**Measured and refused: the WebView2 runtime.** It is a Chromium, it is on
+every Windows machine Studio can run on (Studio itself is a WebView2 app), and
+it looked like the answer to a machine whose Edge was removed. Tried on
+2026-09-15 with `playwright-core` against `msedgewebview2.exe`: it launches
+and closes before answering. It is not a browser and is not on the list.
+Brave from a found path, tried in the same run, answered in 635 ms.
+
+So a Windows machine whose Edge was removed drives Chrome or Brave if either
+is present, and otherwise gets the refusal — which is the right answer,
+because there is nothing on that machine to drive.
+
+**And the person learns before the model does.** The server process starts
+fine on a machine with no browser; the failure lived in the first tool call,
+inside a conversation, which is the worst place to find out. The bundled
+browser's row in Settings now carries one line — *Drives Microsoft Edge*, or
+*No browser found. Studio never downloads one; install Microsoft Edge, Google
+Chrome, Brave or Chromium* — read fresh on every list, so an install shows up
+on the next look without a restart. "Seen" rather than "will work": only a
+launch decides, and the line does not claim otherwise.

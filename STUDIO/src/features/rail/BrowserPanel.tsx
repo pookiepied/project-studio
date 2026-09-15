@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
+import { useWorkspace } from '@/stores/workspace'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
 import type { RailEntry } from '@/stores/rail'
@@ -45,18 +46,21 @@ export function BrowserPanel({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-medium">
-          {entry.title === null || entry.title === '' ? 'No page open' : entry.title}
-        </span>
-        {entry.url === null ? null : (
-          // Deliberately not a link. Following it would open the page in the
-          // person's real browser, with their real cookies — a different act
-          // from the one they are watching, and one they did not ask for.
-          <span className="studio-selectable truncate font-mono text-code text-muted-foreground">
-            {entry.url}
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-sm font-medium">
+            {entry.title === null || entry.title === '' ? 'No page open' : entry.title}
           </span>
-        )}
+          {entry.url === null ? null : (
+            // Deliberately not a link. Following it would open the page in the
+            // person's real browser, with their real cookies — a different act
+            // from the one they are watching, and one they did not ask for.
+            <span className="studio-selectable truncate font-mono text-code text-muted-foreground">
+              {entry.url}
+            </span>
+          )}
+        </div>
+        <StopBrowser conversationId={entry.conversationId} />
       </div>
 
       <BrowserFrameView
@@ -85,6 +89,52 @@ export function BrowserPanel({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * The person's stop for this conversation's browser (ADR 0049 §4).
+ *
+ * The browser is a process a person could otherwise only find in a task
+ * manager; this is the place in Studio where it can be found and ended. The
+ * panel does not know whether one is running - that is the server's to know,
+ * and asking on every render would be a poll for a button - so the button is
+ * always here, and the answer says what happened: "Stopped" when a browser
+ * was running, "Not running" when there was nothing to stop. Both settle
+ * back to the button after a moment, so a second press is possible.
+ */
+function StopBrowser({ conversationId }: { conversationId: string }) {
+  const { browser } = useWorkspace()
+  const [state, setState] = useState<'idle' | 'busy' | 'stopped' | 'nothing'>('idle')
+
+  const stop = async () => {
+    setState('busy')
+    const result = await browser.stop(conversationId)
+    setState(result.ok && result.value ? 'stopped' : 'nothing')
+    setTimeout(() => setState('idle'), 2000)
+  }
+
+  if (state === 'stopped' || state === 'nothing') {
+    return (
+      <span className="shrink-0 text-micro text-muted-foreground" role="status">
+        {state === 'stopped' ? 'Stopped' : 'Not running'}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => void stop()}
+      disabled={state === 'busy'}
+      aria-label="Stop browser"
+      className={cn(
+        'shrink-0 rounded-md px-1.5 py-0.5 text-micro',
+        'text-muted-foreground transition-colors duration-fast',
+        'hover:bg-tint hover:text-foreground disabled:opacity-50',
+      )}
+    >
+      Stop
+    </button>
   )
 }
 

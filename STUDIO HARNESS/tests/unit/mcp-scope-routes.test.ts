@@ -15,6 +15,7 @@ import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { createAdmissionMiddleware, type AdmissionEnv } from "../../src/transport/http/middleware/admission.js";
 import { createMcpRoutes } from "../../src/transport/http/routes/mcp.js";
+import { BROWSER_SERVER_ID, browserServerPath, registerBuiltInServers } from "../../src/extend/mcp/builtin.js";
 
 /**
  * The enablement decisions, through the routes, one scope at a time.
@@ -38,6 +39,7 @@ const COMMAND = process.platform === "win32" ? "C:\\tools\\node.exe" : "/usr/bin
 interface Built {
   readonly db: StudioDatabase;
   readonly selection: ExtensionSelectionStore;
+  readonly registry: McpServerRegistry;
   readonly app: Hono<AdmissionEnv>;
   readonly authorization: string;
 }
@@ -49,8 +51,9 @@ function harness(): Built {
   // answered against the store, not against a read that would agree either
   // way.
   const selection = new ExtensionSelectionStore(db);
+  const registry = new McpServerRegistry(db);
   const management = new McpManagementService({
-    registry: new McpServerRegistry(db),
+    registry,
     grants: new PermissionGrantStore(db),
     selection,
     extensions: { changed: () => undefined },
@@ -70,7 +73,7 @@ function harness(): Built {
   const app = new Hono<AdmissionEnv>();
   app.use("*", createAdmissionMiddleware(session.verifier));
   app.route("/api/mcp", createMcpRoutes(management));
-  return { db, selection, app, authorization: `Bearer ${session.credential}` };
+  return { db, selection, registry, app, authorization: `Bearer ${session.credential}` };
 }
 
 async function install(app: Built["app"], authorization: string): Promise<void> {
@@ -341,6 +344,27 @@ describe("MCP enablement, through the routes", () => {
     });
     expect(saved.status).toBe(201);
     expect(((await saved.json()) as { needsNetwork: boolean }).needsNetwork).toBe(false);
+  });
+
+  it("says which browser the bundled browser would drive, on that row alone", async () => {
+    // The browser server starts fine on a machine with no browser; the row
+    // is where a person learns that before a conversation does. A third
+    // party's row carries no such line, because the question is ours.
+    if (browserServerPath() === undefined) return;
+    registerBuiltInServers(built.registry, built.selection);
+    await install(built.app, authorization);
+    const response = await built.app.request("http://harness.test/api/mcp/servers", {
+      headers: { authorization },
+    });
+    expect(response.status).toBe(200);
+    const rows = (await response.json()) as (ListedServer & {
+      engine?: { seen?: { name: string; at: string }; alsoSeen: string[]; summary: string };
+    })[];
+    const browser = rows.find((row) => row.id === BROWSER_SERVER_ID);
+    const echo = rows.find((row) => row.id === "echo-server");
+    expect(browser?.engine?.summary).toMatch(/^Drives |^No browser found/);
+    expect(Array.isArray(browser?.engine?.alsoSeen)).toBe(true);
+    expect(echo?.engine).toBeUndefined();
   });
 
   it("refuses a network switch that is not a switch", async () => {

@@ -55,6 +55,7 @@ function stubClient(overrides: {
     conversationContext: () => Promise.resolve(ok(null)),
     conversationJobs: () => Promise.resolve(ok([])),
     stopConversationJob: () => Promise.resolve(ok(null)),
+    stopConversationBrowser: () => Promise.resolve(ok(false)),
     conversationMediaJobs: () => Promise.resolve(ok([])),
     stopConversationMediaJob: () => Promise.resolve(ok(undefined)),
     createConnection: () => Promise.resolve(ok(KNOWN_VENDOR)),
