@@ -138,7 +138,7 @@ export function useVoiceSession(active: boolean) {
   useEffect(() => {
     if (!active) {
       clearRun()
-      mic.stop()
+      void mic.stop()
       setStage('connecting')
       setTurn(0)
       setSpoken([])

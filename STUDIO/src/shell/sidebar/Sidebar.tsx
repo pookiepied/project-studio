@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COLLAPSE, DURATION, EASE_OUT, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -99,6 +99,23 @@ export function Sidebar({
   const inSettings = route.kind === 'settings'
   const activeSection = inSettings ? route.sectionId : ''
 
+  /**
+   * A closed column changing layout mode does not move. The two modes hold
+   * a closed column differently - floating, it is full width and pushed off
+   * screen; resident, it is in the row at no width - and the spring between
+   * them, played on a column nobody can see, was not invisible: it entered
+   * the row at its full width and shrank, and the page beside it was
+   * squeezed for the length of the move. That is the breakpoint flipping as
+   * the rail leaves, at widths where the rail alone made the window
+   * compact. Only an open-or-close is a motion; a mode change while closed
+   * is a jump.
+   */
+  const wasOpen = useRef(sidebarOpen)
+  const changingWhileClosed = !sidebarOpen && !wasOpen.current
+  useEffect(() => {
+    wasOpen.current = sidebarOpen
+  }, [sidebarOpen])
+
   const live = conversations.filter((conversation) => !conversation.archived)
   const sorted = [...live].sort((a, b) => {
     // Pinned conversations stay ahead of everything else; the rest is
@@ -141,7 +158,7 @@ export function Sidebar({
             ? { x: sidebarOpen ? 0 : -SHELL.sidebar.expandedWidth, width: SHELL.sidebar.expandedWidth }
             : { x: 0, width: sidebarOpen ? SHELL.sidebar.expandedWidth : 0 }
         }
-        transition={SPRING_PANEL}
+        transition={changingWhileClosed ? { duration: 0 } : SPRING_PANEL}
         onAnimationStart={() => onReflow?.(true)}
         onAnimationComplete={() => onReflow?.(false)}
         // The border goes with the width when it collapses: left on, a closed

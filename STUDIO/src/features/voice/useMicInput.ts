@@ -52,7 +52,13 @@ import { SegmentCutter } from '@/features/voice/segments'
  * not decodable on their own (only the first carries the container header),
  * so a cut is the recorder stopped and a new one started on the same stream,
  * not a chunk boundary. The final segment, whatever is left at `stop()`, is
- * the note `takeNote` hands over, as it always was.
+ * the note `stop()` resolves with.
+ *
+ * The recorder is stopped before the tracks are, and the tracks only once it
+ * has flushed. The other order - tracks first - ends the recorder's source
+ * under it, and the flush that follows can be empty: a segment cut a moment
+ * before the stop then came back as a file of zero bytes, which the harness
+ * refused as no audio at all, and the whole take failed on its last word.
  *
  * ---- Errors -----------------------------------------------------------------
  *
@@ -71,6 +77,8 @@ const GAMMA = 0.8
 const ATTACK = 0.55
 /** ...slow down. Release is what stops the syllable-rate flicker. */
 const RELEASE = 0.11
+/** How long a stopped recorder is given to flush before the take goes on without it. */
+const FLUSH_GUARD_MS = 2_000
 
 export type MicStatus = 'idle' | 'requesting' | 'live' | 'denied' | 'unavailable'
 
@@ -111,7 +119,6 @@ export function useMicInput() {
   const [status, setStatus] = useState<MicStatus>('idle')
   const nodes = useRef<MicNodes | null>(null)
   const listeners = useRef(new Set<MicFrameListener>())
-  const note = useRef<VoiceNote | null>(null)
 
   /**
    * Subscribe to the measurement loop. The listener receives the smoothed
@@ -263,40 +270,57 @@ export function useMicInput() {
 
   /**
    * Stops measuring. If this run was recording, the captured audio is
-   * assembled here — once, on stop — and `takeNote` hands it over.
+   * assembled here - once, on stop - and is what the promise resolves with:
+   * the recorder flushes in its own `onstop`, a task after `stop()` returns,
+   * and a timer racing that task used to lose now and then, which dropped
+   * the last segment on the floor. `null` when not recording.
    */
-  const stop = useCallback(() => {
+  const stop = useCallback((): Promise<VoiceNote | null> => {
     const active = nodes.current
-    if (!active) return
+    if (!active) return Promise.resolve(null)
     nodes.current = null
 
     cancelAnimationFrame(active.frame)
-    for (const track of active.stream.getTracks()) track.stop()
+    const release = () => {
+      for (const track of active.stream.getTracks()) track.stop()
+      void active.context.close()
+    }
+    setStatus('idle')
 
     // The note is the last segment: the whole take when nothing was cut,
     // what remains after the last cut when something was.
     const durationMs = performance.now() - active.segmentStartedAt
     const last = active.recorder
     const lastChunks = active.chunks
-    if (last && last.state !== 'inactive') {
-      last.onstop = () => {
-        note.current = { blob: new Blob(lastChunks, { type: last.mimeType || 'audio/webm' }), durationMs }
-      }
-      last.stop()
+    if (!last || last.state === 'inactive') {
+      release()
+      return Promise.resolve(null)
     }
-
-    void active.context.close()
-    setStatus('idle')
+    return new Promise((resolve) => {
+      let done = false
+      const settle = () => {
+        if (done) return
+        done = true
+        window.clearTimeout(guard)
+        release()
+        resolve({ blob: new Blob(lastChunks, { type: last.mimeType || 'audio/webm' }), durationMs })
+      }
+      // A recorder that never reports its stop would hold the take in
+      // "transcribing" for good; after this long, what it has flushed is
+      // what there is.
+      const guard = window.setTimeout(settle, FLUSH_GUARD_MS)
+      last.onstop = settle
+      last.onerror = settle
+      last.stop()
+    })
   }, [])
 
-  /** The finished recording, consumed once. `null` when not recording. */
-  const takeNote = useCallback((): VoiceNote | null => {
-    const taken = note.current
-    note.current = null
-    return taken
-  }, [])
+  useEffect(
+    () => () => {
+      void stop()
+    },
+    [stop],
+  )
 
-  useEffect(() => stop, [stop])
-
-  return { status, start, stop, onFrame, takeNote }
+  return { status, start, stop, onFrame }
 }

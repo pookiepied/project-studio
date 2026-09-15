@@ -139,50 +139,59 @@ export function SideRail({
         >
           <ResizeHandle width={effective} ceiling={ceiling} onWidth={setWidth} />
 
-          <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
-            <span className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
-              {active === undefined ? 'Side rail' : entryTitle(active)}
-            </span>
+          {/* The contents keep the rail's full width while the frame moves.
+              Without this they took the frame's width as it collapsed, and a
+              column of prose reflowed into a narrower and narrower measure
+              for the length of the exit - the "squish" before the rail was
+              gone - while on the way in it unfolded from a sliver. Fixed to
+              the width the rail is, the frame's edge clips them instead, the
+              way the sidebar's inner column has always been sized. */}
+          <div className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: effective }}>
+            <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
+              <span className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
+                {active === undefined ? 'Side rail' : entryTitle(active)}
+              </span>
 
-            <IconButton label="Close the rail" size="sm" onClick={closeAll}>
-              <Icons.close size="sm" />
-            </IconButton>
-          </header>
+              <IconButton label="Close the rail" size="sm" onClick={closeAll}>
+                <Icons.close size="sm" />
+              </IconButton>
+            </header>
 
-          <RailTabs />
+            <RailTabs />
 
-          {/* Keyed by the entry, so switching plays the view transition rather
-              than swapping content inside a frame that never acknowledges it
-              changed.
+            {/* Keyed by the entry, so switching plays the view transition rather
+                than swapping content inside a frame that never acknowledges it
+                changed.
 
-              `popLayout` is what makes that claim true: the outgoing view fades
-              while the incoming one fades in, without either pushing the other
-              down the scroll. Without a mode at all both stay in the flow and
-              the panel jumps; with `wait` the outgoing view vanishes first and
-              the handover dips through empty - which is exactly what this block
-              did for its first year, calling itself a crossfade. A pure
-              crossfade, like every other lateral move between same-depth views:
-              this one used to add a small rise, the vertical motion that makes a
-              horizontal handover look like a fault.
+                `popLayout` is what makes that claim true: the outgoing view fades
+                while the incoming one fades in, without either pushing the other
+                down the scroll. Without a mode at all both stay in the flow and
+                the panel jumps; with `wait` the outgoing view vanishes first and
+                the handover dips through empty - which is exactly what this block
+                did for its first year, calling itself a crossfade. A pure
+                crossfade, like every other lateral move between same-depth views:
+                this one used to add a small rise, the vertical motion that makes a
+                horizontal handover look like a fault.
 
-              The scroll body is `relative` so the popped-out view overlays it
-              rather than the whole rail. */}
-          <div className="studio-scroll-inset relative min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-            <AnimatePresence initial={false} mode="popLayout">
-              {active !== undefined ? (
-                <motion.div {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
-                  {active.kind === 'artifact' ? (
-                    renderArtifact(active.artifact)
-                  ) : active.kind === 'jobs' ? (
-                    <JobsPanel conversationId={active.conversationId} />
-                  ) : active.kind === 'browser' ? (
-                    <BrowserPanel entry={active} />
-                  ) : (
-                    <PlanPanel conversationId={active.conversationId} />
-                  )}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+                The scroll body is `relative` so the popped-out view overlays it
+                rather than the whole rail. */}
+            <div className="studio-scroll-inset relative min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+              <AnimatePresence initial={false} mode="popLayout">
+                {active !== undefined ? (
+                  <motion.div {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
+                    {active.kind === 'artifact' ? (
+                      renderArtifact(active.artifact)
+                    ) : active.kind === 'jobs' ? (
+                      <JobsPanel conversationId={active.conversationId} />
+                    ) : active.kind === 'browser' ? (
+                      <BrowserPanel entry={active} />
+                    ) : (
+                      <PlanPanel conversationId={active.conversationId} />
+                    )}
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
           </div>
         </motion.aside>
       ) : null}

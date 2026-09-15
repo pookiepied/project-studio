@@ -40,6 +40,15 @@ export type DictationStage = 'idle' | 'requesting' | 'recording' | 'processing' 
 /** How long the blocked message holds the field before restoring it. */
 const BLOCKED_DISMISS_MS = 2800
 
+/**
+ * A transcriber's sentence is held long enough to be read. The fixed hold
+ * fits "Microphone blocked"; a provider's refusal runs to a line and a half,
+ * and at the fixed hold it was gone before its first clause was read.
+ */
+function holdFor(sentence: string): number {
+  return Math.min(8_000, BLOCKED_DISMISS_MS + Math.max(0, sentence.length - 40) * 55)
+}
+
 export function useDictation({ onTake }: { onTake: (text: string) => void }) {
   const [stage, setStage] = useState<DictationStage>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -68,22 +77,36 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
     dismissing.current = null
   }, [])
 
-  /** Ends the take on the transcriber's word, once; later segments are dropped. */
+  /**
+   * Ends the take on the transcriber's word, once; later segments are
+   * dropped. What had already come back is not: those words were said and
+   * transcribed, and they land in the field as the strip returns it, so a
+   * fault in the last segment of a long take costs that segment and not the
+   * minute before it.
+   */
   const fail = useCallback(
     (sentence: string) => {
       clearTimers()
       pipeline.current?.abandon()
       pipeline.current = null
-      mic.stop()
+      void mic.stop()
       setNote(sentence)
       setStage('blocked')
-      dismissing.current = window.setTimeout(() => setStage('idle'), BLOCKED_DISMISS_MS)
+      dismissing.current = window.setTimeout(() => {
+        if (spoken.current !== '') onTake(spoken.current)
+        spoken.current = ''
+        setStage('idle')
+      }, holdFor(sentence))
     },
-    [clearTimers, mic],
+    [clearTimers, mic, onTake],
   )
 
   const start = useCallback(async () => {
     if (stage !== 'idle' && stage !== 'blocked') return
+    // Starting from blocked: the hold that would have returned the field
+    // is over now, and what it kept goes to the field before the new take.
+    clearTimers()
+    if (stage === 'blocked' && spoken.current !== '') onTake(spoken.current)
     setNote(null)
     setTranscript('')
     spoken.current = ''
@@ -110,21 +133,17 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
     clock.current = window.setInterval(() => {
       setElapsedMs(performance.now() - startedAt.current)
     }, 200)
-  }, [fail, mic, stage])
+  }, [clearTimers, fail, mic, onTake, stage])
 
   /** Stop and keep: the last segment joins the others, and the whole take goes to the field. */
   const stop = useCallback(async () => {
     if (stage !== 'recording') return
     clearTimers()
     const line = pipeline.current
-    const note = await new Promise<ReturnType<typeof mic.takeNote>>((resolve) => {
-      mic.stop()
-      // The recorder assembles its blob in `onstop`, one tick after `stop()`
-      // returns. The take happens after that turn of the event loop.
-      window.setTimeout(() => resolve(mic.takeNote()), 0)
-    })
-
     setStage('processing')
+    // The last segment is what the recorder flushes once told to stop; the
+    // microphone hands it over when that has happened, not a tick later.
+    const note = await mic.stop()
     // The last segment goes through the same door as the others, so it
     // lands after them; then the pipeline is drained, and what it says about
     // the whole take decides the close.
@@ -150,7 +169,7 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
     clearTimers()
     pipeline.current?.abandon()
     pipeline.current = null
-    mic.stop()
+    void mic.stop()
     setStage('idle')
   }, [clearTimers, mic, stage])
 

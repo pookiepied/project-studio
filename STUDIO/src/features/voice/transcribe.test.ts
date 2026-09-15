@@ -1,7 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { transcribeRecording } from './transcribe'
+import type { HarnessResult } from '@/platform/harness'
 import type { VoiceNote } from './useMicInput'
+
+/**
+ * The harness client, as a stand-in whose answers the test scripts. The
+ * address is resolved by the real function, so the "no harness" exit still
+ * runs against the real absence; only the call over the wire is replaced.
+ */
+const transcribe = vi.fn<() => Promise<HarnessResult<{ text: string }>>>()
+
+vi.mock('@/platform/harness', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/platform/harness')>()
+  return {
+    ...actual,
+    createHarnessClient: () => ({ transcribe: () => transcribe() }),
+  }
+})
+
+const { transcribeRecording } = await import('./transcribe')
 
 /**
  * The seam's own contract, where the environment can be pinned: with no
@@ -23,8 +40,22 @@ import type { VoiceNote } from './useMicInput'
 
 const note = (blob: Blob | null): VoiceNote => ({ blob, durationMs: 1_700 })
 
+/** A resolvable address, so the call reaches the stand-in client. */
+function withHarness(): void {
+  vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:1')
+  vi.stubEnv('VITE_HARNESS_TOKEN', 'test')
+}
+
+const ok = (text: string): HarnessResult<{ text: string }> => ({ ok: true, value: { text } })
+const refused = (status: number, message: string): HarnessResult<{ text: string }> => ({
+  ok: false,
+  error: { kind: 'harness-error', status, message },
+})
+
 afterEach(() => {
   vi.unstubAllEnvs()
+  transcribe.mockReset()
+  vi.useRealTimers()
 })
 
 describe('the dictation seam', () => {
@@ -41,5 +72,63 @@ describe('the dictation seam', () => {
     const outcome = await transcribeRecording(note(new Blob([new Uint8Array([1, 2, 3])])))
     expect(outcome.kind).toBe('note')
     expect(outcome.kind === 'note' && outcome.note).toContain('harness is not running')
+  })
+})
+
+describe('a file of no bytes', () => {
+  it('is nothing said, not a request: a segment is empty and a take is reported', async () => {
+    withHarness()
+    const empty = note(new Blob([]))
+
+    const segment = await transcribeRecording(empty, { segment: true })
+    expect(segment).toEqual({ kind: 'ok', text: '' })
+
+    const take = await transcribeRecording(empty)
+    expect(take.kind).toBe('note')
+    expect(take.kind === 'note' && take.note).toContain('Nothing was captured')
+    // Neither reached the wire. Posted, the empty string was a body the
+    // route refused, and the refusal named base64 to a person who had only
+    // stopped speaking.
+    expect(transcribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('a refusal a moment could change', () => {
+  it('is tried once more, and the second answer stands', async () => {
+    withHarness()
+    vi.useFakeTimers()
+    transcribe
+      .mockResolvedValueOnce(refused(429, 'Too many requests'))
+      .mockResolvedValueOnce(ok('The second time.'))
+
+    const pending = transcribeRecording(note(new Blob([new Uint8Array([1, 2, 3])])))
+    await vi.runAllTimersAsync()
+    expect(await pending).toEqual({ kind: 'ok', text: 'The second time.' })
+    expect(transcribe).toHaveBeenCalledTimes(2)
+  })
+
+  it('is reported after the second refusal, not tried a third time', async () => {
+    withHarness()
+    vi.useFakeTimers()
+    transcribe.mockResolvedValue(refused(502, 'Deepgram answered 503 with no explanation.'))
+
+    const pending = transcribeRecording(note(new Blob([new Uint8Array([1, 2, 3])])))
+    await vi.runAllTimersAsync()
+    const outcome = await pending
+    expect(outcome.kind === 'note' && outcome.note).toContain('Dictation failed')
+    expect(transcribe).toHaveBeenCalledTimes(2)
+  })
+
+  it('is not what a bad body or a missing model is: those are reported at once', async () => {
+    withHarness()
+    transcribe.mockResolvedValueOnce(refused(400, 'The transcription body must be ...'))
+    const bad = await transcribeRecording(note(new Blob([new Uint8Array([1])])))
+    expect(bad.kind).toBe('note')
+    expect(transcribe).toHaveBeenCalledTimes(1)
+
+    transcribe.mockResolvedValueOnce(refused(502, 'No transcription model is connected.'))
+    const unset = await transcribeRecording(note(new Blob([new Uint8Array([1])])))
+    expect(unset.kind === 'note' && unset.note).toContain('pick one in Settings')
+    expect(transcribe).toHaveBeenCalledTimes(2)
   })
 })
