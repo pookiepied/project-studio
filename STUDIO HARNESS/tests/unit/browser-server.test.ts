@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,8 @@ import { definitions, TOOLS, toolByName } from "../../src/browser/tools.js";
  */
 
 const BUNDLE = fileURLToPath(new URL("../../dist/browser.mjs", import.meta.url));
+const MANIFEST = fileURLToPath(new URL("../../package.json", import.meta.url));
+const SESSION_SOURCE = fileURLToPath(new URL("../../src/browser/session.ts", import.meta.url));
 
 describe("the tool surface", () => {
   it("is the set that was designed, named as Studio's own", () => {
@@ -99,6 +101,29 @@ describe("finding a browser, and refusing well", () => {
     const locations = knownLocations();
     expect(locations.length).toBeGreaterThan(0);
     for (const location of locations) expect(location).toMatch(/edge|chrome/i);
+  });
+
+  it("can only launch through a named channel, so it can never download", () => {
+    // `resolve.ts` says this has to be pinned by a test, and this is it. The
+    // library's own default is a downloaded browser; the two things that
+    // would bring it back are the full `playwright` package (whose install
+    // step fetches browsers) and an `executablePath` in the launch call (the
+    // step before which is finding one, and the step after which is fetching
+    // one). Read from the sources rather than from a launch, because a launch
+    // is what a unit test must not do.
+    const manifest = JSON.parse(readFileSync(MANIFEST, "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    expect(manifest.dependencies?.["playwright-core"]).toBeDefined();
+    expect(manifest.dependencies?.["playwright"]).toBeUndefined();
+    expect(manifest.devDependencies?.["playwright"]).toBeUndefined();
+
+    // The comment beside the launch names `executablePath` to say it is
+    // refused, so the pin is on code: the option is never *passed*.
+    const session = readFileSync(SESSION_SOURCE, "utf8");
+    expect(session).not.toMatch(/executablePath\s*:/);
+    expect(session).toMatch(/chromium\.launch\(\{\s*channel/);
   });
 });
 

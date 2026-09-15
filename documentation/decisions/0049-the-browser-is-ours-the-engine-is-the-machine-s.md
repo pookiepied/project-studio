@@ -297,3 +297,60 @@ that began keying behaviour on it would be tracking somebody across their work.
 used `provenance === "system"` as its eager predicate, which is exactly the
 conflation §5 identified — ownership standing in for cost. No MCP server loads
 eagerly now, whoever wrote it. Eager is the natives.
+
+## Amendment, 2026-09-15 — what an outside reading found, and what it did not
+
+An independent review of the browser code against this ADR, done by a model
+that had not built it. Most of what it found was agreement; three things were
+real and are recorded here so the next reader does not rediscover them.
+
+**A profile directory was documented and never used.** `session.ts` carried a
+`profileRoot()` that named a per-conversation directory under `~/.studio/browser`
+and said it kept two conversations from sharing a cookie jar. Nothing called
+it. The launch path was, and is, `chromium.launch({ channel })` plus
+`browser.newContext()` — an in-memory context that writes nothing to disk.
+The isolation property was true anyway, because each conversation's session
+owns its own context; the persistence the comment implied was not. **Decided:
+delete the function, keep the in-memory context, and say so.** A browser's
+memory lives exactly as long as its process. The idle close in §4 forgets a
+sign-in, a cookie and a half-filled form, and the next call starts from
+nothing. That is the trade §7 already makes — cookie and profile management is
+the second product this ADR refuses to build — and a profile on disk would be
+the first piece of it. Recorded as a decision rather than an oversight so it
+is not "fixed" back.
+
+**The no-download rule had no test.** `resolve.ts` said the library's default
+to download "has to be pinned by a test", and the only test read a refusal
+message. It is pinned now, on the two things that would bring a download back:
+the manifest depends on `playwright-core` and never `playwright`, and the
+launch call names a channel and never passes an `executablePath`.
+
+**The page reader stopped at two boundaries the click path did not.**
+`snapshot()` walked `element.children`, which never enters a shadow root, while
+the CSS-selector path already pierced shadow DOM — so a model could click a
+thing it had never been shown. And `contenteditable` regions were not stamped,
+so a rich-text editor read as an empty box with nothing to type into. Both are
+a few lines and are done; the ref-clearing moved into the same walk so it
+reaches what the walk reaches. Small additions in the same pass: `wait_for`
+takes `hidden` (a selector going away, the pair of `gone` for text), `scroll`
+goes `left` and `right`, and `viewport` emulates `reducedMotion` and print
+`media`.
+
+**Recorded and deliberately not done**, each against the test in this ADR's
+consequences — a tool that no named job needs is a schema every turn pays for:
+
+- *Iframes.* The walk does not enter a frame document and refs have no frame
+  dimension, so a Storybook story, an iframe-based editor or an embedded
+  payment field is invisible and unclickable. This is the gap most likely to
+  be hit in ordinary use, and it is the one to build next when it is — with a
+  frame dimension on refs, not a `frame` argument on every acting tool.
+- *Pixel coordinates.* `click`, `hover` and `drag` take refs and selectors
+  only. A canvas — a map, a chart, a signature pad — has no elements to stamp.
+  Refs cannot be guessed wrong and coordinates can, which is why the surface
+  is refs-first; an optional coordinate form on `click` alone is the smallest
+  honest addition when a canvas job arrives.
+- *Downloads and network mocking.* "Test my export button" and "show me the
+  500 state" are both product decisions about what a headless browser may do
+  to the machine and to the app under test. Not taken here.
+- *WebSocket traffic* is absent from the network log; the console usually
+  carries the failure.

@@ -444,7 +444,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     name: "studio_browser_scroll",
     description: "Scroll the page, or scroll an element into view.",
     inputSchema: object({
-      direction: { type: "string", enum: ["up", "down", "top", "bottom"] },
+      direction: { type: "string", enum: ["up", "down", "left", "right", "top", "bottom"] },
       amount: { type: "number", description: "Pixels. Default one viewport." },
       ...TARGET,
       ...TAB,
@@ -462,7 +462,11 @@ export const TOOLS: readonly ToolDefinition[] = [
         ([where, by]) => {
           if (where === "top") window.scrollTo({ top: 0 });
           else if (where === "bottom") window.scrollTo({ top: document.body.scrollHeight });
-          else {
+          else if (where === "left" || where === "right") {
+            // A wide table or a carousel; the same step, sideways.
+            const step = by ?? window.innerWidth * 0.9;
+            window.scrollBy({ left: where === "left" ? -step : step });
+          } else {
             const step = by ?? window.innerHeight * 0.9;
             window.scrollBy({ top: where === "up" ? -step : step });
           }
@@ -555,6 +559,10 @@ export const TOOLS: readonly ToolDefinition[] = [
       text: { type: "string", description: "Wait until this text is on the page." },
       gone: { type: "string", description: "Wait until this text is no longer on the page." },
       selector: { type: "string", description: "Wait until this CSS selector matches." },
+      hidden: {
+        type: "string",
+        description: "Wait until this CSS selector no longer matches anything visible.",
+      },
       state: {
         type: "string",
         enum: ["load", "domcontentloaded", "networkidle"],
@@ -570,6 +578,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const waitText = str(input, "text");
       const gone = str(input, "gone");
       const selector = str(input, "selector");
+      const hidden = str(input, "hidden");
       const state = str(input, "state");
       const seconds = num(input, "seconds");
 
@@ -585,6 +594,10 @@ export const TOOLS: readonly ToolDefinition[] = [
         await tab.page.locator(selector).first().waitFor({ state: "visible", timeout });
         return acted(tab.page, tab.id, `${selector} appeared.`);
       }
+      if (hidden !== undefined) {
+        await tab.page.locator(hidden).first().waitFor({ state: "hidden", timeout });
+        return acted(tab.page, tab.id, `${hidden} went away.`);
+      }
       if (state !== undefined) {
         await tab.page.waitForLoadState(state as "load" | "domcontentloaded" | "networkidle", {
           timeout,
@@ -596,7 +609,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         return acted(tab.page, tab.id, `Waited ${String(seconds)} seconds.`);
       }
       throw new BrowserError("bad_input", {
-        message: "Say what to wait for: text, gone, selector, state or seconds.",
+        message: "Say what to wait for: text, gone, selector, hidden, state or seconds.",
       });
     },
   },
@@ -677,9 +690,10 @@ export const TOOLS: readonly ToolDefinition[] = [
       const tab = await pageFor(session, input);
       const expression = required(input, "expression");
       const value: unknown = await tab.page.evaluate(
-        // Wrapped so both an expression and a statement body work, which is
-        // the difference between this being usable and being a puzzle about
-        // where to put a `return`.
+        // Wrapped so the model never has to write `return`, and so `await`
+        // works inside. This takes an *expression* - a statement body would
+        // be a syntax error inside the parentheses - which is what the
+        // description asks for.
         `(async () => { return (${expression}); })()`,
       );
       return read(tab.page, tab.id, JSON.stringify(value, null, 2)?.slice(0, 20_000) ?? "undefined");
@@ -689,7 +703,8 @@ export const TOOLS: readonly ToolDefinition[] = [
   {
     name: "studio_browser_viewport",
     description:
-      "Change the size of the window the page thinks it is in, and whether it is in dark mode. " +
+      "Change the size of the window the page thinks it is in, whether it is in dark mode, " +
+      "whether it asks for reduced motion, and whether it is being printed. " +
       "This is how a layout is checked on a phone, a tablet and a wide monitor without leaving " +
       "the conversation. Reload the page afterwards if it decides its layout when it loads.",
     inputSchema: object({
@@ -702,6 +717,16 @@ export const TOOLS: readonly ToolDefinition[] = [
       width: NUMBER,
       height: NUMBER,
       colorScheme: { type: "string", enum: ["light", "dark"] },
+      reducedMotion: {
+        type: "string",
+        enum: ["reduce", "no-preference"],
+        description: "Whether the page sees prefers-reduced-motion. Explains a missing animation.",
+      },
+      media: {
+        type: "string",
+        enum: ["screen", "print"],
+        description: "Render as if on screen or as if printing, for checking a print stylesheet.",
+      },
       ...TAB,
     }),
     run: async (session, input) => {
@@ -723,18 +748,29 @@ export const TOOLS: readonly ToolDefinition[] = [
             ? { width, height }
             : undefined;
       const scheme = str(input, "colorScheme");
-      if (size === undefined && scheme === undefined) {
+      const motion = str(input, "reducedMotion");
+      const media = str(input, "media");
+      if (size === undefined && scheme === undefined && motion === undefined && media === undefined) {
         throw new BrowserError("bad_input", {
-          message: "Give a preset, or a width and a height, or a colorScheme.",
+          message: "Give a preset, a width and a height, a colorScheme, a reducedMotion or a media.",
         });
       }
       if (size !== undefined) await tab.page.setViewportSize(size);
-      if (scheme !== undefined) {
-        await tab.page.emulateMedia({ colorScheme: scheme as "light" | "dark" });
+      if (scheme !== undefined || motion !== undefined || media !== undefined) {
+        // One call, only the fields given: `emulateMedia` leaves an omitted
+        // field as it was, so dark mode set earlier survives a later
+        // reduced-motion change.
+        await tab.page.emulateMedia({
+          ...(scheme === undefined ? {} : { colorScheme: scheme as "light" | "dark" }),
+          ...(motion === undefined ? {} : { reducedMotion: motion as "reduce" | "no-preference" }),
+          ...(media === undefined ? {} : { media: media as "screen" | "print" }),
+        });
       }
       const said = [
         size === undefined ? undefined : `Viewport is now ${String(size.width)}x${String(size.height)}.`,
         scheme === undefined ? undefined : `Colour scheme is ${scheme}.`,
+        motion === undefined ? undefined : `Reduced motion is ${motion}.`,
+        media === undefined ? undefined : `Media is ${media}.`,
       ]
         .filter((line): line is string => line !== undefined)
         .join(" ");

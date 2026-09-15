@@ -1,7 +1,3 @@
-import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-
 import type { Browser, BrowserContext, ConsoleMessage, Page, Request, Response } from "playwright-core";
 import { chromium } from "playwright-core";
 
@@ -28,6 +24,15 @@ import { BrowserError } from "./errors.js";
  * signed into is a site this browser is signed out of, which is the correct
  * trade and worth saying out loud, because it is the first thing that will
  * surprise someone.
+ *
+ * **And it lives exactly as long as the process.** The context is in-memory:
+ * nothing is written to disk, so there is no profile directory to name, to
+ * clean up, or to leak between two harnesses. The price is that the idle
+ * close above forgets everything - a sign-in, a cookie, a half-filled form -
+ * and the next call starts from nothing. That is the documented trade (ADR
+ * 0049 §4, "carries a browser's memory until it goes idle"), chosen over a
+ * persistent profile because a directory of cookies is a thing that has to be
+ * managed, and managing it is the second product the ADR refuses to build.
  */
 
 /** How long a browser may sit unused before it closes itself. */
@@ -79,8 +84,10 @@ export class BrowserSession {
   #closing: Promise<void> | undefined;
 
   /**
-   * @param key Which conversation this browser belongs to. It names the
-   *   profile directory, so two conversations cannot share a cookie jar.
+   * @param key Which conversation this browser belongs to. Isolation between
+   *   conversations comes from each session owning its own browser and
+   *   context, not from anything on disk; the key is what the server's
+   *   session map is indexed by, and what a status line names.
    */
   constructor(readonly key: string) {}
 
@@ -125,8 +132,10 @@ export class BrowserSession {
         this.#channel = channel;
         this.#context = await browser.newContext({
           viewport: { width: 1280, height: 800 },
-          // Ours, disposable, and never the person's. Created under Studio's
-          // own data directory so that clearing Studio clears this too.
+          // Ours, disposable, and never the person's: a fresh in-memory
+          // context, not a profile on disk. Downloads are refused because a
+          // file arriving on the machine is a policy question this tool does
+          // not answer (ADR 0049 §7).
           acceptDownloads: false,
         });
         browser.on("disconnected", () => {
@@ -142,18 +151,6 @@ export class BrowserSession {
       }
     }
     throw new BrowserError("no_browser", { message: noBrowserMessage(lastError) });
-  }
-
-  /**
-   * The profile directory. Made here so it exists before Chromium wants it.
-   *
-   * Under Studio's own data root, keyed by the session, so two harnesses do
-   * not fight over one profile and deleting Studio's data deletes this.
-   */
-  static profileRoot(key: string): string {
-    const root = join(homedir(), ".studio", "browser", key);
-    mkdirSync(root, { recursive: true });
-    return root;
   }
 
   /**

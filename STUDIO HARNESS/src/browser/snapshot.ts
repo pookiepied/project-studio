@@ -78,13 +78,6 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
         "section",
       ]);
 
-      // Cleared first, so a ref never means two different things across two
-      // reads of the same page. A stale number that silently rebinds is worse
-      // than one that is simply gone.
-      for (const stamped of Array.from(document.querySelectorAll(`[${attribute}]`))) {
-        stamped.removeAttribute(attribute);
-      }
-
       const visible = (element: Element): boolean => {
         const rect = element.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return false;
@@ -121,14 +114,29 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
       const lines: string[] = [];
       let counter = 0;
       const walk = (element: Element, depth: number): void => {
-        if (lines.length >= max) return;
+        // Cleared as it is reached, so a ref never means two different things
+        // across two reads of the same page. A stale number that silently
+        // rebinds is worse than one that is simply gone. Done here rather than
+        // with one `querySelectorAll` up front because that query stops at a
+        // shadow boundary and this walk does not.
+        element.removeAttribute(attribute);
         const tag = element.tagName.toLowerCase();
         if (tag === "script" || tag === "style" || tag === "noscript") return;
+        // Past the cap the walk keeps going, because clearing must reach the
+        // whole page even when listing does not; it just stops stamping.
+        const full = lines.length >= max;
 
-        const interactive = INTERACTIVE.has(tag) || element.hasAttribute("onclick");
+        // A rich-text editor is a div that takes typing; without this line it
+        // is invisible to a read and the model has nothing to type into. The
+        // attribute, not `isContentEditable`: the property is inherited by
+        // every paragraph inside the editor, and stamping each of those would
+        // bury the one ref that matters.
+        const editableAttribute = element.getAttribute("contenteditable");
+        const editable = editableAttribute !== null && editableAttribute !== "false";
+        const interactive = INTERACTIVE.has(tag) || editable || element.hasAttribute("onclick");
         const wanted = interactive || (includeAll && STRUCTURAL.has(tag));
 
-        if (wanted && visible(element)) {
+        if (wanted && !full && visible(element)) {
           counter += 1;
           element.setAttribute(attribute, String(counter));
           const parts = [`${"  ".repeat(Math.min(depth, 8))}${role(element)}`];
@@ -144,6 +152,14 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
           lines.push(parts.join(" "));
         }
 
+        // `children` never enters a shadow root, so a web component's insides
+        // would read as an empty box. The selector path already pierces shadow
+        // DOM (Playwright's engine does by default), so without this the model
+        // could click a thing it was never shown.
+        const shadow = element.shadowRoot;
+        if (shadow !== null) {
+          for (const child of Array.from(shadow.children)) walk(child, depth + 1);
+        }
         for (const child of Array.from(element.children)) walk(child, depth + 1);
       };
 
