@@ -114,6 +114,31 @@ describe('the store while the harness is starting', () => {
     await waitFor(() => expect(phase()).toBe('no-harness'))
   })
 
+  it('stops waiting after the deadline, so a start that never ends is not an endless splash', async () => {
+    // The false reassurance to refuse: a harness that reports "starting"
+    // forever. Past the deadline the store says the harness is not running,
+    // which is the page with the start button on it.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      resolveHarnessAddress.mockResolvedValue(null)
+      harnessIsStarting.mockResolvedValue(true)
+
+      render(
+        <WorkspaceProvider>
+          <Probe />
+        </WorkspaceProvider>,
+      )
+      await waitFor(() => expect(listeners.length).toBeGreaterThan(0))
+      await settle()
+      expect(phase()).toBe('loading')
+
+      await act(() => vi.advanceTimersByTimeAsync(8_500))
+      await waitFor(() => expect(phase()).toBe('no-harness'))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reads an absence as an absence when nothing is starting', async () => {
     resolveHarnessAddress.mockResolvedValue(null)
     harnessIsStarting.mockResolvedValue(false)

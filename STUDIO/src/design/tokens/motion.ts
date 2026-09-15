@@ -232,7 +232,14 @@ export const SPLASH = {
    * changing its mind. A start that takes longer than this is a start that
    * something is wrong with, and the app comes up to say so.
    */
-  maxHoldMs: 8000,
+  maxHoldMs: 9000,
+  /**
+   * The beat between the store's answer and the splash lifting. The shell
+   * under the splash takes the answer too - the sidebar fills, the greeting
+   * arrives - and lifting on the same frame showed that settling through
+   * the fade, which read as a cut. A beat lets it finish first.
+   */
+  settleMs: 360,
   /**
    * The fade that hands the window to the app underneath.
    *

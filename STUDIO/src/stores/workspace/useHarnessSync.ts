@@ -42,6 +42,15 @@ import type { ModelCatalogState, StorePhase } from '@/stores/workspace/types'
  * The writes live beside it (`useConversationWrites`, `useProjectWrites`) and
  * reach the harness through the handle this returns.
  */
+/**
+ * How long a start is waited for before it is reported as an absence.
+ *
+ * A cold start is ready in two to four seconds on this machine; a start
+ * that has run this long is one something is wrong with, and the person
+ * needs the page that lets them press start, not a splash.
+ */
+const STARTING_DEADLINE_MS = 8_000
+
 export interface HarnessSync {
   /** The client for the harness at its current address, or null while it is away. */
   readonly clientRef: RefObject<HarnessClient | null>
@@ -87,6 +96,9 @@ export function useHarnessSync(): HarnessSync {
   const clientRef = useRef<HarnessClient | null>(null)
   const liveRef = useRef(true)
   const titleRefreshRef = useRef<ReturnType<typeof createTitleRefresh> | null>(null)
+  /** When this store first saw the harness starting; null once it is not. */
+  const startingSince = useRef<number | null>(null)
+  const startingTimer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     let client = clientRef.current
@@ -100,7 +112,26 @@ export function useHarnessSync(): HarnessSync {
         // to the app when `harness-started` arrived. The store stays
         // `loading` through the start - the lifecycle subscription below
         // re-reads on the start's end, whichever way it ends.
-        if (await harnessIsStarting()) return
+        //
+        // But not forever. A wait with no end is the false reassurance the
+        // old "not running" page at least never gave: the person cannot
+        // press start on a splash. Past `STARTING_DEADLINE_MS` a start that
+        // has not ended is reported as an absence, and the page that shows
+        // has the start button, which asks the supervisor again.
+        if (await harnessIsStarting()) {
+          if (!liveRef.current) return
+          const now = performance.now()
+          startingSince.current ??= now
+          const waited = now - startingSince.current
+          if (waited < STARTING_DEADLINE_MS) {
+            if (startingTimer.current !== null) window.clearTimeout(startingTimer.current)
+            startingTimer.current = window.setTimeout(() => {
+              startingTimer.current = null
+              if (liveRef.current) void load()
+            }, STARTING_DEADLINE_MS - waited)
+            return
+          }
+        }
         if (!liveRef.current) return
         // Said differently from a failure: nothing is wrong except absence.
         setStorePhase((current) =>
@@ -116,6 +147,7 @@ export function useHarnessSync(): HarnessSync {
       client = createHarnessClient(address)
       clientRef.current = client
     }
+    startingSince.current = null
 
     // The catalog rides the same client and the same restart events as the
     // index, but answers for itself: a picker that cannot be read is the
@@ -182,6 +214,8 @@ export function useHarnessSync(): HarnessSync {
     void load()
     return () => {
       liveRef.current = false
+      if (startingTimer.current !== null) window.clearTimeout(startingTimer.current)
+      startingTimer.current = null
     }
   }, [load])
 

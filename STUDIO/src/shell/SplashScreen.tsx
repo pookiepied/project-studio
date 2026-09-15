@@ -1,6 +1,14 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { StudioMark } from '@/components/brand'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
+
+/**
+ * How long the mark's entrance takes: the last tile's delay plus its own
+ * duration (`tileMotion` in `StudioMark`). After this the entrance is over,
+ * and a splash still waiting has nothing left to play unless told to.
+ */
+const ENTRANCE_MS = 1_200
 
 /**
  * The preload screen: the brand, arriving.
@@ -12,7 +20,27 @@ import { EASE_OUT, SPLASH } from '@/design/tokens'
  * component owns only the container's slow settle and the exit fade that hands
  * the window over.
  */
-export function SplashScreen() {
+export function SplashScreen({
+  waiting = false,
+}: {
+  /**
+   * The store has not answered yet. The mark's entrance plays once and then
+   * stops, and a splash held past it with a still mark read as a window that
+   * had hung - the harness was starting under it, and nothing said so. Once
+   * the entrance is done, a waiting splash hands the mark its busy shimmer,
+   * the same one the strip shows while a turn runs, so the wait is visibly a
+   * wait. It is the same mark throughout: the shimmer is the entrance's
+   * tiles continuing to move, not a spinner arriving beside them.
+   */
+  waiting?: boolean
+}) {
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setEntered(true), ENTRANCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
+  const busy = waiting && entered
+
   return (
     <motion.div
       aria-hidden
@@ -44,7 +72,7 @@ export function SplashScreen() {
             as a poster rather than a boot state. One step down keeps the
             staircase legible while giving the mark the same margin of quiet
             around it the home greeting has. */}
-        <StudioMark entrance size={88} />
+        <StudioMark entrance={!busy} busy={busy} size={88} />
       </motion.div>
     </motion.div>
   )

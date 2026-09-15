@@ -114,11 +114,16 @@ function StudioApp() {
   useEffect(() => {
     // The splash stays for its full entrance even on an instant boot — the
     // mark is interrupted mid-arrival otherwise. Elapsed time is subtracted so
-    // a slow mount shortens the wait rather than stacking on top of it.
+    // a slow mount shortens the wait rather than stacking on top of it. Once
+    // the store has answered, one more beat for the shell to take the answer
+    // before the splash lifts off it.
     const elapsed = performance.now() - startedAt.current
     const floor = Math.max(0, SPLASH.minDurationMs - elapsed)
     const ceiling = Math.max(0, SPLASH.minDurationMs + SPLASH.maxHoldMs - elapsed)
-    const timer = window.setTimeout(() => setShowSplash(false), settled ? floor : ceiling)
+    const timer = window.setTimeout(
+      () => setShowSplash(false),
+      settled ? Math.max(floor, SPLASH.settleMs) : ceiling,
+    )
     return () => window.clearTimeout(timer)
   }, [settled])
 
@@ -147,7 +152,7 @@ function StudioApp() {
       >
         <AppShell />
       </motion.div>
-      <AnimatePresence>{showSplash ? <SplashScreen /> : null}</AnimatePresence>
+      <AnimatePresence>{showSplash ? <SplashScreen waiting={!settled} /> : null}</AnimatePresence>
     </>
   )
 }
