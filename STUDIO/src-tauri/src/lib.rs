@@ -617,13 +617,20 @@ pub fn run() {
       Some(vec![tray::HIDDEN_FLAG]),
     ))
     .setup(move |app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      // Logging in every build. It was debug only, which left a release
+      // build with no record of anything - a harness that failed to start
+      // could only be diagnosed by rebuilding in debug. Release keeps the
+      // log file and drops the stdout and webview targets, which have no
+      // reader there.
+      let logging = tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
+      let logging = if cfg!(debug_assertions) {
+        logging
+      } else {
+        logging.targets([tauri_plugin_log::Target::new(
+          tauri_plugin_log::TargetKind::LogDir { file_name: None },
+        )])
+      };
+      app.handle().plugin(logging.build())?;
       lifecycle_supervisor.attach_lifecycle_emitter(app.handle().clone());
       tray::install(app)?;
       if remote_access_enabled_at_launch(app.handle()) {

@@ -475,7 +475,16 @@ impl HarnessSupervisor {
             PathBuf::from("../STUDIO HARNESS/dist/server.mjs"),
             PathBuf::from("./STUDIO HARNESS/dist/server.mjs"),
             PathBuf::from("../../STUDIO HARNESS/dist/server.mjs"),
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../STUDIO HARNESS/dist/server.mjs"),
+            // The repository's own copy, by the path compiled in at build
+            // time. `src-tauri` sits two levels below the repository root
+            // (`Project Studio/STUDIO/src-tauri`), and the harness beside
+            // `STUDIO`, not inside it. The one-level form pointed at
+            // `STUDIO/STUDIO HARNESS`, which does not exist, so a release
+            // build launched from anywhere but `src-tauri` found no harness
+            // and opened to "the harness is not running". Dev never noticed
+            // because `tauri dev` runs with `src-tauri` as the working
+            // directory and the relative candidate above answers first.
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../STUDIO HARNESS/dist/server.mjs"),
         ];
         for c in candidates {
             if c.exists() {
