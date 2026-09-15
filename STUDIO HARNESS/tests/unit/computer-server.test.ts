@@ -35,7 +35,7 @@ describe("the tool surface", () => {
   it("is the set that was designed, named as Studio's own", () => {
     for (const tool of TOOLS) expect(tool.name.startsWith("studio_computer_")).toBe(true);
     expect(new Set(TOOLS.map((tool) => tool.name)).size).toBe(TOOLS.length);
-    expect(TOOLS).toHaveLength(23);
+    expect(TOOLS).toHaveLength(26);
   });
 
   it("covers the jobs the capability exists for", () => {
@@ -91,6 +91,72 @@ describe("the tool surface", () => {
       expect(Object.keys(definition).sort()).toEqual(["description", "inputSchema", "name"]);
     }
   });
+});
+
+describe("bearings: the tools that keep a model from getting lost", () => {
+  const said = (answer: { content: readonly Record<string, unknown>[] }): string => String(answer.content[0]?.["text"]);
+  const row = (handle: number, title: string, display: number) => ({
+    handle,
+    title,
+    app: "Notepad",
+    pid: 1,
+    x: 10,
+    y: 20,
+    width: 800,
+    height: 600,
+    minimized: false,
+    maximized: false,
+    display,
+  });
+  const withPictures = (answers: Record<string, unknown>): ComputerSession =>
+    ({
+      request: async (op: string) => answers[op] ?? {},
+      rememberFrame: () => undefined,
+    }) as unknown as ComputerSession;
+
+  it("status says which window is being worked in, on which display, and whether it is in front", async () => {
+    const session = withPictures({
+      status: { target: row(4, "Notes", 1), targetInFront: false, front: row(9, "Other", 0), cursor: { display: 0, x: 1, y: 2 }, displays: [] },
+    });
+    const answer = await toolByName("studio_computer_status")!.run(session, {});
+    expect(said(answer)).toContain('Working in: "Notes" (window 4) (Notepad) on display 1');
+    expect(said(answer)).toContain("NOT the window in front");
+    expect(said(answer)).toContain('In front: "Other" (window 9)');
+  });
+
+  it("status says when nothing has been chosen yet, and when the target has closed", async () => {
+    const fresh = await toolByName("studio_computer_status")!.run(withPictures({ status: { target: null, targetGone: false } }), {});
+    expect(said(fresh)).toContain("No window has been chosen");
+    const gone = await toolByName("studio_computer_status")!.run(withPictures({ status: { target: null, targetGone: true } }), {});
+    expect(said(gone)).toContain("has closed");
+  });
+
+  it("windows marks the display and the window being worked in", async () => {
+    const session = withPictures({ windows: [{ ...row(4, "Notes", 1), foreground: true, target: true }] });
+    const answer = await toolByName("studio_computer_windows")!.run(session, {});
+    expect(said(answer)).toBe(
+      'window 4: "Notes" (Notepad) on display 1 at (10,20) 800x600, in front, the window being worked in',
+    );
+  });
+
+  it("arrange reports the window as it is afterwards, and a close that was only asked for", async () => {
+    const session = withPictures({ arrange: { ...row(4, "Notes", 0), maximized: true } });
+    const done = await toolByName("studio_computer_arrange")!.run(session, { window: 4, action: "maximize" });
+    expect(said(done)).toContain('Maximized "Notes" (window 4) (Notepad) on display 0, 800x600 at (10,20), maximized.');
+    const asked = await toolByName("studio_computer_arrange")!.run(withPictures({ arrange: { closed: false, handle: 4 } }), { window: 4, action: "close" });
+    expect(said(asked)).toContain("still open");
+  });
+
+  it("wait_for_window names what appeared, or says that nothing did", async () => {
+    const found = await toolByName("studio_computer_wait_for_window")!.run(
+      withPictures({ wait_window: { found: true, handle: 7, title: "Save As", app: "Notepad", display: 0, foreground: true } }),
+      { text: "Save As" },
+    );
+    expect(said(found)).toBe('"Save As" (window 7) (Notepad) is on display 0. It is in front.');
+    const none = await toolByName("studio_computer_wait_for_window")!.run(withPictures({ wait_window: { found: false, waited: 10 } }), { text: "Save As" });
+    expect(said(none)).toBe('No window matching "Save As" appeared within 10 seconds.');
+  });
+
 });
 
 describe("keys that went out while the front changed", () => {

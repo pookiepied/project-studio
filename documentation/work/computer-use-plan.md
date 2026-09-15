@@ -18,7 +18,7 @@ first version deliberately does not do.
 harness
   registry        studio-computer · provenance: system · a row like the browser's
   supervisor      spawns on demand, restarts, uncontained (ours)
-  catalog         tools/list → 23 studio_computer_* definitions
+  catalog         tools/list → 26 studio_computer_* definitions
   discovery       announced as built in; schemas loaded on request
         │  stdio (MCP), node.exe <path>/computer.mjs
         ▼
@@ -46,10 +46,10 @@ the list had a tool per variant.
 
 | Job | Tools |
 |---|---|
-| Seeing | `displays`, `screenshot { display?, scale? }`, `zoom { region, display? }` |
+| Seeing | `displays`, `screenshot { display?, window?, format? }`, `zoom { region, display? }` |
 | Pointer | `cursor`, `move`, `click { x, y, button?, count?, modifiers? }`, `drag { from, to }`, `mouse_button { action: down \| up }`, `scroll { x, y, direction, amount? }` |
 | Keyboard | `type { text }`, `key { keys, repeat? }`, `hold_key { keys, seconds }` |
-| Windows | `apps`, `windows { app? }`, `open { app? , path? }`, `focus { window }` |
+| Windows | `apps`, `windows { app? }`, `open { app? , path? }`, `focus { window }`, `status`, `arrange { window, action, display?, x?, y?, width?, height? }`, `wait_for_window { text, seconds? }` |
 | Accessibility | `read_ui { window?, depth?, limit? }`, `act { ref, action }`, `set_value { ref, value }`, `select_text { ref, start, end }` |
 | Other | `clipboard { action: read \| write, text? }`, `wait { seconds }`, `stop` |
 
@@ -66,6 +66,19 @@ Windows to be ready for. `get_app_state` is `read_ui`, and it hands out
 **Refs.** `read_ui` stamps every element it lists with `ui_N`, kept in the
 session's map until the next `read_ui`, which clears it. A ref from before a
 read is gone, not rebound — the browser's rule, for the browser's reason.
+
+**Bearings.** Added 2026-09-15, after a model lost its window among many
+and mistook a picture of the wrong display for a click that did nothing.
+`windows` now says which display each window is on and which is the one
+being worked in; `status` says where the work is in one call (the target,
+whether it is in front, what is in front if not, the pointer, the displays);
+`arrange` does what the title bar does (maximize on a chosen display,
+minimize, restore, move, resize, close by WM_CLOSE); `wait_for_window`
+waits for a dialog or a slow app by title and names it by handle; and
+`screenshot { window }` pictures one window wherever it is. With no
+`display` given, every picture and every pointer action now follows the
+window being worked in, then the pointer, then the primary - not the primary
+unconditionally.
 
 **Coordinates.** Physical pixels of the chosen display. A screenshot may be
 returned scaled down (longest side 1568 by default) and the result names the

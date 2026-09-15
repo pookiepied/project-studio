@@ -48,9 +48,25 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool AllowSetForegroundWindow(int pid);
 [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
 [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from, uint to, bool attach);
+[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+[DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+[DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
 '@
 
 [void][Studio.Native]::SetProcessDPIAware()
+
+# Whether an argument was given. The Node side sends "" for "not given", and
+# a number is compared against "" by converting "" to a number: in
+# PowerShell `0 -eq ""` is TRUE, so display 0, x 0 and count 0 all read as
+# absent when tested that way. Measured on 2026-09-15 as a move to display 0
+# landing on display 1 - the default - every time. Only a string can be the
+# empty string; a number that is given is given.
+function Given($v) {
+  if ($null -eq $v) { return $false }
+  if ($v -is [string]) { return $v -ne "" }
+  return $true
+}
 
 # ---- Pictures ---------------------------------------------------------------
 
@@ -67,9 +83,40 @@ function Get-Displays {
   return $list
 }
 
+# The display a point is on, by index; the primary one when it is on none.
+function Display-Of([int]$x, [int]$y) {
+  $all = [System.Windows.Forms.Screen]::AllScreens
+  for ($i = 0; $i -lt $all.Length; $i++) {
+    $b = $all[$i].Bounds
+    if ($x -ge $b.X -and $x -lt $b.X + $b.Width -and $y -ge $b.Y -and $y -lt $b.Y + $b.Height) { return $i }
+  }
+  for ($i = 0; $i -lt $all.Length; $i++) { if ($all[$i].Primary) { return $i } }
+  return 0
+}
+
+# The display of the window being worked in, by its centre. Null when there
+# is no target or it has gone.
+function Target-Display {
+  if ($script:Target -eq 0) { return $null }
+  $h = [IntPtr]$script:Target
+  if (-not [Studio.Native]::IsWindow($h) -or [Studio.Native]::IsIconic($h)) { return $null }
+  $r = New-Object Studio.Native+RECT
+  if (-not [Studio.Native]::GetWindowRect($h, [ref]$r)) { return $null }
+  return Display-Of ([int](($r.Left + $r.Right) / 2)) ([int](($r.Top + $r.Bottom) / 2))
+}
+
+# With no index given, the display follows the work: the one the window
+# being worked in is on, else the one the pointer is on, else the primary.
+# Before this the default was always the primary, and a model working in a
+# window on the second display got, with every click, a picture of the wrong
+# screen - and concluded its click had done nothing.
 function Resolve-Display($index) {
   $all = [System.Windows.Forms.Screen]::AllScreens
-  if ($null -eq $index -or $index -eq "") {
+  if (-not (Given $index)) {
+    $t = Target-Display
+    if ($null -ne $t) { return @{ index = $t; screen = $all[$t] } }
+    $p = New-Object Studio.Native+POINT
+    if ([Studio.Native]::GetCursorPos([ref]$p)) { $c = Display-Of $p.X $p.Y; return @{ index = $c; screen = $all[$c] } }
     for ($i = 0; $i -lt $all.Length; $i++) { if ($all[$i].Primary) { return @{ index = $i; screen = $all[$i] } } }
     return @{ index = 0; screen = $all[0] }
   }
@@ -81,7 +128,20 @@ function Resolve-Display($index) {
 # A PNG of one display, or a region of it, scaled so the longest side is at
 # most `max` pixels. The answer names the full frame the picture stands for,
 # because the model acts in that frame and never in the picture's pixels.
-function Take-Screenshot($display, $region, $max, $format, $quality) {
+function Take-Screenshot($display, $region, $max, $format, $quality, $window) {
+  # A window handle picks the display and the region both: the rectangle the
+  # window covers, clipped to the display its centre is on. The answer still
+  # names that display's frame, so a point in the picture is a point to click.
+  if ((Given $window) -and [int64]$window -ne 0) {
+    $wh = [IntPtr][int64]$window
+    if (-not [Studio.Native]::IsWindow($wh)) { throw "Window $window is no longer on screen. List windows again." }
+    if ([Studio.Native]::IsIconic($wh)) { throw "Window $window is minimized, so there is nothing of it to picture. Focus it first." }
+    $wr = New-Object Studio.Native+RECT
+    [void][Studio.Native]::GetWindowRect($wh, [ref]$wr)
+    $display = Display-Of ([int](($wr.Left + $wr.Right) / 2)) ([int](($wr.Top + $wr.Bottom) / 2))
+    $db = ([System.Windows.Forms.Screen]::AllScreens[$display]).Bounds
+    $region = @(($wr.Left - $db.X), ($wr.Top - $db.Y), ($wr.Right - $db.X), ($wr.Bottom - $db.Y))
+  }
   $d = Resolve-Display $display
   $b = $d.screen.Bounds
   $x = $b.X; $y = $b.Y; $w = $b.Width; $h = $b.Height
@@ -94,7 +154,7 @@ function Take-Screenshot($display, $region, $max, $format, $quality) {
   $bmp = New-Object System.Drawing.Bitmap $w, $h
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   try { $g.CopyFromScreen($x, $y, 0, 0, (New-Object System.Drawing.Size $w, $h)) } finally { $g.Dispose() }
-  $limit = if ($null -eq $max -or $max -eq "") { 1568 } else { [int]$max }
+  $limit = if (-not (Given $max)) { 1568 } else { [int]$max }
   $scale = 1.0
   $longest = [Math]::Max($w, $h)
   if ($longest -gt $limit) { $scale = $limit / $longest }
@@ -189,9 +249,9 @@ function Press-Button($button, $direction) {
 }
 
 function Click-At($display, $x, $y, $button, $count, $modifiers) {
-  if ($null -ne $x -and $x -ne "") { Move-Pointer $display $x $y }
-  $b = if ($null -eq $button -or $button -eq "") { "left" } else { $button }
-  $n = if ($null -eq $count -or $count -eq "") { 1 } else { [int]$count }
+  if ((Given $x)) { Move-Pointer $display $x $y }
+  $b = if (-not (Given $button)) { "left" } else { $button }
+  $n = if (-not (Given $count)) { 1 } else { [int]$count }
   $held = Press-Modifiers $modifiers $true
   try {
     for ($i = 0; $i -lt $n; $i++) {
@@ -216,8 +276,8 @@ function Drag-Pointer($display, $from, $to) {
 }
 
 function Scroll-At($display, $x, $y, $direction, $amount) {
-  if ($null -ne $x -and $x -ne "") { Move-Pointer $display $x $y }
-  $ticks = if ($null -eq $amount -or $amount -eq "") { 3 } else { [int]$amount }
+  if ((Given $x)) { Move-Pointer $display $x $y }
+  $ticks = if (-not (Given $amount)) { 3 } else { [int]$amount }
   $delta = 120 * $ticks
   switch ($direction) {
     "up" { Send-Mouse 0x0800 $delta }
@@ -271,7 +331,7 @@ function Send-Key([int]$vk, [bool]$down) {
 # Modifiers named in "ctrl+shift" form; returns the codes held so they can be
 # released in reverse in a finally, even when the middle throws.
 function Press-Modifiers($spec, [bool]$down) {
-  if ($null -eq $spec -or $spec -eq "" -or $spec.Count -eq 0) { return @() }
+  if (-not (Given $spec) -or $spec.Count -eq 0) { return @() }
   $codes = @()
   if ($spec -is [string]) {
     foreach ($part in $spec.Split("+")) { if ($part.Trim() -ne "") { $codes += (Resolve-Key $part) } }
@@ -285,7 +345,7 @@ function Press-Chord($chord, $repeat) {
   $parts = @($chord.Split("+") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
   if ($parts.Count -eq 0) { throw "Say which key to press." }
   $codes = @($parts | ForEach-Object { Resolve-Key $_ })
-  $n = if ($null -eq $repeat -or $repeat -eq "") { 1 } else { [int]$repeat }
+  $n = if (-not (Given $repeat)) { 1 } else { [int]$repeat }
   for ($r = 0; $r -lt $n; $r++) {
     foreach ($c in $codes) { Send-Key $c $true }
     for ($k = $codes.Count - 1; $k -ge 0; $k--) { Send-Key $codes[$k] $false }
@@ -368,9 +428,11 @@ function Get-TopWindows($app) {
     }
     $w.app = $procs[$w.pid]
     $w.foreground = ($w.handle -eq $fg)
+    $w.target = ($w.handle -eq $script:Target)
+    $w.display = Display-Of ([int]($w.x + $w.width / 2)) ([int]($w.y + $w.height / 2))
   }
   $list = $script:Windows
-  if ($null -ne $app -and $app -ne "") {
+  if ((Given $app)) {
     $needle = $app.ToLowerInvariant()
     $list = @($list | Where-Object { $_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*" })
   }
@@ -485,6 +547,14 @@ function Focus-Window($handle) {
     Send-Mouse 0x0001 0
     $ok = [Studio.Native]::SetForegroundWindow($h)
     if (-not $ok) { Start-Sleep -Milliseconds 50; $ok = [Studio.Native]::SetForegroundWindow($h) }
+    # Still refused: the foreground lock. A tap of Alt on its own is the
+    # long-standing way to release it - Windows treats it as the person
+    # reaching for a menu - and it changes nothing in the window that has it.
+    if (-not $ok) {
+      Send-Key 0x12 $true; Send-Key 0x12 $false
+      Start-Sleep -Milliseconds 30
+      $ok = [Studio.Native]::SetForegroundWindow($h)
+    }
   } finally { if ($attached) { [void][Studio.Native]::AttachThreadInput($me, $fgThread, $false) } }
   Start-Sleep -Milliseconds 150
   # In front is not the same as taking keys. A Store app (Calculator, Notepad,
@@ -525,7 +595,7 @@ function Wait-NewWindow($before, $hint) {
     $now = @(Get-TopWindows $null)
     $fresh = @($now | Where-Object { -not $known.ContainsKey([int64]$_.handle) -and -not $_.minimized })
     if ($fresh.Count -eq 0) { continue }
-    if ($null -ne $hint -and $hint -ne "") {
+    if ((Given $hint)) {
       $needle = $hint.ToLowerInvariant()
       $named = @($fresh | Where-Object { $_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*" })
       if ($named.Count -gt 0) { return $named[0] }
@@ -539,13 +609,13 @@ function Wait-NewWindow($before, $hint) {
 
 function Open-App($app, $path) {
   $before = @(Get-TopWindows $null)
-  if ($null -ne $path -and $path -ne "") {
+  if ((Given $path)) {
     $p = Start-Process -FilePath $path -PassThru
     $w = Wait-NewWindow $before ([System.IO.Path]::GetFileNameWithoutExtension($path))
     if ($null -ne $w) { [void](Focus-Window $w.handle); Set-Target $w.handle }
     return [ordered]@{ started = $true; pid = $p.Id; what = $path; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
   }
-  if ($null -eq $app -or $app -eq "") { throw "Say which app to open, or give a path." }
+  if (-not (Given $app)) { throw "Say which app to open, or give a path." }
   # Already running with a window: bring it forward rather than start a second.
   $existing = @(Get-TopWindows $app)
   if ($existing.Count -gt 0) {
@@ -562,6 +632,112 @@ function Open-App($app, $path) {
   return [ordered]@{ started = $true; what = $starts[0].Name; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
 }
 
+# ---- Bearings ---------------------------------------------------------------
+#
+# Where the work is: the window being worked in, whether it is the one in
+# front, which display it is on, and what is in front if not. The one call to
+# make on getting lost, and cheap enough to make before anything that matters.
+
+function Window-Row($handle) {
+  $h = [IntPtr][int64]$handle
+  if ($h -eq [IntPtr]::Zero -or -not [Studio.Native]::IsWindow($h)) { return $null }
+  $r = New-Object Studio.Native+RECT
+  [void][Studio.Native]::GetWindowRect($h, [ref]$r)
+  $owner = [uint32]0
+  [void][Studio.Native]::GetWindowThreadProcessId($h, [ref]$owner)
+  $p = Get-Process -Id $owner -ErrorAction SilentlyContinue
+  return [ordered]@{
+    handle = [int64]$h; title = (Get-WindowTitle $h); app = $(if ($null -ne $p) { $p.ProcessName } else { "" }); pid = [int]$owner
+    x = $r.Left; y = $r.Top; width = ($r.Right - $r.Left); height = ($r.Bottom - $r.Top)
+    minimized = [Studio.Native]::IsIconic($h); maximized = [Studio.Native]::IsZoomed($h)
+    display = (Display-Of ([int](($r.Left + $r.Right) / 2)) ([int](($r.Top + $r.Bottom) / 2)))
+  }
+}
+
+function Get-Status {
+  $fg = [int64][Studio.Native]::GetForegroundWindow()
+  $target = Window-Row $script:Target
+  $gone = ($script:Target -ne 0 -and $null -eq $target)
+  if ($gone) { $script:Target = [int64]0 }
+  return [ordered]@{
+    target = $target
+    targetGone = $gone
+    targetInFront = $(if ($null -ne $target) { Same-Window $fg $script:Target } else { $false })
+    front = (Window-Row (Root-Of $fg))
+    cursor = (Get-Cursor)
+    displays = @(Get-Displays)
+  }
+}
+
+# ---- Arranging windows ------------------------------------------------------
+#
+# What a person does with the title bar and its buttons: put a window where
+# it can be seen whole. A maximized window on a known display is the one
+# arrangement that ends "which of these is mine" - nothing else overlaps it
+# and every picture of that display is a picture of it.
+
+function Arrange-Window($handle, $action, $display, $x, $y, $width, $height) {
+  $h = [IntPtr][int64]$handle
+  if ($h -eq [IntPtr]::Zero -or -not [Studio.Native]::IsWindow($h)) { throw "Window $handle is no longer on screen. List windows again." }
+  $SWP_NOSIZE = 0x0001; $SWP_NOMOVE = 0x0002; $SWP_NOZORDER = 0x0004; $SWP_NOACTIVATE = 0x0010
+  switch ($action) {
+    "maximize" {
+      # A maximize lands on the display the window is on, so a move there
+      # comes first when another display was asked for.
+      if ((Given $display)) {
+        $b = (Resolve-Display $display).screen.Bounds
+        if ([Studio.Native]::IsZoomed($h)) { [void][Studio.Native]::ShowWindow($h, 9); Start-Sleep -Milliseconds 100 }
+        [void][Studio.Native]::SetWindowPos($h, [IntPtr]::Zero, $b.X + 40, $b.Y + 40, 0, 0, ($SWP_NOSIZE -bor $SWP_NOZORDER -bor $SWP_NOACTIVATE))
+      }
+      [void][Studio.Native]::ShowWindow($h, 3)
+    }
+    "minimize" { [void][Studio.Native]::ShowWindow($h, 6) }
+    "restore" { [void][Studio.Native]::ShowWindow($h, 9) }
+    "move" {
+      if (-not (Given $x) -or -not (Given $y)) { throw "Give x and y for a move, in the pixels of the display (display picks which)." }
+      $a = To-Absolute $display $x $y
+      if ([Studio.Native]::IsZoomed($h)) { [void][Studio.Native]::ShowWindow($h, 9); Start-Sleep -Milliseconds 100 }
+      [void][Studio.Native]::SetWindowPos($h, [IntPtr]::Zero, $a.x, $a.y, 0, 0, ($SWP_NOSIZE -bor $SWP_NOZORDER -bor $SWP_NOACTIVATE))
+    }
+    "resize" {
+      if (-not (Given $width) -or -not (Given $height)) { throw "Give width and height for a resize." }
+      if ([Studio.Native]::IsZoomed($h)) { [void][Studio.Native]::ShowWindow($h, 9); Start-Sleep -Milliseconds 100 }
+      [void][Studio.Native]::SetWindowPos($h, [IntPtr]::Zero, 0, 0, [int]$width, [int]$height, ($SWP_NOMOVE -bor $SWP_NOZORDER -bor $SWP_NOACTIVATE))
+    }
+    "close" {
+      # WM_CLOSE, which is the title bar's X: the app gets to ask about
+      # unsaved work rather than being killed with it.
+      [void][Studio.Native]::PostMessageW($h, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+      Start-Sleep -Milliseconds 300
+      if (-not [Studio.Native]::IsWindow($h) -and $script:Target -eq [int64]$h) { $script:Target = [int64]0 }
+      return [ordered]@{ closed = (-not [Studio.Native]::IsWindow($h)); handle = [int64]$handle }
+    }
+    default { throw "The action must be maximize, minimize, restore, move, resize or close." }
+  }
+  Start-Sleep -Milliseconds 150
+  return (Window-Row $handle)
+}
+
+# A window that is not there yet: a dialog a click will raise, a file that
+# takes a moment to open. Waits up to `seconds` for a visible top-level
+# window whose app or title contains the text, and names it by handle.
+function Wait-ForWindow($text, $seconds) {
+  if (-not (Given $text)) { throw "Say which window to wait for: part of its title or its app." }
+  $limit = if (-not (Given $seconds)) { 10 } else { [Math]::Min([double]$seconds, 60) }
+  $deadline = [DateTime]::UtcNow.AddSeconds($limit)
+  $needle = $text.ToLowerInvariant()
+  while ($true) {
+    $found = @(Get-TopWindows $null | Where-Object { -not $_.minimized -and ($_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*") })
+    if ($found.Count -gt 0) {
+      $fg = [int64][Studio.Native]::GetForegroundWindow()
+      $pick = @($found | Sort-Object { $(if ($_.handle -eq $fg) { 1 } else { 0 }) }, { $_.width * $_.height } -Descending)[0]
+      return [ordered]@{ found = $true; handle = $pick.handle; title = $pick.title; app = $pick.app; display = $pick.display; foreground = $pick.foreground }
+    }
+    if ([DateTime]::UtcNow -ge $deadline) { return [ordered]@{ found = $false; waited = $limit } }
+    Start-Sleep -Milliseconds 250
+  }
+}
+
 # ---- Accessibility ----------------------------------------------------------
 
 $script:Refs = @{}
@@ -570,7 +746,7 @@ $script:RefsWindow = [int64]0
 # The handle a read walks: the one given, else the target. Never the window in
 # front - see the target rule above.
 function Ui-Handle($window) {
-  if ($null -ne $window -and $window -ne "") { return [int64]$window }
+  if ((Given $window)) { return [int64]$window }
   if ($script:Target -eq 0) { throw "Say which window to read: give a handle from windows, or open or focus a window first. Reading whatever is in front is not done, because that may be the person's own window." }
   return $script:Target
 }
@@ -590,8 +766,8 @@ function Read-Ui($window, $depth, $limit, $all) {
   # Reading a window is choosing it: the refs it hands out belong to it, and
   # what the model does with them next happens there.
   Set-Target $script:RefsWindow
-  $maxDepth = if ($null -eq $depth -or $depth -eq "") { 12 } else { [int]$depth }
-  $maxLines = if ($null -eq $limit -or $limit -eq "") { 400 } else { [int]$limit }
+  $maxDepth = if (-not (Given $depth)) { 12 } else { [int]$depth }
+  $maxLines = if (-not (Given $limit)) { 400 } else { [int]$limit }
   $everything = ($all -eq $true)
   $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
   $lines = New-Object System.Collections.Generic.List[string]
@@ -737,7 +913,10 @@ while ($true) {
     $a = $req.args
     switch ($req.op) {
       "displays" { Answer $id @(Get-Displays) }
-      "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality) }
+      "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality $a.window) }
+      "status" { Answer $id (Get-Status) }
+      "arrange" { Answer $id (Arrange-Window $a.window $a.action $a.display $a.x $a.y $a.width $a.height) }
+      "wait_window" { Answer $id (Wait-ForWindow $a.text $a.seconds) }
       "cursor" { Answer $id (Get-Cursor) }
       "move" { Move-Pointer $a.display $a.x $a.y; Answer $id (Get-Cursor) }
       "click" { Click-At $a.display $a.x $a.y $a.button $a.count $a.modifiers; Start-Sleep -Milliseconds 80; Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow())); Answer $id (Get-Cursor) }

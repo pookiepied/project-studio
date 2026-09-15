@@ -51,7 +51,9 @@ const STRING = { type: "string" } as const;
 const DISPLAY = {
   display: {
     type: "number",
-    description: "Which display, by the index from `displays`. Defaults to the primary one.",
+    description:
+      "Which display, by the index from `displays`. Defaults to the display of the window being worked in, " +
+      "else the pointer's, else the primary.",
   },
 } as const;
 
@@ -189,6 +191,20 @@ function withFront(said: string, sent: unknown): string {
   return front === "" ? said : `${said} ${front}`;
 }
 
+/** One window, as status and arrange describe it: name, app, display, place, state. */
+function windowLine(row: Record<string, unknown>): string {
+  const state = [row["minimized"] === true ? "minimized" : "", row["maximized"] === true ? "maximized" : ""].filter((s) => s !== "");
+  return (
+    `${windowName(row)} (${String(row["app"])}) on display ${String(row["display"])}, ` +
+    `${String(row["width"])}x${String(row["height"])} at (${String(row["x"])},${String(row["y"])})` +
+    (state.length === 0 ? "" : `, ${state.join(", ")}`)
+  );
+}
+
+function pastTense(action: string): string {
+  return { maximize: "Maximized", minimize: "Minimized", restore: "Restored", move: "Moved", resize: "Resized" }[action] ?? "Arranged";
+}
+
 /** A window as the answers name it: its title and the handle to name it by. */
 function windowName(result: Record<string, unknown>): string {
   const title = typeof result["window"] === "string" ? result["window"] : typeof result["title"] === "string" ? result["title"] : "";
@@ -246,9 +262,11 @@ export const TOOLS: readonly ToolDefinition[] = [
     name: "studio_computer_screenshot",
     description:
       "See what is on a display right now. The answer says which display and what size frame " +
-      "the picture stands for; give coordinates in that frame. Use zoom to read small text.",
+      "the picture stands for; give coordinates in that frame. Use zoom to read small text. " +
+      "Give a window handle to picture just that window, wherever it is.",
     inputSchema: object({
       ...DISPLAY,
+      window: { type: "number", description: "A handle from windows: picture only that window's rectangle." },
       format: {
         type: "string",
         enum: ["jpeg", "png"],
@@ -256,8 +274,10 @@ export const TOOLS: readonly ToolDefinition[] = [
       },
     }),
     run: async (session, input) => {
+      const window = num(input, "window");
       const shot = await picture(session, {
         ...displayArg(input),
+        ...(window === undefined ? {} : { window }),
         max: 1568,
         format: str(input, "format") ?? "jpeg",
       });
@@ -500,8 +520,8 @@ export const TOOLS: readonly ToolDefinition[] = [
   {
     name: "studio_computer_windows",
     description:
-      "The windows on screen, with a handle to name one by, its title, position and size. " +
-      "Give an app name to see only its windows.",
+      "The windows on screen, with a handle to name one by, its title, app, display, position and size. " +
+      "Says which is in front and which is the one being worked in. Give an app name to see only its windows.",
     inputSchema: object({ app: { type: "string", description: "Filter by app or title, case-insensitively." } }),
     run: async (session, input) => {
       const windows = await session.request("windows", { app: str(input, "app") ?? "" });
@@ -520,7 +540,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const lines = Array.isArray(ordered)
         ? ordered.map((w: unknown) =>
             isRecord(w)
-              ? `window ${String(w["handle"])}: "${String(w["title"])}" (${String(w["app"])}) at (${String(w["x"])},${String(w["y"])}) ${String(w["width"])}x${String(w["height"])}${w["minimized"] === true ? ", minimized" : ""}${w["foreground"] === true ? ", in front" : ""}`
+              ? `window ${String(w["handle"])}: "${String(w["title"])}" (${String(w["app"])}) on display ${String(w["display"])} at (${String(w["x"])},${String(w["y"])}) ${String(w["width"])}x${String(w["height"])}${w["minimized"] === true ? ", minimized" : ""}${w["foreground"] === true ? ", in front" : ""}${w["target"] === true ? ", the window being worked in" : ""}`
               : "",
           )
         : [];
@@ -561,9 +581,124 @@ export const TOOLS: readonly ToolDefinition[] = [
         session,
         focused
           ? `${named} is in front and is the window being worked in.`
-          : `Windows did not bring ${named} to the front; click inside it.`,
+          : `Windows did not bring ${named} to the front; click inside it, or arrange it (restore, maximize) and try again.`,
         undefined,
       );
+    },
+  },
+
+  {
+    name: "studio_computer_status",
+    description:
+      "Where the work is: the window being worked in (handle, title, app, display, size, minimized or " +
+      "maximized), whether it is the one in front, what is in front if not, the pointer and the displays. " +
+      "The call to make when lost, or before keys, and cheap enough to make often.",
+    inputSchema: object({}),
+    run: async (session) => {
+      const status = await session.request("status");
+      if (!isRecord(status)) return answer("The desktop could not be asked.");
+      const lines: string[] = [];
+      const target = status["target"];
+      if (isRecord(target)) {
+        lines.push(`Working in: ${windowLine(target)}.`);
+        lines.push(
+          status["targetInFront"] === true
+            ? "It is the window in front; keys and text will reach it."
+            : "It is NOT the window in front; keys and text would be refused. Focus it, or click inside it, first.",
+        );
+      } else if (status["targetGone"] === true) {
+        lines.push("The window being worked in has closed. Open, focus, read or click in a window to choose another.");
+      } else {
+        lines.push("No window has been chosen to work in yet. Open, focus, read or click in one.");
+      }
+      const front = status["front"];
+      if (isRecord(front) && !(isRecord(target) && front["handle"] === target["handle"])) {
+        lines.push(`In front: ${windowLine(front)}.`);
+      }
+      const cursor = status["cursor"];
+      if (isRecord(cursor)) {
+        lines.push(`Pointer at (${String(cursor["x"])},${String(cursor["y"])}) on display ${String(cursor["display"])}.`);
+      }
+      const displays = status["displays"];
+      if (Array.isArray(displays)) {
+        lines.push(
+          `Displays: ${displays
+            .map((d: unknown) =>
+              isRecord(d) ? `${String(d["index"])} (${String(d["width"])}x${String(d["height"])}${d["primary"] === true ? ", primary" : ""})` : "",
+            )
+            .join(", ")}.`,
+        );
+      }
+      return answer(lines.join("\n"));
+    },
+  },
+
+  {
+    name: "studio_computer_arrange",
+    description:
+      "Arrange a window by its handle: maximize (optionally on a given display), minimize, restore, move, " +
+      "resize or close. Maximizing the window being worked in on one display is the surest way to keep " +
+      "track of it: nothing overlaps it and every picture of that display shows it whole. Close is the " +
+      "title bar's X, so an app may ask about unsaved work.",
+    inputSchema: object(
+      {
+        window: { type: "number", description: "The handle from windows, open or status." },
+        action: { type: "string", enum: ["maximize", "minimize", "restore", "move", "resize", "close"] },
+        display: { type: "number", description: "For maximize and move: which display, by index." },
+        x: { type: "number", description: "For move: the new left edge, in the display's pixels." },
+        y: { type: "number", description: "For move: the new top edge, in the display's pixels." },
+        width: { type: "number", description: "For resize: the new width in pixels." },
+        height: { type: "number", description: "For resize: the new height in pixels." },
+      },
+      ["window", "action"],
+    ),
+    run: async (session, input) => {
+      const window = requiredNumber(input, "window");
+      const action = required(input, "action");
+      const result = await session.request("arrange", {
+        window,
+        action,
+        display: num(input, "display") ?? "",
+        x: num(input, "x") ?? "",
+        y: num(input, "y") ?? "",
+        width: num(input, "width") ?? "",
+        height: num(input, "height") ?? "",
+      });
+      if (action === "close") {
+        const closed = isRecord(result) && result["closed"] === true;
+        return acted(
+          session,
+          closed
+            ? `Window ${String(window)} has closed.`
+            : `Window ${String(window)} was asked to close and is still open; it may be asking about unsaved work.`,
+          undefined,
+        );
+      }
+      const said = isRecord(result) ? `${pastTense(action)} ${windowLine(result)}.` : `${pastTense(action)} window ${String(window)}.`;
+      return acted(session, said, isRecord(result) && typeof result["display"] === "number" ? result["display"] : undefined);
+    },
+  },
+
+  {
+    name: "studio_computer_wait_for_window",
+    description:
+      "Wait for a window whose title or app contains some text to appear - a dialog a click raises, a " +
+      "file that takes a moment to open - and get its handle. Better than a fixed wait and a guess.",
+    inputSchema: object(
+      {
+        text: { type: "string", description: 'Part of the title or app name: "Save As", "Notepad".' },
+        seconds: { type: "number", description: "How long to wait at most. Default 10, at most 60." },
+      },
+      ["text"],
+    ),
+    run: async (session, input) => {
+      const text = required(input, "text");
+      const result = await session.request("wait_window", { text, seconds: num(input, "seconds") ?? "" });
+      if (!isRecord(result) || result["found"] !== true) {
+        return answer(`No window matching "${text}" appeared within ${String(isRecord(result) ? result["waited"] : "")} seconds.`);
+      }
+      const front = result["foreground"] === true ? " It is in front." : " It is not in front; focus it before keys.";
+      return answer(`${windowName(result)} (${String(result["app"])}) is on display ${String(result["display"])}.${front}`);
     },
   },
 
