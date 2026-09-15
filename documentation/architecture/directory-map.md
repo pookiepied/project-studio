@@ -81,6 +81,7 @@ contracts/       shared types, model ids, and the one effect table (ADR 0020)
 credentials/     keychain-backed, via @napi-rs/keyring
 extend/          what can be added — MCP servers, skills, hooks — over one spine
                  mcp/ has two channels; nothing above them knows which is in use
+                 skills/ scans the folders; the folder is the installation (ADR 0056)
 models/          registry, adapters (test / local BYOK / studio-cloud), catalog
 net/             destination.ts - every outbound address is checked here first
                  http.ts        - the only place we open a connection ourselves

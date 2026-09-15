@@ -251,6 +251,31 @@ while a turn drives it. Consent for the screen under Full Auto remains open.
 Add application-owned and workspace-discovered skills, validation, catalog metadata, and agent
 assignment. Skills provide instructions and resources, not permissions or executable authority.
 
+**Foundation done, 2026-09-15.** See ADR 0056. Flue already reads the Agent Skills format —
+`SKILL.md` with frontmatter, one catalog line in the composed prompt, the body returned by its
+`activate_skill` tool — so the harness built no skills engine. It decides the folders
+(`<installation>/skills/` bundled, `~/.studio/skills/` the person's), the enablement (the extend
+spine's `skill` kind, three scopes, off by default), and mounts the enabled set with `useSkill()`
+in the render. Validation is Flue's parser; a folder that fails it is listed as a problem, not
+thrown. `allowed-tools` is parsed and ignored: a skill grants nothing, and every tool it names still
+passes the gate and the kernel. One bundled skill ships, `create-skill`, which tells the model how
+to author one. The settings pane and the project screen render skills with the same scope control
+servers use. Proof: `tests/integration/skills-flue.test.ts` drives the built server through off,
+on (line in the prompt, body from the tool, one turn), and off again.
+
+Remaining in this phase:
+
+- **Installing a skill** from a folder, an archive, or a URL, from the settings screen. Today the
+  person copies the folder by hand, which the pane says.
+- **A model-driven install** — the model produces the files, the person approves the move into
+  `~/.studio/skills/`. A permission question over a destination outside every root; not yet
+  designed.
+- **Workspace skills and trust.** Flue reads `<project>/.agents/skills/` on its own, outside the
+  enable layer and before the folder is trusted. Gate it on `WorkspaceTrustStore`, or extend the
+  runtime patch to switch discovery off. ADR 0056, Consequences.
+- **Agent assignment** — which subagent gets which skill. Phase 13's question, once there are
+  subagents to assign to.
+
 ### Phase 13: Subagents And Tasks
 
 Define specialized profiles and delegation policy. Preserve parent-owned durability and restrict

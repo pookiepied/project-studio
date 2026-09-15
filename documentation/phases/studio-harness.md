@@ -45,7 +45,7 @@ work the remediation exists to make safe.
 
 | Phase | Title | Depends on |
 |---|---|---|
-| **12** | Skills — application-owned and workspace-discovered skills, validation, catalog metadata, agent assignment. Instructions and resources, never authority. | 11 (same three-layer model), #49 trust |
+| **12** | Skills — application-owned and workspace-discovered skills, validation, catalog metadata, agent assignment. Instructions and resources, never authority. **Foundation landed 2026-09-15** (ADR 0056; proof `tests/integration/skills-flue.test.ts`): folders scanned, enablement over the spine, `useSkill()` in the render. Open: install from folder/URL, model-driven install, `.agents/skills/` trust, assignment. | 11 (same three-layer model), #49 trust |
 | **13** | Subagents and tasks — delegation, `task` and `skill` tools. | 12, #49 grants must not leak parent → child |
 | **14** | Projects, workspaces, and sandboxes | #15 OS isolation, #50 process/shell policy |
 | **15** | Memory and context | #34 context optimizer is currently unwired |

@@ -46,6 +46,7 @@ src/
   execution/     the turn as it runs: AsyncLocalStorage context, closing turns, outcomes
   extend/        what the user switched on per project, and making what runs match it
     mcp/         MCP servers: registry, launcher, supervisor, handshake, channels, wire/
+    skills/      skill folders: bundled under skills/, the person's under ~/.studio/skills
   gateway/       every outside provider, behind one word
     language/    model providers and adapters; local/ is BYOK over Pi's Models
     media/       image, speech and transcription providers: adapters, drivers, jobs that outlive a call
@@ -70,6 +71,7 @@ src/
   transport/
     http/        the harness's own API: create-app, middleware/, routes/
   vendor/        pinned binaries: resolving shipped or managed ones
+skills/          the skills Studio ships, one folder each, read beside vendor/ (ADR 0056)
 tests/
   unit/          one file per subject; tools/ mirrors src/tools
   integration/   a real server, real SQLite, real OS stores; skipped where the machine cannot

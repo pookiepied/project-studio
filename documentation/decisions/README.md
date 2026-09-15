@@ -102,6 +102,12 @@ wrong answer, and why we believed it, is the useful part.
 | [0049](0049-the-browser-is-ours-the-engine-is-the-machine-s.md) | The browser is ours, the engine is the machine's — why nothing ships an engine, and why 0048's eager rule is narrowed |
 | [0053](0053-dictation-is-live-by-segments.md) | Dictation is live by segments, on the transcribers that exist — the take cut at its pauses, text in speaking order, Improve offered afterwards and undoable |
 | [0054](0054-the-microphone-is-studio-s-to-grant.md) | The microphone is Studio's to grant — WebView2's permission question answered by the app on every webview; no stall, no borrowed prompt |
+| [0055](0055-the-desktop-is-driven-by-what-windows-already-has.md) | The desktop is driven by what Windows already has — the computer server, and the rule that it never acts on a window it did not open, focus, read or click |
+
+### Skills
+| | |
+|---|---|
+| [0056](0056-a-skill-is-a-folder-and-flue-reads-it.md) | A skill is a folder, and Flue reads it — bundled under the installation and the person's under `~/.studio/skills`, switched on through the spine, mounted with `useSkill()`; grants nothing |
 
 ### Errors, observability, and recovery
 | | |
