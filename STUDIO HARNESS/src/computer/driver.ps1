@@ -216,18 +216,39 @@ function Get-Cursor {
   return [ordered]@{ display = 0; x = $p.X; y = $p.Y }
 }
 
-function Send-Mouse([uint32]$flags, [int]$data) {
+# INPUT is built from the inside out, never written into in place. In
+# PowerShell `$i.u.mi.dwFlags = $flags` reads `$i.u` - a struct, a value -
+# into a copy, sets the copy, and drops it; `$i` is unchanged and what
+# reaches SendInput is an event with every field zero. Windows accepts a
+# zero event (SendInput answers 1) and it means nothing: no button, key code
+# 0, character 0. Measured on 2026-09-15 as every click, drag, key and typed
+# character since the driver was written reported sent and arriving nowhere,
+# while the pointer moved (SetCursorPos) and UI Automation worked, which is
+# what made it look like a focus problem. Assigning whole structs upward is
+# the one form that persists.
+function New-Input([uint32]$type, $union) {
   $i = New-Object Studio.Native+INPUT
-  $i.type = 0
-  $i.u.mi.dwFlags = $flags
+  $i.type = $type
+  $i.u = $union
+  return $i
+}
+
+function Send-Inputs([Studio.Native+INPUT[]]$inputs, $what) {
+  $sent = [Studio.Native]::SendInput($inputs.Count, $inputs, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
+  if ($sent -ne $inputs.Count) { throw "Windows refused the $what. A window that runs as administrator cannot be driven from here." }
+}
+
+function Send-Mouse([uint32]$flags, [int]$data) {
+  $mi = New-Object Studio.Native+MOUSEINPUT
+  $mi.dwFlags = $flags
   # mouseData is a DWORD that Windows reads as a signed wheel delta, so a
   # scroll down (-120) is the same 32 bits reinterpreted. `[uint32]-120` is
   # a conversion, not a reinterpretation, and PowerShell refuses it: measured
   # on 2026-09-15 as `Cannot convert "-240" to UInt32` on every scroll down.
-  $i.u.mi.mouseData = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$data), 0)
-  $arr = [Studio.Native+INPUT[]]@($i)
-  $sent = [Studio.Native]::SendInput(1, $arr, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
-  if ($sent -ne 1) { throw "Windows refused the mouse input. A window that runs as administrator cannot be driven from here." }
+  $mi.mouseData = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$data), 0)
+  $u = New-Object Studio.Native+INPUTUNION
+  $u.mi = $mi
+  Send-Inputs ([Studio.Native+INPUT[]]@((New-Input 0 $u))) "mouse input"
 }
 
 function Move-Pointer($display, $x, $y) {
@@ -255,7 +276,7 @@ function Click-At($display, $x, $y, $button, $count, $modifiers) {
   $held = Press-Modifiers $modifiers $true
   try {
     for ($i = 0; $i -lt $n; $i++) {
-      Press-Button $b "down"; Press-Button $b "up"
+      Press-Button $b "down"; Start-Sleep -Milliseconds 30; Press-Button $b "up"
       if ($i -lt $n - 1) { Start-Sleep -Milliseconds 60 }
     }
   } finally { Press-Modifiers $held $false | Out-Null }
@@ -314,18 +335,22 @@ function Resolve-Key($name) {
   throw "Unknown key `"$name`". Use names like return, tab, escape, ctrl, shift, alt, win, f5, or a single character."
 }
 
+function New-KeyInput([uint16]$vk, [uint16]$scan, [uint32]$flags) {
+  $ki = New-Object Studio.Native+KEYBDINPUT
+  $ki.wVk = $vk
+  $ki.wScan = $scan
+  $ki.dwFlags = $flags
+  $u = New-Object Studio.Native+INPUTUNION
+  $u.ki = $ki
+  return (New-Input 1 $u)
+}
+
 function Send-Key([int]$vk, [bool]$down) {
-  $i = New-Object Studio.Native+INPUT
-  $i.type = 1
-  $i.u.ki.wVk = [uint16]$vk
-  $i.u.ki.wScan = [uint16][Studio.Native]::MapVirtualKeyW([uint32]$vk, 0)
   $flags = 0
   if ($ExtendedKeys -contains $vk) { $flags = $flags -bor 0x0001 }
   if (-not $down) { $flags = $flags -bor 0x0002 }
-  $i.u.ki.dwFlags = [uint32]$flags
-  $arr = [Studio.Native+INPUT[]]@($i)
-  $sent = [Studio.Native]::SendInput(1, $arr, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
-  if ($sent -ne 1) { throw "Windows refused the key. A window that runs as administrator cannot be driven from here." }
+  $scan = [uint16][Studio.Native]::MapVirtualKeyW([uint32]$vk, 0)
+  Send-Inputs ([Studio.Native+INPUT[]]@((New-KeyInput ([uint16]$vk) $scan ([uint32]$flags)))) "key"
 }
 
 # Modifiers named in "ctrl+shift" form; returns the codes held so they can be
@@ -367,15 +392,9 @@ function Type-Text($text) {
   foreach ($ch in $text.ToCharArray()) {
     if ($ch -eq "`n") { Send-Key 0x0D $true; Send-Key 0x0D $false; continue }
     if ($ch -eq "`r") { continue }
-    foreach ($up in @($false, $true)) {
-      $i = New-Object Studio.Native+INPUT
-      $i.type = 1
-      $i.u.ki.wVk = 0
-      $i.u.ki.wScan = [uint16]$ch
-      $i.u.ki.dwFlags = [uint32](0x0004 -bor $(if ($up) { 0x0002 } else { 0 }))
-      $arr = [Studio.Native+INPUT[]]@($i)
-      [void][Studio.Native]::SendInput(1, $arr, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
-    }
+    $down = New-KeyInput 0 ([uint16]$ch) 0x0004
+    $up = New-KeyInput 0 ([uint16]$ch) (0x0004 -bor 0x0002)
+    Send-Inputs ([Studio.Native+INPUT[]]@($down, $up)) "character"
     Start-Sleep -Milliseconds 4
   }
 }
