@@ -193,6 +193,16 @@ async fn computer_indicator_show(app: AppHandle, conversation_id: String) -> Res
   .always_on_top(true)
   .skip_taskbar(true)
   .focused(false)
+  // `focused(false)` alone is not enough. On Windows it is a one-shot marker
+  // that tao consumes on the first show (`SW_SHOWNOACTIVATE`); every show
+  // after that is a plain `SW_SHOW`, which activates the window. The pill is
+  // hidden and shown once per turn, so from the second turn on it took the
+  // foreground at the instant the model began to act: measured on
+  // 2026-09-15 as keys reported typed that never reached Notepad, and clicks
+  // in Paint that only brought Paint forward. `focusable(false)` is
+  // `WS_EX_NOACTIVATE` for the window's whole life, so no show ever takes
+  // the keyboard from the window the model was told is the target.
+  .focusable(false)
   .resizable(false)
   .maximizable(false)
   .minimizable(false)

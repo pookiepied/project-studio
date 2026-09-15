@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { computerReport } from "../../src/computer/resolve.js";
-import { unsupportedMessage } from "../../src/computer/session.js";
+import { unsupportedMessage, type ComputerSession } from "../../src/computer/session.js";
 import { definitions, TOOLS, toolByName } from "../../src/computer/tools.js";
 
 /**
@@ -90,6 +90,29 @@ describe("the tool surface", () => {
     for (const definition of definitions()) {
       expect(Object.keys(definition).sort()).toEqual(["description", "inputSchema", "name"]);
     }
+  });
+});
+
+describe("keys that went out while the front changed", () => {
+  // A stand-in for the driver: answers what it is told to, so the tool's
+  // words can be checked without a desktop.
+  function fakeSession(answers: Record<string, unknown>): ComputerSession {
+    return {
+      request: async (op: string) => answers[op] ?? {},
+    } as unknown as ComputerSession;
+  }
+
+  it("says so when the driver reports another window in front", async () => {
+    const note = 'The window in front is now "Other" (window 9), not "Notepad" (window 4).';
+    const session = fakeSession({ hold: { done: true, front: note } });
+    const answer = await toolByName("studio_computer_hold_key")!.run(session, { keys: "shift", seconds: 1 });
+    expect(answer.content[0]).toMatchObject({ text: `Held shift for 1 seconds. ${note}` });
+  });
+
+  it("says nothing extra when the target stayed in front", async () => {
+    const session = fakeSession({ hold: { done: true, front: null } });
+    const answer = await toolByName("studio_computer_hold_key")!.run(session, { keys: "shift", seconds: 1 });
+    expect(answer.content[0]).toMatchObject({ text: "Held shift for 1 seconds." });
   });
 });
 

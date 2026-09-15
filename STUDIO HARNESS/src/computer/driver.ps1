@@ -449,6 +449,21 @@ function Assert-Target($what) {
   }
 }
 
+# Called after keys have gone out. The check before them is a moment earlier
+# than the keys, and a window can come to the front in between - a dialog, a
+# person's click, a window another program raises. Keys already sent cannot
+# be taken back, and "done" would be a lie about where they went, so the
+# answer carries a note naming the window now in front. A note and not a
+# refusal, because a chord is often meant to change the front: Alt+F4 closes
+# the target, Ctrl+N opens a second window, Return dismisses a dialog.
+function Front-Note {
+  $fg = [int64][Studio.Native]::GetForegroundWindow()
+  if (Same-Window $fg $script:Target) { return $null }
+  $mine = Describe-Window $script:Target
+  $front = if ($fg -eq 0) { "no window" } else { Describe-Window $fg }
+  return "The window in front is now $front, not $mine. Keys that went out after the change landed there; check what arrived before going on."
+}
+
 function Focus-Window($handle) {
   $h = [IntPtr][int64]$handle
   if ([Studio.Native]::IsIconic($h)) { [void][Studio.Native]::ShowWindow($h, 9) }
@@ -729,9 +744,9 @@ while ($true) {
       "drag" { Drag-Pointer $a.display $a.from $a.to; Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow())); Answer $id (Get-Cursor) }
       "button" { Press-Button $(if ($a.button) { $a.button } else { "left" }) $a.action; Answer $id ([ordered]@{ done = $true }) }
       "scroll" { Scroll-At $a.display $a.x $a.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true }) }
-      "type" { Assert-Target "type"; Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length }) }
-      "key" { Assert-Target "press keys"; Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true }) }
-      "hold" { Assert-Target "hold keys"; Hold-Chord ([string]$a.keys) $a.seconds; Answer $id ([ordered]@{ done = $true }) }
+      "type" { Assert-Target "type"; Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length; front = (Front-Note) }) }
+      "key" { Assert-Target "press keys"; Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true; front = (Front-Note) }) }
+      "hold" { Assert-Target "hold keys"; Hold-Chord ([string]$a.keys) $a.seconds; Answer $id ([ordered]@{ done = $true; front = (Front-Note) }) }
       "apps" { Answer $id @(Get-Apps) }
       "windows" { Answer $id @(Get-TopWindows $a.app) }
       "open" { Answer $id (Open-App $a.app $a.path) }

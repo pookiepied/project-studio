@@ -177,6 +177,18 @@ async function acted(session: ComputerSession, said: string, display: number | u
   }
 }
 
+/**
+ * What was said, plus the driver's note when another window came to the
+ * front while the keys were going out. The driver checks the target before
+ * it sends and again after; keys already sent cannot be recalled, so the
+ * note says where the later ones landed instead of letting "Typed 57
+ * characters" stand for text that reached nothing.
+ */
+function withFront(said: string, sent: unknown): string {
+  const front = isRecord(sent) && typeof sent["front"] === "string" ? sent["front"] : "";
+  return front === "" ? said : `${said} ${front}`;
+}
+
 /** A window as the answers name it: its title and the handle to name it by. */
 function windowName(result: Record<string, unknown>): string {
   const title = typeof result["window"] === "string" ? result["window"] : typeof result["title"] === "string" ? result["title"] : "";
@@ -422,8 +434,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const body = input["text"];
       if (typeof body !== "string") throw new ComputerError("bad_input", { message: "Give the text to type." });
-      await session.request("type", { text: body });
-      return acted(session, `Typed ${String(body.length)} characters.`, undefined);
+      const sent = await session.request("type", { text: body });
+      return acted(session, withFront(`Typed ${String(body.length)} characters.`, sent), undefined);
     },
   },
 
@@ -444,8 +456,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const keys = required(input, "keys");
       const repeat = num(input, "repeat") ?? 1;
-      await session.request("key", { keys, repeat });
-      return acted(session, repeat === 1 ? `Pressed ${keys}.` : `Pressed ${keys} ${String(repeat)} times.`, undefined);
+      const sent = await session.request("key", { keys, repeat });
+      return acted(session, withFront(repeat === 1 ? `Pressed ${keys}.` : `Pressed ${keys} ${String(repeat)} times.`, sent), undefined);
     },
   },
 
@@ -462,8 +474,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const keys = required(input, "keys");
       const seconds = Math.min(requiredNumber(input, "seconds"), 30);
-      await session.request("hold", { keys, seconds });
-      return answer(`Held ${keys} for ${String(seconds)} seconds.`);
+      const sent = await session.request("hold", { keys, seconds });
+      return answer(withFront(`Held ${keys} for ${String(seconds)} seconds.`, sent));
     },
   },
 
