@@ -14,6 +14,7 @@ import { HarnessDownPage } from '@/shell/HarnessDownPage'
 import { TopStrip } from '@/shell/chrome/TopStrip'
 import { SideRail } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
+import { usePanelHandover } from '@/shell/panelHandover'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
 import { useRail } from '@/stores/rail'
@@ -38,7 +39,6 @@ const SURFACE_VARIANTS = surfaceVariants()
 export function AppShell() {
   const { route, move, sidebarOpen, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
     useNavigation()
-  const compact = useCompactLayout()
   /**
    * True while the sidebar's width spring is moving. The page re-lays-out on
    * every frame of that spring, and the transcript is the heaviest thing in
@@ -53,38 +53,31 @@ export function AppShell() {
     open: railOpen,
     collapsed: railCollapsed,
     entries: railEntries,
+    width: railWidth,
     collapse: collapseRail,
     expand: expandRail,
   } = useRail()
   const railEntryCount = railEntries.length
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
-  /** The page only rounds when there is a sidebar beside it to rest on. */
-  const rounded = sidebarOpen && !compact
-
   /**
-   * The two columns are mutually exclusive.
-   *
-   * Not a stylistic call: at any width where both fit, the conversation between
-   * them is narrower than either one of them, which is the failure
-   * `useCompactLayout` already exists to prevent from the other direction. The
-   * old behaviour let the sidebar float over the page while the rail kept its
-   * space, so the reading column was covered on one side and squeezed on the
-   * other, by two panels neither of which you were reading.
-   *
-   * The sidebar wins the gesture, because opening it is always deliberate —
-   * you clicked the toggle. The rail is folded rather than closed, so its
-   * contents survive, and it says so with the pill below.
+   * The two columns are mutually exclusive, and the one asked for last wins:
+   * the other leaves first, and the arriving one waits for it. The rule and
+   * the reasons are with `usePanelHandover`; what the shell draws from is
+   * the pair of `shown` flags, never the stores' own `open` directly. The
+   * rail is folded rather than closed, so its contents survive, and it says
+   * so with the pill below.
    */
-  useEffect(() => {
-    if (sidebarOpen && railOpen) collapseRail()
-  }, [sidebarOpen, railOpen, collapseRail])
+  const { sidebarShown, railShown, sidebarSettled, railSettled } = usePanelHandover({
+    sidebarOpen,
+    railOpen,
+    closeSidebar: toggleSidebar,
+    collapseRail,
+  })
+  const compact = useCompactLayout(railShown ? railWidth : 0)
 
-  /** Bringing the rail back closes the sidebar, the same trade in reverse. */
-  const restoreRail = () => {
-    if (sidebarOpen) toggleSidebar()
-    expandRail()
-  }
+  /** The page only rounds when there is a sidebar beside it to rest on. */
+  const rounded = sidebarShown && !compact
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -173,8 +166,15 @@ export function AppShell() {
           reason: the stage covers the sidebar and the page on purpose. */}
       <VoiceModeProvider>
         <Sidebar
+          open={sidebarShown}
+          compact={compact}
           onNewProject={() => setNewProjectOpen(true)}
-          onReflow={setReflowLight}
+          onReflow={(moving) => {
+            setReflowLight(moving)
+            // The spring landing is also the column having settled, which is
+            // what a rail waiting on the sidebar's exit is waiting for.
+            if (!moving) sidebarSettled()
+          }}
         />
 
       {/* The page is a panel resting on the sidebar, and only while the sidebar
@@ -210,8 +210,8 @@ export function AppShell() {
           // off against the window when the rail is gone, exactly as the left
           // edge does when the sidebar is gone. One rule for both edges: round
           // where something is being rested on, square where the window is.
-          borderTopRightRadius: railOpen ? RADIUS.xl : 0,
-          borderBottomRightRadius: railOpen ? RADIUS.xl : 0,
+          borderTopRightRadius: railShown ? RADIUS.xl : 0,
+          borderBottomRightRadius: railShown ? RADIUS.xl : 0,
         }}
       >
         <TopStrip />
@@ -279,7 +279,7 @@ export function AppShell() {
       {/* Outside the page's rounded container, so the rail is a sibling of the
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
-      <SideRail />
+      <SideRail open={railShown} onClosed={railSettled} />
 
       {/* The rail, folded, saying so.
           Only this side gets a prompt. The sidebar is summoned by a control
@@ -292,7 +292,9 @@ export function AppShell() {
         {railCollapsed ? (
           <motion.button
             type="button"
-            onClick={restoreRail}
+            // Bringing the rail back is the same request as opening anything
+            // into it: the handover closes the sidebar first if it is up.
+            onClick={expandRail}
             aria-label={`Show the side rail (${railEntryCount} open)`}
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}

@@ -38,7 +38,6 @@ type Route = { kind: 'home' } | { kind: 'chat'; conversationId: string } | { kin
 
 const navigation = {
   route: { kind: 'home' } as Route,
-  sidebarOpen: true,
   toggleSidebar: vi.fn(),
   goHome: vi.fn(),
   openSettings: vi.fn(),
@@ -69,23 +68,12 @@ vi.mock('@/features/chat/connection/fork', () => ({
   useForkConversation: () => ({ forkWhole: vi.fn() }),
 }))
 
-vi.mock('@/stores/rail', () => ({
-  useRail: () => ({ open: false, width: 420 }),
-}))
-
-// jsdom has no matchMedia; the column reads the breakpoint with it.
-vi.stubGlobal('matchMedia', () => ({
-  matches: false,
-  addEventListener: () => {},
-  removeEventListener: () => {},
-}))
-
 afterEach(cleanup)
 
 describe('the sidebar column while Settings is the route', () => {
   it('holds the settings tree -- groups and rows -- and a way back at the top', () => {
     navigation.route = { kind: 'settings', sectionId: 'general' }
-    render(<Sidebar onNewProject={() => {}} />)
+    render(<Sidebar open compact={false} onNewProject={() => {}} />)
 
     expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeTruthy()
     // Group headings are the tree's `<p>` labels. One group shares its name
@@ -102,7 +90,7 @@ describe('the sidebar column while Settings is the route', () => {
 
   it('holds no conversations, no project controls and no footer shortcuts', () => {
     navigation.route = { kind: 'settings', sectionId: 'general' }
-    render(<Sidebar onNewProject={() => {}} />)
+    render(<Sidebar open compact={false} onNewProject={() => {}} />)
 
     expect(screen.queryByText('A conversation being read')).toBeNull()
     expect(screen.queryByText('Conversations')).toBeNull()
@@ -117,7 +105,7 @@ describe('the sidebar column while Settings is the route', () => {
 describe('the sidebar column on the app surfaces', () => {
   it('holds the conversations and no settings tree', () => {
     navigation.route = { kind: 'chat', conversationId: CONVERSATION.id }
-    render(<Sidebar onNewProject={() => {}} />)
+    render(<Sidebar open compact={false} onNewProject={() => {}} />)
 
     expect(screen.getByText('A conversation being read')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'New conversation' })).toBeTruthy()

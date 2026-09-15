@@ -233,6 +233,31 @@ describe('the open', () => {
     expect(latest?.pinned).toBe(false)
   })
 
+  it('holds the pin through a clamp that lands at the bottom of a shorter document', () => {
+    const view = mountTranscript()
+    measure(4000, 500)
+    act(() => flushFrames(OPEN_FRAMES))
+    expect(geometry.top).toBeCloseTo(3500, 0)
+
+    // The document loses height under a viewport at its end - rows stepped
+    // out of layout for the sidebar's move - and the position is clamped to
+    // the new end. Upward by position, but nobody scrolled.
+    measure(2000, 500)
+    act(() => {
+      viewportElement().scrollTop = 3500
+    })
+    expect(geometry.top).toBe(1500)
+    expect(latest?.pinned).toBe(true)
+
+    // The height comes back when the move lands (a delivery stands in for
+    // the resize observer here), and the follow is still alive to chase it.
+    measure(4000, 500)
+    view.rerender(<Probe dependency={2} navigation="cnv_a" />)
+    act(() => flushFrames(OPEN_FRAMES))
+    expect(geometry.top).toBeCloseTo(3500, 0)
+    expect(latest?.pinned).toBe(true)
+  })
+
   it('opens the next conversation at its bottom when the page is reused', () => {
     const view = mountTranscript(1, 'cnv_a')
     measure(4000, 500)

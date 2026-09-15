@@ -220,6 +220,14 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     // escape the pull, which is the bug this whole file exists to prevent.
     const upward = element.scrollTop < lastTop.current
     lastTop.current = element.scrollTop
+    // A move up that ends at the bottom is not a reader, it is a clamp: the
+    // document got shorter under a viewport that was at its end - a block
+    // collapsed, rows stepped out of layout for a move - and the browser
+    // pulled the position back to the new end. A reader who wants to leave
+    // has already said so through a gesture, which released the pin before
+    // this event arrived; a pin that is still held here is one nobody asked
+    // to drop, and dropping it left the follow dead after every collapse.
+    if (upward && atBottom()) return
     setPinned(!upward && atBottom())
   }, [atBottom])
 

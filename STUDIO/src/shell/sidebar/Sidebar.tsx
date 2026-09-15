@@ -9,7 +9,6 @@ import { ProjectSection } from '@/shell/sidebar/ProjectSection'
 import { SettingsTree } from '@/shell/sidebar/SettingsTree'
 import { SidebarLoading, SidebarUnavailable } from '@/shell/sidebar/SidebarStates'
 import { startWindowDrag } from '@/platform/tauri'
-import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -61,20 +60,33 @@ import { cn } from '@/lib/cn'
  * column is simply revealed, and nothing inside it is asked to re-measure.
  */
 export function Sidebar({
+  open: sidebarOpen,
+  compact,
   onNewProject,
   onReflow,
 }: {
+  /**
+   * Whether the column is on screen.
+   *
+   * Handed in by the shell rather than read from the navigation store,
+   * because the two are not always the same thing: while the rail is on its
+   * way out the store already says open and the column waits, so that the
+   * two moves happen in order (`panelHandover`). The store is still where
+   * the toggles go; this is only what is drawn.
+   */
+  open: boolean
+  /** Whether the column floats over the page rather than taking space from it. */
+  compact: boolean
   onNewProject: () => void
   /**
    * Called as the width spring starts and ends, so the page can spend the
-   * move in cheap layout -- see `AppShell`, which holds the class.
+   * move in cheap layout -- see `AppShell`, which holds the class and also
+   * reads the end as the column having settled.
    */
   onReflow?: (moving: boolean) => void
 }) {
-  const compact = useCompactLayout()
   const {
     route,
-    sidebarOpen,
     toggleSidebar,
     goHome,
     openSettings,

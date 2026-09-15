@@ -252,15 +252,31 @@
    move stuttered exactly in its middle: smooth leaving, laggy at the turn,
    smooth landing. While `studio-reflow-light` is on the page (AppShell holds
    it for the length of the spring, fed by the sidebar's own animation
-   callbacks), every message row steps out of layout and remembers the size
-   it last rendered, so a frame costs only the rows on screen. When the
+   callbacks), every message row steps out of layout and stands in at the
+   size it last rendered, so a frame costs only the rows on screen. When the
    spring lands the class leaves, and everything is laid out for real again.
-   Scoped to the move on purpose: an always-on rule would hand the paging
-   window estimated heights for rows nobody has rendered yet, and the
-   hold-still correction there measures real heights.
+
+   The two halves of that are deliberately split. `content-visibility` is
+   scoped to the move: always on, it would hand the paging window estimated
+   heights for rows nobody has rendered yet, and the hold-still correction
+   there measures real heights. `contain-intrinsic-size: auto` is always on,
+   and has to be: a row only remembers its rendered size while the property
+   is set on it, and a row that has nothing remembered when it steps out of
+   layout stands in at the 120px fallback instead. With both on the class,
+   nothing had been remembered when the move began, so every row above the
+   viewport shrank to 120px at once, the document lost most of its height,
+   the scroll position was clamped to the end of what was left, and the
+   follow read that clamp as the reader scrolling up. Every sidebar toggle
+   -- and every rail open or close that flipped the breakpoint, which runs
+   the same spring unseen -- threw the reader to the top of the transcript.
+   On its own the property changes no layout; it only keeps the memory the
+   move relies on.
  */
+
+.studio-message {
+  contain-intrinsic-size: auto 120px;
+}
 
 .studio-reflow-light .studio-message {
   content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
 }

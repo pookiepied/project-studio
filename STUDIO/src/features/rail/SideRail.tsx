@@ -52,8 +52,21 @@ function entryTitle(entry: RailEntry): string {
  * The toggle is in the header rather than in settings: which one is right
  * depends on what is open right now, not on a preference held across sessions.
  */
-export function SideRail() {
-  const { open, entries, activeId, width, setWidth, closeAll } = useRail()
+export function SideRail({
+  open,
+  onClosed,
+}: {
+  /**
+   * Whether the rail is on screen. Handed in by the shell rather than read
+   * from the store, for the same reason the sidebar's is: while the sidebar
+   * is on its way out the store already says open and the rail waits, so
+   * the two moves happen in order (`panelHandover`).
+   */
+  open: boolean
+  /** The rail has finished leaving. What releases a sidebar waiting on it. */
+  onClosed?: () => void
+}) {
+  const { entries, activeId, width, setWidth, closeAll } = useRail()
   const frame = useRef<HTMLElement>(null)
   const [room, setRoom] = useState(Number.POSITIVE_INFINITY)
 
@@ -87,7 +100,7 @@ export function SideRail() {
   const effective = Math.min(width, ceiling)
 
   return (
-    <AnimatePresence initial={false}>
+    <AnimatePresence initial={false} onExitComplete={onClosed}>
       {open ? (
         <motion.aside
           aria-label="Side rail"

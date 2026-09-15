@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useRail } from '@/stores/rail'
 
 /**
  * Whether the window is too narrow for the sidebar to take space from the page.
@@ -47,13 +46,18 @@ const COMPACT_WIDTH = 900
  * beside it, with the scrim it already has. Nothing is hidden and nothing new
  * had to be designed — the two panels simply stop competing for the same
  * pixels.
+ *
+ * The width is passed in rather than read from the rail store, because what
+ * counts is the rail on screen, not the rail asked for: during a handover
+ * (`panelHandover`) the store says open while the column is still held off
+ * the screen, and reserving for it then would flip the sidebar from resident
+ * to floating in the middle of its own exit. The shell is the one caller,
+ * and it passes what it is drawing.
  */
-export function useCompactLayout(): boolean {
-  const { open, width } = useRail()
-
+export function useCompactLayout(railWidth: number): boolean {
   // The rail's own margins count: it is inset, so it costs its width plus the
   // gap either side of it.
-  const reserved = open ? width + 16 : 0
+  const reserved = railWidth > 0 ? railWidth + 16 : 0
   const query = `(max-width: ${COMPACT_WIDTH + reserved}px)`
 
   const [compact, setCompact] = useState(
