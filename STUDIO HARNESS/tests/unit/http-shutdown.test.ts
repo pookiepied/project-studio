@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
+import type { SkillAdministration } from "../../src/application/skill-management.js";
 import type { ProviderAdministration } from "../../src/gateway/connections/management.js";
 import type { ConversationStore } from "../../src/conversations/store.js";
 import type { ProjectStore } from "../../src/projects/store.js";
@@ -40,6 +41,7 @@ function composeApp(clientType: "studio-host" | "studio-client") {
   let requested = 0;
   const app = createHttpApp({
     servers: { list: () => [] } as unknown as McpAdministration,
+    skills: { list: () => [], problems: () => [] } as unknown as SkillAdministration,
     providers: {
       listConnections: () => [],
     } as unknown as ProviderAdministration,

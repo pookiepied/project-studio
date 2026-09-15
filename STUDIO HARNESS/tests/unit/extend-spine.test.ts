@@ -1,6 +1,11 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ExtendError } from "../../src/extend/errors.js";
+import { SkillRegistry } from "../../src/extend/skills/registry.js";
 import {
   ExtensionInventory,
   type ExtensionSummary,
@@ -286,6 +291,37 @@ describe("the extend spine", () => {
       // Ours is off by default too. Whether a bundled extension may be
       // switched off is a product question, and the spine does not answer it.
       expect(listed.every((entry) => !entry.enabled)).toBe(true);
+    });
+  });
+
+  describe("the second kind plugs in the way the first did", () => {
+    // The skill registry is the second real provider the spine has had, and
+    // the spine was written promising a second kind would arrive by adding a
+    // folder and editing nothing. This is that promise, checked: a folder of
+    // skills lists and resolves through the same code the MCP registry does.
+    it("lists and resolves skills from a folder through the spine unchanged", () => {
+      const home = mkdtempSync(join(tmpdir(), "studio-spine-skills-"));
+      try {
+        mkdirSync(join(home, "hello"));
+        writeFileSync(
+          join(home, "hello", "SKILL.md"),
+          "---\nname: hello\ndescription: Greets.\n---\n\nSay hello.\n",
+        );
+        const registry = new SkillRegistry({ roots: [{ directory: home, provenance: "user" }] });
+        inventory.register("skill", () => registry.asExtensions());
+
+        expect(inventory.list("skill", { projectId: "a" })).toEqual([
+          { id: "hello", title: "hello", author: "third-party", kind: "skill", enabled: false },
+        ]);
+        selection.set({ kind: "skill", extensionId: "hello", scope: GLOBAL_SCOPE }, true);
+        expect(inventory.active("skill", { projectId: "a" }).map((entry) => entry.id)).toEqual(["hello"]);
+        // The folder going away is the uninstall, and the selection left
+        // behind resurrects nothing.
+        rmSync(join(home, "hello"), { recursive: true });
+        expect(inventory.active("skill", { projectId: "a" })).toEqual([]);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
     });
   });
 });

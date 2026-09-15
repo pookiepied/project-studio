@@ -7,6 +7,8 @@ import { ADMISSION_SCOPES } from "../../admission/scopes.js";
 import type { PermissionApprovalBroker } from "../../application/approval-broker.js";
 import type { QuestionBroker } from "../../application/question-broker.js";
 import type { McpAdministration } from "../../application/mcp-management.js";
+import type { SkillAdministration } from "../../application/skill-management.js";
+import { createSkillRoutes } from "./routes/skills.js";
 import type { ProviderAdministration } from "../../gateway/connections/management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
 import type { MediaAdministration } from "../../gateway/media/service.js";
@@ -37,6 +39,8 @@ import type { FaviconSource } from "../../web/favicons.js";
 export interface CreateHttpAppOptions {
   /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
   readonly servers: McpAdministration;
+  /** The skill administration surface, the same kind of port as `servers`. */
+  readonly skills: SkillAdministration;
   /**
    * Re-asks a conversation's capability note, called by the turn-settings
    * middleware between submissions. A port of the same shape as `servers`:
@@ -168,6 +172,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.use("*", createAdmissionMiddleware(options.admission));
 
   app.route("/api/mcp", createMcpRoutes(options.servers));
+  app.route("/api/skills", createSkillRoutes(options.skills));
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route(

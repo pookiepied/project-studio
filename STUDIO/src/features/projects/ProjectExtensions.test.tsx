@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ProjectExtensions } from './ProjectExtensions'
 import type { McpServers, McpView } from '@/features/settings/mcp/useMcpServers'
-import type { HarnessFailure, McpServerRecord } from '@/platform/harness'
+import type { Skills, SkillsView } from '@/features/settings/skills/useSkills'
+import type { HarnessFailure, McpServerRecord, SkillRecord } from '@/platform/harness'
 
 /**
  * The project's own decisions, as they land on the screen.
@@ -22,14 +23,43 @@ import type { HarnessFailure, McpServerRecord } from '@/platform/harness'
  */
 
 const useMcpServers = vi.hoisted(() => vi.fn())
+const useSkills = vi.hoisted(() => vi.fn())
 
 vi.mock('@/features/settings/mcp/useMcpServers', () => ({ useMcpServers }))
+vi.mock('@/features/settings/skills/useSkills', () => ({ useSkills }))
 
 afterEach(cleanup)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // The skills half answers empty unless a case says otherwise, so every
+  // server case renders the screen as it did before skills joined it.
+  skillsHooked({ status: 'ready', listing: { skills: [], problems: [] } })
 })
+
+function skill(overrides: Partial<SkillRecord> = {}): SkillRecord {
+  return {
+    id: 'review-pr',
+    title: 'review-pr',
+    description: 'Reviews a pull request.',
+    provenance: 'user',
+    directory: 'C:\\skills\\review-pr',
+    enabledByDefault: false,
+    ...overrides,
+  }
+}
+
+function skillsHooked(
+  view: SkillsView,
+  setEnabled: Skills['setEnabled'] = vi.fn(async () => null),
+): void {
+  useSkills.mockReturnValue({
+    view,
+    refreshing: false,
+    refresh: vi.fn(async () => {}),
+    setEnabled,
+  })
+}
 
 function record(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
   return {
@@ -67,11 +97,41 @@ function hooked(
 const ready = (servers: readonly McpServerRecord[]): McpView => ({ status: 'ready', servers })
 
 describe('the project extensions section', () => {
-  it('asks the hook for this project, and only this project', () => {
+  it('asks both hooks for this project, and only this project', () => {
     hooked(ready([]))
     render(<ProjectExtensions projectId="prj_1" />)
 
     expect(useMcpServers).toHaveBeenCalledWith({ projectId: 'prj_1' })
+    expect(useSkills).toHaveBeenCalledWith({ projectId: 'prj_1' })
+  })
+
+  it('decides about a skill with the same row, at the skill hook', async () => {
+    // The second kind, on the same screen. The row reads the skill's own
+    // project reading, and its decision travels to the skill hook - never
+    // to the server one - as the same three answers.
+    const setSkillEnabled = vi.fn(async () => null)
+    hooked(ready([]))
+    skillsHooked(
+      {
+        status: 'ready',
+        listing: {
+          skills: [skill({ project: { decision: null, resolved: true, decidedAt: 'global' } })],
+          problems: [],
+        },
+      },
+      setSkillEnabled,
+    )
+    render(<ProjectExtensions projectId="prj_1" />)
+
+    const group = screen.getByRole('radiogroup', { name: 'review-pr in this project' })
+    expect(within(group).getByRole('radio', { name: 'Inherit' }).getAttribute('aria-checked')).toBe(
+      'true',
+    )
+    expect(screen.getByText('Inherits the default, which has it on.')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(within(group).getByRole('radio', { name: 'Off' }))
+    })
+    expect(setSkillEnabled).toHaveBeenCalledWith('review-pr', false)
   })
 
   it('reads Inherit as Inherit while the default decides, and says what that means', () => {

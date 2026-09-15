@@ -17,6 +17,7 @@ import {
   type PurgeOutcome,
 } from '../contracts'
 import { MCP_PATH } from './mcp'
+import { SKILLS_PATH } from './skills'
 import type { HarnessResult, Requester } from './request'
 
 /**
@@ -67,6 +68,12 @@ export interface ConversationIndexClient {
   setConversationMcpServerEnabled(
     conversationId: string,
     serverId: string,
+    enabled: boolean | null,
+  ): Promise<HarnessResult<void>>
+  /** The same decision, for a skill. Same body, same reach, same door. */
+  setConversationSkillEnabled(
+    conversationId: string,
+    skillId: string,
     enabled: boolean | null,
   ): Promise<HarnessResult<void>>
   /**
@@ -177,6 +184,14 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
       return empty(
         'PUT',
         `${MCP_PATH}/conversations/${encodeURIComponent(conversationId)}/extensions/mcp/${encodeURIComponent(serverId)}`,
+        { enabled },
+      )
+    },
+
+    setConversationSkillEnabled(conversationId, skillId, enabled) {
+      return empty(
+        'PUT',
+        `${SKILLS_PATH}/conversations/${encodeURIComponent(conversationId)}/extensions/skill/${encodeURIComponent(skillId)}`,
         { enabled },
       )
     },

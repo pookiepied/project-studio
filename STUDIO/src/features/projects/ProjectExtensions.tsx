@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Icons } from '@/components/icons'
 import { extensionMark } from '@/components/icons/extensionMark'
 import { Loading, StateNote } from '@/components/state'
 import { ScopeToggle, inheritSentence } from '@/features/settings/mcp/ScopeToggle'
 import { useMcpServers } from '@/features/settings/mcp/useMcpServers'
-import type { HarnessFailure, McpScopeReading, McpServerRecord } from '@/platform/harness'
+import { useSkills } from '@/features/settings/skills/useSkills'
+import type { HarnessFailure, McpScopeReading } from '@/platform/harness'
 
 /**
  * This project's extensions, and what it has decided about each.
@@ -34,23 +36,31 @@ import type { HarnessFailure, McpScopeReading, McpServerRecord } from '@/platfor
  * switch itself cannot say: the person toggling here is changing what their
  * project's conversations can reach, and the one conversation they may be
  * picturing does not reshuffle itself.
+ *
+ * ---- Two kinds, one row ---------------------------------------------------
+ *
+ * Servers and skills are the two kinds of extension a project decides about,
+ * and they are decided the same way: the same three answers, the same
+ * readings, the same route shape one mount over. So they share the row and
+ * the toggle, and differ only in the group they are listed under and the
+ * hook that reads them.
  */
 export function ProjectExtensions({ projectId }: { projectId: string }) {
   const servers = useMcpServers({ projectId })
+  const skills = useSkills({ projectId })
   // A refused write leaves the list, but the person must not click again
   // into silence: the refusal renders where the click happened, once, until
   // the next attempt replaces it.
   const [lastError, setLastError] = useState<HarnessFailure | null>(null)
 
-  const { view } = servers
+  const serverView = servers.view
+  const skillView = skills.view
 
-  if (view.status === 'loading') {
-    return (
-      <Loading label="Loading extensions" />
-    )
+  if (serverView.status === 'loading' || skillView.status === 'loading') {
+    return <Loading label="Loading extensions" />
   }
 
-  if (view.status === 'no-harness') {
+  if (serverView.status === 'no-harness' || skillView.status === 'no-harness') {
     return (
       <StateNote
         title="The harness is not running."
@@ -59,37 +69,63 @@ export function ProjectExtensions({ projectId }: { projectId: string }) {
     )
   }
 
-  if (view.status === 'failed') {
-    return <StateNote title="The list could not be read." detail={view.error.message} />
+  if (serverView.status === 'failed') {
+    return <StateNote title="The list could not be read." detail={serverView.error.message} />
   }
-
-  if (view.servers.length === 0) {
-    return (
-      <StateNote
-        title="No extensions installed."
-        detail="Add one under Settings, Extensions. It starts undecided everywhere, including here."
-      />
-    )
+  if (skillView.status === 'failed') {
+    return <StateNote title="The list could not be read." detail={skillView.error.message} />
   }
 
   return (
     <div>
-      <div className="flex flex-col gap-1">
-        {view.servers.map((server) => (
-          <ScopeRow
-            key={server.id}
-            server={server}
-            reading={server.project}
-            onDecide={(enabled) => {
-              // Seed the switch locally so it moves on the click, then let
-              // the hook's re-read be the authority - the same bargain the
-              // global pane's rows make, and for the same reason: the harness
-              // is what knows what a write produced.
-              void servers.setEnabled(server.id, enabled).then(setLastError)
-            }}
+      <Group label="MCP servers">
+        {serverView.servers.length === 0 ? (
+          <StateNote
+            title="No MCP servers installed."
+            detail="Add one under Settings, Extensions. It starts undecided everywhere, including here."
           />
-        ))}
-      </div>
+        ) : (
+          serverView.servers.map((server) => (
+            <ScopeRow
+              key={server.id}
+              id={`server-${server.id}`}
+              title={server.title}
+              description={server.description}
+              mark={extensionMark(server)}
+              reading={server.project}
+              onDecide={(enabled) => {
+                // Seed the switch locally so it moves on the click, then let
+                // the hook's re-read be the authority - the same bargain the
+                // global pane's rows make, and for the same reason: the harness
+                // is what knows what a write produced.
+                void servers.setEnabled(server.id, enabled).then(setLastError)
+              }}
+            />
+          ))
+        )}
+      </Group>
+      <Group label="Skills">
+        {skillView.listing.skills.length === 0 ? (
+          <StateNote
+            title="No skills installed."
+            detail="Put a skill folder in place under Settings, Skills. It starts undecided everywhere, including here."
+          />
+        ) : (
+          skillView.listing.skills.map((skill) => (
+            <ScopeRow
+              key={skill.id}
+              id={`skill-${skill.id}`}
+              title={skill.title}
+              description={skill.description}
+              mark={<Icons.skill />}
+              reading={skill.project}
+              onDecide={(enabled) => {
+                void skills.setEnabled(skill.id, enabled).then(setLastError)
+              }}
+            />
+          ))
+        )}
+      </Group>
       {lastError === null ? null : (
         <StateNote title="The harness refused that change." detail={lastError.message} />
       )}
@@ -98,6 +134,15 @@ export function ProjectExtensions({ projectId }: { projectId: string }) {
         capabilities note it was given at its start does not change, so the model meets a later
         addition when it looks, or in a new conversation.
       </p>
+    </div>
+  )
+}
+
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mb-4">
+      <p className="mb-1.5 text-caption text-muted-foreground">{label}</p>
+      <div className="flex flex-col gap-1">{children}</div>
     </div>
   )
 }
@@ -111,11 +156,18 @@ export function ProjectExtensions({ projectId }: { projectId: string }) {
  * the wrong answer in exactly that case.
  */
 function ScopeRow({
-  server,
+  id,
+  title,
+  description,
+  mark,
   reading,
   onDecide,
 }: {
-  server: McpServerRecord
+  /** Unique across both groups, for the toggle's layout identity. */
+  id: string
+  title: string
+  description: string
+  mark: ReactNode
   /** This scope's own reading, when the harness supplied one. */
   reading?: McpScopeReading
   onDecide: (enabled: boolean | null) => void
@@ -127,13 +179,11 @@ function ScopeRow({
 
   return (
     <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
-      <span className="shrink-0">{extensionMark(server)}</span>
+      <span className="shrink-0">{mark}</span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-ui text-foreground">{server.title}</p>
-        {server.description === '' ? null : (
-          <p className="mt-0.5 truncate text-caption text-muted-foreground">
-            {server.description}
-          </p>
+        <p className="truncate text-ui text-foreground">{title}</p>
+        {description === '' ? null : (
+          <p className="mt-0.5 truncate text-caption text-muted-foreground">{description}</p>
         )}
         {/* The effect, while the switch reads Inherit. When it reads On or
             Off the control IS the effect, and the row says nothing - the
@@ -151,8 +201,8 @@ function ScopeRow({
             setDecision(enabled)
             onDecide(enabled)
           }}
-          ariaLabel={`${server.title} in this project`}
-          layoutId={`project-extension-${server.id}`}
+          ariaLabel={`${title} in this project`}
+          layoutId={`project-extension-${id}`}
         />
       </div>
     </div>

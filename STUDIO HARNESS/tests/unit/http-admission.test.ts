@@ -4,6 +4,7 @@ import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
+import type { SkillAdministration } from "../../src/application/skill-management.js";
 import type { ProviderAdministration } from "../../src/gateway/connections/management.js";
 import type { ConversationStore } from "../../src/conversations/store.js";
 import type { ProjectStore } from "../../src/projects/store.js";
@@ -129,6 +130,7 @@ describe("Harness HTTP admission", () => {
           return [];
         },
       } as unknown as McpAdministration,
+      skills: { list: () => [], problems: () => [] } as unknown as SkillAdministration,
       providers: {
         listConnections: () => {
           providerEntered += 1;

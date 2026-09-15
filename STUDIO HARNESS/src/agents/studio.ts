@@ -1,6 +1,6 @@
 'use agent';
 
-import { useModel, useSandbox, type AgentProps } from "@flue/runtime";
+import { useModel, useSandbox, useSkill, type AgentProps } from "@flue/runtime";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
@@ -143,6 +143,18 @@ export function Studio({ id }: AgentProps) {
       projectRoot: workspace,
     }),
   );
+  // The skills switched on for this conversation, mounted on Flue's own
+  // surface rather than announced in the capabilities note below: Flue puts
+  // one line per skill in the system prompt it composes and loads the body
+  // only through its `activate_skill` tool, which is the progressive shape
+  // ADR 0048 wants and the one the Agent Skills format was written for. Read
+  // per render like everything else here; Flue freezes the catalog into the
+  // prompt at the conversation's baseline and narrates a later change as a
+  // signal, so a toggle mid-conversation does not move the cached prefix.
+  // The one cost it does have: `activate_skill` exists only while something
+  // is mounted, so switching the last skill off removes a tool - rare, and
+  // Flue's own trade.
+  for (const skill of runtime.conversationSkills?.(id) ?? []) useSkill(skill);
   // Derived by comparing the two, not assumed from which branch built the
   // path. They are equal for a conversation with no project, and for a
   // project with no folders, and that reports "conversation", which is the

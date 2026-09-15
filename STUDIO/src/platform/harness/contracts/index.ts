@@ -148,6 +148,14 @@ export {
 } from './mcp'
 
 export {
+  type SkillRecord,
+  type SkillProblem,
+  type SkillListing,
+  parseSkill,
+  parseSkillListing,
+} from './skills'
+
+export {
   type SandboxLevel,
   type SandboxScopeMode,
   type SandboxScopeSource,

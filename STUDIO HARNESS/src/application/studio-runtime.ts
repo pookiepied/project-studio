@@ -1,7 +1,8 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
-import type { Sandbox, SandboxFactory } from "@flue/runtime";
+import type { Sandbox, SandboxFactory, SkillReference } from "@flue/runtime";
 
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
@@ -32,6 +33,8 @@ import type { McpServerRecord } from "../extend/mcp/registry.js";
 import { McpSupervisor } from "../extend/mcp/supervisor.js";
 import { ExtensionSelectionStore, type ResolutionContext } from "../extend/selection.js";
 import { McpManagementService, type McpAdministration } from "./mcp-management.js";
+import { SkillManagementService, type SkillAdministration } from "./skill-management.js";
+import { SkillRegistry } from "../extend/skills/registry.js";
 import { modelToolName } from "./tool-name.js";
 import { ProjectStore } from "../projects/store.js";
 import { SandboxScopeStore } from "../sandbox/scope-store.js";
@@ -425,6 +428,17 @@ export interface AgentHost {
    * satisfies the host.
    */
   conversationCapabilityInventory?(conversationId: string): string;
+  /**
+   * The skills switched on for one conversation, ready for `useSkill`.
+   *
+   * Skills are not in the capability inventory above and not behind the
+   * discover tool: Flue owns this surface. Each reference becomes one catalog
+   * line in the system prompt and is loaded in full only when the model calls
+   * Flue's `activate_skill`, which is the same shape as every other harness
+   * that reads the Agent Skills format. Optional for the same reason as the
+   * inventory.
+   */
+  conversationSkills?(conversationId: string): readonly SkillReference[];
 }
 
 /**
@@ -451,6 +465,8 @@ export class StudioRuntime implements AgentHost {
   readonly #supervisor: McpSupervisor;
   readonly #catalog: McpCapabilityCatalog;
   readonly #management: McpManagementService;
+  readonly #skills: SkillRegistry;
+  readonly #skillManagement: SkillManagementService;
   readonly #capabilities: CapabilityInventory;
   /**
    * The capability keys discovery has adopted, one set per conversation.
@@ -643,6 +659,11 @@ export class StudioRuntime implements AgentHost {
     });
 
     this.#inventory.register("mcp", () => this.#registry.asExtensions());
+    // The second kind the spine was built for. No reconciler joins it: a
+    // skill is a folder of text, and there is nothing to start or stop when
+    // one is switched on - the render reads what is on and mounts it.
+    this.#skills = new SkillRegistry();
+    this.#inventory.register("skill", () => this.#skills.asExtensions());
     this.#extensions.register(
       "mcp",
       createMcpReconciler({
@@ -693,11 +714,58 @@ export class StudioRuntime implements AgentHost {
       // costs.
       reconcile: () => this.#reconcileAfterSettingsChange(),
     });
+    this.#skillManagement = new SkillManagementService({
+      registry: this.#skills,
+      selection: this.#selection,
+      extensions: this.#extensions,
+      projectId: this.#projectId,
+      conversationProject: (conversationId) => this.#conversationProject(conversationId),
+    });
   }
 
   /** The MCP administration surface, for the HTTP layer. */
   get servers(): McpAdministration {
     return this.#management;
+  }
+
+  /** The skill administration surface, for the HTTP layer. */
+  get skills(): SkillAdministration {
+    return this.#skillManagement;
+  }
+
+  /**
+   * The skills this conversation mounts, resolved through its own chain.
+   *
+   * Two things a mounted set must never do are handled here rather than left
+   * to the render. It must not fail the run: a skill whose folder stopped
+   * packaging since it was switched on is dropped with a warning, because a
+   * settings decision made last week must not turn into a 500 today. And it
+   * must not collide with a workspace skill: Flue discovers
+   * `<cwd>/.agents/skills/` on its own and throws when a name appears in both
+   * places, so a name that is also a folder there is left to the workspace,
+   * which is the nearer of the two.
+   */
+  conversationSkills(conversationId: string): readonly SkillReference[] {
+    const workspace = this.conversationProjectFolders(conversationId)[0];
+    const references: SkillReference[] = [];
+    for (const entry of this.#inventory.active("skill", this.#enablementContext(conversationId))) {
+      if (workspace !== undefined && existsSync(join(workspace, ".agents", "skills", entry.id))) {
+        this.#logger?.warn(
+          `The skill "${entry.id}" is switched on and also in the project's .agents/skills folder; the project's copy is the one mounted.`,
+          { skill_id: entry.id },
+        );
+        continue;
+      }
+      try {
+        references.push(this.#skills.reference(entry.id));
+      } catch (error) {
+        this.#logger?.warn(
+          `The skill "${entry.id}" could not be mounted: ${error instanceof Error ? error.message : String(error)}`,
+          { skill_id: entry.id },
+        );
+      }
+    }
+    return references;
   }
 
   get projectId(): string {

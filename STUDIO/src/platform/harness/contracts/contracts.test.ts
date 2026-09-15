@@ -9,6 +9,8 @@ import {
   parseHarnessErrorBody,
   parseMcpServer,
   parseMcpServers,
+  parseSkill,
+  parseSkillListing,
   parseModelCapability,
   parsePendingApprovals,
   parseProbeResult,
@@ -956,5 +958,48 @@ describe('parseMcpServer', () => {
     expect(parseMcpServer({ ...MCP_SERVER, project: { decision: 'yes', resolved: true } })).toBeNull()
     expect(parseMcpServer({ ...MCP_SERVER, project: { decision: true } })).toBeNull()
     expect(parseMcpServer({ ...MCP_SERVER, project: { decision: null, resolved: true, decidedAt: 'village' } })).toBeNull()
+  })
+})
+
+const SKILL = {
+  id: 'review-pr',
+  title: 'review-pr',
+  description: 'Reviews a pull request.',
+  provenance: 'user',
+  directory: 'C:\\Users\\me\\.studio\\skills\\review-pr',
+  enabledByDefault: false,
+}
+
+describe('parseSkill', () => {
+  it('reads a record, and the same scope readings a server carries', () => {
+    expect(parseSkill({ ...SKILL })).toEqual({ ...SKILL })
+    const read = parseSkill({
+      ...SKILL,
+      project: { decision: null, resolved: true, decidedAt: 'global' },
+    })
+    expect(read?.project).toEqual({ decision: null, resolved: true, decidedAt: 'global' })
+  })
+
+  it('refuses a skill with no description, because the line is what the model reads', () => {
+    expect(parseSkill({ ...SKILL, description: '' })).toBeNull()
+  })
+
+  it('reads an unknown provenance as the person\'s, never as Studio\'s', () => {
+    expect(parseSkill({ ...SKILL, provenance: 'vendor' })?.provenance).toBe('user')
+  })
+
+  it('refuses a malformed reading rather than rendering half of one', () => {
+    expect(parseSkill({ ...SKILL, conversation: { decision: 'yes', resolved: true } })).toBeNull()
+  })
+
+  it('reads the listing with its problems beside it, and refuses a broken problem', () => {
+    const listing = parseSkillListing({
+      skills: [SKILL],
+      problems: [{ directory: 'C:\\skills\\bad', reason: 'missing YAML frontmatter' }],
+    })
+    expect(listing?.skills).toHaveLength(1)
+    expect(listing?.problems).toEqual([{ directory: 'C:\\skills\\bad', reason: 'missing YAML frontmatter' }])
+    expect(parseSkillListing({ skills: [SKILL], problems: [{ directory: 'x' }] })).toBeNull()
+    expect(parseSkillListing({ skills: [SKILL] })).toBeNull()
   })
 })

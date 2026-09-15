@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
+import type { SkillAdministration } from "../../src/application/skill-management.js";
 import { ConversationStore } from "../../src/conversations/store.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ProjectStore } from "../../src/projects/store.js";
@@ -84,6 +85,7 @@ beforeEach(() => {
   session = createAdmissionSession();
   app = createHttpApp({
     servers: { list: () => [] } as unknown as McpAdministration,
+    skills: { list: () => [], problems: () => [] } as unknown as SkillAdministration,
     providers: new ProviderManagementService({
       connections,
       catalog: new ModelCatalog({ db, connections }),

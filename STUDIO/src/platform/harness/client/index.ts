@@ -31,6 +31,7 @@ import { mediaClient, type MediaClient } from './media'
 import { projectClient, type ProjectClient } from './projects'
 import { providerClient, type ProviderClient } from './providers'
 import { createRequester, type HarnessClientOptions } from './request'
+import { skillClient, type SkillClient } from './skills'
 
 export type {
   HarnessAddress,
@@ -43,6 +44,7 @@ export type { ManualModelInput } from './providers'
 export interface HarnessClient
   extends ProviderClient,
     McpClient,
+    SkillClient,
     MediaClient,
     ConversationIndexClient,
     DecisionClient,
@@ -53,6 +55,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
   return {
     ...providerClient(request),
     ...mcpClient(request),
+    ...skillClient(request),
     ...mediaClient(request),
     ...conversationIndexClient(request),
     ...decisionClient(request),

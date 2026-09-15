@@ -322,6 +322,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     bootLog("step 11: createHttpApp entering");
     const app = createHttpApp({
       servers: runtime.servers,
+      skills: runtime.skills,
       // Awaited before the run renders. `start()` memoises, so this costs one
       // wait on the first submission after a harness starts and nothing at
       // all afterwards - and it is what lets a capability Studio ships be

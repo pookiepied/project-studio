@@ -6,6 +6,7 @@ import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
+import type { SkillAdministration } from "../../src/application/skill-management.js";
 import { ProviderManagementService } from "../../src/gateway/connections/management.js";
 import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
 import { RetrievalSettingsStore } from "../../src/gateway/retrieval/settings.js";
@@ -70,6 +71,7 @@ beforeEach(() => {
   session = createAdmissionSession();
   app = createHttpApp({
     servers: { list: () => [] } as unknown as McpAdministration,
+    skills: { list: () => [], problems: () => [] } as unknown as SkillAdministration,
     providers: new ProviderManagementService({
       connections,
       catalog: new ModelCatalog({ db, connections }),

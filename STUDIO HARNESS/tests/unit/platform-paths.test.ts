@@ -102,6 +102,7 @@ describe("the Studio home", () => {
     expect(durableDirectories()).toEqual([
       join(workspace, "config"),
       join(workspace, "data"),
+      join(workspace, "skills"),
     ]);
     expect(durableDirectories()).not.toContain(cacheDirectory());
   });

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
+import type { SkillAdministration } from "../../src/application/skill-management.js";
 import type {
   CapabilityDescriptor,
   ExecutionScope,
@@ -108,6 +109,7 @@ beforeEach(() => {
   session = createAdmissionSession();
   app = createHttpApp({
     servers: { list: () => [] } as unknown as McpAdministration,
+    skills: { list: () => [], problems: () => [] } as unknown as SkillAdministration,
     providers: new ProviderManagementService({
       connections,
       catalog: new ModelCatalog({ db, connections }),

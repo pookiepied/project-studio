@@ -15,6 +15,7 @@ const ProvidersPane = lazyNamed(
   'ProvidersPane',
 )
 const McpPane = lazyNamed(() => import('@/features/settings/mcp/McpPane'), 'McpPane')
+const SkillsPane = lazyNamed(() => import('@/features/settings/skills/SkillsPane'), 'SkillsPane')
 const EnvironmentsPane = lazyNamed(
   () => import('@/features/settings/environments/EnvironmentsPane'),
   'EnvironmentsPane',
@@ -44,6 +45,7 @@ const BUILT: Readonly<Record<string, () => ReactNode>> = {
   media: deferred('Media', <ProvidersPane kind="media" />),
   tools: deferred('Tools', <ProvidersPane kind="retrieval" />),
   mcp: deferred('MCP servers', <McpPane />),
+  skills: deferred('Skills', <SkillsPane />),
   environments: deferred('Environments', <EnvironmentsPane />),
   devices: deferred('Other devices', <DevicesPane />),
 }

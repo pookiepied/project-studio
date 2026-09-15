@@ -37,12 +37,21 @@ import { StorageError } from "../storage/errors.js";
  *   logs/     diagnostics                   disposable, but findable
  *   cache/    derived data                  disposable
  *   tmp/      scratch                       cleared between runs
+ *   skills/   skill folders the user put here   losing it loses their skills
  *
  * A flat home does not survive contact with a real product — `~/.codex` has
  * over forty entries at its top level, and nothing about it says which of them
- * matter. The rule here: a new directory must belong to one of these six. If it
- * genuinely fits none of them, the category set is wrong and should be changed
- * deliberately, rather than a seventh sibling appearing at the top level.
+ * matter. The rule here: a new directory must belong to one of these seven. If
+ * it genuinely fits none of them, the category set is wrong and should be
+ * changed deliberately, rather than an eighth sibling appearing at the top
+ * level.
+ *
+ * `skills/` is the one deliberate change so far, and it is a category of one.
+ * By the first six it belongs under `config/`, and it was placed at the top
+ * level anyway, on purpose: a skill folder is the thing a person copies in by
+ * hand, following instructions written for `~/.claude/skills`, and the path
+ * they expect is the one that works. A folder that has to be explained is a
+ * folder that gets put in the wrong place.
  */
 
 const HOME_DIRECTORY_NAME = ".studio";
@@ -168,6 +177,16 @@ export function cacheDirectory(): string {
 /** Scratch space. Anything here may be deleted between runs. */
 export function temporaryDirectory(): string {
   return studioPath("tmp");
+}
+
+/**
+ * The skills the person installed by hand: `<name>/SKILL.md` per folder.
+ *
+ * Top level rather than under `config/`; the header says why. Enumerated by
+ * `durableDirectories` because losing it loses work the person wrote.
+ */
+export function userSkillsDirectory(): string {
+  return studioPath("skills");
 }
 
 /** Per-project state the application owns, keyed by project id. */
@@ -306,7 +325,7 @@ export function conversationTrashDirectory(conversationId: string): string {
  * durable directory cannot be added and then forgotten by the backup.
  */
 export function durableDirectories(): readonly string[] {
-  return [configDirectory(), studioPath("data")];
+  return [configDirectory(), studioPath("data"), userSkillsDirectory()];
 }
 
 /**

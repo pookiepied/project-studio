@@ -412,6 +412,43 @@ export function stream(
         }
       }
 
+      // The skill scenario. A mounted skill is one catalog line in the
+      // system prompt and one framework tool, `activate_skill`, whose result
+      // is the skill's body; nothing of the skill is anywhere else. So the
+      // script reads exactly those two surfaces and reports what it found,
+      // which is what the integration test asserts: that switching a skill
+      // on puts it in both places, and switching it off takes it out of
+      // both. The fixture's name is known to the script the way the MCP
+      // fixture's id is.
+      if (userText.toLowerCase().includes("skill")) {
+        const activate = context.tools?.find((tool) => tool.name === "activate_skill");
+        if (activate !== undefined && !hasAnyToolResult(context)) {
+          const toolCall = {
+            type: "toolCall" as const,
+            id: "skill-activate-1",
+            name: "activate_skill",
+            arguments: { name: "hello" },
+          };
+          const message = createMessage(model, [toolCall]);
+          message.stopReason = "toolUse";
+          events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+          events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+          events.push({ type: "done", reason: "toolUse", message });
+          return;
+        }
+      }
+
+      const skillClosing = ((): string | undefined => {
+        if (!userText.toLowerCase().includes("skill")) return undefined;
+        const listed = (context.systemPrompt ?? "").includes("**hello**") ? "yes" : "no";
+        if (context.tools?.some((tool) => tool.name === "activate_skill") !== true) {
+          return `No skill can be activated in this conversation. Listed: ${listed}.`;
+        }
+        return lastToolResultIncludes(context, "Say hello, warmly.")
+          ? `Skill activated: hello. Listed: ${listed}.`
+          : `The skill did not activate. Listed: ${listed}.`;
+      })();
+
       // Two tool calls in one assistant message, which is what a model does
       // when the work is independent - and what the whole stack under it has
       // to survive. Both are `native/glob`, so both travel the real path: the
@@ -500,7 +537,9 @@ export function stream(
         return;
       }
 
-      const text = hasToolResult(context)
+      const text = skillClosing !== undefined
+        ? skillClosing
+        : hasToolResult(context)
         ? "Project Studio V2 workspace is ready."
         : hasMcpToolResult(context)
           ? "MCP tool completed."

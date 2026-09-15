@@ -45,11 +45,6 @@ export const PLACEHOLDERS: Readonly<Record<string, Placeholder>> = {
     description: 'Letting Studio drive a browser or the desktop.',
     items: ['Which browser to drive', 'Sites that are always refused', 'Screenshot permission'],
   },
-  skills: {
-    title: 'Skills',
-    description: 'Packaged instructions for a kind of task.',
-    items: ['Installed skills, on or off', 'What triggers each one', 'Add a skill from a folder'],
-  },
   hooks: {
     title: 'Hooks',
     description: "Commands that run around the agent's actions.",

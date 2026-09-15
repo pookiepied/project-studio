@@ -609,6 +609,63 @@ describe('the scope writes', () => {
 })
 
 /**
+ * The skill routes, on the wire: the same decision as a server's, at the
+ * same three scopes, under its own mount.
+ */
+describe('the skill writes', () => {
+  const SKILL_LISTING = {
+    skills: [
+      {
+        id: 'review-pr',
+        title: 'review-pr',
+        description: 'Reviews a pull request.',
+        provenance: 'user',
+        directory: 'C:\\skills\\review-pr',
+        enabledByDefault: false,
+      },
+    ],
+    problems: [],
+  }
+
+  it('reads the listing, with the scope in the query', async () => {
+    const stub = stubFetch(() => jsonResponse(SKILL_LISTING))
+    const result = await clientWith(stub.fetch).listSkills({ projectId: 'prj/1' })
+
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/skills?projectId=prj%2F1`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.skills[0]?.id).toBe('review-pr')
+  })
+
+  it('writes the default at the global route and a project decision at the project route', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+    const client = clientWith(stub.fetch)
+
+    await client.setSkillEnabled('review-pr', true)
+    await client.setSkillEnabled('review-pr', null, { projectId: 'prj 1' })
+
+    expect(stub.calls[0]?.method).toBe('PUT')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/skills/extensions/skill/review-pr`)
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: true })
+    expect(stub.calls[1]?.url).toBe(
+      `${BASE_URL}/api/skills/projects/prj%201/extensions/skill/review-pr`,
+    )
+    expect(JSON.parse(stub.calls[1]?.body ?? 'null')).toEqual({ enabled: null })
+  })
+
+  it("writes the conversation's decision to the conversation's own route", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+
+    await clientWith(stub.fetch).setConversationSkillEnabled('conv_1', 'review-pr', false)
+
+    expect(stub.calls[0]?.url).toBe(
+      `${BASE_URL}/api/skills/conversations/conv_1/extensions/skill/review-pr`,
+    )
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: false })
+  })
+})
+
+/**
  * The harness-side folder browser, on the wire (plan step 6).
  *
  * The path rides the query, because it is the address being asked about, and
