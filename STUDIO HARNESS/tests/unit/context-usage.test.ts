@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ContextUsageTracker } from "../../src/conversations/context-usage.js";
+import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import type { FlueObservation } from "@flue/runtime";
 
 /**
@@ -108,8 +109,64 @@ describe("the measured context", () => {
   });
 
   it("answers nothing for a conversation no turn has reported on", () => {
-    // The ordinary state before a first reply lands, and after a restart.
-    // The caller falls back to its estimate, which is not an error path.
+    // The ordinary state before a first reply lands. The caller falls back
+    // to its estimate, which is not an error path.
     expect(tracker().get("cnv_never")).toBeUndefined();
   });
-})
+});
+
+/**
+ * The figure across a restart.
+ *
+ * The tracker was memory only, and the harness is restarted far more often
+ * than a transcript changes: every rebuild, every quit. Each restart sent
+ * every conversation back to the webview's estimate - about a fifth of the
+ * real number - until its next turn, and the meter was reported broken three
+ * times for it. A second tracker on the same database stands in for the
+ * process that comes back.
+ */
+describe("the measured context across a restart", () => {
+  const opened: StudioDatabase[] = [];
+  const database = (): StudioDatabase => {
+    const db = openDatabase({ path: ":memory:" });
+    opened.push(db);
+    return db;
+  };
+  afterEach(() => {
+    for (const db of opened.splice(0)) db.close();
+  });
+
+  it("answers after a restart with what the last process measured", () => {
+    const db = database();
+    const before = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    before.record(turn("cnv_1", { input: 1_000, cacheRead: 90_000, cacheWrite: 500, output: 300 }));
+
+    const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    expect(after.get("cnv_1")).toMatchObject({
+      input: 1_000,
+      cacheRead: 90_000,
+      cacheWrite: 500,
+      output: 300,
+    });
+  });
+
+  it("keeps the latest turn in the store, not the first", () => {
+    const db = database();
+    const before = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    before.record(turn("cnv_1", { input: 40_000, output: 100 }));
+    before.record(turn("cnv_1", { input: 52_000, output: 200 }));
+
+    const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    expect(after.get("cnv_1")?.input).toBe(52_000);
+  });
+
+  it("forgets from the store as well as from memory", () => {
+    const db = database();
+    const before = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    before.record(turn("cnv_1", { input: 40_000, output: 100 }));
+    before.forget("cnv_1");
+
+    const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    expect(after.get("cnv_1")).toBeUndefined();
+  });
+});

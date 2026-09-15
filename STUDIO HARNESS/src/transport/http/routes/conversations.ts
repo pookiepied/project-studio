@@ -36,6 +36,12 @@ export interface ConversationRoutesOptions {
    */
   readonly contextUsage?: {
     get(conversationId: string): ConversationUsage | undefined;
+    /**
+     * Drops a conversation's figure when the conversation goes. The tracker
+     * owns its table (one owner per table, 008.3-05), so the purge cannot
+     * cascade it in SQL and asks here instead.
+     */
+    forget?(conversationId: string): void;
   };
   /**
    * The background commands, for the panel that shows them.
@@ -135,8 +141,9 @@ export function createConversationRoutes(
    *
    * A conversation nobody has measured answers 200 with a null rather than
    * 404. It is a real and ordinary state - a conversation whose first reply
-   * has not landed, or one resumed after a restart - and the caller's job in
-   * that case is to fall back to its estimate, which is not an error path.
+   * has not landed - and the caller's job in that case is to fall back to
+   * its estimate, which is not an error path. A restart is no longer such a
+   * state: the figure is stored, and comes back with the process.
    */
   routes.get("/:id/context", (context) => {
     const measured = options.contextUsage?.get(context.req.param("id"));
@@ -235,6 +242,7 @@ export function createConversationRoutes(
         },
         [id],
       );
+      if (outcome.removed.includes(id)) options.contextUsage?.forget?.(id);
       const detail = outcome.details[id];
       if (!outcome.removed.includes(id) && detail?.errorCode === "storage.conflict") {
         throw new StorageError("conflict", {
@@ -264,6 +272,7 @@ export function createConversationRoutes(
         },
         idsForPurge(await body(context)),
       );
+      for (const id of outcome.removed) options.contextUsage?.forget?.(id);
       return context.json(outcome);
     } catch (error) {
       return context.json(failure(error), statusOf(error));

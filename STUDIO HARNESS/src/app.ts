@@ -293,7 +293,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // reason it is subscribed here rather than deeper: a run's own usage is
     // reported to the observer, not to the transcript, and the webview cannot
     // see it any other way. Stopped in the drain below beside the titler.
-    const contextUsage = new ContextUsageTracker();
+    const contextUsage = new ContextUsageTracker({ database });
     contextUsage.start();
     bootLog("step 10: conversation and project stores completed");
 

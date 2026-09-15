@@ -1,6 +1,7 @@
 import { observe, type FlueObservation } from "@flue/runtime";
 
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
+import type { StudioDatabase } from "../storage/database.js";
 
 /**
  * How full a conversation's context window actually is.
@@ -92,26 +93,45 @@ function usageOf(observation: FlueObservation): ConversationUsage | undefined {
 export interface ContextUsageOptions {
   /** Defaults to the runtime's live subscription; tests drive it by hand. */
   readonly subscribe?: (handler: (observation: FlueObservation) => void) => () => void;
+  /**
+   * Where the figure outlives the process. Without it the tracker is memory
+   * only, which is what the unit tests want and what no running harness
+   * should be.
+   */
+  readonly database?: StudioDatabase;
 }
 
 /**
  * The latest measured prompt for each conversation.
  *
- * In memory. The measurement describes the transcript as it stands, and the
- * transcript outlives the process, so a restart does lose it - the webview
- * falls back to its estimate for one turn and is corrected the moment the
- * conversation is used again. Persisting it would mean a durable claim about
- * a window whose contents are reconstructed from elsewhere, and a stale row
- * that reads as authoritative is worse than an estimate that admits it is one.
+ * ---- Why it is stored ------------------------------------------------------
+ *
+ * It was memory only, on the reasoning that the transcript outlives the
+ * process and a measurement should not be a durable claim about a window
+ * whose contents are reconstructed from elsewhere. That reasoning had the
+ * frequencies backwards. The process is restarted far more often than any
+ * transcript changes - every rebuild in development, every quit - and each
+ * restart sent every conversation back to the webview's estimate until its
+ * next turn. The estimate reads about a fifth of the real figure, so the
+ * meter that had just been made honest looked broken again after every
+ * restart, and was reported as such three times.
+ *
+ * The figure is the last request as the provider billed it. The transcript
+ * cannot change without a request that replaces the figure, so a stored row
+ * is exactly as true after a restart as it was before one. Memory stays as
+ * the cache in front of the table; the table is what makes the answer
+ * survive.
  */
 export class ContextUsageTracker {
   readonly #latest = new Map<string, ConversationUsage>();
   readonly #subscribe: (handler: (observation: FlueObservation) => void) => () => void;
+  readonly #db: StudioDatabase | undefined;
   #stop: (() => void) | undefined;
 
   constructor(options: ContextUsageOptions = {}) {
     this.#subscribe =
       options.subscribe ?? ((handler) => observe((observation) => handler(observation)));
+    this.#db = options.database;
   }
 
   start(): void {
@@ -126,11 +146,59 @@ export class ContextUsageTracker {
 
   /** What was last measured for one conversation, if anything ever was. */
   get(conversationId: string): ConversationUsage | undefined {
-    return this.#latest.get(conversationId);
+    const held = this.#latest.get(conversationId);
+    if (held !== undefined) return held;
+    const stored = this.#load(conversationId);
+    if (stored !== undefined) this.#latest.set(conversationId, stored);
+    return stored;
   }
 
   forget(conversationId: string): void {
     this.#latest.delete(conversationId);
+    this.#db
+      ?.prepare("DELETE FROM conversation_context_usage WHERE conversation_id = ?")
+      .run(conversationId);
+  }
+
+  #load(conversationId: string): ConversationUsage | undefined {
+    if (this.#db === undefined) return undefined;
+    const row = this.#db
+      .prepare(
+        `SELECT input, cache_read, cache_write, output, observed_at
+           FROM conversation_context_usage WHERE conversation_id = ?`,
+      )
+      .get(conversationId) as Record<string, unknown> | undefined;
+    if (row === undefined) return undefined;
+    return {
+      input: count(row.input),
+      cacheRead: count(row.cache_read),
+      cacheWrite: count(row.cache_write),
+      output: count(row.output),
+      observedAt: count(row.observed_at),
+    };
+  }
+
+  #save(conversationId: string, usage: ConversationUsage): void {
+    this.#db
+      ?.prepare(
+        `INSERT INTO conversation_context_usage
+           (conversation_id, input, cache_read, cache_write, output, observed_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(conversation_id) DO UPDATE SET
+           input = excluded.input,
+           cache_read = excluded.cache_read,
+           cache_write = excluded.cache_write,
+           output = excluded.output,
+           observed_at = excluded.observed_at`,
+      )
+      .run(
+        conversationId,
+        usage.input,
+        usage.cacheRead,
+        usage.cacheWrite,
+        usage.output,
+        usage.observedAt,
+      );
   }
 
   /**
@@ -147,5 +215,6 @@ export class ContextUsageTracker {
     const usage = usageOf(observation);
     if (usage === undefined) return;
     this.#latest.set(conversationId, usage);
+    this.#save(conversationId, usage);
   }
 }

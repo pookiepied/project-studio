@@ -1075,6 +1075,38 @@ export const MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 24,
+    name: "conversation_context_usage",
+    up(db) {
+      // The provider's own figure for a conversation's last request - what
+      // the context meter draws from. It was kept in memory only, on the
+      // reasoning that the transcript outlives the process and a measurement
+      // should not outlive what it measures. In practice the process is
+      // restarted far more often than a transcript changes, and every
+      // restart sent every conversation back to the webview's estimate,
+      // which reads about a fifth of the real number, until its next turn.
+      // The figure is the last request as the provider billed it, and the
+      // transcript cannot change without a request that replaces it, so a
+      // stored row is as true after a restart as before one.
+      //
+      // Its own table rather than columns on `conversation`: the row is
+      // written on every model request and the index row on none of them,
+      // and a conversation can be measured before the index knows it, so
+      // there is no foreign key. `observed_at` lets a reader tell a stale
+      // figure from a fresh one, as the in-memory record already did.
+      db.exec(`
+        CREATE TABLE conversation_context_usage (
+          conversation_id TEXT PRIMARY KEY,
+          input           INTEGER NOT NULL,
+          cache_read      INTEGER NOT NULL,
+          cache_write     INTEGER NOT NULL,
+          output          INTEGER NOT NULL,
+          observed_at     INTEGER NOT NULL
+        ) STRICT;
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */
