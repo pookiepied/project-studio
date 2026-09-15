@@ -128,6 +128,10 @@ export interface BoundClient {
   readonly browser: {
     stop: (conversationId: string) => Promise<HarnessResult<boolean>>
   }
+  /** The person's stop for a conversation's computer control (ADR 0055 §7). */
+  readonly computer: {
+    stop: (conversationId: string) => Promise<HarnessResult<boolean>>
+  }
   /** The generation jobs - images and videos - bound the same way. */
   readonly mediaJobs: {
     list: (conversationId: string) => Promise<HarnessResult<readonly MediaJob[]>>

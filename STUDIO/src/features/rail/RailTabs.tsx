@@ -1,4 +1,5 @@
 import { Icons } from '@/components/icons'
+import { familyById, type ReportFamilyId } from '@/features/chat/transcript/live/reportFamily'
 import { useRail, type RailEntry } from '@/stores/rail'
 import { cn } from '@/lib/cn'
 
@@ -47,7 +48,7 @@ export function RailTabs() {
                 : entry.kind === 'jobs'
                   ? 'Background commands'
                   : entry.kind === 'browser'
-                    ? 'Browser'
+                    ? familyById(entry.family).label
                     : 'Plan'
             return (
               <div
@@ -70,7 +71,7 @@ export function RailTabs() {
                     ) : entry.kind === 'jobs' ? (
                       <Icons.backgroundJobs />
                     ) : entry.kind === 'browser' ? (
-                      <Icons.browserUse />
+                      <ReportMark family={entry.family} />
                     ) : (
                       <Icons.plan />
                     )}
@@ -133,4 +134,10 @@ function groupByConversation(entries: readonly RailEntry[]): Group[] {
   }
 
   return groups
+}
+
+/** The tab's mark for a browser or computer report: the family's own. */
+function ReportMark({ family }: { family: ReportFamilyId }) {
+  const { Mark } = familyById(family)
+  return <Mark />
 }

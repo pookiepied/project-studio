@@ -186,6 +186,7 @@ describe('the browser entry', () => {
 
     act(() => {
       result.current.showBrowser('cnv_1', 'Conversation', {
+        family: 'browser',
         url: 'https://example.com',
         title: 'Example',
         frame: { kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' },
@@ -209,6 +210,7 @@ describe('the browser entry', () => {
     })
     act(() => {
       result.current.showBrowser('cnv_1', 'Conversation', {
+        family: 'browser',
         url: null,
         title: null,
         frame: null,
@@ -219,6 +221,7 @@ describe('the browser entry', () => {
 
     act(() => {
       result.current.showBrowser('cnv_1', 'Conversation', {
+        family: 'browser',
         url: 'https://example.com/pricing',
         title: 'Pricing',
         frame: { kind: 'attachment', id: 'att_msg_1_0', mimeType: 'image/jpeg' },
@@ -242,6 +245,7 @@ describe('the browser entry', () => {
 
     act(() => {
       result.current.showBrowser('cnv_1', 'One', {
+        family: 'browser',
         url: 'https://one.example',
         title: null,
         frame: null,
@@ -250,6 +254,7 @@ describe('the browser entry', () => {
     })
     act(() => {
       result.current.showBrowser('cnv_2', 'Two', {
+        family: 'browser',
         url: 'https://two.example',
         title: null,
         frame: null,
@@ -259,5 +264,35 @@ describe('the browser entry', () => {
 
     const browsers = result.current.entries.filter((entry) => entry.kind === 'browser')
     expect(browsers).toHaveLength(2)
+  })
+
+  it("keeps a conversation's computer report apart from its browser report", () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+
+    act(() => {
+      result.current.showBrowser('cnv_1', 'One', {
+        family: 'browser',
+        url: 'https://one.example',
+        title: null,
+        frame: null,
+        steps: [],
+      })
+    })
+    act(() => {
+      result.current.showBrowser('cnv_1', 'One', {
+        family: 'computer',
+        url: null,
+        title: 'Calculator',
+        frame: null,
+        steps: [],
+      })
+    })
+
+    const ids = result.current.entries
+      .filter((entry) => entry.kind === 'browser')
+      .map((entry) => entry.id)
+    // Two tabs, one conversation: driving the desktop does not overwrite the
+    // page the same turn is browsing.
+    expect(ids).toEqual(['browser:cnv_1', 'computer:cnv_1'])
   })
 })

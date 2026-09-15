@@ -6,6 +6,7 @@ import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
 import { JobsPanel } from '@/features/jobs'
 import { BrowserPanel } from '@/features/rail/BrowserPanel'
+import { familyById } from '@/features/chat/transcript/live/reportFamily'
 import { PlanPanel } from '@/features/plans'
 import { RailTabs } from '@/features/rail/RailTabs'
 import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, type RailEntry } from '@/stores/rail'
@@ -25,7 +26,7 @@ const MIN_PAGE_WIDTH = 520
 function entryTitle(entry: RailEntry): string {
   if (entry.kind === 'artifact') return entry.artifact.title
   if (entry.kind === 'jobs') return 'Background commands'
-  return entry.kind === 'browser' ? 'Browser' : 'Plan'
+  return entry.kind === 'browser' ? familyById(entry.family).label : 'Plan'
 }
 
 

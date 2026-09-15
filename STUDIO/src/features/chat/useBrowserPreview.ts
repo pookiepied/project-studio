@@ -1,10 +1,6 @@
 import { useEffect, useRef } from 'react'
-import {
-  browserAction,
-  browserStepOf,
-  type BrowserFrame,
-  type BrowserStep,
-} from '@/features/chat/transcript/live/browserCall'
+import type { BrowserFrame, BrowserStep } from '@/features/chat/transcript/live/browserCall'
+import { REPORT_FAMILIES, type ReportFamily } from '@/features/chat/transcript/live/reportFamily'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 import { useRail } from '@/stores/rail'
 
@@ -31,6 +27,9 @@ import { useRail } from '@/stores/rail'
  * to the rail as one replacement. Nothing accumulates here between passes, so
  * a reattach or a re-derive cannot double a step, and what the panel shows is
  * always exactly what the log says.
+ *
+ * The computer's report (ADR 0055 §7) is derived the same way, from the same
+ * pass, into its own entry: one hook, one family at a time.
  */
 export function useBrowserPreview(
   conversationId: string,
@@ -52,27 +51,30 @@ export function useBrowserPreview(
   // prefixes it, which is what makes a switch away and back report again
   // rather than deciding it was already shown - a different conversation is a
   // different browser.
-  const reported = useRef<string | null>(null)
+  const reported = useRef<Map<ReportFamily, string>>(new Map())
 
   useEffect(() => {
-    const steps = browserStepsOf(items)
-    if (steps.length === 0) {
-      reported.current = null
-      return
-    }
-    const last = steps[steps.length - 1]
-    if (last === undefined) return
-    const settled = steps.filter((step) => step.settled).length
-    const signature = `${conversationId}:${steps.length}:${settled}:${last.id}`
-    if (signature === reported.current) return
-    reported.current = signature
+    for (const family of REPORT_FAMILIES) {
+      const steps = stepsOf(family, items)
+      if (steps.length === 0) {
+        reported.current.delete(family)
+        continue
+      }
+      const last = steps[steps.length - 1]
+      if (last === undefined) continue
+      const settled = steps.filter((step) => step.settled).length
+      const signature = `${conversationId}:${steps.length}:${settled}:${last.id}`
+      if (signature === reported.current.get(family)) continue
+      reported.current.set(family, signature)
 
-    showBrowser(conversationId, conversationTitle, { ...reportOf(steps), steps })
+      showBrowser(conversationId, conversationTitle, { family: family.id, ...reportOf(steps), steps })
+    }
   }, [items, conversationId, conversationTitle, showBrowser])
 }
 
 /**
- * Every browser call in the log, oldest first, as the report's step list.
+ * Every one of a family's calls in the log, oldest first, as the report's
+ * step list.
  *
  * A call still running is in the list: the verb arrives in the present tense
  * and its subject is read from the input, so the rail's newest line is what
@@ -81,7 +83,7 @@ export function useBrowserPreview(
  * place and no picture - only an answered one can - so the header facts are
  * untouched by it.
  */
-function browserStepsOf(items: readonly TranscriptItem[]): readonly BrowserStep[] {
+function stepsOf(family: ReportFamily, items: readonly TranscriptItem[]): readonly BrowserStep[] {
   const steps: BrowserStep[] = []
   for (const item of items) {
     if (item.kind !== 'assistant') continue
@@ -89,8 +91,8 @@ function browserStepsOf(items: readonly TranscriptItem[]): readonly BrowserStep[
       if (segment.kind !== 'tools') continue
       for (const group of segment.groups) {
         for (const call of group.calls) {
-          if (browserAction(call.toolName) === null) continue
-          const step = browserStepOf(call)
+          if (family.action(call.toolName) === null) continue
+          const step = family.stepOf(call)
           if (step !== null) steps.push(step)
         }
       }

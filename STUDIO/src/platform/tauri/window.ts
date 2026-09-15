@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 
 /**
@@ -112,6 +113,53 @@ export function detachedConversationId(): string | null {
 export function diagnosticKind(): string | null {
   if (typeof window === 'undefined') return null
   return new URLSearchParams(window.location.search).get('diagnostic')
+}
+
+/**
+ * Which indicator this window is, or null for an ordinary window.
+ *
+ * `computer` is the "Studio is using your computer" pill (ADR 0055 §7): a
+ * second, frameless, transparent window that `computer_indicator_show` opens
+ * at the top of the display. Read from the URL like the two above.
+ */
+export function indicatorKind(): string | null {
+  if (typeof window === 'undefined') return null
+  return new URLSearchParams(window.location.search).get('indicator')
+}
+
+/**
+ * Put up the pill that says Studio is using the computer, for a conversation.
+ * Nothing outside Tauri: a browser tab has no desktop to indicate on.
+ */
+export async function showComputerIndicator(conversationId: string): Promise<void> {
+  if (!isTauri()) return
+  await invoke('computer_indicator_show', { conversationId })
+}
+
+/** Take the pill down. */
+export async function hideComputerIndicator(): Promise<void> {
+  if (!isTauri()) return
+  await invoke('computer_indicator_hide')
+}
+
+/** The pill's own Stop: asks the native side to tell the conversation. */
+export async function requestComputerStop(): Promise<void> {
+  if (!isTauri()) return
+  await invoke('computer_indicator_stop')
+}
+
+/**
+ * Hear the pill's Stop. The payload is the conversation id the pill was up
+ * for; the listener stops that conversation's computer control and its run.
+ * Returns the unlisten, or a no-op outside Tauri.
+ */
+export async function onComputerStopRequested(
+  handler: (conversationId: string) => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => undefined
+  return listen<string>('studio://computer-indicator/stop', (event) => {
+    handler(event.payload)
+  })
 }
 
 /**

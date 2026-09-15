@@ -7,6 +7,7 @@ import { createInterface } from "node:readline";
 
 import driverSource from "./driver.ps1?raw";
 import { ComputerError } from "./errors.js";
+import { windowsPowerShell } from "./resolve.js";
 
 /**
  * One desktop driver, and the reasons it is allowed to exist.
@@ -128,8 +129,11 @@ export class ComputerSession {
       throw new ComputerError("unsupported", { message: unsupportedMessage() });
     }
 
+    // The absolute path, because this process was given no PATH (see
+    // `windowsPowerShell`), and `windowsHide` because a console window
+    // flashing up over the person's work is exactly what a driver must not do.
     const child = spawn(
-      "powershell.exe",
+      windowsPowerShell(),
       ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", driverPath()],
       { stdio: "pipe", windowsHide: true },
     );

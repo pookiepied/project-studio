@@ -6,8 +6,9 @@ mod tray;
 mod window;
 
 use harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
-use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 /// Guards the one-shot suppression of the first `app_ready` show when the app
 /// was launched by the login item. See `app_ready`.
@@ -119,9 +120,133 @@ async fn app_ready(window: tauri::WebviewWindow) -> Result<(), String> {
   {
     return Ok(());
   }
+  // The computer indicator is shown and never focused. It appears while the
+  // model is typing into some other window, and focusing it would take the
+  // keyboard away from the very window the model was just told is the target.
+  if window.label() == COMPUTER_INDICATOR_LABEL {
+    let _ = window.show();
+    return Ok(());
+  }
   let _ = window.show();
   let _ = window.set_focus();
   Ok(())
+}
+
+/// The window label of the "Studio is using your computer" pill. Covered by
+/// its own entry in `capabilities/default.json`.
+const COMPUTER_INDICATOR_LABEL: &str = "computer-indicator";
+/// The pill's size, in logical pixels. Matches `ComputerIndicatorWindow`.
+const COMPUTER_INDICATOR_SIZE: (f64, f64) = (340.0, 48.0);
+/// How far below the top edge of the primary display the pill sits.
+const COMPUTER_INDICATOR_TOP: f64 = 12.0;
+
+/// Which conversation the pill is up for, so its Stop knows what to stop.
+///
+/// Held here rather than passed to the pill's own webview: the pill is one
+/// window for the whole app, shown by whichever conversation is driving the
+/// computer, and the conversation can change while it is up. Its Stop asks
+/// this side, and this side tells the main window which run to end.
+#[derive(Default)]
+struct ComputerIndicator {
+  conversation: Mutex<Option<String>>,
+}
+
+/// The event the pill's Stop raises, carrying the conversation id. The main
+/// window listens and stops that conversation's computer control and its run.
+const COMPUTER_INDICATOR_STOP_EVENT: &str = "studio://computer-indicator/stop";
+
+/// Show the pill that says Studio is using the computer (ADR 0055 §7).
+///
+/// Not a border and not a resize of the app: a second window, frameless and
+/// transparent, always on top, at the top centre of the primary display, with
+/// only the pill painted in it. It is never given focus (see `app_ready`) and
+/// never takes the taskbar, so the desktop looks the same as before except
+/// for one small sign that says who is at the keyboard.
+///
+/// Built once and then hidden and shown, because a webview takes a moment to
+/// come up and a turn may drive the computer several times.
+#[tauri::command]
+async fn computer_indicator_show(app: AppHandle, conversation_id: String) -> Result<(), String> {
+  if let Ok(mut current) = app.state::<ComputerIndicator>().conversation.lock() {
+    *current = Some(conversation_id);
+  }
+
+  if let Some(existing) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) {
+    let _ = existing.show();
+    return Ok(());
+  }
+
+  let (width, height) = COMPUTER_INDICATOR_SIZE;
+  let (x, y) = computer_indicator_position(&app, width);
+
+  WebviewWindowBuilder::new(
+    &app,
+    COMPUTER_INDICATOR_LABEL,
+    WebviewUrl::App("index.html?indicator=computer".into()),
+  )
+  .title("Studio is using your computer")
+  .inner_size(width, height)
+  .position(x, y)
+  .decorations(false)
+  .transparent(true)
+  .shadow(false)
+  .always_on_top(true)
+  .skip_taskbar(true)
+  .focused(false)
+  .resizable(false)
+  .maximizable(false)
+  .minimizable(false)
+  .visible(false)
+  .build()
+  .map_err(|error| error.to_string())?;
+
+  Ok(())
+}
+
+/// Top centre of the primary display, in logical pixels. Falls back to a
+/// plausible spot when the display cannot be asked, rather than failing the
+/// show: a pill in the wrong place still says what it is for.
+fn computer_indicator_position(app: &AppHandle, width: f64) -> (f64, f64) {
+  let monitor = app.primary_monitor().ok().flatten();
+  let Some(monitor) = monitor else {
+    return (480.0, COMPUTER_INDICATOR_TOP);
+  };
+  let scale = monitor.scale_factor();
+  let logical_width = monitor.size().width as f64 / scale;
+  let origin_x = monitor.position().x as f64 / scale;
+  let origin_y = monitor.position().y as f64 / scale;
+  (origin_x + (logical_width - width) / 2.0, origin_y + COMPUTER_INDICATOR_TOP)
+}
+
+/// Hide the pill. Called when the turn that drove the computer has ended.
+#[tauri::command]
+async fn computer_indicator_hide(app: AppHandle) -> Result<(), String> {
+  if let Ok(mut current) = app.state::<ComputerIndicator>().conversation.lock() {
+    *current = None;
+  }
+  if let Some(window) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) {
+    let _ = window.hide();
+  }
+  Ok(())
+}
+
+/// The pill's Stop. Tells every window which conversation to stop; the main
+/// window (or the detached one showing it) ends the driver and the run. The
+/// pill itself is hidden by the same path once the turn is over.
+#[tauri::command]
+async fn computer_indicator_stop(app: AppHandle) -> Result<(), String> {
+  let conversation = app
+    .state::<ComputerIndicator>()
+    .conversation
+    .lock()
+    .ok()
+    .and_then(|current| current.clone());
+  let Some(conversation) = conversation else {
+    return Ok(());
+  };
+  app
+    .emit(COMPUTER_INDICATOR_STOP_EVENT, conversation)
+    .map_err(|error| error.to_string())
 }
 
 /// Quit the whole application — the same verb the tray's Quit item performs.
@@ -585,6 +710,7 @@ pub fn run() {
     ))))
     .manage(std::sync::Arc::new(remote::PairingState::default()))
     .manage(remote::RemoteAccess::default())
+    .manage(ComputerIndicator::default())
     // The permission grant, attached to every webview this app creates.
     .plugin(permissions_plugin())
     // Remembers size and position across launches. A desktop app that reopens
@@ -682,6 +808,9 @@ pub fn run() {
       app_ready,
       open_conversation_window,
       open_diagnostic_window,
+      computer_indicator_show,
+      computer_indicator_hide,
+      computer_indicator_stop,
       quit_app,
       get_harness_endpoint,
       restart_harness,

@@ -15,18 +15,20 @@ import { BrowserPanel } from './BrowserPanel'
  */
 
 const stop = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
+const stopComputer = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
 
 vi.mock('@/stores/workspace', () => ({
-  useWorkspace: () => ({ browser: { stop } }),
+  useWorkspace: () => ({ browser: { stop }, computer: { stop: stopComputer } }),
 }))
 vi.mock('@/features/chat/useAttachmentFrame', () => ({
   useAttachmentFrame: () => null,
 }))
 
-function entry() {
+function entry(family: 'browser' | 'computer' = 'browser') {
   return {
     kind: 'browser' as const,
-    id: 'browser:cnv_1',
+    family,
+    id: `${family}:cnv_1`,
     conversationId: 'cnv_1',
     conversationTitle: 'A conversation',
     openedAt: 0,
@@ -40,6 +42,7 @@ function entry() {
 afterEach(() => {
   cleanup()
   stop.mockReset()
+  stopComputer.mockReset()
   vi.useRealTimers()
 })
 
@@ -66,5 +69,16 @@ describe('BrowserPanel', () => {
       vi.advanceTimersByTime(2000)
     })
     expect(screen.getByRole('button', { name: 'Stop browser' })).toBeTruthy()
+  })
+
+  it("stops the computer, not the browser, when the entry is the computer's report", async () => {
+    stopComputer.mockResolvedValue({ ok: true, value: true })
+    render(<BrowserPanel entry={entry('computer')} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Stop computer' }))
+    })
+    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
+    expect(stop).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toBe('Stopped')
   })
 })

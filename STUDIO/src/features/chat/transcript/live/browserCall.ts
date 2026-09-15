@@ -99,7 +99,7 @@ function blocks(output: unknown): readonly unknown[] {
   return inner === undefined ? [] : blocks(inner)
 }
 
-function textOf(output: unknown): string {
+export function textOf(output: unknown): string {
   return blocks(output)
     .filter((block): block is Record<string, unknown> => isRecord(block))
     .filter((block) => block['type'] === 'text' && typeof block['text'] === 'string')
@@ -107,7 +107,7 @@ function textOf(output: unknown): string {
     .join('\n')
 }
 
-function frameOf(output: unknown): BrowserFrame | null {
+export function frameOf(output: unknown): BrowserFrame | null {
   for (const block of blocks(output)) {
     if (!isRecord(block)) continue
     // The two spellings persistence can leave behind. A live chunk carries

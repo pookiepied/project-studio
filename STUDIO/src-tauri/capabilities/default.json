@@ -6,7 +6,8 @@
   "windows": [
     "main",
     "conversation-*",
-    "diagnostic-*"
+    "diagnostic-*",
+    "computer-indicator"
   ],
   "permissions": [
     "core:default",

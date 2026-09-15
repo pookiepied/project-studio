@@ -177,6 +177,33 @@ async function acted(session: ComputerSession, said: string, display: number | u
   }
 }
 
+/** A window as the answers name it: its title and the handle to name it by. */
+function windowName(result: Record<string, unknown>): string {
+  const title = typeof result["window"] === "string" ? result["window"] : typeof result["title"] === "string" ? result["title"] : "";
+  const handle = typeof result["handle"] === "number" && result["handle"] !== 0 ? result["handle"] : undefined;
+  if (title === "" && handle === undefined) return "The window";
+  if (handle === undefined) return `"${title}"`;
+  return title === "" ? `window ${String(handle)}` : `"${title}" (window ${String(handle)})`;
+}
+
+/**
+ * What `open` did, and which window it landed in. The handle is the point:
+ * every later call names the window rather than trusting that it is still
+ * the one in front, which is the rule that keeps a model's typing out of the
+ * person's own windows (driver.ps1, "The target").
+ */
+function openSentence(result: Record<string, unknown>): string {
+  const named = windowName(result);
+  if (result["started"] === true) {
+    return typeof result["handle"] === "number" && result["handle"] !== 0
+      ? `Started ${String(result["what"])}; its window is ${named}, in front and being worked in.`
+      : `Started ${String(result["what"])}, but no new window appeared within five seconds. List windows to find it, then focus it by handle.`;
+  }
+  return result["focused"] === true
+    ? `Brought ${named} to the front; it is the window being worked in.`
+    : `${named} is open but could not be brought to the front; click inside it.`;
+}
+
 function displayArg(input: Record<string, unknown>): Record<string, unknown> {
   const display = num(input, "display");
   return display === undefined ? {} : { display };
@@ -388,7 +415,8 @@ export const TOOLS: readonly ToolDefinition[] = [
   {
     name: "studio_computer_type",
     description:
-      "Type text into whatever has keyboard focus. Newlines press Return. " +
+      "Type text into the window being worked in, at its keyboard focus. Newlines press Return. " +
+      "Refused if another window has come to the front since it was opened, focused, read or clicked in. " +
       "For a shortcut use key; for a field that has a ui_ reference, set_value is exact.",
     inputSchema: object({ text: STRING }, ["text"]),
     run: async (session, input) => {
@@ -404,7 +432,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     description:
       'Press a key or a shortcut: "return", "escape", "tab", "ctrl+s", "alt+f4", "win+d", "ctrl+shift+t". ' +
       "Names: letters, digits, return, tab, escape, backspace, delete, space, home, end, pageup, pagedown, " +
-      "up, down, left, right, f1-f12, ctrl, shift, alt, win.",
+      "up, down, left, right, f1-f12, ctrl, shift, alt, win. Goes to the window being worked in, " +
+      "and is refused if another window has come to the front.",
     inputSchema: object(
       {
         keys: { type: "string", description: 'The key or chord, joined with "+".' },
@@ -503,13 +532,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         throw new ComputerError("bad_input", { message: "Give an app name or a path." });
       }
       const result = await session.request("open", { app: app ?? "", path: path ?? "" });
-      const said = isRecord(result)
-        ? result["started"] === true
-          ? `Started ${String(result["what"])}.`
-          : result["focused"] === true
-            ? `Brought "${String(result["window"])}" to the front.`
-            : `"${String(result["window"])}" is open but could not be brought to the front; click it.`
-        : "Opened.";
+      const said = isRecord(result) ? openSentence(result) : "Opened.";
       return acted(session, said, undefined);
     },
   },
@@ -521,7 +544,14 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const result = await session.request("focus", { window: requiredNumber(input, "window") });
       const focused = isRecord(result) && result["focused"] === true;
-      return acted(session, focused ? "The window is in front." : "Windows did not bring it to the front; click it.", undefined);
+      const named = isRecord(result) ? windowName(result) : "The window";
+      return acted(
+        session,
+        focused
+          ? `${named} is in front and is the window being worked in.`
+          : `Windows did not bring ${named} to the front; click inside it.`,
+        undefined,
+      );
     },
   },
 
@@ -531,10 +561,10 @@ export const TOOLS: readonly ToolDefinition[] = [
     description:
       "Read a window's controls as an outline, each stamped with a reference like ui_12 and its centre point. " +
       "The reliable way to find what to act on: use act, set_value or select_text with a reference, " +
-      "or click its centre. Reads the window in front unless a handle is given. " +
-      "References are replaced by the next read.",
+      "or click its centre. Reads the window named by handle, or else the one last opened, focused, " +
+      "read or clicked in; it never reads whatever happens to be in front. References are replaced by the next read.",
     inputSchema: object({
-      window: { type: "number", description: "A handle from windows. Defaults to the window in front." },
+      window: { type: "number", description: "A handle from windows or open. Defaults to the window being worked in." },
       all: { type: "boolean", description: "Include text and structure, not only controls." },
       depth: { type: "number", description: "How deep to walk. Default 12." },
       limit: { type: "number", description: "Most lines to return. Default 400." },
@@ -550,7 +580,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const minimized = result["minimized"] === true ? " This window is minimized; focus it before acting on it." : "";
       const outline = typeof result["outline"] === "string" ? result["outline"] : "";
       return answer(
-        `Window: ${String(result["window"])}${minimized}\n\n${outline === "" ? "No controls were found. Try all: true, or a screenshot." : outline}`,
+        `Window: ${windowName(result)}${minimized}\n\n${outline === "" ? "No controls were found. Try all: true, or a screenshot." : outline}`,
       );
     },
   },

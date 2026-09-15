@@ -92,6 +92,11 @@ export interface ConversationIndexClient {
    * "there was nothing to stop" and "I pressed stop and nothing happened".
    */
   stopConversationBrowser(id: string): Promise<HarnessResult<boolean>>
+  /**
+   * The person's stop for the conversation's computer control (ADR 0055 §7).
+   * Answers whether a driver was actually running, for the same reason.
+   */
+  stopConversationComputer(id: string): Promise<HarnessResult<boolean>>
 }
 
 function conversationPath(id: string, suffix = ''): string {
@@ -184,6 +189,18 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
       return json(
         'POST',
         conversationPath(id, '/browser/stop'),
+        undefined,
+        (value) =>
+          typeof value === 'object' && value !== null
+            ? (value as Record<string, unknown>)['stopped'] === true
+            : false,
+      )
+    },
+
+    stopConversationComputer(id) {
+      return json(
+        'POST',
+        conversationPath(id, '/computer/stop'),
         undefined,
         (value) =>
           typeof value === 'object' && value !== null

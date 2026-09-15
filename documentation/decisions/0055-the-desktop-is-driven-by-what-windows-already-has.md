@@ -146,15 +146,56 @@ tells the model to focus the window first.
 tried to assign it. Recorded because the error message does not say which
 line.
 
-### 7. Not decided here, on purpose
+### 7. The target rule, the picture and the sign (amended 2026-09-15)
 
-**Consent for the screen.** The kernel approves every call, and under Manual
-mode a person sees each one. Under Full Auto they do not, and a model with
-the pointer is the one capability where "you can undo it" is not the safety
-story, because a click in someone else's application has no snapshot. A
-second consent — *you may act on my screen, for this conversation* — is the
-right shape, and it is the design pass this ADR leaves open rather than
-inventing a dialog on the last day of the work.
+**What happened.** The first input run on this machine typed into the
+person's own Notepad window. The model had opened Notepad, then read the
+window "in front", and by the time it typed, the window in front was the
+person's. Nothing in the driver made a difference between "the window I was
+given" and "whatever is in front now", so the keys went to the latter. The
+text was harmless; the lesson is not. Three things are decided by it.
+
+**Nothing is sent to a window the driver did not choose.** The driver holds
+one *target*: the window it last opened, focused, read, or clicked in. `type`,
+`key` and `hold_key` refuse when there is no target, and refuse when the
+window in front is not the target, naming both windows and saying nothing was
+sent. `read_ui` refuses to read "whatever is in front": it takes a handle from
+`windows`, or the target. The foreground window is never an implicit target.
+Two Windows facts made the rule harder than it sounds and are recorded here:
+Store apps (Calculator, Notepad) put keyboard focus in a child
+`Windows.UI.Core.CoreWindow`, so the foreground handle is not the frame handle
+`windows` lists — the comparison accepts a child or a root ancestor, not just
+equality; and `SetForegroundWindow` is refused unless the caller sent the last
+input, so `focus` sends a zero-length mouse move first, then asks, then puts
+UI Automation focus on the first focusable control, because raising a Store
+app's frame does not give it the keyboard.
+
+**The person sees what the model sees.** Every acting call brings back a frame
+of the display it acted on, and the client draws the computer's calls the way
+it draws the browser's (ADR 0049 §7): one report box in the transcript with
+the newest picture where the reader looks first, and one *Computer* tab in the
+rail holding the latest picture, the window being worked in, the whole
+sequence, and Stop. Browser and computer are two *families* of one report;
+the family is a parameter, not a second component.
+
+**A sign on the desktop, not a border and not a resize.** While a turn is
+driving the computer, a second Tauri window is up: frameless, transparent,
+always on top, never focused, never in the taskbar, at the top centre of the
+primary display, painting only a pill that says *Studio is using your
+computer* with a Stop. The alternatives were rejected on their merits: a
+coloured border round the screen is hard on the eyes for the whole time the
+model works, and shrinking or moving the app makes it look broken. The pill is
+shown by the window that owns the conversation, for exactly as long as its
+running turn holds a computer call, and its Stop reaches that window through
+the native side, which stops the driver and the run.
+
+**Still not decided: consent for the screen.** The kernel approves every
+call, and under Manual mode a person sees each one. Under Full Auto they do
+not, and a model with the pointer is the one capability where "you can undo
+it" is not the safety story, because a click in someone else's application
+has no snapshot. A second consent — *you may act on my screen, for this
+conversation* — is the right shape, and it is the design pass this ADR still
+leaves open. The target rule and the sign narrow the harm; they do not ask.
 
 **Elevated windows.** Windows UIPI refuses input from a lower-integrity
 process to a higher one. The driver's refusal names it; nothing can fix it
@@ -175,6 +216,11 @@ nothing else in the server is. Not built, and the row says so.
   extensions as before.
 - The driver can be blocked by antivirus on a machine Studio has not seen.
   The refusal that results names the driver and the fix is §6's helper.
+- A model that reads "whatever is in front" gets a refusal and a remedy, and a
+  model that types before choosing a window gets the same. That costs a call
+  now and then; it is the price of never typing into the person's window.
+- A second window exists while the computer is driven. It is listed in the
+  capabilities file like every other label, and it is never focused.
 
 ## Required proof
 
@@ -187,5 +233,10 @@ nothing else in the server is. Not built, and the row says so.
   `cursor`, `screenshot` and `zoom` with correct frames, `apps`, `windows`,
   `read_ui` of the Studio window with 26 stamped controls, a stale ref
   refused with the remedy, `clipboard` read.
-- Not yet: any call that moves the pointer or presses a key. Those are
-  proved on a machine the person has handed over, and the plan says when.
+- Input, on this machine, once handed over: `open Calculator` returns the
+  new window's handle; `read_ui` by that handle; `act invoke` on 7, +, 8, =
+  reads back "Display is 15"; `type` and `key` refuse with no target and
+  refuse when the foreground window is not the target; `scroll` down and
+  left; `screenshot`. Done 2026-09-15. Still owed: typing into a Store app
+  after `focus` (the UI Automation focus step), and the in-app check of the
+  report box, the rail tab and the pill.

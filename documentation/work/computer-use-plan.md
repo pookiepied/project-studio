@@ -170,3 +170,35 @@ measured. Three things worth carrying:
   and the rail; the computer does not. A screenshot arrives as an image in
   the tool result and is drawn as one. A "what the model did on the desktop"
   panel is the same shape as the browser's and is the next design item.
+  *(Done later the same day; see §7.)*
+
+## 7. The incident, and what it decided (2026-09-15)
+
+The first input run typed into the person's own Notepad. ADR 0055 §7 now
+records the rule that came out of it and the two features that followed.
+The findings that would otherwise be lost:
+
+- **The foreground window is not the frame window** for Store apps. Calculator
+  lists as one handle in `windows` and reports another as foreground (its
+  `CoreWindow` child). Any "is the right window in front" check must accept a
+  child or the root ancestor.
+- **`SetForegroundWindow` is refused** unless the caller sent the last input.
+  A zero-length `SendInput` mouse move before the call is enough. Raising a
+  Store app's frame still leaves the keyboard elsewhere; UI Automation
+  `SetFocus` on the first keyboard-focusable descendant is the fix, and it is
+  the one step not yet proved by hand.
+- **`mouseData` is a DWORD** and PowerShell will not convert a negative int to
+  `UInt32`. Reinterpret the bytes; do not cast. Scroll down and scroll left
+  both failed on this before.
+- **The report is a family, not a copy.** `reportFamily.ts` parameterises
+  `BrowserReport`, `BrowserPanel`, the rail entry and `useBrowserPreview` by
+  family (`browser` | `computer`), so both capabilities share one box, one
+  panel, one hook. The rail keys entries as `<family>:<conversation>`.
+- **The sign is a second window.** `computer_indicator_show/hide/stop` in
+  `lib.rs`; label `computer-indicator` (in the capabilities file); the client
+  renders `ComputerIndicatorWindow` for `?indicator=computer`;
+  `useComputerIndicator` on `ChatPage` shows it while the running turn holds a
+  computer call and answers its Stop. No border, no resize.
+- **Still open:** models calling `studio_computer_*` names without `discover`
+  get Pi's "not found". Either open-schema stub entries for the system servers
+  or firmer prose in the capability inventory; not decided.

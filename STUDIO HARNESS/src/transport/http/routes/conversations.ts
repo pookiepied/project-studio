@@ -68,6 +68,14 @@ export interface ConversationRoutesOptions {
   readonly browser?: {
     stop(conversationId: string): Promise<boolean>;
   };
+  /**
+   * The person's stop for a conversation's computer control (ADR 0055 §7):
+   * the driver is ended and anything it held is released. The same shape as
+   * the browser's, for the same reason.
+   */
+  readonly computer?: {
+    stop(conversationId: string): Promise<boolean>;
+  };
 }
 
 /**
@@ -194,6 +202,11 @@ export function createConversationRoutes(
   // from a button, and only one of them is a bug.
   routes.post("/:id/browser/stop", async (context) => {
     const stopped = (await options.browser?.stop(context.req.param("id"))) ?? false;
+    return context.json({ stopped });
+  });
+
+  routes.post("/:id/computer/stop", async (context) => {
+    const stopped = (await options.computer?.stop(context.req.param("id"))) ?? false;
     return context.json({ stopped });
   });
 

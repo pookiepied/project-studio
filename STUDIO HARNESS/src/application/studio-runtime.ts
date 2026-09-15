@@ -24,7 +24,7 @@ import {
 } from "../context/capability-inventory.js";
 import { McpCapabilityCatalog } from "../extend/mcp/capabilities.js";
 import type { McpTool } from "../extend/mcp/capabilities.js";
-import { BROWSER_SERVER_ID, registerBuiltInServers } from "../extend/mcp/builtin.js";
+import { BROWSER_SERVER_ID, COMPUTER_SERVER_ID, registerBuiltInServers } from "../extend/mcp/builtin.js";
 import { createMcpLauncher } from "../extend/mcp/launcher.js";
 import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
@@ -1013,22 +1013,43 @@ export class StudioRuntime implements AgentHost {
    * reached behind a `ready` status. Answers whether a browser was running.
    */
   async stopBrowser(conversationId: string): Promise<boolean> {
-    const record = this.#registry.get(BROWSER_SERVER_ID);
-    if (record === undefined) return false;
-    if (this.#supervisor.status(record.id)?.state !== "ready") return false;
+    const text = await this.#askSystemServer(BROWSER_SERVER_ID, "studio_browser_quit", conversationId);
+    return text.includes("is closed");
+  }
+
+  /**
+   * Ends one conversation's computer control, at the person's request.
+   *
+   * ADR 0055 §7: the pill on screen says the computer is being driven and
+   * offers a stop, and this is that stop - the model's own
+   * `studio_computer_stop`, which releases anything held before the driver
+   * ends. Answers whether a driver was running.
+   */
+  async stopComputer(conversationId: string): Promise<boolean> {
+    const text = await this.#askSystemServer(COMPUTER_SERVER_ID, "studio_computer_stop", conversationId);
+    return text.includes("has stopped");
+  }
+
+  /**
+   * One tool of a system server, called on a conversation's behalf, as text.
+   * A server that is not connected has nothing to end, and this must not
+   * start one to ask: `ensure` is only reached behind a `ready` status.
+   */
+  async #askSystemServer(serverId: string, tool: string, conversationId: string): Promise<string> {
+    const record = this.#registry.get(serverId);
+    if (record === undefined) return "";
+    if (this.#supervisor.status(record.id)?.state !== "ready") return "";
     const connection = await this.#supervisor.ensure(record);
     const result = await connection.request("tools/call", {
-      name: "studio_browser_quit",
+      name: tool,
       arguments: {},
       _meta: { "studio/conversation": conversationId },
     });
-    const text =
-      typeof result === "object" && result !== null && Array.isArray((result as { content?: unknown }).content)
-        ? ((result as { content: { text?: unknown }[] }).content
-            .map((entry) => (typeof entry.text === "string" ? entry.text : ""))
-            .join(" "))
-        : "";
-    return text.includes("is closed");
+    return typeof result === "object" && result !== null && Array.isArray((result as { content?: unknown }).content)
+      ? (result as { content: { text?: unknown }[] }).content
+          .map((entry) => (typeof entry.text === "string" ? entry.text : ""))
+          .join(" ")
+      : "";
   }
 
   /** Whether one conversation runs uncontained. Trusted is per project. */

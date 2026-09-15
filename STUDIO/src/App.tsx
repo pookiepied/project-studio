@@ -5,10 +5,12 @@ import { EASE_OUT, SPLASH } from '@/design/tokens'
 import {
   detachedConversationId,
   diagnosticKind,
+  indicatorKind,
   signalAppReady,
   suppressWebviewChrome,
 } from '@/platform/tauri'
 import { AppShell } from '@/shell/AppShell'
+import { ComputerIndicatorWindow } from '@/shell/ComputerIndicatorWindow'
 import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { DetachedShell } from '@/shell/DetachedShell'
 import { PairingGate } from '@/shell/PairingGate'
@@ -34,6 +36,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
   // this is a fact about which window this is, not state.
   const detached = detachedConversationId()
   const diagnostic = diagnosticKind()
+  const indicator = indicatorKind()
 
   useEffect(() => {
     // Startup contract: the native window stays hidden until the first paint,
@@ -51,6 +54,19 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
   // seam and renders the answer. Mounting `WorkspaceProvider` around a window
   // whose entire subject is that the harness is down would have it reaching
   // for a store that by definition is not there.
+  // The computer indicator stops here for the same reason, and further: it
+  // needs no pairing and no harness, only the theme, because its one action
+  // is a call to the native side. See `ComputerIndicatorWindow`.
+  if (indicator === 'computer') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AppearanceProvider initial={initialAppearance}>
+          <ComputerIndicatorWindow />
+        </AppearanceProvider>
+      </MotionConfig>
+    )
+  }
+
   if (diagnostic !== null) {
     return (
       <MotionConfig reducedMotion="user">

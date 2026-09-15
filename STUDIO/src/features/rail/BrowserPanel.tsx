@@ -3,6 +3,7 @@ import { cn } from '@/lib/cn'
 import { useWorkspace } from '@/stores/workspace'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
+import { familyById, type ReportFamily } from '@/features/chat/transcript/live/reportFamily'
 import type { RailEntry } from '@/stores/rail'
 
 /**
@@ -30,6 +31,10 @@ import type { RailEntry } from '@/stores/rail'
  * attachment reference, usually) and resolve through the same hook the
  * transcript uses, so a picture is either truly present or truly absent —
  * never a broken glyph claiming bytes that are not here.
+ *
+ * The computer's preview (ADR 0055 §7) is this panel under its own family:
+ * the frame is the screen, the place is the window being worked in, and the
+ * stop ends the driver.
  */
 export function BrowserPanel({
   entry,
@@ -43,13 +48,14 @@ export function BrowserPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected =
     entry.steps.find((step) => step.id === (selectedId ?? latest)) ?? null
+  const family = familyById(entry.family)
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-sm font-medium">
-            {entry.title === null || entry.title === '' ? 'No page open' : entry.title}
+            {entry.title === null || entry.title === '' ? family.nowhere : entry.title}
           </span>
           {entry.url === null ? null : (
             // Deliberately not a link. Following it would open the page in the
@@ -60,13 +66,14 @@ export function BrowserPanel({
             </span>
           )}
         </div>
-        <StopBrowser conversationId={entry.conversationId} />
+        <StopBrowser conversationId={entry.conversationId} family={family} />
       </div>
 
       <BrowserFrameView
         conversationId={entry.conversationId}
         step={selected}
         title={entry.title}
+        family={family}
       />
 
       {entry.steps.length === 0 ? null : (
@@ -103,13 +110,13 @@ export function BrowserPanel({
  * was running, "Not running" when there was nothing to stop. Both settle
  * back to the button after a moment, so a second press is possible.
  */
-function StopBrowser({ conversationId }: { conversationId: string }) {
-  const { browser } = useWorkspace()
+function StopBrowser({ conversationId, family }: { conversationId: string; family: ReportFamily }) {
+  const { browser, computer } = useWorkspace()
   const [state, setState] = useState<'idle' | 'busy' | 'stopped' | 'nothing'>('idle')
 
   const stop = async () => {
     setState('busy')
-    const result = await browser.stop(conversationId)
+    const result = await (family.id === 'computer' ? computer : browser).stop(conversationId)
     setState(result.ok && result.value ? 'stopped' : 'nothing')
     setTimeout(() => setState('idle'), 2000)
   }
@@ -126,7 +133,7 @@ function StopBrowser({ conversationId }: { conversationId: string }) {
       type="button"
       onClick={() => void stop()}
       disabled={state === 'busy'}
-      aria-label="Stop browser"
+      aria-label={`Stop ${family.label.toLowerCase()}`}
       className={cn(
         'shrink-0 rounded-md px-1.5 py-0.5 text-micro',
         'text-muted-foreground transition-colors duration-fast',
@@ -171,16 +178,20 @@ function BrowserFrameView({
   conversationId,
   step,
   title,
+  family,
 }: {
   conversationId: string
   step: BrowserStep | null
   title: string | null
+  family: ReportFamily
 }) {
   const frameUrl = useAttachmentFrame(conversationId, step?.frame ?? null)
   if (step === null) {
     return (
       <p className="text-caption text-muted-foreground">
-        The browser has not sent a picture yet.
+        {family.id === 'computer'
+          ? 'No picture of the screen yet.'
+          : 'The browser has not sent a picture yet.'}
       </p>
     )
   }
@@ -199,11 +210,7 @@ function BrowserFrameView({
     <div className="overflow-hidden rounded-md border border-border bg-background">
       <img
         src={frameUrl}
-        alt={
-          title === null
-            ? 'The page as the browser saw it'
-            : `${title}, as the browser saw it`
-        }
+        alt={title === null ? family.pictureOf : `${title}, ${family.pictureOf}`}
         className="w-full object-contain object-top"
         draggable={false}
       />

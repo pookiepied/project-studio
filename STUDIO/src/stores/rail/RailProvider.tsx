@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { Artifact } from '@/domain/artifacts/types'
 import type { BrowserFrame, BrowserStep } from '@/domain/browser/steps'
+import type { ReportFamilyId } from '@/features/chat/transcript/live/reportFamily'
 
 /**
  * The side rail's state.
@@ -87,7 +88,13 @@ export type RailEntry =
        * one keystroke away.
        */
       readonly kind: 'browser'
-      /** `browser:<conversation id>` - one per conversation, keyed by it. */
+      /**
+       * Which capability this is a report of. The computer's report (ADR
+       * 0055 §7) is the same entry - a picture and a sequence - under its own
+       * family, and its own tab: a conversation may drive both at once.
+       */
+      readonly family: ReportFamilyId
+      /** `browser:<conversation id>` or `computer:<conversation id>` - one per conversation and family. */
       readonly id: string
       readonly conversationId: string
       readonly conversationTitle: string
@@ -115,9 +122,9 @@ export function jobsEntryId(conversationId: string): string {
   return `jobs:${conversationId}`
 }
 
-/** The id of a conversation's browser preview. Keyed the same way. */
-function browserEntryId(conversationId: string): string {
-  return `browser:${conversationId}`
+/** The id of a conversation's browser or computer preview. Keyed the same way. */
+function reportEntryId(family: ReportFamilyId, conversationId: string): string {
+  return `${family}:${conversationId}`
 }
 
 /**
@@ -203,6 +210,7 @@ interface RailValue {
     conversationId: string,
     conversationTitle: string,
     report: {
+      readonly family: ReportFamilyId
       readonly url: string | null
       readonly title: string | null
       readonly frame: BrowserFrame | null
@@ -305,11 +313,12 @@ export function RailProvider({ children }: { children: ReactNode }) {
 
   const showBrowser = useCallback<RailValue['showBrowser']>(
     (conversationId, conversationTitle, report) => {
-      const id = browserEntryId(conversationId)
+      const id = reportEntryId(report.family, conversationId)
       setEntries((current) => {
         const existing = current.find((entry) => entry.id === id)
         const next: RailEntry = {
           kind: 'browser',
+          family: report.family,
           id,
           conversationId,
           conversationTitle,

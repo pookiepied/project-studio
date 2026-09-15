@@ -32,7 +32,18 @@ Brief: The person handed over a thirty-tool list from a computer-use MCP server 
 
 - `documentation/work/computer-use-plan.md`, `documentation/decisions/0055-the-desktop-is-driven-by-what-windows-already-has.md`.
 
+### Amendment, later on 2026-09-15: the target rule, the report and the sign
+
+- **Driver (`driver.ps1`):** a single *target* window (last opened, focused, read or clicked); `type`/`key`/`hold_key` refuse with no target or when another window is in front, naming both and confirming nothing was sent; `read_ui` never reads "whatever is in front" and returns the handle it read; `open` waits for the new window, focuses it and returns its handle; `focus` sends a no-op input before `SetForegroundWindow`, retries once, then sets UI Automation focus inside the window; the foreground/target comparison accepts a Store app's `CoreWindow` child; `mouseData` is reinterpreted as a DWORD so scroll down/left work.
+- **Server (`tools.ts`):** `open`, `focus`, `read_ui` answer with `"Title" (window N)` so the client can read the place; descriptions say what is refused and why.
+- **Stop route:** `POST /conversations/:id/computer/stop` (harness), `stopConversationComputer` (client), `workspace.computer.stop`, and `studio-runtime.stopComputer` alongside `stopBrowser`.
+- **Client report family (`reportFamily.ts`, `computerCall.ts`):** `BrowserReport`, `BrowserCard`, `BrowserPanel`, the rail entry (`<family>:<conversation>`) and `useBrowserPreview` are parameterised by family, so the computer gets the same transcript box (newest screenshot first) and its own *Computer* rail tab with Stop.
+- **The sign (`lib.rs`, `ComputerIndicatorWindow.tsx`, `useComputerIndicator.ts`):** a frameless, transparent, always-on-top, unfocused `computer-indicator` window at the top centre of the primary display, painting only "Studio is using your computer" and Stop; shown while the running turn holds a computer call; Stop travels through the native side to the owning window, which stops the driver and aborts the run. No coloured border and no resizing of the app, by decision.
+- **Tests:** `computerCall.test.ts`, `useComputerIndicator.test.tsx`, a computer-family case in `BrowserPanel.test.tsx` and `RailProvider.test.tsx`, two cases for the stop route.
+
 ## Issues Found
+
+- **The first input run typed into the person's own Notepad window.** The model opened Notepad, read "the window in front", and by the time it typed the person's window was in front. The text was harmless. The target rule above is the fix; ADR 0055 §7 records it. The person's Notepad content included two credentials, which were seen once and are not repeated anywhere; the person has been advised to rotate them.
 
 - **Windows Defender (AMSI) blocked the first driver outright** as "malicious content". Bisected to the JPEG `EncoderParameters` quality block, a classic spyware signature; saving JPEG at default quality passes. Recorded in ADR 0055 §6 with the durable fix (a compiled helper shipped with the Tauri app) and its trigger.
 - `$pid` is a reserved PowerShell variable; the first draft assigned it. Renamed.
@@ -43,7 +54,9 @@ Brief: The person handed over a thirty-tool list from a computer-use MCP server 
 
 Built and proved over the real wire on this machine: handshake, 23-tool list, `displays` (two monitors with offsets), `cursor`, `screenshot` and `zoom` with correct frame lines, `apps`, `windows`, `read_ui` of the Studio window (26 stamped controls with centres), a stale ref refused with the remedy, bad input refused before any driver exists, clipboard read, and `stop` idempotent. No PowerShell is started by connecting, discovering or listing.
 
-Not proved: anything that moves the pointer or presses a key (`move`, `click`, `drag`, `scroll`, `type`, `key`, `hold_key`, `open`, `focus`, `act`, `set_value`, `select_text`). Those wait for the handed-over machine, together with the browser's in-app hand-check.
+Later the same day, by hand over the driver on this machine: refusals for `read_ui`/`type`/`key` with no target; `open Calculator` with the new handle; `read_ui` by handle; `act invoke` 7 + 8 = reads "Display is 15"; `scroll` down and left; `screenshot` 1280x720. Client type-check and the full client suite pass (the known highlighter test passes alone). Rust `cargo check` passes.
+
+Not yet proved: typing into a Store app after `focus` (the UI Automation focus step), and the in-app hand-check of the report box, the *Computer* rail tab and the pill. Those wait for the person to hand the machine back, and are run only against a window the driver itself opened.
 
 ## Notes
 

@@ -239,6 +239,13 @@ a modern-only client connects to almost nothing published today. `C-15` and `C-1
 Phase 12 and the connector work inherit the same three layers. Only the first one differs, and
 only because a skill grants no authority.
 
+Two servers are bundled with Studio and announced as its own rather than as extensions: the
+browser (ADR 0049) and the computer (ADR 0055). On 2026-09-15 the computer's first input run
+typed into the person's own window, and ADR 0055 §7 now fixes the rule: the driver never acts
+on a window it did not open, focus, read or click, the person sees every screenshot in the
+transcript and a rail tab, and a small always-on-top pill says "Studio is using your computer"
+while a turn drives it. Consent for the screen under Full Auto remains open.
+
 ### Phase 12: Skills
 
 Add application-owned and workspace-discovered skills, validation, catalog metadata, and agent

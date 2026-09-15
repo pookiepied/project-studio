@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Icons } from '@/components/icons'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 
 import { BrowserCard } from './BrowserCard'
-import { browserStepOf, readBrowserCall, type BrowserStep } from './browserCall'
+import type { BrowserStep } from './browserCall'
+import { BROWSER_FAMILY, type ReportFamily } from './reportFamily'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 
 /**
@@ -22,27 +22,33 @@ import type { ToolCallView } from '@/features/chat/transcript/projection'
  * frame. Non-browser calls in the same segment keep their ordinary rows and
  * are not this component's business.
  *
- * The steps are `browserStepOf`'s output, the same mapping the rail's step
- * list renders; the box and the panel are two sizes of one report, not two
- * readings of the log.
+ * The steps are the family's `stepOf` output, the same mapping the rail's
+ * step list renders; the box and the panel are two sizes of one report, not
+ * two readings of the log.
+ *
+ * The computer's calls (ADR 0055 §7) are the same report under another
+ * family: the newest frame of the screen on top, each act a step beneath.
  */
 export function BrowserReport({
   calls,
   live,
   conversationId,
+  family = BROWSER_FAMILY,
 }: {
   calls: readonly ToolCallView[]
   /** This turn is being written now: a call without its answer shimmers. */
   live: boolean
   /** The conversation the calls ran in, which keys their attachments. */
   conversationId: string
+  /** Which capability this is a report of. The browser unless said. */
+  family?: ReportFamily
 }) {
   // Paired, not parallel: a step and the call it came from travel together,
   // so the expanding row never has to trust that two filtered arrays still
   // line up by index.
   const steps: readonly { readonly call: ToolCallView; readonly step: BrowserStep }[] = calls
     .map((call) => {
-      const step = browserStepOf(call)
+      const step = family.stepOf(call)
       return step === null ? null : { call, step }
     })
     .filter((entry): entry is { call: ToolCallView; step: BrowserStep } => entry !== null)
@@ -62,8 +68,8 @@ export function BrowserReport({
   return (
     <div className="my-1 flex flex-col gap-2 rounded-md border border-border p-2.5">
       <div className="flex min-w-0 items-center gap-1.5">
-        <Icons.browserUse size="sm" className="shrink-0 text-muted-foreground" />
-        <span className="shrink-0 text-caption font-medium">Browser</span>
+        <family.Mark size="sm" className="shrink-0 text-muted-foreground" />
+        <span className="shrink-0 text-caption font-medium">{family.label}</span>
         {running ? (
           <span className="studio-shimmer inline-block whitespace-nowrap text-caption text-muted-foreground">
             working
@@ -73,13 +79,18 @@ export function BrowserReport({
             {steps.length === 1 ? '1 step' : `${steps.length} steps`}
           </span>
         )}
-        {latestUrl === null ? null : (
+        {latestUrl !== null ? (
           // Not a link, as on every browser surface: the person is watching a
           // model browse, not being handed the page to browse themselves.
           <span className="studio-selectable min-w-0 truncate font-mono text-caption text-muted-foreground">
             {latestUrl}
           </span>
-        )}
+        ) : latestTitle !== null && family.id === 'computer' ? (
+          // The computer has no URL; the window it is working in is its place.
+          <span className="studio-selectable min-w-0 truncate text-caption text-muted-foreground">
+            {latestTitle}
+          </span>
+        ) : null}
       </div>
 
       {/* No frame URL is no image element - an attachment still being fetched
@@ -90,11 +101,7 @@ export function BrowserReport({
         <div className="overflow-hidden rounded-md border border-border bg-background">
           <img
             src={frameUrl}
-            alt={
-              latestTitle === null
-                ? 'The page as the browser saw it'
-                : `${latestTitle}, as the browser saw it`
-            }
+            alt={latestTitle === null ? family.pictureOf : `${latestTitle}, ${family.pictureOf}`}
             className="max-h-[24rem] w-full object-contain object-top"
             draggable={false}
           />
@@ -111,6 +118,7 @@ export function BrowserReport({
               entry={entry}
               ordinal={index + 1}
               conversationId={conversationId}
+              family={family}
             />
           ))}
         </ol>
@@ -132,16 +140,18 @@ function BrowserStepRow({
   entry,
   ordinal,
   conversationId,
+  family,
 }: {
   entry: { readonly call: ToolCallView; readonly step: BrowserStep }
   ordinal: number
   conversationId: string
+  family: ReportFamily
 }) {
   const { call, step } = entry
   const [open, setOpen] = useState(false)
   const view =
     call.output !== null && call.output.present
-      ? readBrowserCall(call.toolName, call.output.value, call.errorText)
+      ? family.read(call.toolName, call.output.value, call.errorText)
       : null
   return (
     <li>
@@ -167,7 +177,7 @@ function BrowserStepRow({
       >
         {view === null ? null : (
           <div className="pt-1">
-            <BrowserCard call={view} conversationId={conversationId} />
+            <BrowserCard call={view} conversationId={conversationId} family={family} />
           </div>
         )}
       </DisclosureRow>

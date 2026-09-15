@@ -21,6 +21,7 @@ import { JobsPill, useBackgroundJobs } from '@/features/jobs'
 import { PlanPill, usePlan } from '@/features/plans'
 import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
+import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
 import { GALLERY_CONVERSATION_ID } from '@/domain/conversation/gallery'
 import { contextReport } from '@/domain/turn/context'
 import {
@@ -351,6 +352,10 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // The rail's browser preview follows the conversation without ever taking it
   // over: the entry is kept current, and opening it stays the person's move.
   useBrowserPreview(conversation.id, conversation.title ?? 'Conversation', live.items)
+
+  // The sign on the desktop that Studio is at the keyboard, up for exactly as
+  // long as this turn is driving the computer. Its Stop ends the run here.
+  useComputerIndicator(conversation.id, live.items, running, stopTurn)
 
   return (
     <div className="relative flex h-full flex-col">

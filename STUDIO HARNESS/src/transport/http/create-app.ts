@@ -98,6 +98,8 @@ export interface CreateHttpAppOptions {
   readonly backgroundJobs?: BackgroundJobs;
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
   readonly browser?: { stop(conversationId: string): Promise<boolean> };
+  /** The person's stop for a conversation's computer control (ADR 0055 §7). */
+  readonly computer?: { stop(conversationId: string): Promise<boolean> };
   /**
    * The application database. The conversation routes own the purge of
    * conversation-scoped rows through it; everything else keeps reaching only

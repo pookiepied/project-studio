@@ -18,9 +18,18 @@ export interface ComputerEngineReport {
   readonly summary: string;
 }
 
-/** Where Windows PowerShell 5.1 always is. It ships with Windows and cannot be removed. */
-function windowsPowerShell(): string {
-  const root = process.env["SystemRoot"] ?? "C:\\Windows";
+/**
+ * Where Windows PowerShell 5.1 always is. It ships with Windows and cannot
+ * be removed.
+ *
+ * An absolute path, never the bare name: the computer server is launched by
+ * the harness with the environment ADR 0039 gives a child, which carries no
+ * PATH to resolve a bare name against - measured on 2026-09-15 as `spawn
+ * powershell.exe ENOENT` in the first real turn. `SystemRoot` may be absent
+ * for the same reason, so the default is the one Windows has used since XP.
+ */
+export function windowsPowerShell(): string {
+  const root = process.env["SystemRoot"] ?? process.env["windir"] ?? "C:\\Windows";
   return join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
 

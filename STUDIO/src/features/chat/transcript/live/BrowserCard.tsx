@@ -1,6 +1,7 @@
 import { cn } from '@/lib/cn'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserCallView } from './browserCall'
+import { BROWSER_FAMILY, type ReportFamily } from './reportFamily'
 
 /**
  * A browser call, shown as a report of a browser.
@@ -18,10 +19,13 @@ import type { BrowserCallView } from './browserCall'
 export function BrowserCard({
   call,
   conversationId,
+  family = BROWSER_FAMILY,
 }: {
   call: BrowserCallView
   /** The conversation the call ran in, which keys its attachments. */
   conversationId: string
+  /** Which capability the call belongs to; it words the picture. */
+  family?: ReportFamily
 }) {
   const { frame, url, title, said } = call
   const frameUrl = useAttachmentFrame(conversationId, frame)
@@ -60,11 +64,7 @@ export function BrowserCard({
         >
           <img
             src={frameUrl}
-            alt={
-              title === null
-                ? 'The page as the browser saw it'
-                : `${title}, as the browser saw it`
-            }
+            alt={title === null ? family.pictureOf : `${title}, ${family.pictureOf}`}
             className="w-full object-contain object-top"
             draggable={false}
           />

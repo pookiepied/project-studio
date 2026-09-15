@@ -28,7 +28,9 @@ afterEach(() => {
   db.close();
 });
 
-function build(browser?: { stop(conversationId: string): Promise<boolean> }) {
+type Stopper = { stop(conversationId: string): Promise<boolean> };
+
+function build(browser?: Stopper, computer?: Stopper) {
   const session = createAdmissionSession({ scopes: ALL_ADMISSION_SCOPES });
   const app = new Hono<AdmissionEnv>();
   app.use("*", createAdmissionMiddleware(session.verifier));
@@ -38,6 +40,7 @@ function build(browser?: { stop(conversationId: string): Promise<boolean> }) {
       conversations: { list: () => [] } as unknown as ConversationStore,
       database: db,
       ...(browser === undefined ? {} : { browser }),
+      ...(computer === undefined ? {} : { computer }),
     }),
   );
   return { app, authorization: `Bearer ${session.credential}` };
@@ -68,6 +71,39 @@ describe("stopping a conversation's browser", () => {
       headers: { authorization },
     });
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ stopped: false });
+  });
+});
+
+/**
+ * The computer's stop (ADR 0055 §7) is the same contract at its own path:
+ * the pill on screen presses it, and the pill must be told the truth about
+ * whether anything was driving.
+ */
+describe("stopping a conversation's computer control", () => {
+  it("asks the runtime about that conversation and answers what it said", async () => {
+    const asked: string[] = [];
+    const { app, authorization } = build(undefined, {
+      stop: (conversationId) => {
+        asked.push(conversationId);
+        return Promise.resolve(true);
+      },
+    });
+    const response = await app.request("http://harness.test/api/conversations/cnv_9/computer/stop", {
+      method: "POST",
+      headers: { authorization },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ stopped: true });
+    expect(asked).toEqual(["cnv_9"]);
+  });
+
+  it("says nothing was running when there is no runtime to ask", async () => {
+    const { app, authorization } = build();
+    const response = await app.request("http://harness.test/api/conversations/cnv_9/computer/stop", {
+      method: "POST",
+      headers: { authorization },
+    });
     expect(await response.json()).toEqual({ stopped: false });
   });
 });

@@ -39,6 +39,8 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+[DllImport("user32.dll")] public static extern bool IsChild(IntPtr parent, IntPtr hWnd);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder s, int n);
 [DllImport("user32.dll")] public static extern int GetWindowTextLengthW(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
@@ -62,7 +64,7 @@ function Get-Displays {
       x = $s.Bounds.X; y = $s.Bounds.Y; width = $s.Bounds.Width; height = $s.Bounds.Height
     }
   }
-  return ,$list
+  return $list
 }
 
 function Resolve-Display($index) {
@@ -158,7 +160,11 @@ function Send-Mouse([uint32]$flags, [int]$data) {
   $i = New-Object Studio.Native+INPUT
   $i.type = 0
   $i.u.mi.dwFlags = $flags
-  $i.u.mi.mouseData = [uint32]$data
+  # mouseData is a DWORD that Windows reads as a signed wheel delta, so a
+  # scroll down (-120) is the same 32 bits reinterpreted. `[uint32]-120` is
+  # a conversion, not a reinterpretation, and PowerShell refuses it: measured
+  # on 2026-09-15 as `Cannot convert "-240" to UInt32` on every scroll down.
+  $i.u.mi.mouseData = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$data), 0)
   $arr = [Studio.Native+INPUT[]]@($i)
   $sent = [Studio.Native]::SendInput(1, $arr, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
   if ($sent -ne 1) { throw "Windows refused the mouse input. A window that runs as administrator cannot be driven from here." }
@@ -344,6 +350,12 @@ $script:Enum = [Studio.Native+EnumWindowsProc]{
   return $true
 }
 
+# Lists come back plain and are wrapped with @() where they are consumed.
+# `return ,$list` - the usual trick for keeping an array whole - hands a caller
+# ONE item when the list is empty (the empty array itself), so `@(...)` at the
+# caller counts 1 and `[0].title` is null. Measured on 2026-09-15 as "open"
+# reporting a window called "null" that could not be focused, on a machine
+# with no such window at all.
 function Get-TopWindows($app) {
   $script:Windows = @()
   [void][Studio.Native]::EnumWindows($script:Enum, [IntPtr]::Zero)
@@ -362,7 +374,7 @@ function Get-TopWindows($app) {
     $needle = $app.ToLowerInvariant()
     $list = @($list | Where-Object { $_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*" })
   }
-  return ,@($list)
+  return $list
 }
 
 function Get-Apps {
@@ -372,7 +384,69 @@ function Get-Apps {
     $byName[$w.app].windows += 1
     if ($w.foreground) { $byName[$w.app].foreground = $true }
   }
-  return ,@($byName.Values | Sort-Object { $_.app })
+  return @($byName.Values | Sort-Object { $_.app })
+}
+
+# ---- The target -------------------------------------------------------------
+#
+# Keys and text go to whatever window Windows has in front, and that window is
+# not necessarily the one the model was working in: the person may have
+# clicked somewhere, an app may have raised a dialog, a launch may have landed
+# on another monitor. On 2026-09-15 a read of "the window in front" answered
+# with the person's own Notepad, and the value set through the reference it
+# returned replaced their notes. So the driver keeps a target: the window the
+# model last opened, focused, read, clicked in or acted on. Reading with no
+# handle reads the target, never the foreground; keys and text are refused
+# when the target is not the window in front, or when there is no target yet.
+# A click by coordinate chooses a window the way a person's click does, and
+# becomes the target for the same reason.
+
+$script:Target = [int64]0
+
+function Set-Target($handle) {
+  if ($null -ne $handle -and [int64]$handle -ne 0) { $script:Target = [int64]$handle }
+}
+
+# The top-level window a handle belongs to: what `windows` would list.
+function Root-Of($handle) {
+  $h = [IntPtr][int64]$handle
+  if ($h -eq [IntPtr]::Zero) { return [int64]0 }
+  $root = [Studio.Native]::GetAncestor($h, 2)
+  if ($root -eq [IntPtr]::Zero) { return [int64]$h }
+  return [int64]$root
+}
+
+function Describe-Window($handle) {
+  $t = Get-WindowTitle ([IntPtr][int64]$handle)
+  if ($t -eq "") { return "window $handle" }
+  return "`"$t`" (window $handle)"
+}
+
+# Whether the window in front is the target, counting the target's own
+# children as itself. A Store app (Calculator, Notepad, Settings) keeps its
+# keyboard focus in a CoreWindow parented to the frame window that `windows`
+# lists, so the foreground handle differs from the frame's while the person
+# would say it is the same window. Measured on 2026-09-15 as every key to a
+# freshly opened Calculator being refused as "not the one being worked in".
+function Same-Window($front, $target) {
+  if ($front -eq $target) { return $true }
+  if ($front -eq 0 -or $target -eq 0) { return $false }
+  $f = [IntPtr]$front; $t = [IntPtr]$target
+  if ([Studio.Native]::IsChild($t, $f)) { return $true }
+  return ([int64][Studio.Native]::GetAncestor($f, 2) -eq $target)
+}
+
+# Called before anything that goes to the keyboard focus.
+function Assert-Target($what) {
+  if ($script:Target -eq 0) {
+    throw "Nothing has been chosen to $what into yet. Open or focus a window, read it and focus a control, or click where the input should go, and then $what."
+  }
+  $fg = [int64][Studio.Native]::GetForegroundWindow()
+  if (-not (Same-Window $fg $script:Target)) {
+    $mine = Describe-Window $script:Target
+    $front = if ($fg -eq 0) { "no window" } else { Describe-Window $fg }
+    throw "The window in front is $front, not $mine, which is the one being worked in. Nothing was sent. Focus the window you mean (focus, or open, or a click inside it) before you $what."
+  }
 }
 
 function Focus-Window($handle) {
@@ -388,51 +462,119 @@ function Focus-Window($handle) {
   $attached = $false
   if ($fgThread -ne 0 -and $fgThread -ne $me) { $attached = [Studio.Native]::AttachThreadInput($me, $fgThread, $true) }
   try {
+    # A process is allowed to change the foreground if it sent the last input
+    # event. A zero-length pointer move is an input event that moves nothing,
+    # and it is what turns a refused SetForegroundWindow (measured as
+    # asked=false on 2026-09-15, from a driver whose only prior act was
+    # listing windows) into an accepted one.
+    Send-Mouse 0x0001 0
     $ok = [Studio.Native]::SetForegroundWindow($h)
+    if (-not $ok) { Start-Sleep -Milliseconds 50; $ok = [Studio.Native]::SetForegroundWindow($h) }
   } finally { if ($attached) { [void][Studio.Native]::AttachThreadInput($me, $fgThread, $false) } }
   Start-Sleep -Milliseconds 150
-  return [ordered]@{ focused = ([int64][Studio.Native]::GetForegroundWindow() -eq [int64]$handle); asked = [bool]$ok }
+  # In front is not the same as taking keys. A Store app (Calculator, Notepad,
+  # Settings) is a frame window whose keyboard focus lives in a child
+  # CoreWindow, and raising the frame leaves that child unfocused: measured
+  # on 2026-09-15 as Escape, digits and Alt+F4 accepted and going nowhere.
+  # What a person's click does is put the focus on a control inside; UI
+  # Automation's SetFocus on the first focusable descendant does the same.
+  # Left alone when the focus is already inside the window.
+  try {
+    $rootEl = [System.Windows.Automation.AutomationElement]::FromHandle($h)
+    $focusedNow = [System.Windows.Automation.AutomationElement]::FocusedElement
+    $inside = $false
+    try { $inside = ($null -ne $focusedNow) -and (Same-Window ([int64]$focusedNow.Current.NativeWindowHandle) ([int64]$handle)) } catch {}
+    if (-not $inside) {
+      $cond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::IsKeyboardFocusableProperty, $true)
+      $first = $rootEl.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+      if ($null -ne $first) { $first.SetFocus(); Start-Sleep -Milliseconds 100 }
+    }
+  } catch {}
+  $focused = (Same-Window ([int64][Studio.Native]::GetForegroundWindow()) ([int64]$handle))
+  if ($focused) { Set-Target $handle }
+  return [ordered]@{ focused = $focused; asked = [bool]$ok; handle = [int64]$handle; title = (Get-WindowTitle $h) }
+}
+
+# The window a launch produced: the first visible top-level window that was
+# not there before, waited for up to five seconds. A launch that answered
+# "started" and nothing else left the model to guess which window was its,
+# and guessing is the one thing the target rule exists to end. Named by
+# handle so the model can read it and act in it without ever asking for
+# "the window in front".
+function Wait-NewWindow($before, $hint) {
+  $known = @{}
+  foreach ($w in $before) { $known[[int64]$w.handle] = $true }
+  $deadline = [DateTime]::UtcNow.AddSeconds(5)
+  while ([DateTime]::UtcNow -lt $deadline) {
+    Start-Sleep -Milliseconds 250
+    $now = @(Get-TopWindows $null)
+    $fresh = @($now | Where-Object { -not $known.ContainsKey([int64]$_.handle) -and -not $_.minimized })
+    if ($fresh.Count -eq 0) { continue }
+    if ($null -ne $hint -and $hint -ne "") {
+      $needle = $hint.ToLowerInvariant()
+      $named = @($fresh | Where-Object { $_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*" })
+      if ($named.Count -gt 0) { return $named[0] }
+    }
+    # The biggest new window is the app; a 1x1 helper the same launch made
+    # is not what anybody meant.
+    return ($fresh | Sort-Object { $_.width * $_.height } -Descending)[0]
+  }
+  return $null
 }
 
 function Open-App($app, $path) {
+  $before = @(Get-TopWindows $null)
   if ($null -ne $path -and $path -ne "") {
     $p = Start-Process -FilePath $path -PassThru
-    return [ordered]@{ started = $true; pid = $p.Id; what = $path }
+    $w = Wait-NewWindow $before ([System.IO.Path]::GetFileNameWithoutExtension($path))
+    if ($null -ne $w) { [void](Focus-Window $w.handle); Set-Target $w.handle }
+    return [ordered]@{ started = $true; pid = $p.Id; what = $path; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
   }
   if ($null -eq $app -or $app -eq "") { throw "Say which app to open, or give a path." }
   # Already running with a window: bring it forward rather than start a second.
   $existing = @(Get-TopWindows $app)
   if ($existing.Count -gt 0) {
     $f = Focus-Window $existing[0].handle
-    return [ordered]@{ started = $false; focused = $f.focused; window = $existing[0].title; pid = $existing[0].pid }
+    return [ordered]@{ started = $false; focused = $f.focused; window = $existing[0].title; pid = $existing[0].pid; handle = $existing[0].handle }
   }
   $needle = $app.ToLowerInvariant()
   $starts = @(Get-StartApps | Where-Object { $_.Name.ToLowerInvariant() -eq $needle })
   if ($starts.Count -eq 0) { $starts = @(Get-StartApps | Where-Object { $_.Name.ToLowerInvariant() -like "*$needle*" }) }
   if ($starts.Count -eq 0) { throw "No app called `"$app`" is installed. Names are as they appear in the Start menu." }
   Start-Process -FilePath "explorer.exe" -ArgumentList ("shell:AppsFolder\" + $starts[0].AppID)
-  Start-Sleep -Milliseconds 1500
-  return [ordered]@{ started = $true; what = $starts[0].Name }
+  $w = Wait-NewWindow $before $app
+  if ($null -ne $w) { [void](Focus-Window $w.handle); Set-Target $w.handle }
+  return [ordered]@{ started = $true; what = $starts[0].Name; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
 }
 
 # ---- Accessibility ----------------------------------------------------------
 
 $script:Refs = @{}
+$script:RefsWindow = [int64]0
+
+# The handle a read walks: the one given, else the target. Never the window in
+# front - see the target rule above.
+function Ui-Handle($window) {
+  if ($null -ne $window -and $window -ne "") { return [int64]$window }
+  if ($script:Target -eq 0) { throw "Say which window to read: give a handle from windows, or open or focus a window first. Reading whatever is in front is not done, because that may be the person's own window." }
+  return $script:Target
+}
 
 function Ui-Root($window) {
-  if ($null -ne $window -and $window -ne "") {
-    return [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][int64]$window)
-  }
-  $fg = [Studio.Native]::GetForegroundWindow()
-  if ($fg -eq [IntPtr]::Zero) { throw "No window is in the foreground. Name a window from `windows`." }
-  return [System.Windows.Automation.AutomationElement]::FromHandle($fg)
+  $h = Ui-Handle $window
+  if (-not [Studio.Native]::IsWindowVisible([IntPtr]$h)) { throw "Window $h is no longer on screen. List windows again." }
+  return [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$h)
 }
 
 $Interactive = @("button", "check box", "radio button", "combo box", "edit", "hyperlink", "list item", "menu item", "tab item", "slider", "spinner", "split button", "tree item", "document", "menu bar", "menu", "list", "tab", "tool bar", "data item", "header item")
 
 function Read-Ui($window, $depth, $limit, $all) {
   $script:Refs = @{}
+  $script:RefsWindow = Ui-Handle $window
   $root = Ui-Root $window
+  # Reading a window is choosing it: the refs it hands out belong to it, and
+  # what the model does with them next happens there.
+  Set-Target $script:RefsWindow
   $maxDepth = if ($null -eq $depth -or $depth -eq "") { 12 } else { [int]$depth }
   $maxLines = if ($null -eq $limit -or $limit -eq "") { 400 } else { [int]$limit }
   $everything = ($all -eq $true)
@@ -487,7 +629,7 @@ function Read-Ui($window, $depth, $limit, $all) {
   $title = try { $root.Current.Name } catch { "" }
   $minimized = $false
   try { $minimized = [Studio.Native]::IsIconic([IntPtr]$root.Current.NativeWindowHandle) } catch {}
-  return [ordered]@{ window = $title; minimized = $minimized; outline = ($lines -join "`n") }
+  return [ordered]@{ window = $title; handle = $script:RefsWindow; minimized = $minimized; outline = ($lines -join "`n") }
 }
 
 function Ui-Ref($ref) {
@@ -567,7 +709,7 @@ function Refuse($id, $message) {
   [Console]::Out.Flush()
 }
 
-Answer "ready" ([ordered]@{ displays = (Get-Displays) })
+Answer "ready" ([ordered]@{ displays = @(Get-Displays) })
 
 while ($true) {
   $line = [Console]::In.ReadLine()
@@ -579,19 +721,19 @@ while ($true) {
     $id = $req.id
     $a = $req.args
     switch ($req.op) {
-      "displays" { Answer $id (Get-Displays) }
+      "displays" { Answer $id @(Get-Displays) }
       "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality) }
       "cursor" { Answer $id (Get-Cursor) }
       "move" { Move-Pointer $a.display $a.x $a.y; Answer $id (Get-Cursor) }
-      "click" { Click-At $a.display $a.x $a.y $a.button $a.count $a.modifiers; Answer $id (Get-Cursor) }
-      "drag" { Drag-Pointer $a.display $a.from $a.to; Answer $id (Get-Cursor) }
+      "click" { Click-At $a.display $a.x $a.y $a.button $a.count $a.modifiers; Start-Sleep -Milliseconds 80; Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow())); Answer $id (Get-Cursor) }
+      "drag" { Drag-Pointer $a.display $a.from $a.to; Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow())); Answer $id (Get-Cursor) }
       "button" { Press-Button $(if ($a.button) { $a.button } else { "left" }) $a.action; Answer $id ([ordered]@{ done = $true }) }
       "scroll" { Scroll-At $a.display $a.x $a.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true }) }
-      "type" { Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length }) }
-      "key" { Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true }) }
-      "hold" { Hold-Chord ([string]$a.keys) $a.seconds; Answer $id ([ordered]@{ done = $true }) }
-      "apps" { Answer $id (Get-Apps) }
-      "windows" { Answer $id (Get-TopWindows $a.app) }
+      "type" { Assert-Target "type"; Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length }) }
+      "key" { Assert-Target "press keys"; Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true }) }
+      "hold" { Assert-Target "hold keys"; Hold-Chord ([string]$a.keys) $a.seconds; Answer $id ([ordered]@{ done = $true }) }
+      "apps" { Answer $id @(Get-Apps) }
+      "windows" { Answer $id @(Get-TopWindows $a.app) }
       "open" { Answer $id (Open-App $a.app $a.path) }
       "focus" { Answer $id (Focus-Window $a.window) }
       "read_ui" { Answer $id (Read-Ui $a.window $a.depth $a.limit $a.all) }

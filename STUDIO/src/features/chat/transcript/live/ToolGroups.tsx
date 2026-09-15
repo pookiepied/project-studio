@@ -4,7 +4,7 @@ import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 
-import { browserAction } from './browserCall'
+import { familyOf, REPORT_FAMILIES, type ReportFamily } from './reportFamily'
 import { netOf } from './groupNet'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
@@ -82,19 +82,22 @@ export function ToolGroups({
       break
     }
   }
-  // Two families lift out of the row-per-call rule, each into one object
+  // Three families lift out of the row-per-call rule, each into one object
   // placed where its first call stood. The browser's calls are one story,
   // not a row each (ADR 0049 §7): latest frame on top, every call a step
-  // beneath. The web's calls - a search, a page read - are one piece of
-  // research: three searches fired together are three dots on one card,
+  // beneath - and the computer's calls are the same story of the screen
+  // (ADR 0055 §7). The web's calls - a search, a page read - are one piece
+  // of research: three searches fired together are three dots on one card,
   // not three disclosure rows of prose. Everything else keeps the ordinary
   // rendering, in the wire's order, around them.
   const calls = groups.flatMap((group) => group.calls)
-  const browserCalls = calls.filter((call) => browserAction(call.toolName) !== null)
+  const familyCalls = new Map<ReportFamily, readonly ToolCallView[]>(
+    REPORT_FAMILIES.map((family) => [family, calls.filter((call) => family.action(call.toolName) !== null)]),
+  )
   const webCalls = calls.filter((call) => webKind(call.toolName) !== null)
 
   const rows: ReactNode[] = []
-  let reportPlaced = false
+  const reportPlaced = new Set<ReportFamily>()
   let researchPlaced = false
   for (const group of groups) {
     if (group.file !== null && group.calls.length > 1) {
@@ -109,15 +112,17 @@ export function ToolGroups({
       continue
     }
     for (const call of group.calls) {
-      if (browserAction(call.toolName) !== null) {
-        if (!reportPlaced) {
-          reportPlaced = true
+      const family = familyOf(call.toolName)
+      if (family !== null) {
+        if (!reportPlaced.has(family)) {
+          reportPlaced.add(family)
           rows.push(
             <BrowserReport
-              key={`browser:${call.toolCallId}`}
-              calls={browserCalls}
+              key={`${family.id}:${call.toolCallId}`}
+              calls={familyCalls.get(family) ?? []}
               live={live}
               conversationId={conversationId}
+              family={family}
             />,
           )
         }
