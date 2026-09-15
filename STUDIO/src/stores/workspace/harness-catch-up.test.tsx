@@ -38,6 +38,9 @@ vi.mock('@/platform/harness', async () => {
   return {
     ...actual,
     resolveHarnessAddress: () => resolveHarnessAddress(),
+    // Not starting: the first null is an absence here, as it was before the
+    // store learned to wait through a start (`harness-start.test`).
+    harnessIsStarting: async () => false,
     createHarnessClient: () => client,
     startHarness: vi.fn(async () => false),
   }

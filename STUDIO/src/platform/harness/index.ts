@@ -21,6 +21,7 @@ export {
   httpHarnessStatus,
   startHarness,
   harnessFailureReason,
+  harnessIsStarting,
 } from './connection'
 
 export {

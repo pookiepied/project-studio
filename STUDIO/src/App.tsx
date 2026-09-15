@@ -15,7 +15,7 @@ import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
-import { WorkspaceProvider } from '@/stores/workspace'
+import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
 
 /**
  * The root, and all of the routing there is: a window is either the studio or
@@ -98,16 +98,29 @@ function StudioApp() {
   // the splash by the remount gap.
   const startedAt = useRef(performance.now())
   const [showSplash, setShowSplash] = useState(true)
+  const { storePhase } = useWorkspace()
 
+  // The splash holds until the store has an answer, within a cap.
+  //
+  // The harness is started under it, and on a cold start it is ready a
+  // second or two after the window is. Lifting the splash on the clock alone
+  // showed "the harness is not running" for that second and then the app -
+  // the window arriving twice, the first time wrong. Waiting for the store's
+  // first read means the app arrives once, with the harness already behind
+  // it; it costs nothing on a warm start, where the read is faster than the
+  // splash's own minimum. The cap is for a start that is not going to end:
+  // past it the app comes up and says what it knows.
+  const settled = storePhase.status !== 'loading'
   useEffect(() => {
     // The splash stays for its full entrance even on an instant boot — the
     // mark is interrupted mid-arrival otherwise. Elapsed time is subtracted so
     // a slow mount shortens the wait rather than stacking on top of it.
     const elapsed = performance.now() - startedAt.current
-    const remaining = Math.max(0, SPLASH.minDurationMs - elapsed)
-    const timer = window.setTimeout(() => setShowSplash(false), remaining)
+    const floor = Math.max(0, SPLASH.minDurationMs - elapsed)
+    const ceiling = Math.max(0, SPLASH.minDurationMs + SPLASH.maxHoldMs - elapsed)
+    const timer = window.setTimeout(() => setShowSplash(false), settled ? floor : ceiling)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [settled])
 
   return (
     <>

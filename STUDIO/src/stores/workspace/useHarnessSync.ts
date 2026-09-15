@@ -5,6 +5,7 @@ import type { Project } from '@/domain/projects/types'
 import { detachedConversationId } from '@/platform/tauri'
 import {
   createHarnessClient,
+  harnessIsStarting,
   resolveHarnessAddress,
   startHarness,
   type HarnessClient,
@@ -93,6 +94,14 @@ export function useHarnessSync(): HarnessSync {
       const address = await resolveHarnessAddress()
       if (!liveRef.current) return
       if (address === null) {
+        // A harness still coming up is not absent. The supervisor starts it
+        // at launch and it takes a second or two; read as an absence, every
+        // cold start opened on "the harness is not running" and then jumped
+        // to the app when `harness-started` arrived. The store stays
+        // `loading` through the start - the lifecycle subscription below
+        // re-reads on the start's end, whichever way it ends.
+        if (await harnessIsStarting()) return
+        if (!liveRef.current) return
         // Said differently from a failure: nothing is wrong except absence.
         setStorePhase((current) =>
           current.status === 'loading' ? { status: 'no-harness', error: null } : current,
@@ -192,7 +201,15 @@ export function useHarnessSync(): HarnessSync {
     let unlisten: (() => void) | null = null
     let disposed = false
     void defaultListen((signal) => {
-      if (signal.name === 'harness-starting' || signal.name === 'harness-started') {
+      // A start's end is a reason to read again whichever way it went: a
+      // store holding `loading` through the start has to learn that the
+      // start failed, or it holds forever.
+      if (
+        signal.name === 'harness-starting' ||
+        signal.name === 'harness-started' ||
+        signal.name === 'harness-failed' ||
+        signal.name === 'harness-stopped'
+      ) {
         restartLoad()
       }
     })

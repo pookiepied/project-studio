@@ -308,6 +308,34 @@ export async function startHarness(): Promise<boolean> {
  * a sentence, so the answer is `null` there too, and the remedy remains
  * configuration rather than a start.
  */
+/**
+ * Whether the harness is on its way up.
+ *
+ * The supervisor starts it eagerly at launch, and for the first second or
+ * two of every cold start the answer to "where is the harness" is "not yet"
+ * rather than "nowhere". `resolveHarnessAddress` folds both into `null`,
+ * which is right for a client that needs an address now and wrong for the
+ * store deciding what the window shows: read as an absence, every launch
+ * opened on "the harness is not running" for the length of the start and
+ * then jumped to the app. This is the other half of the answer, so the
+ * store can hold its loading state through a start instead.
+ *
+ * `false` for a harness that is running, stopped, or failed, and for a page
+ * with no supervisor behind it - none of those is a wait.
+ */
+export async function harnessIsStarting(): Promise<boolean> {
+  if (!isTauri()) {
+    const report = await httpHarnessStatus()
+    return report?.state === 'starting'
+  }
+  try {
+    const report = await invoke<HarnessStatusReport>('get_harness_status')
+    return report.state === 'starting'
+  } catch {
+    return false
+  }
+}
+
 export async function harnessFailureReason(): Promise<string | null> {
   if (!isTauri()) {
     const report = await httpHarnessStatus()

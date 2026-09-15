@@ -225,6 +225,15 @@ export const SPLASH = {
   /** Minimum time the splash is on screen, entrance included. */
   minDurationMs: 1800,
   /**
+   * The most the splash will wait for the store beyond its minimum.
+   *
+   * The harness starts under the splash, and the splash holds until the
+   * store has read it, so the app arrives once rather than arriving and then
+   * changing its mind. A start that takes longer than this is a start that
+   * something is wrong with, and the app comes up to say so.
+   */
+  maxHoldMs: 8000,
+  /**
    * The fade that hands the window to the app underneath.
    *
    * Longer than the mark's own exit, so the two are sequenced rather than
