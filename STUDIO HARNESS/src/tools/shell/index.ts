@@ -19,6 +19,7 @@ import { readCommandPrograms } from "./command.js";
 import { programDirectories, shellResource } from "./resolve.js";
 import { createJobsTool } from "./jobs.js";
 import type { BackgroundJobs } from "../../process/background.js";
+import type { MediaJobs } from "../../gateway/media/jobs.js";
 
 export { shellResource } from "./resolve.js";
 
@@ -292,6 +293,14 @@ export interface ShellToolOptions {
    * foreground - a caller that asked not to wait must not be made to wait.
    */
   readonly jobs?: BackgroundJobs;
+  /**
+   * The registry generation jobs are kept in, when this harness has media.
+   *
+   * The jobs tool reads both: one listing, one way to check a job's
+   * progress, one Stop - the conversation's background work in one place,
+   * which is the reason the tool exists twice over.
+   */
+  readonly mediaJobs?: MediaJobs;
 }
 
 function createShellTool(
@@ -576,5 +585,11 @@ function createShellTool(
  */
 export function registerShellTools(gate: CallGate, options: ShellToolOptions = {}): void {
   gate.register(createShellTool(options));
-  if (options.jobs !== undefined) gate.register(createJobsTool(options.jobs));
+  // Registered whenever there are background commands to keep, and covering
+  // the generation registry too when there is one: one tool for the
+  // conversation's background work, whatever kind of waiting it does.
+  if (options.jobs !== undefined) {
+    if (options.mediaJobs === undefined) gate.register(createJobsTool(options.jobs));
+    else gate.register(createJobsTool(options.jobs, options.mediaJobs));
+  }
 }

@@ -142,6 +142,14 @@ function defaultSleep(ms: number): Promise<void> {
 
 export class MediaJobs {
   readonly #jobs = new Map<string, Job>();
+  /**
+   * Who hears that a generation has ended, in the conversation that started
+   * it. The finished-job ping's hook into this registry. Fired from `#end`,
+   * while the job still reads untold - so whoever hears it delivers it - and
+   * silently for a stop, whose `reported` marker precedes the end: whoever
+   * stopped it was the news's only intended reader.
+   */
+  readonly #endListeners = new Set<(conversationId: string) => void>();
   readonly #artifactsDirectory: (conversationId: string) => string;
   readonly #sleep: (ms: number) => Promise<void>;
   readonly #now: () => number;
@@ -189,6 +197,11 @@ export class MediaJobs {
     return statusOf(job);
   }
 
+  /** Registers a listener that hears, with the conversation id, when one of this registry's jobs ends. */
+  onEnded(listener: (conversationId: string) => void): void {
+    this.#endListeners.add(listener);
+  }
+
   /** One job, if it belongs to the asking conversation. */
   get(conversationId: string, id: string): MediaJobStatus | undefined {
     const job = this.#jobs.get(id);
@@ -229,6 +242,10 @@ export class MediaJobs {
   stop(conversationId: string, id: string): boolean {
     const job = this.#jobs.get(id);
     if (job === undefined || job.conversationId !== conversationId) return false;
+    // Marked told before the end, so the announcement the end fires finds
+    // nothing to deliver: a stop is somebody already watching, and the
+    // drained-and-empty answer is how the announcement learns that.
+    job.reported = true;
     if (job.state === "queued" || job.state === "running") {
       this.#end(job, "stopped");
       const polled = job.polled;
@@ -239,7 +256,6 @@ export class MediaJobs {
         });
       }
     }
-    job.reported = true;
     return true;
   }
 
@@ -353,6 +369,11 @@ export class MediaJobs {
     job.state = state;
     job.endedAt = this.#now();
     job.settle();
+    // Fired while the job still reads untold, so whoever hears the news is
+    // the one whose drain delivers it - the same arbiter the tool-result
+    // tail and the next turn's block drain through, and exactly one of the
+    // three tells the model.
+    for (const listener of this.#endListeners) listener(job.conversationId);
   }
 }
 

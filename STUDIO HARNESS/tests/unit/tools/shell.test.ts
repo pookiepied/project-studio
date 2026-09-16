@@ -24,6 +24,7 @@ import { openDatabase, type StudioDatabase } from "../../../src/storage/database
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
 import { BackgroundJobs } from "../../../src/process/background.js";
+import { MediaJobs, type MediaJobStatus } from "../../../src/gateway/media/jobs.js";
 import { readCommandPrograms } from "../../../src/tools/shell/command.js";
 import {
   interpreterCanStart,
@@ -118,7 +119,7 @@ function recordingApprover() {
   };
 }
 
-function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recordingApprover>; jobs?: BackgroundJobs } = {}) {
+function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recordingApprover>; jobs?: BackgroundJobs; mediaJobs?: MediaJobs } = {}) {
   const sandbox = new LocalSandbox(
     createSandboxPolicy({
       workspaceRoot: workspace,
@@ -141,7 +142,10 @@ function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recor
     }),
     sandbox,
   });
-  registerShellTools(instance, options.jobs === undefined ? {} : { jobs: options.jobs });
+  registerShellTools(instance, {
+    ...(options.jobs === undefined ? {} : { jobs: options.jobs }),
+    ...(options.mediaJobs === undefined ? {} : { mediaJobs: options.mediaJobs }),
+  });
   return instance;
 }
 
@@ -829,7 +833,11 @@ describe("command lines running together", () => {
  * The registry's own behaviour is covered in `background-jobs.test.ts`. What
  * is left to this file is the seam: that the flag reaches it, that a
  * composition without one refuses instead of quietly blocking, and that the
- * jobs tool only appears where there is somewhere to keep jobs.
+ * jobs tool only appears where there is somewhere to keep jobs. The jobs
+ * tool's other half - the generation jobs - is here too, because the seam is
+ * the point: one listing, one read, one Stop, whichever kind of waiting the
+ * job does. What the generations' registry does alone is
+ * `media-jobs.test.ts`'s business.
  */
 describe("running a command in the background", () => {
   /**
@@ -882,6 +890,125 @@ describe("running a command in the background", () => {
     });
     expect(jobs.get(SCOPE.conversationId, id)?.state).toBe("stopped");
     await releaseAll(jobs);
+  });
+
+  /**
+   * A generation registry whose jobs the tests can drive without a vendor.
+   * The artifacts directory is local to the workspace, so a DONE job's
+   * writes land where the teardown already removes, and no Studio home is
+   * needed to read this tool.
+   */
+  function generationJobs(): MediaJobs {
+    return new MediaJobs({
+      artifactsDirectory: (conversationId) => join(workspace, "artifacts", conversationId),
+    });
+  }
+
+  function startGeneration(
+    mediaJobs: MediaJobs,
+    shape: "running" | "done",
+    description = "a bicycle rolling downhill",
+  ): MediaJobStatus {
+    return mediaJobs.start({
+      conversationId: SCOPE.conversationId,
+      slot: "videoGeneration",
+      description,
+      modelId: "test-video-2",
+      generation: {
+        shape: "sync",
+        result:
+          shape === "running"
+            ? new Promise(() => {})
+            : Promise.resolve([{ bytes: new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]), mimeType: "video/mp4" }]),
+      },
+    });
+  }
+
+  /** Waits until the one generation of this registry has finished. */
+  async function untilDone(mediaJobs: MediaJobs): Promise<MediaJobStatus> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const job = mediaJobs.list(SCOPE.conversationId)[0];
+      if (job?.state === "done") return job;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error("the generation never finished");
+  }
+
+  it("lists generations beside the commands, in one listing", async () => {
+    const jobs = new BackgroundJobs();
+    const mediaJobs = generationJobs();
+    const instance = gate({ jobs, mediaJobs });
+
+    await run(instance, {
+      command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
+      background: true,
+    });
+    const generation = startGeneration(mediaJobs, "running");
+
+    const listed = String(
+      await instance.call({ name: "native/jobs", input: {}, scope: SCOPE }),
+    ).split("\n");
+    expect(listed).toHaveLength(2);
+    expect(listed[0]).toContain(jobs.list(SCOPE.conversationId)[0]?.id);
+    expect(listed[1]).toContain(generation.id);
+    expect(listed[1]).toContain("generating");
+    expect(listed[1]).toContain("a bicycle rolling downhill");
+
+    mediaJobs.stopAll();
+    await releaseAll(jobs);
+  });
+
+  it("reads a finished generation: how long it took and where its bytes are", async () => {
+    const mediaJobs = generationJobs();
+    const instance = gate({ jobs: new BackgroundJobs(), mediaJobs });
+    const generation = startGeneration(mediaJobs, "done");
+    await untilDone(mediaJobs);
+
+    const answer = String(
+      await instance.call({ name: "native/jobs", input: { id: generation.id }, scope: SCOPE }),
+    );
+    expect(answer).toContain("finished");
+    expect(answer).toContain("Took");
+    // The same Artifact line the finished-job announcement carries, because
+    // the transcript renders it and the model cites it, wherever it read it.
+    expect(answer).toContain(
+      `Artifact: /api/media/artifacts/${SCOPE.conversationId}/${generation.id}-1.mp4 (video/mp4)`,
+    );
+
+    mediaJobs.stopAll();
+  });
+
+  it("stops a generation by its id and answers what it stopped", async () => {
+    const mediaJobs = generationJobs();
+    const instance = gate({ jobs: new BackgroundJobs(), mediaJobs });
+    const generation = startGeneration(mediaJobs, "running");
+
+    const answer = String(
+      await instance.call({
+        name: "native/jobs",
+        input: { id: generation.id, stop: true },
+        scope: SCOPE,
+      }),
+    );
+    expect(answer).toContain("stopped");
+    expect(answer).toContain("Stopped before it finished");
+    expect(mediaJobs.get(SCOPE.conversationId, generation.id)?.state).toBe("stopped");
+
+    mediaJobs.stopAll();
+  });
+
+  it("refuses an unknown id the same way whichever registry it names", async () => {
+    const instance = gate({
+      jobs: new BackgroundJobs(),
+      mediaJobs: generationJobs(),
+    });
+
+    await expect(
+      instance.call({ name: "native/jobs", input: { id: "media_99" }, scope: SCOPE }),
+    ).rejects.toThrow(/no job media_99/);
+    await expect(
+      instance.call({ name: "native/jobs", input: { id: "job_99" }, scope: SCOPE }),
+    ).rejects.toThrow(/no job job_99/);
   });
 
   it("refuses to stop without being told which job", async () => {

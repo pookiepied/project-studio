@@ -116,6 +116,16 @@ export interface StartJobOptions extends Omit<RunProcessOptions, "timeoutMs" | "
  */
 export class BackgroundJobs {
   readonly #jobs = new Map<string, Job>();
+  /**
+   * Who hears that a job has ended, in the conversation where it ended.
+   *
+   * The finished-job ping's hook into this registry, and the only thing the
+   * announcement promises: it fires at the moment the state actually changed -
+   * a child that exited, a start that failed - while the job still reads
+   * untold, so whoever hears it is the one whose drain delivers it. A stop
+   * fires nothing, because a stop is somebody already watching; see `stop`.
+   */
+  readonly #endListeners = new Set<(conversationId: string) => void>();
   #counter = 0;
   /**
    * A tag for this runtime, so an id cannot mean two things.
@@ -177,8 +187,12 @@ export class BackgroundJobs {
     child.stderr.on("data", take);
 
     child.on("error", (cause: Error) => {
+      const wasRunning = job.state === "running";
       job.state = "failed";
       job.error = cause.message;
+      // A genuine transition, not a confirmation: the job that never started
+      // is news the same way an exit is, and the listeners hear it here.
+      if (wasRunning) this.#announceEnd(job.conversationId);
     });
 
     child.on("close", (code) => {
@@ -188,11 +202,21 @@ export class BackgroundJobs {
       if (job.state === "running") {
         job.state = "exited";
         job.exitCode = code ?? 1;
+        this.#announceEnd(job.conversationId);
       }
       job.endedAt ??= Date.now();
     });
 
     return statusOf(job);
+  }
+
+  /** Registers a listener that hears, with the conversation id, when one of this registry's jobs ends. */
+  onEnded(listener: (conversationId: string) => void): void {
+    this.#endListeners.add(listener);
+  }
+
+  #announceEnd(conversationId: string): void {
+    for (const listener of this.#endListeners) listener(conversationId);
   }
 
   /** One job, if it belongs to the asking conversation. */
@@ -226,7 +250,9 @@ export class BackgroundJobs {
       job.kill();
     }
     // A stop is somebody already watching, so there is nothing left to tell
-    // them about this one ending.
+    // them about this one ending. No announcement fires either: the close
+    // that follows finds the job already ended, and whoever stopped it was
+    // the news's only intended reader.
     job.reported = true;
     return true;
   }

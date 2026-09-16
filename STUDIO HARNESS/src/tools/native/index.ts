@@ -9,6 +9,7 @@ import type { CallGate } from "../gate.js";
 import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
 import type { ImageBudget } from "../filesystem/image-budget.js";
 import type { BackgroundJobs } from "../../process/background.js";
+import type { MediaJobs } from "../../gateway/media/jobs.js";
 import { registerAskTools, type AskToolRegistration } from "../ask/index.js";
 import { registerDiscoverTools, type DiscoverToolRegistration } from "../discover/index.js";
 import { registerPlanTools, type PlanToolRegistration } from "../plan/index.js";
@@ -49,6 +50,18 @@ export interface NativeToolRegistrationOptions {
    * says so when one is asked for.
    */
   readonly jobs?: BackgroundJobs;
+  /**
+   * Where generation jobs are kept, for the jobs tool that reads them.
+   *
+   * Passed beside `media` because the two read it at different depths: the
+   * generation tools dispatch through the service, and the jobs tool reads
+   * the registry - listing, progress, Stop - exactly as it reads the
+   * commands' registry beside it. Carried separately rather than pulled
+   * through the service, because a service built without a registry answers
+   * by throwing, and the tool's question is "is there one", not "what did
+   * you do without one".
+   */
+  readonly mediaJobs?: MediaJobs;
   /** The generation tools; absent in a harness built without media. */
   readonly media?: MediaToolRegistration;
   /**
@@ -112,7 +125,10 @@ export function registerNativeTools(
   );
   registerSearchTools(gate);
   registerGitTools(gate);
-  registerShellTools(gate, options.jobs === undefined ? {} : { jobs: options.jobs });
+  registerShellTools(gate, {
+    ...(options.jobs === undefined ? {} : { jobs: options.jobs }),
+    ...(options.mediaJobs === undefined ? {} : { mediaJobs: options.mediaJobs }),
+  });
   registerDiscoverTools(gate, options.discover);
   if (options.ask !== undefined) {
     registerAskTools(gate, options.ask);

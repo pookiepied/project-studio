@@ -72,7 +72,8 @@ import { ToolError } from "../tools/errors.js";
 import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
-import { BackgroundJobs, finishedNotice } from "../process/background.js";
+import { BackgroundJobs, finishedNotice, type JobStatus } from "../process/background.js";
+import { JobPings } from "../process/job-pings.js";
 import { MediaService } from "../gateway/media/service.js";
 import type { MediaJobs } from "../gateway/media/jobs.js";
 import type { MediaAdapters } from "../gateway/media/adapters/types.js";
@@ -123,6 +124,20 @@ export interface StudioRuntimeOptions {
    */
   readonly mediaJobs?: MediaJobs;
   readonly mediaAdapters?: MediaAdapters;
+  /**
+   * Where a finished job's news goes: one conversation, one message.
+   *
+   * The composition root binds this to the conversation's own agent
+   * (Flue's dispatch, a signal delivery), and that is the whole of the
+   * wiring: the registries announce an ending, this port carries it. Without
+   * the port the pings never exist at all - no hub, no announcements, no
+   * drains - because a mechanism that collected the endings and had nowhere
+   * to put them would swallow exactly the news the other two delivery points
+   * (the tool-result tail, the next turn's block) exist to carry. Optional
+   * for the same reason the media surfaces are: a composition without it
+   * simply does not wake anybody, rather than pretending to.
+   */
+  readonly deliverJobPing?: (conversationId: string, body: string) => Promise<void>;
   // There was a `mode?: () => ExecutionMode` here, and nothing passed it: the
   // mode was a process-wide callback with no writer, so every conversation ran
   // Manual forever. It is gone rather than kept as dead surface. The mode is a
@@ -243,6 +258,28 @@ function modelToolResult(value: unknown, notice?: string): ModelToolResult {
 function joinNotices(...notices: readonly (string | undefined)[]): string | undefined {
   const present = notices.filter((notice): notice is string => notice !== undefined);
   return present.length === 0 ? undefined : present.join("\n\n");
+}
+
+/**
+ * One ended command, as a line the model reads.
+ *
+ * Tenseless on purpose, because two delivery points use it: the next turn's
+ * environment block, where the ending may be hours old, and the finished-job
+ * announcement, where it is seconds old. Both drain the same registry, so
+ * only one of them ever carries the line - which is exactly why the line
+ * itself must be the same in both, and why the wording lives here rather
+ * than at either call site.
+ */
+function shellEndedLine(job: JobStatus): string {
+  const how =
+    job.state === "stopped"
+      ? "was stopped"
+      : job.state === "failed"
+        ? "never started"
+        : job.exitCode === 0
+          ? "finished"
+          : `exited ${job.exitCode ?? "?"}`;
+  return `${job.id} ${how}: ${job.command}`;
 }
 
 function sessionEnvironment(sandbox: LocalSandbox): Sandbox {
@@ -601,6 +638,15 @@ export class StudioRuntime implements AgentHost {
    * registered.
    */
   readonly #media: MediaService | undefined;
+  /**
+   * The generation jobs, as the options carried them in - the registry
+   * itself, kept beside the service that wraps it because the two read it at
+   * different layers: the service hands it to the generation tools, and the
+   * finished-job announcement registers on it right here, where the
+   * conversation index that guards the delivery lives. It is undefined
+   * exactly when `#media` is - the one option decides both.
+   */
+  readonly #mediaJobs: MediaJobs | undefined;
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -615,6 +661,7 @@ export class StudioRuntime implements AgentHost {
     this.#sessionId = options.sessionId ?? "standalone";
 
     this.#db = options.database;
+    this.#mediaJobs = options.mediaJobs;
     this.#media =
       options.mediaJobs === undefined
         ? undefined
@@ -740,6 +787,49 @@ export class StudioRuntime implements AgentHost {
       projectId: this.#projectId,
       conversationProject: (conversationId) => this.#conversationProject(conversationId),
     });
+
+    // The finished-job announcements, wired once: both registries - the
+    // commands above, the generations when this harness has them - call the
+    // one hub, and the hub's drain is what decides who tells the model. The
+    // sources speak the same lines the environment block would have, because
+    // whichever of the two delivery points wins, the model reads one
+    // vocabulary for the same fact. Built only when this composition has
+    // somewhere to deliver, and held by the listeners it registers - a hub
+    // nobody hears is a hub nobody needs, and the promise it keeps is
+    // registered once per process, not once per run: a job outlives the turn
+    // that started it, and so does the promise to tell the model when it ends.
+    if (options.deliverJobPing !== undefined) {
+      const deliverJobPing = options.deliverJobPing;
+      const pings = new JobPings({
+        deliver: deliverJobPing,
+        // A job can outlive its conversation row - the purge asks
+        // nothing of the job registries - and a signal delivered there
+        // would resurrect the conversation's agent as an instance
+        // nobody sees. Only a conversation the index still holds gets
+        // its news.
+        exists: (conversationId) => this.#conversations.get(conversationId) !== undefined,
+        onFailure: (reason) =>
+          this.#logger?.warn(
+            `A finished background job could not be told to its conversation: ` +
+              `${reason instanceof Error ? reason.message : String(reason)}`,
+          ),
+      });
+      pings.addSource({
+        drain: (conversationId) =>
+          this.#jobs.drainFinished(conversationId).map((job) => shellEndedLine(job)),
+      });
+      const media = this.#media;
+      if (media !== undefined) {
+        pings.addSource({
+          // The ended lines, drained - the running half of the same
+          // builder is the next turn's block's business, not the
+          // announcement's.
+          drain: (conversationId) => mediaJobLines(media, conversationId).ended,
+        });
+        this.#mediaJobs?.onEnded((conversationId) => pings.announce(conversationId));
+      }
+      this.#jobs.onEnded((conversationId) => pings.announce(conversationId));
+    }
   }
 
   /** The MCP administration surface, for the HTTP layer. */
@@ -1055,23 +1145,19 @@ export class StudioRuntime implements AgentHost {
    * are drained, so each is announced once and then stops being mentioned -
    * an exit code repeated on every turn for the rest of a conversation is
    * noise that eventually reads as a job that keeps failing.
+   *
+   * The drained end is also one of two places the end can arrive: when this
+   * harness composes the finished-job announcement, the announcement's own
+   * drain usually wins, and this block then says nothing - the other half of
+   * the exactly-once bargain, and why the ended lines are one wording shared
+   * with it (`shellEndedLine`).
    */
   conversationBackgroundJobs(conversationId: string): readonly string[] {
     const running = this.#jobs
       .list(conversationId)
       .filter((job) => job.state === "running")
       .map((job) => `${job.id} is running: ${job.command}`);
-    const ended = this.#jobs.drainFinished(conversationId).map((job) => {
-      const how =
-        job.state === "stopped"
-          ? "was stopped"
-          : job.state === "failed"
-            ? "never started"
-            : job.exitCode === 0
-              ? "finished"
-              : `exited ${job.exitCode ?? "?"}`;
-      return `${job.id} ${how}: ${job.command}`;
-    });
+    const ended = this.#jobs.drainFinished(conversationId).map((job) => shellEndedLine(job));
     const media =
       this.#media === undefined ? { running: [], ended: [] } : mediaJobLines(this.#media, conversationId);
     return [...running, ...ended, ...media.running, ...media.ended];
@@ -1504,6 +1590,10 @@ export class StudioRuntime implements AgentHost {
       accessLog: this.#accessLogFor(options.conversationId),
       imageBudget: this.#imageBudget,
       jobs: this.#jobs,
+      // The generations join the jobs tool's listing and its Stop: a
+      // conversation's background work, one tool. Present exactly when the
+      // generation tools are, since both come from the one mediaJobs option.
+      ...(this.#mediaJobs === undefined ? {} : { mediaJobs: this.#mediaJobs }),
       ...(this.#media === undefined
         ? {}
         : {

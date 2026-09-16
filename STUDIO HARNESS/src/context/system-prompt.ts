@@ -250,14 +250,15 @@ do not: builds, tests, package managers, long-running processes. Where a
 purpose-built tool does the same job, prefer it - it is safer, it reports
 failure more clearly, and it is easier to follow.
 
-**jobs** - lists the commands this conversation started in the background,
-reads one job's recent output, or stops it. A command that is not meant to
-finish - a dev server, a watcher, a long download - goes through the shell's
-background option and is handled from here afterwards. Run one in the
-foreground instead and the call waits for the whole time limit, then loses
-its output with the failure; launching it into its own window does not
-avoid that, because the wait is on the pipes it inherits and not on the
-process. Stop what you started once you are done with it.
+**jobs** - lists the background work this conversation started, whether that
+was a command or an image or video generation, reads one job's recent output
+or its progress, and stops it. A command that is not meant to finish - a dev
+server, a watcher, a long download - goes through the shell's background
+option and is handled from here afterwards. Run one in the foreground instead
+and the call waits for the whole time limit, then loses its output with the
+failure; launching it into its own window does not avoid that, because the
+wait is on the pipes it inherits and not on the process. Stop what you
+started once you are done with it.
 
 The shell does not write your files. A redirection, sed, or echo that
 writes into a file skips the checks that protect the user's work.
@@ -296,9 +297,12 @@ from the workspace when input_paths are given, and answers with the
 finished image. It waits for the picture, which can take a minute or two.
 
 **studio_video** - starts generating a short video and answers at once
-with a job id. It takes minutes: carry on, and the finished video is
-announced on a later tool result or at the start of your next turn, as an
-Artifact line naming the file. Do not poll for it.
+with a job id. It takes minutes: carry on. The finished video reaches you
+without anyone polling for it - on a later tool result, at the start of
+your next turn, or as its own message even when the user has written
+nothing - as an Artifact line naming the file. When that last one happens,
+answer it: the user sees your reply, not the notification. To learn how a
+running job is doing before then, ask the jobs tool.
 
 Which model paints or films is chosen by the user in Settings; you do not
 choose a vendor. The web and generation tools are the only tools that

@@ -2,18 +2,30 @@ import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
 } from "../../contracts/capabilities.js";
+import type { MediaJobs } from "../../gateway/media/jobs.js";
 import type { BackgroundJobs, JobStatus } from "../../process/background.js";
 import { ToolError } from "../errors.js";
+import { mediaJobDetail, mediaJobSummary } from "../media/index.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 
 /**
- * Reading and ending the commands that were started in the background.
+ * Reading and ending the background work this conversation started: commands
+ * and generations alike.
  *
- * One tool rather than three, because the three things a caller wants to do
- * here - see what is running, read what one has printed, stop it - are the
- * same question asked with more or less of an id. A separate `list`, `output`
- * and `stop` would be three capabilities to approve for what is, in every
- * case, looking at processes this conversation already started.
+ * One tool rather than two, because the things a caller wants here - see what
+ * is running, read how one is doing, stop it - are the same question asked
+ * with more or less of an id, whichever kind of job it is. A generation only
+ * looked like a second tool's business: its job lives in a registry of its
+ * own (`MediaJobs`), but from the outside it is background work this
+ * conversation started, started by a tool that answers with an id, exactly
+ * the way a background command is. Two listings and two read paths for the
+ * same idea would have the model guessing which of them to call.
+ *
+ * Which registry holds a given id is decided by its prefix - commands mint
+ * `job_`, generations mint `media_` - because the ids are the one thing the
+ * two registries already made distinct, and a model that has to remember
+ * which registry owns which id is being handed a mistake to make. An unknown
+ * id is refused the same way either way.
  *
  */
 
@@ -26,12 +38,13 @@ export interface JobsInput {
 
 const JOBS_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "jobs" },
-  title: "Background commands",
+  title: "Background jobs",
   description:
-    "Lists the commands this conversation started in the background, reads " +
-    "one job's recent output, or stops one. Call with no arguments to list " +
-    'them, with {"id": "job_1"} to read that one, and with {"id": "job_1", ' +
-    '"stop": true} to end it. Only the most recent output is kept.',
+    "Lists the background work this conversation started - commands and image or " +
+    "video generations alike -, reads one job's output or progress, or stops it. " +
+    'Call with no arguments to list them, with {"id": "job_1"} or {"id": "media_1"} ' +
+    'to read that one, and with {"id": "job_1", "stop": true} to end it. A command ' +
+    "keeps its most recent output; a generation reports the provider's own progress.",
   inputSchema: {
     type: "object",
     properties: {
@@ -43,9 +56,10 @@ const JOBS_DESCRIPTOR: CapabilityDescriptor = {
   // `read`, the same declaration `plan` and `ask` carry while they too write
   // state. It is what a studio-authored capability with no elevated reach
   // declares here, and the reach is the question: listing and reading touch
-  // nothing, and stopping ends a process this same conversation was already
-  // approved to start. A second approval to end it would leave "leave it
-  // running" as the only unapproved path, which is backwards.
+  // nothing, and stopping ends a process - or cancels a vendor's job - this
+  // same conversation was already approved to start. A second approval to
+  // end it would leave "leave it running" as the only unapproved path, which
+  // is backwards.
   effects: ["read"],
   provenance: NATIVE_PROVENANCE,
   // Listing and reading are; stopping a stopped job is a no-op. Nothing here
@@ -53,7 +67,7 @@ const JOBS_DESCRIPTOR: CapabilityDescriptor = {
   idempotent: true,
 };
 
-/** One job as a person reads it, without its output. */
+/** One command as a person reads it, without its output. */
 function summarize(job: JobStatus): string {
   const state =
     job.state === "running"
@@ -66,7 +80,7 @@ function summarize(job: JobStatus): string {
   return `${job.id}  ${state}  ${job.command}`;
 }
 
-/** One job with its output, which is what a caller asking by id wants. */
+/** One command with its output, which is what a caller asking by id wants. */
 function detail(job: JobStatus): string {
   const lines = [summarize(job), ""];
   if (job.dropped > 0) {
@@ -79,10 +93,50 @@ function detail(job: JobStatus): string {
   return lines.join("\n");
 }
 
-export function createJobsTool(jobs: BackgroundJobs): ToolDefinition<JobsInput, string> {
+/** The unknown-id refusal, worded once because both registries answer it. */
+function noSuchJob(id: string): ToolError {
+  return new ToolError("invalid_input", {
+    message: `There is no job ${id} in this conversation.`,
+  });
+}
+
+/**
+ * The generations' half, for ids minted by the generation tools.
+ *
+ * Split from the commands' half rather than merged with it because the two
+ * registries answer different things at the same call: a command answers with
+ * its output, a generation with its progress, and a shared code path would
+ * need a third parameter to say which answer to produce. Undefined when this
+ * composition has no generation registry, which is the same condition under
+ * which no generation tool exists - so a `media_` id can only arrive when
+ * there is a registry to read, and the answer says so plainly when it is not.
+ */
+function generationAnswer(
+  mediaJobs: MediaJobs | undefined,
+  conversationId: string,
+  id: string,
+  stop: boolean,
+): string {
+  if (mediaJobs === undefined) throw noSuchJob(id);
+
+  if (stop) {
+    if (!mediaJobs.stop(conversationId, id)) throw noSuchJob(id);
+    const stopped = mediaJobs.get(conversationId, id);
+    return stopped === undefined ? `Stopped ${id}.` : mediaJobDetail(stopped);
+  }
+
+  const job = mediaJobs.get(conversationId, id);
+  if (job === undefined) throw noSuchJob(id);
+  return mediaJobDetail(job);
+}
+
+export function createJobsTool(
+  jobs: BackgroundJobs,
+  mediaJobs?: MediaJobs,
+): ToolDefinition<JobsInput, string> {
   return defineStudioTool({
     descriptor: JOBS_DESCRIPTOR,
-    // No resource of its own: the thing being looked at is a process this
+    // No resource of its own: the thing being looked at is work this
     // conversation already started under its own approval.
     resourceKind: "command",
     resource: () => undefined,
@@ -110,31 +164,34 @@ export function createJobsTool(jobs: BackgroundJobs): ToolDefinition<JobsInput, 
       const conversationId = context.scope.conversationId;
 
       if (input.id === undefined) {
-        const running = jobs.list(conversationId);
-        if (running.length === 0) {
-          return "This conversation has started no background commands.";
+        // One listing, both kinds: the commands first, then the generations.
+        // A model looking for a running thing - or the person reading over
+        // its shoulder - scans one list, not two, and the id's own prefix
+        // tells the caller what it is addressing.
+        const listed = [
+          ...jobs.list(conversationId).map((job) => summarize(job)),
+          ...(mediaJobs === undefined ? [] : mediaJobs.list(conversationId).map((job) => mediaJobSummary(job))),
+        ];
+        if (listed.length === 0) {
+          return "This conversation has started no background jobs.";
         }
-        return running.map((job) => summarize(job)).join("\n");
+        return listed.join("\n");
+      }
+
+      if (input.id.startsWith("media_")) {
+        return generationAnswer(mediaJobs, conversationId, input.id, input.stop);
       }
 
       if (input.stop) {
         // Scoped to the conversation, so an id guessed from another one is
         // "no such job" rather than a process somebody else was using.
-        if (!jobs.stop(conversationId, input.id)) {
-          throw new ToolError("invalid_input", {
-            message: `There is no job ${input.id} in this conversation.`,
-          });
-        }
+        if (!jobs.stop(conversationId, input.id)) throw noSuchJob(input.id);
         const stopped = jobs.get(conversationId, input.id);
         return stopped === undefined ? `Stopped ${input.id}.` : detail(stopped);
       }
 
       const job = jobs.get(conversationId, input.id);
-      if (job === undefined) {
-        throw new ToolError("invalid_input", {
-          message: `There is no job ${input.id} in this conversation.`,
-        });
-      }
+      if (job === undefined) throw noSuchJob(input.id);
       return detail(job);
     },
   });

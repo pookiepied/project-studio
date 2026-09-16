@@ -309,3 +309,72 @@ describe("the registry", () => {
     ]);
   });
 });
+
+/**
+ * The end announcements, the finished-job ping's way in.
+ *
+ * The promise is about timing as much as fact: the listener hears the
+ * conversation while the ending still reads untold, so whoever hears it is
+ * the one whose drain delivers it. And a stop - the one ending somebody
+ * chose to watch - tells its announcement nothing: the told-marker precedes
+ * the end, which is how the announcement learns the news was taken, not
+ * missed.
+ */
+describe("the end announcements", () => {
+  it("name the conversation at the moment the ending still reads untold", async () => {
+    const heard: string[] = [];
+    const untoldAtAnnouncement: (string | undefined)[] = [];
+    jobs.onEnded((conversationId) => {
+      heard.push(conversationId);
+      // The announcement's own contract: its drain is what delivers. At the
+      // moment of the announcement the ending must still be there to take.
+      untoldAtAnnouncement.push(jobs.drainFinished(conversationId)[0]?.id);
+    });
+
+    const vendor = scripted([{ state: "done", outputs: [MP4] }]);
+    const started = jobs.start({
+      conversationId: "conv-1",
+      slot: "videoGeneration",
+      description: "x",
+      modelId: "m",
+      generation: { shape: "poll", job: vendor.job },
+    });
+    await jobs.finished("conv-1", started.id);
+
+    expect(heard).toEqual(["conv-1"]);
+    expect(untoldAtAnnouncement).toEqual([started.id]);
+  });
+
+  it("find a stopped job already told", async () => {
+    let untoldAtAnnouncement: number | undefined;
+    jobs.onEnded((conversationId) => {
+      untoldAtAnnouncement = jobs.drainFinished(conversationId).length;
+    });
+
+    let release: (outcome: PollOutcome) => void = () => {};
+    const gate = new Promise<PollOutcome>((resolve) => {
+      release = resolve;
+    });
+    const started = jobs.start({
+      conversationId: "conv-1",
+      slot: "videoGeneration",
+      description: "x",
+      modelId: "m",
+      generation: {
+        shape: "poll",
+        job: { id: "v", poll: () => gate, cancel: async () => undefined },
+      },
+    });
+
+    jobs.stop("conv-1", started.id);
+    // The one #end the stop fired announced an empty drain: the news was
+    // taken, not missed, whoever heard it.
+    expect(untoldAtAnnouncement).toBe(0);
+
+    // The poll's late answer changes neither the state nor the
+    // announcements: a job that already ended once does not end twice.
+    release({ state: "done", outputs: [MP4] });
+    await jobs.finished("conv-1", started.id);
+    expect(untoldAtAnnouncement).toBe(0);
+  });
+});

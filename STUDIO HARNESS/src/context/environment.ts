@@ -442,21 +442,23 @@ function containmentStatement(): readonly string[] {
  * of the block and renders for no other kind.
  */
 /**
- * The background commands, when there are any.
+ * The background work, when there is any.
  *
  * Both the running and the just-ended ones, because the two answer different
  * questions and a model given only one of them asks for the other. A running
  * job is something the turn can use - the dev server is up, so fetch the page.
  * An ended one is news, and it is delivered here exactly once: the caller
  * drains the ended list to build these lines, so the next turn's block carries
- * only what is still true.
+ * only what is still true. Exactly once, because the drain is the arbiter -
+ * when this harness also delivers the finished-job announcement, whichever of
+ * the two drains first tells the model and the other says nothing.
  */
 function backgroundJobsStatement(facts: EnvironmentFacts): readonly string[] {
   if (facts.backgroundJobs === undefined || facts.backgroundJobs.length === 0) return [];
   return [
-    "Background commands you started:",
+    "Background work you started:",
     ...facts.backgroundJobs,
-    "Read output or stop one with the jobs tool.",
+    "The jobs tool reads a command's output, reports a generation's progress, or stops one.",
     "",
   ];
 }

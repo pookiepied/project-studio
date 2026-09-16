@@ -11,6 +11,8 @@
 // reason; module evaluation makes the second import a no-op.
 import "./host/bootstrap.js";
 
+import { dispatch } from "@flue/runtime";
+
 import {
   admissionCredentialFromEnvironment,
 } from "./admission/verifier.js";
@@ -193,6 +195,21 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       sessionId: admission.context.sessionId,
       mediaJobs,
       mediaAdapters,
+      // The finished-job ping's one Flue seam: when a background job ends, its
+      // news is dispatched to the conversation's own agent instance as a
+      // signal - a delivery, not a turn-settings-carrying prompt, so it needs
+      // no admission of its own. Flue wakes an idle conversation with a new
+      // response and hands a busy one the news at its next turn boundary, and
+      // neither the model's answer nor the signal's delivery depends on the
+      // user writing anything. The settings row it reads was settled by the
+      // earlier, human turns; a signal changes none of them. Anything here
+      // failing is logged by the hub and costs one piece of news - the
+      // registries' own exactly-once means it will not be repeated either.
+      deliverJobPing: (conversationId, body) =>
+        dispatch(Studio, {
+          id: conversationId,
+          message: { kind: "signal", type: "studio.jobs.finished", body },
+        }).then(() => undefined),
     });
     studioRuntime = runtime;
     configureStudioRuntime(runtime);

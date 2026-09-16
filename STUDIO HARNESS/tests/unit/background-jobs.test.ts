@@ -306,3 +306,63 @@ describe("the wording of the ending notice", () => {
     expect(notice).not.toContain("done")
   })
 })
+
+/**
+ * The end announcements, the finished-job ping's way in.
+ *
+ * The promise is about timing as much as fact: the listener hears the
+ * conversation while the ending still reads untold, so whoever hears it is
+ * the one whose drain delivers it. A stop announces nothing, because a stop
+ * is somebody already watching - the killed child's close arrives soon after
+ * and finds the ending taken, not missed.
+ */
+describe("the end announcements", () => {
+  it("name the conversation at the moment the ending still reads untold", async () => {
+    jobs = new BackgroundJobs();
+    const heard: string[] = [];
+    const untoldAtAnnouncement: (string | undefined)[] = [];
+    jobs.onEnded((conversationId) => {
+      heard.push(conversationId);
+      // The announcement's own contract: its drain is what delivers. At the
+      // moment of the announcement the ending must still be there to take.
+      untoldAtAnnouncement.push(jobs.drainFinished(conversationId)[0]?.id);
+    });
+
+    const started = jobs.start({
+      executable: NODE,
+      // The shape of `brief`, spelled here because that helper closes over
+      // its own describe.
+      args: ["-e", "console.log('done'); process.exit(0)"],
+      cwd: process.cwd(),
+      command: "node download",
+      conversationId: "cnv_1",
+    });
+    await settles(started.id, (job) => job.state === "exited");
+
+    expect(heard).toEqual(["cnv_1"]);
+    expect(untoldAtAnnouncement).toEqual([started.id]);
+  });
+
+  it("say nothing for a stop, whose news somebody already took", async () => {
+    jobs = new BackgroundJobs();
+    let announcements = 0;
+    jobs.onEnded(() => {
+      announcements += 1;
+    });
+
+    const started = jobs.start({
+      executable: NODE,
+      args: server(),
+      cwd: process.cwd(),
+      command: "node server",
+      conversationId: "cnv_1",
+    });
+    expect(jobs.stop("cnv_1", started.id)).toBe(true);
+    expect(announcements).toBe(0);
+
+    // Then the close arrives, carried by the child that just died. It finds
+    // the job already ended, and no second ending is owed for it.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(announcements).toBe(0);
+  });
+});

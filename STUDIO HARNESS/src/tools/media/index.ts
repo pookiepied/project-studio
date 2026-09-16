@@ -30,8 +30,11 @@ import { defineStudioTool, type ToolContext, type ToolDefinition } from "../type
  * picture - as an image block when the current model accepts images and
  * the conversation's image budget has room, as words otherwise. A video is
  * minutes, so `studio_video` answers at once with the job's id and the
- * turn goes on; the job's end is told the way a background command's is,
- * on the tail of the next tool result or in the next turn's block.
+ * turn goes on; the job's end is told the way a background command's is, on
+ * the tail of the next tool result, in the next turn's block, or - when
+ * nobody writes anything - as the finished-job announcement that wakes the
+ * conversation on its own. Between those, the jobs tool reads this same
+ * registry and answers with the provider's own progress line.
  *
  * ---- What the result says ----------------------------------------------------
  *
@@ -216,6 +219,69 @@ function artifactLine(job: MediaJobStatus, output: MediaJobStatus["outputs"][num
   return `Artifact: /api/media/artifacts/${job.conversationId}/${output.fileName} (${output.mimeType})`;
 }
 
+/** A wait, as words: "45 seconds", "2 minutes 10 seconds". */
+function elapsedWords(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return total === 1 ? "1 second" : `${String(total)} seconds`;
+  const minutes = Math.floor(total / 60);
+  const minutesWord = minutes === 1 ? "1 minute" : `${String(minutes)} minutes`;
+  const seconds = total % 60;
+  return seconds === 0 ? minutesWord : `${minutesWord} ${String(seconds)} seconds`;
+}
+
+/**
+ * One job as the jobs tool lists it, without its answers' details.
+ *
+ * The same column shape the background commands' listing uses, because the
+ * two kinds of job appear in one listing and a second grammar would read as
+ * a second tool. The prompt - not the vendor's word - is what a person, or a
+ * model, recognises the job by.
+ */
+export function mediaJobSummary(job: MediaJobStatus): string {
+  const state =
+    job.state === "queued"
+      ? "queued"
+      : job.state === "running"
+        ? "generating"
+        : job.state === "done"
+          ? "finished"
+          : job.state === "stopped"
+            ? "stopped"
+            : "failed";
+  return `${job.id}  ${state}  ${job.description}`;
+}
+
+/**
+ * One job with what a caller asking by id wants: how far, what the vendor
+ * last said, what came out.
+ *
+ * The provider's own detail leads while the job runs, because "generating"
+ * alone is what the listing already said and the progress line is the only
+ * news a mid-flight check exists for. Finished, the interesting half is the
+ * output - as the same Artifact lines the transcript and the finished-job
+ * announcement carry, so one asking-again read teaches nothing new about
+ * where the file lives. What is deliberately absent: a byte count, a model
+ * id, a started-at clock. The model that asked wants the state of the work,
+ * and the rest of it is the description's job already.
+ */
+export function mediaJobDetail(job: MediaJobStatus): string {
+  const lines = [mediaJobSummary(job), ""];
+  if (job.state === "queued" || job.state === "running") {
+    lines.push(`Started ${elapsedWords(Date.now() - job.startedAt)} ago.`);
+    if (job.detail !== undefined) {
+      lines.push(`The provider last said: ${job.detail}`);
+    }
+  } else if (job.state === "done") {
+    lines.push(`Took ${elapsedWords((job.endedAt ?? job.startedAt) - job.startedAt)}. What it produced:`);
+    for (const output of job.outputs) lines.push(artifactLine(job, output));
+  } else if (job.state === "stopped") {
+    lines.push("Stopped before it finished; nothing is recorded.");
+  } else {
+    lines.push(`The provider said: ${job.error ?? "nothing"}.`);
+  }
+  return lines.join("\n");
+}
+
 function mediaFailure(error: unknown): never {
   if (error instanceof MediaError) {
     throw new ToolError(error.kind === "slot-unset" ? "unavailable" : "execution_failed", {
@@ -361,8 +427,9 @@ function createVideoTool(
         .catch(mediaFailure);
 
       return [
-        `Started video job ${started.id} with ${started.modelId}. It takes minutes; carry on, ` +
-          "and you will be told when it has landed.",
+        `Started video job ${started.id} with ${started.modelId}. It takes minutes; carry on, check ` +
+          "its progress with the jobs tool if it matters, and you will be told when it has landed - " +
+          "even when nobody has written anything. When that happens, tell the user what finished.",
       ].join("\n");
     },
   });
