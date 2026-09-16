@@ -171,6 +171,26 @@ describe("the studio agent's identity and model contracts", () => {
     expect(STUDIO_SOURCE).toContain("useSandbox(");
   });
 
+  it("copies a delivery's pictures through the host, while the delivery is in hand", () => {
+    // The render is the one place a delivery is readable (`useDelivery`) and
+    // the one place that runs before the factory which grants the folder -
+    // so the copy belongs here, and the host member it calls is the harness's
+    // authority over what is written. Both halves are read from the module's
+    // shape, the same way the call-shape assertions above are.
+    expect(STUDIO_SOURCE).toContain("useDelivery()");
+    expect(STUDIO_SOURCE).toContain(
+      "runtime.persistDeliveredAttachments?.(id, delivery.attachments);",
+    );
+  });
+
+  it("names the conversation's kept-picture folders to the environment block", () => {
+    // Neither folder sits inside the workspace, so a model that was not told
+    // of them would never glob its way in; the note is what turns the read
+    // roots granted by the policy into something the model can use.
+    expect(STUDIO_SOURCE).toContain("conversationAttachmentsDirectory(id),");
+    expect(STUDIO_SOURCE).toContain("conversationArtifactsDirectory(id),");
+  });
+
   it("appends the environment block after the static prompt", () => {
     // The order is the cache argument: the static prompt stays
     // byte-identical across conversations so it and the tool array form one

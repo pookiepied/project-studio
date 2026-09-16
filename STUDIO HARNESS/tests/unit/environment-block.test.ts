@@ -447,3 +447,55 @@ describe("the background commands in the block", () => {
     expect(block).toContain("jobs tool")
   })
 })
+
+/**
+ * The two folders this conversation keeps what crosses between the person and
+ * the model in.
+ *
+ * Until the read roots were granted, neither folder was reachable: an
+ * attachment reached the model only as the pixels riding its message, and a
+ * generation's output lived behind a route nobody's file tools could resolve.
+ * The note exists because a root granted but never named is a call spent
+ * discovering it - and it is conditional on the facts, so a composition that
+ * does not name the folders costs exactly what it cost before, byte for byte.
+ */
+describe("the conversation's kept pictures in the block", () => {
+  const day = new Date(2026, 7, 30, 12, 0, 0)
+  const attachments = "/home/pooki/.studio/data/conversations/cnv_1/attachments"
+  const artifacts = "/home/pooki/.studio/data/conversations/cnv_1/artifacts"
+
+  it("names where an upload's copy and a generation's output are read from", () => {
+    const block = environmentBlock(
+      environmentFacts(
+        "/work",
+        day,
+        "conversation",
+        undefined,
+        undefined,
+        "/work/scratch",
+        undefined,
+        attachments,
+        artifacts,
+      ),
+    )
+
+    expect(block).toContain("copied, under its own name, into")
+    expect(block).toContain(attachments)
+    expect(block).toContain("the very file names those lines report, in")
+    expect(block).toContain(artifacts)
+    expect(block).toMatch(/yours to read/)
+  })
+
+  it("says nothing while the folders go unnamed, as every earlier composition did", () => {
+    const before = environmentBlock(environmentFacts("/work", day))
+    // One without the other is the pair's own condition: the statement waits
+    // for both, so a partially supplied facts object halves into silence
+    // rather than a note about one folder and a question about the other.
+    const half = environmentBlock(
+      environmentFacts("/work", day, "conversation", undefined, undefined, undefined, undefined, attachments),
+    )
+
+    expect(before).not.toContain("Two more folders")
+    expect(half).not.toContain("Two more folders")
+  })
+})

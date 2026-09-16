@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,11 @@ import type { SecureCredentialStore } from "../../src/credentials/credential-sto
 import { ConversationStore } from "../../src/conversations/store.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
+import {
+  conversationArtifactsDirectory,
+  conversationAttachmentsDirectory,
+  conversationWorkspaceDirectory,
+} from "../../src/platform/paths.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 /**
@@ -143,5 +148,61 @@ describe("a project conversation under real containment", () => {
       expect(existsSync(denied)).toBe(false);
     },
     120_000,
+  );
+
+  it(
+    "reads what the harness copied beside the conversation, where the workspace's own roots do not reach",
+    async () => {
+      // The folders the model was never granted: an uploaded picture lived
+      // only in Flue's attachment store, and a generation's output only
+      // behind its artifacts route, so neither could be read, and `studio_image`
+      // had no path to be handed. What changed is the read roots; this runs
+      // the harness's own copy, then asks the sandbox for the bytes, the way
+      // the read tool and the image tool both resolve.
+      const state = await harness();
+      state.conversations.record({
+        id: "cnv_pics",
+        firstMessage: "Reimagine this one",
+        permissionMode: "full-auto",
+      });
+
+      // What the render does when a delivery carries pictures - before the
+      // factory that grants the folder has ever run. The copy makes the
+      // attachments directory itself; the factory's own creation of it then
+      // finds it there.
+      state.runtime.persistDeliveredAttachments("cnv_pics", [
+        {
+          data: Buffer.from([0x89, 0x50, 0x0d, 0x0a]).toString("base64"),
+          mimeType: "image/png",
+          filename: "photo.png",
+        },
+      ]);
+
+      const factory = state.runtime.createAgentSandbox({
+        agentId: "studio",
+        conversationId: "cnv_pics",
+        // No project: the conversation stands in its own workspace, and the
+        // two folders that must be readable are its siblings. No trust, so
+        // this is the contained case - the roots are the only way in.
+        projectRoot: conversationWorkspaceDirectory("cnv_pics"),
+      });
+      const env = await factory.createSandbox({ id: "cnv_pics" });
+
+      // What a finished generation does, mid-conversation: the app's own
+      // bytes, filed, after admission had created the tree.
+      const generated = join(conversationArtifactsDirectory("cnv_pics"), "cover.png");
+      writeFileSync(generated, Buffer.from([1, 2, 3]));
+
+      const copied = join(conversationAttachmentsDirectory("cnv_pics"), "photo.png");
+      expect([...(await env.readFileBuffer(copied))]).toEqual([0x89, 0x50, 0x0d, 0x0a]);
+      expect([...(await env.readFileBuffer(generated))]).toEqual([1, 2, 3]);
+
+      // And the boundary holds one step beyond: a stranger folder of the
+      // test's own is still nobody's root here.
+      const stranger = join(state.root, "elsewhere.png");
+      writeFileSync(stranger, Buffer.from([9]));
+      await expect(env.readFileBuffer(stranger)).rejects.toThrow();
+    },
+    60_000,
   );
 });

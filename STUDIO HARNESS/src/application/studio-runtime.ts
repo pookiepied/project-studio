@@ -50,6 +50,10 @@ import { createErrorReporter } from "../observability/error-reporter.js";
 import type { Logger } from "../observability/logger.js";
 import type { QuestionBroker } from "./question-broker.js";
 import {
+  copyDeliveredAttachments,
+  type DeliveredAttachmentImage,
+} from "../conversations/attachments.js";
+import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
   conversationScratchDirectory,
@@ -439,6 +443,21 @@ export interface AgentHost {
    * inventory.
    */
   conversationSkills?(conversationId: string): readonly SkillReference[];
+  /**
+   * Copies one delivery's attached images into the conversation's own
+   * `attachments/` directory, so the run's file tools can read them.
+   *
+   * Called from the render, because that is where the delivery is in hand:
+   * the hook (`useDelivery`) is the model's own access to what it was sent,
+   * and this is the harness's. Nothing returns - the note the render composes
+   * names the directory, not the files, so there is no answer to carry.
+   * Optional so a test double that predates attachment copies still satisfies
+   * the host, like every member here.
+   */
+  persistDeliveredAttachments?(
+    conversationId: string,
+    attachments: readonly DeliveredAttachmentImage[],
+  ): void;
 }
 
 /**
@@ -1059,6 +1078,33 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
+   * Files one delivery's pictures where the conversation's own permission
+   * policy can read them.
+   *
+   * The render calls it once per turn, which is when the delivery is in hand
+   * and when the copies must already exist - the same submission's factory
+   * builds the policy that grants the folder, so a turn's own attachments
+   * have to be on disk before its tools are. What running twice means, and
+   * why it is harmless, is the copy's own contract: `conversations/attachments.ts`.
+   * A failure is logged, never thrown - the pixels ride the message either
+   * way, and a turn that loses its copies loses only the convenience.
+   */
+  persistDeliveredAttachments(
+    conversationId: string,
+    attachments: readonly DeliveredAttachmentImage[],
+  ): void {
+    try {
+      copyDeliveredAttachments(conversationId, attachments);
+    } catch (error) {
+      this.#logger?.warn(
+        `The pictures on this message could not be copied into the conversation's ` +
+          `own folder, so its tools cannot read them: ${conversationId}`,
+        { reason: error instanceof Error ? error.message : String(error) },
+      );
+    }
+  }
+
+  /**
    * The background commands, for the HTTP surface that shows them.
    *
    * Exposed as the registry rather than as a copy of its listing, because the
@@ -1318,13 +1364,28 @@ export class StudioRuntime implements AgentHost {
     // as outside the workspace. In a plain conversation it is a second
     // writable root beside the workspace the run stands in.
     const scratchRoot = conversationScratchDirectory(options.conversationId);
+    // Readable, and readable only. Both are the harness's to write - the
+    // delivery's pictures at submission, the generations' outputs at
+    // completion - and the run's to read, which is the half that used to be
+    // missing: an uploaded image lived outside every read root, so the one
+    // tool that could work on it had no path to reach it through. A second
+    // writer to a folder this application files would be a state nobody can
+    // explain, which is why neither joins the write roots below.
+    const attachmentsRoot = conversationAttachmentsDirectory(options.conversationId);
+    const artifactsRoot = conversationArtifactsDirectory(options.conversationId);
     const policy = createSandboxPolicy({
       workspaceRoot: projectRoot,
       // The scratch root is readable as well as writable, and not only for
       // symmetry: the policy refuses a writable root that sits inside no
       // readable one, because a place you may write and never read back is a
       // place you cannot work in.
-      readRoots: withoutDuplicateRoots([scratchRoot, ...otherFolders, ...roots.readRoots]),
+      readRoots: withoutDuplicateRoots([
+        scratchRoot,
+        attachmentsRoot,
+        artifactsRoot,
+        ...otherFolders,
+        ...roots.readRoots,
+      ]),
       writeRoots: withoutDuplicateRoots([
         projectRoot,
         scratchRoot,

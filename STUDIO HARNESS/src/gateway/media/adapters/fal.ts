@@ -30,7 +30,8 @@ import type {
  *
  * The base URL a connection carries is the queue host,
  * `https://queue.fal.run`; the model id is the path. Input images and first
- * frames travel as data URIs, which FAL takes in `image_url` fields.
+ * frames travel as data URIs, which FAL takes in its `image_url` and
+ * `image_urls` fields.
  */
 
 const AUTHOR: UrlAuthor = "user";
@@ -261,13 +262,23 @@ async function collect(
 }
 
 async function generateImage(input: ImageGenerationInput, endpoint: DriverEndpoint): Promise<Generation> {
+  // Two families of input, checked against the published schemas on
+  // 2026-09-16: the current edits - nano-banana, flux-2, seedream, gpt-image -
+  // require the plural `image_urls`, while the older image-to-image endpoints
+  // require the singular `image_url`, and the singular key went to models
+  // that were not looking for it, which is where "at least one image URL is
+  // required" came from. Neither family forbids extra properties, so both
+  // keys always ride: the plural carries every reference, the singular the
+  // first, and each endpoint reads its own - a singular endpoint handed
+  // several references simply works from the first, the only shape it has.
   const references = input.inputImages ?? [];
+  const first = references[0];
   const body = {
     prompt: input.prompt,
     ...(input.count === undefined ? {} : { num_images: input.count }),
     ...(input.aspectRatio === undefined ? {} : { aspect_ratio: input.aspectRatio }),
-    ...(references.length === 1 ? { image_url: dataUrl(references[0] as MediaBytes) } : {}),
-    ...(references.length > 1 ? { image_urls: references.map(dataUrl) } : {}),
+    ...(references.length === 0 ? {} : { image_urls: references.map(dataUrl) }),
+    ...(first === undefined ? {} : { image_url: dataUrl(first) }),
   };
   return polled(await submit(input.modelId, body, endpoint), endpoint, "image/png");
 }

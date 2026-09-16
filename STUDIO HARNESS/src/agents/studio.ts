@@ -1,10 +1,12 @@
 'use agent';
 
-import { useModel, useSandbox, useSkill, type AgentProps } from "@flue/runtime";
+import { useDelivery, useModel, useSandbox, useSkill, type AgentProps } from "@flue/runtime";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
 import {
+  conversationArtifactsDirectory,
+  conversationAttachmentsDirectory,
   conversationScratchDirectory,
   conversationWorkspaceDirectory,
 } from "../platform/paths.js";
@@ -155,6 +157,16 @@ export function Studio({ id }: AgentProps) {
   // is mounted, so switching the last skill off removes a tool - rare, and
   // Flue's own trade.
   for (const skill of runtime.conversationSkills?.(id) ?? []) useSkill(skill);
+  // The pictures this delivery carries, copied where this conversation's own
+  // policy can read them. `useDelivery` is the access the model itself will
+  // read the message through; this call is the harness's, and the render is
+  // the one place it can happen - the sandbox factory that grants the folder
+  // runs after this and reads no delivery. A `signal` carries no attachments,
+  // and an older test double without the host member copies nothing.
+  const delivery = useDelivery();
+  if (delivery.kind === "user" && delivery.attachments !== undefined) {
+    runtime.persistDeliveredAttachments?.(id, delivery.attachments);
+  }
   // Derived by comparing the two, not assumed from which branch built the
   // path. They are equal for a conversation with no project, and for a
   // project with no folders, and that reports "conversation", which is the
@@ -191,6 +203,13 @@ export function Studio({ id }: AgentProps) {
       // once per turn, here, because assembling the prompt is the one thing a
       // turn does exactly once.
       runtime.conversationBackgroundJobs?.(id),
+      // The folders the person's uploads and the generations' outputs land
+      // in, named for the same reason the scratch directory is: a model that
+      // has not been told reaches for neither. Both are read roots, and
+      // neither is inside the workspace, so nothing this conversation keeps
+      // would ever turn up in a glob of its own.
+      conversationAttachmentsDirectory(id),
+      conversationArtifactsDirectory(id),
     ),
   )}${capabilities}`;
 }

@@ -277,6 +277,10 @@ describe("FAL through the queue", () => {
       prompt: "a sunset",
       num_images: 2,
       image_url: "data:image/png;base64,BQ==",
+      // One reference rides both keys: the singular for the older
+      // image-to-image endpoints, the plural for the edit models that
+      // require it and answered "at least one image URL is required" without.
+      image_urls: ["data:image/png;base64,BQ=="],
     });
 
     expect(await generation.job.poll()).toEqual({ state: "queued", detail: "2 ahead in the queue" });
@@ -290,6 +294,44 @@ describe("FAL through the queue", () => {
     ]);
     // The status was asked with logs on, every time.
     expect(standIn.seen.filter((seen) => seen.path.includes("/status?logs=1"))).toHaveLength(3);
+  });
+
+  it("hands the plural the whole list and the singular the first, whichever the endpoint speaks", async () => {
+    standIn.answers.set(
+      "/fal-ai/flux-2/pro/edit",
+      json({ request_id: "req-edit", status_url: `${host()}/fal-ai/flux-2/pro/edit/requests/req-edit/status` }),
+    );
+    standIn.answers.set(
+      "/fal-ai/flux-2/pro/edit/requests/req-edit/status",
+      json({ status: "COMPLETED" }),
+    );
+    standIn.answers.set(
+      "/fal-ai/flux-2/pro/edit/requests/req-edit",
+      json({ images: [{ url: `${host()}/cdn/c.png`, content_type: "image/png" }] }),
+    );
+    standIn.answers.set("/cdn/c.png", () => ({ status: 200, type: "image/png", body: Buffer.from([3]) }));
+
+    const generation = await falMedia.generateImage?.(
+      {
+        prompt: "blend these two",
+        modelId: "fal-ai/flux-2/pro/edit",
+        inputImages: [
+          { bytes: new Uint8Array([1]), mimeType: "image/png" },
+          { bytes: new Uint8Array([2]), mimeType: "image/jpeg" },
+        ],
+      },
+      endpoint(),
+    );
+    if (generation?.shape !== "poll") throw new Error("expected poll");
+    expect(sentJson(standIn.seen[0])).toEqual({
+      prompt: "blend these two",
+      image_url: "data:image/png;base64,AQ==",
+      image_urls: ["data:image/png;base64,AQ==", "data:image/jpeg;base64,Ag=="],
+    });
+    const done = await generation.job.poll();
+    expect(done.state).toBe("done");
+    if (done.state !== "done") return;
+    expect(done.outputs.map((output) => output.mimeType)).toEqual(["image/png"]);
   });
 
   it("cancels with a PUT to the cancel URL", async () => {

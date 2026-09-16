@@ -108,6 +108,21 @@ export interface EnvironmentFacts {
    */
   readonly scratch?: string;
   /**
+   * The conversation's `attachments/` and `artifacts/` directories, when the
+   * caller names them to the model.
+   *
+   * Every conversation has both - the sandbox factory creates the pair
+   * wherever it creates the workspace - but a block composed without them
+   * stays byte-identical to what it was before this fact existed, the same
+   * deal the background jobs' absence strikes. Present, the note tells the
+   * model where an upload's copy and a generation's output can be read
+   * from: the two things its file tools could not reach at all until the
+   * read roots were granted, because neither folder sits inside the
+   * workspace.
+   */
+  readonly attachmentsDirectory?: string;
+  readonly artifactsDirectory?: string;
+  /**
    * The background commands this conversation has, as lines to render.
    *
    * Present only when there are any, and that condition is the whole design.
@@ -164,6 +179,8 @@ export function environmentFacts(
   projectFolders?: readonly string[],
   scratch?: string,
   backgroundJobs?: readonly string[],
+  attachmentsDirectory?: string,
+  artifactsDirectory?: string,
 ): EnvironmentFacts {
   return {
     workspace,
@@ -180,6 +197,8 @@ export function environmentFacts(
     // caller ever pass the workspace again, dropping it is still the right
     // answer.
     ...(scratch === undefined || scratch === workspace ? {} : { scratch }),
+    ...(attachmentsDirectory === undefined ? {} : { attachmentsDirectory }),
+    ...(artifactsDirectory === undefined ? {} : { artifactsDirectory }),
     ...(backgroundJobs === undefined || backgroundJobs.length === 0
       ? {}
       : { backgroundJobs }),
@@ -455,6 +474,37 @@ function projectFoldersStatement(facts: EnvironmentFacts): readonly string[] {
   ];
 }
 
+/**
+ * The two folders this conversation keeps what crosses between the person
+ * and the model in.
+ *
+ * Added with the read roots that made them reachable, because a root granted
+ * but never named is a call spent discovering it. Before this note an
+ * attachment reached the model only as the pixels riding its message - no
+ * path existed for a tool to be handed, which is why an edit of an uploaded
+ * picture needed the person to copy the file somewhere themselves. The note
+ * is conditional on the facts, not on any conversation: both directories
+ * exist for every conversation, so when they are named at all the lines are
+ * conversation-stable and land in the cached prefix.
+ */
+function conversationFoldersStatement(facts: EnvironmentFacts): readonly string[] {
+  if (facts.attachmentsDirectory === undefined || facts.artifactsDirectory === undefined) {
+    return [];
+  }
+  return [
+    "Two more folders of this conversation's own stand beside the ones above,",
+    "and both are yours to read. What the person attaches to a message is",
+    "also copied, under its own name, into",
+    `${facts.attachmentsDirectory},`,
+    "so a tool can be handed the file rather than the picture. What you",
+    "generate - the image or video an Artifact line names - is kept, under",
+    "the very file names those lines report, in",
+    `${facts.artifactsDirectory}.`,
+    "Both persist with the conversation.",
+    "",
+  ];
+}
+
 function extraRootsStatement(extraRoots: readonly string[] | undefined): readonly string[] {
   if (extraRoots === undefined || extraRoots.length === 0) return [];
   // Paths only, no explanation of how they got there. The block is paid for on
@@ -482,6 +532,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
       : "It is not a git repository.",
     "",
     ...workspaceStatement(facts),
+    ...conversationFoldersStatement(facts),
     ...projectFoldersStatement(facts),
     ...backgroundJobsStatement(facts),
     ...extraRootsStatement(facts.extraRoots),

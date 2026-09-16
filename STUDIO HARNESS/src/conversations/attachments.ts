@@ -1,0 +1,195 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  conversationAttachmentsDirectory,
+  ensureDirectory,
+} from "../platform/paths.js";
+
+/**
+ * A delivered attachment becomes a file the conversation's sandbox can read.
+ *
+ * ---- Why the copy exists ---------------------------------------------------
+ *
+ * The picture a message carries rides as base64 beside its words and reaches
+ * the model as pixels, but it exists nowhere the model's file tools can
+ * reach: the attachment store keys its bytes by digest under Flue's own
+ * journal, and `attachments/` sat outside every read root. So `studio_image`
+ * could edit nothing the person attached - there was no path for the model
+ * to pass - and the workaround was the person copying their own upload into
+ * the workspace by hand.
+ *
+ * The copy closes that gap at the one moment the harness, not the model, can:
+ * each image a delivered message carries is decoded and written under its own
+ * name into the conversation's `attachments/` directory. It is a second of
+ * the same bytes, not a move - the transcript's attachment route serves the
+ * original store, and nothing here reads it. The environment note tells the
+ * model the directory; this module itself is invisible to it.
+ *
+ * ---- Why it is safe to run twice -------------------------------------------
+ *
+ * The render that calls this runs again: a crash-resumed submission derives
+ * the same delivery, and a delivery that joins a live response adds another
+ * call. So the write is idempotent by construction - a free name is written,
+ * a name that already holds these bytes is kept, and because the folder's
+ * state, not the call count, decides, the next render computes the same
+ * answer. A second, different picture under a taken name yields to the next
+ * number (`photo-2.png`, `-3`, ...), which keeps two attachments the
+ * conversation both called `photo.png` keep both.
+ *
+ * ---- What it deliberately does not do --------------------------------------
+ *
+ * It returns nothing and lists nothing: the environment note names the
+ * directory, not the files, and finding one there is the model's one `glob`,
+ * the same way it finds anything in its workspace. It does not fail the turn:
+ * the pixels ride on the message either way, so a copy that cannot happen is
+ * the caller's log line, not a refusal.
+ */
+
+/** The fields of Flue's delivered attachment that a copy is made from. */
+export interface DeliveredAttachmentImage {
+  /** The picture, base64 - a leading `data:` prefix, when one arrives, is accepted. */
+  readonly data: string;
+  readonly mimeType: string;
+  /** The name the person's device gave the file, when one travelled. */
+  readonly filename?: string;
+}
+
+/**
+ * The extension a copy wears when its name cannot supply one, keyed by the
+ * mime the wire declares. The picture mimes here are exactly the ones the
+ * attachment picker lets through, so this answers for every attachment that
+ * reaches this far; anything else falls to `png` below, which the providers
+ * themselves read past a declared type.
+ */
+const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+/** The extension when neither the name nor a known mime answers. */
+const LAST_RESORT_EXTENSION = "png";
+
+/** Filenames past this are cut, extension kept, for contained paths. */
+const MAX_NAME_LENGTH = 120;
+
+/** What a copy's name may be made of: the plain, the spaced, and the dotted. */
+// eslint-disable-next-line no-control-regex -- removing control characters is the point.
+const UNSAFE_IN_A_NAME = /[\u0000-\u001f\u007f<>:"/\\|?*]+/g;
+
+/**
+ * Writes every attachment's copy, creating the directory the way callers here
+ * always have: when it is needed, not speculatively.
+ */
+export function copyDeliveredAttachments(
+  conversationId: string,
+  attachments: readonly DeliveredAttachmentImage[],
+): void {
+  if (attachments.length === 0) return;
+  const directory = ensureDirectory(conversationAttachmentsDirectory(conversationId));
+  for (const [index, attachment] of attachments.entries()) {
+    const bytes = decoded(attachment.data);
+    writeFileSync(vacantPath(directory, nameOf(attachment, index + 1), bytes), bytes);
+  }
+}
+
+/** The next path in the directory that is either free or already these bytes. */
+function vacantPath(directory: string, name: string, bytes: Uint8Array): string {
+  const dot = name.lastIndexOf(".");
+  const stem = dot === -1 ? name : name.slice(0, dot);
+  const extension = dot === -1 ? "" : name.slice(dot);
+  for (let attempt = 0; ; attempt += 1) {
+    const numbered = attempt === 0 ? name : `${stem}-${String(attempt + 1)}${extension}`;
+    const target = join(directory, numbered);
+    const there = readAt(target);
+    if (there === undefined) return target;
+    if (there.length === bytes.length && there.equals(bytes)) return target;
+  }
+}
+
+/** The file at a path, or nothing when there is none to read. */
+function readAt(target: string): Buffer | undefined {
+  try {
+    return readFileSync(target);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The copy's name: the attachment's own, wearing an extension the media tool
+ * understands - its own when it had one, the mime's when it did not, and its
+ * place in the message when it had no name at all.
+ */
+function nameOf(attachment: DeliveredAttachmentImage, sequence: number): string {
+  const extension = extensionOf(attachment);
+  const stem = stemOf(attachment, sequence);
+  return cap(`${stem}.${extension}`, extension);
+}
+
+/** The extension the copy wears, from the name first and the mime second. */
+function extensionOf(attachment: DeliveredAttachmentImage): string {
+  const named = basenameOf(attachment.filename ?? "");
+  const dot = named.lastIndexOf(".");
+  if (dot !== -1) {
+    const candidate = named.slice(dot + 1).toLowerCase();
+    if (isCarriedExtension(candidate)) return candidate;
+  }
+  return EXTENSION_BY_MIME[attachment.mimeType] ?? LAST_RESORT_EXTENSION;
+}
+
+/**
+ * Whether the name's own extension is one the media tool maps to a mime -
+ * the whole point of preferring it. Anything else (`.~`, `.photo`, a triple
+ * dot) is part of the name, and the mime, which the picker sniffed from the
+ * bytes, decides instead.
+ */
+function isCarriedExtension(candidate: string): boolean {
+  return /^[a-z0-9]{1,5}$/.test(candidate) && Object.values(EXTENSION_BY_MIME).includes(candidate);
+}
+
+/**
+ * The part of the name before the extension, cleaned: one directory's worth
+ * of the filename across either platform's separator, control and delimiter
+ * characters out, and the count of the message when there was no name at all
+ * - which is also the fallback when cleaning empties one.
+ */
+function stemOf(attachment: DeliveredAttachmentImage, sequence: number): string {
+  const named = basenameOf(attachment.filename ?? "");
+  const dot = named.lastIndexOf(".");
+  const without =
+    dot !== -1 && isCarriedExtension(named.slice(dot + 1).toLowerCase())
+      ? named.slice(0, dot)
+      : named;
+  // A name that ends its life at a dot would pair it with the extension's own
+  // and read doubled - `photo..png` - so they go with the trim.
+  const cleaned = (without || `attachment-${String(sequence)}`)
+    .replace(UNSAFE_IN_A_NAME, " ")
+    .replace(/\.+$/, "")
+    .trim();
+  return cleaned === "" ? `attachment-${String(sequence)}` : cleaned;
+}
+
+/** The filename's last segment, over either platform's separator, trimmed. */
+function basenameOf(filename: string): string {
+  const slashed = filename.replace(/\\/g, "/");
+  return slashed.slice(slashed.lastIndexOf("/") + 1).trim();
+}
+
+/** The full name cut to the bound, the extension kept, never emptied. */
+function cap(name: string, extension: string): string {
+  if (name.length <= MAX_NAME_LENGTH) return name;
+  return `${name.slice(0, MAX_NAME_LENGTH - extension.length - 1).trim()}.${extension}`;
+}
+
+/** The attachment's bytes, with a leading data-URI prefix tolerated. */
+function decoded(data: string): Uint8Array {
+  const marker = ";base64,";
+  const encoded =
+    data.startsWith("data:") && data.includes(marker)
+      ? data.slice(data.indexOf(marker) + marker.length)
+      : data;
+  return new Uint8Array(Buffer.from(encoded, "base64"));
+}
