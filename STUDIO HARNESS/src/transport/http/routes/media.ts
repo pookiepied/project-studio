@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Hono } from "hono";
@@ -31,13 +31,13 @@ import { conversationArtifactsDirectory } from "../../../platform/paths.js";
  * most, well inside a JSON round trip.
  *
  * The generation half - the jobs the model's image and video tools start -
- * is read here too: the list of a conversation's jobs, a Stop for one, and
- * the bytes of a finished output. The bytes are served from the
- * conversation's artifacts directory by a file name the job registry made,
- * and the name is checked against the shape the registry produces before
- * any path is built, so a request cannot name a file the registry did not
- * write. A finished output never changes, so the response says so and the
- * webview caches it for the session.
+ * is read here too: the list of a conversation's jobs, a Stop for one, the
+ * finished artifacts those jobs left, and the bytes of one of them. The bytes
+ * are served from the conversation's artifacts directory by a file name the
+ * job registry made, and the name is checked against the shape the registry
+ * produces before any path is built, so a request cannot name a file the
+ * registry did not write. A finished output never changes, so the response
+ * says so and the webview caches it for the session.
  */
 
 /** `media_<run tag><counter>-<index>.<extension>` - exactly what `MediaJobs` writes. */
@@ -57,6 +57,11 @@ const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   wav: "audio/wav",
   ogg: "audio/ogg",
 };
+
+/** The type a finished artifact answers as, from the extension its name carries. */
+function mimeTypeOf(fileName: string): string {
+  return MIME_BY_EXTENSION[fileName.slice(fileName.lastIndexOf(".") + 1)] ?? "application/octet-stream";
+}
 
 async function body(context: { req: { json(): Promise<unknown> } }): Promise<unknown> {
   try {
@@ -191,20 +196,55 @@ export function createMediaRoutes(
     }
   });
 
+  /**
+   * What a conversation's generations finished with, by the names their
+   * files carry.
+   *
+   * The jobs route answers only what this process's registry holds, and the
+   * registry is in memory: a generation from before a restart answers here
+   * or nowhere. The files were written before "done" was ever recorded and
+   * they stay, and they carry the job's own id, so a caller that knows a
+   * forgotten job's id reads this listing and finds exactly its outputs -
+   * which is how the transcript's card recovers what the finished notice
+   * already said, without the registry's help. The answer moves (the next
+   * generation adds a file), so unlike the bytes it says nothing about
+   * caching.
+   */
+  routes.get("/artifacts/:conversationId", async (context) => {
+    const conversationId = context.req.param("conversationId");
+    if (!CONVERSATION_ID.test(conversationId)) {
+      return context.json({ error: "There is no such artifact.", code: "media.not-found" }, 404);
+    }
+    // A directory that cannot be read is the ordinary no-artifacts answer,
+    // not a failure: the directory exists from the conversation's first
+    // admitted prompt, and until something is generated into it there is
+    // nothing to list. What a caller wants here is "nothing yet", which an
+    // error would make it tell apart from.
+    let names: readonly string[];
+    try {
+      names = await readdir(conversationArtifactsDirectory(conversationId));
+    } catch {
+      names = [];
+    }
+    const artifacts = names
+      .filter((name) => ARTIFACT_FILE_NAME.test(name))
+      .sort()
+      .map((fileName) => ({ fileName, mimeType: mimeTypeOf(fileName) }));
+    return context.json({ artifacts });
+  });
+
   routes.get("/artifacts/:conversationId/:fileName", async (context) => {
     const conversationId = context.req.param("conversationId");
     const fileName = context.req.param("fileName");
     if (!CONVERSATION_ID.test(conversationId) || !ARTIFACT_FILE_NAME.test(fileName)) {
       return context.json({ error: "There is no such artifact.", code: "media.not-found" }, 404);
     }
-    const extension = fileName.slice(fileName.lastIndexOf(".") + 1);
-    const mimeType = MIME_BY_EXTENSION[extension] ?? "application/octet-stream";
     try {
       const bytes = await readFile(join(conversationArtifactsDirectory(conversationId), fileName));
       return new Response(bytes, {
         status: 200,
         headers: {
-          "content-type": mimeType,
+          "content-type": mimeTypeOf(fileName),
           "content-length": String(bytes.byteLength),
           "cache-control": "private, max-age=31536000, immutable",
         },

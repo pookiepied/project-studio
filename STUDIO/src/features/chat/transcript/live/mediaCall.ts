@@ -102,7 +102,9 @@ export function readMediaCall(call: ToolCallView): MediaCallView | null {
  *
  * `null` before the first answer from the media routes; `'unknown'` when the
  * harness answered and does not hold the job - the registry is in memory,
- * so a job from before a restart is gone, and its result with it.
+ * so a job from before a restart is gone. Its outputs, when it produced any,
+ * still answer from the conversation's artifacts directory, and arrive here
+ * as `recovered` rather than being lost with it.
  */
 export type FollowedJob = MediaJob | 'unknown' | null
 
@@ -129,6 +131,11 @@ export function titleOf(prompt: string | null, kind: 'image' | 'video'): string 
   return `${(cut > TITLE_LENGTH / 2 ? head.slice(0, cut) : head).trimEnd()}…`
 }
 
+/** Where the harness serves one finished output's bytes. */
+export function artifactPath(conversationId: string, fileName: string): string {
+  return `/api/media/artifacts/${conversationId}/${fileName}`
+}
+
 /**
  * The artifact the transcript draws for a generation call.
  *
@@ -137,22 +144,33 @@ export function titleOf(prompt: string | null, kind: 'image' | 'video'): string 
  * truth from then on: its state, its vendor's word on progress, its files
  * when it ends. The refusal of the call itself - a permission not granted, a
  * slot unset - is the harness's sentence and outranks everything else.
+ *
+ * After a restart the job reads as `unknown`, and the outputs a generation
+ * left arrive as `recovered`: what the conversation's artifacts directory
+ * answers for that job's id, which is the same record the finished notice
+ * printed. The card then carries the video it promised, instead of saying
+ * the result was not kept.
  */
 export function mediaCallArtifact(
   call: ToolCallView,
   view: MediaCallView,
   job: FollowedJob,
   conversationId: string,
+  recovered: readonly MediaArtifactRef[] = [],
 ): Artifact {
   const answered = call.output !== null && call.output.present
   const fromJob =
     job !== null && job !== 'unknown' && job.state === 'done'
       ? job.outputs.map((output) => ({
-          path: `/api/media/artifacts/${conversationId}/${output.fileName}`,
+          path: artifactPath(conversationId, output.fileName),
           mimeType: output.mimeType,
         }))
       : []
-  const outputs = view.artifacts.length > 0 ? view.artifacts : fromJob
+  // Three truths, in the order they were learned: what the call's own answer
+  // carried, what the followed job reported, what the conversation's
+  // artifacts directory answers for a job the registry no longer holds.
+  const outputs =
+    view.artifacts.length > 0 ? view.artifacts : fromJob.length > 0 ? fromJob : recovered
 
   let status: ArtifactStatus
   let error: string | undefined

@@ -101,6 +101,10 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
         call('The harness is not running, so nothing was stopped.', (client) =>
           client.stopConversationMediaJob(conversationId, jobId),
         ),
+      artifacts: (conversationId) =>
+        call('The harness is not running, so there are no artifacts to list.', (client) =>
+          client.conversationMediaArtifacts(conversationId),
+        ),
     },
     browseFolders: (path) =>
       call(

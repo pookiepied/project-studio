@@ -31,6 +31,18 @@ export interface BackgroundJob {
 export const JOB_STATES = ['running', 'exited', 'stopped', 'failed'] as const
 
 /**
+ * One finished generation's output as the harness names its file.
+ *
+ * The same shape a finished job's `outputs` carry, and what the
+ * conversation's artifacts listing answers with when the registry that
+ * reported the job is gone.
+ */
+export type MediaArtifactFile = {
+  readonly fileName: string
+  readonly mimeType: string
+}
+
+/**
  * A generation job - an image or a video the model asked for - as the
  * harness's `MediaJobs` reports it. Its outputs are files the harness holds,
  * served at `/api/media/artifacts/<conversation>/<fileName>`.
@@ -45,7 +57,7 @@ export interface MediaJob {
   readonly detail: string | null
   readonly startedAt: number
   readonly endedAt: number | null
-  readonly outputs: readonly { readonly fileName: string; readonly mimeType: string }[]
+  readonly outputs: readonly MediaArtifactFile[]
   readonly error?: string
 }
 
@@ -61,6 +73,18 @@ export function parseMediaJobs(value: unknown): readonly MediaJob[] {
   })
 }
 
+/** The outputs half of a job row, or of the artifacts listing: what was produced, as the files were named. */
+function parseOutputs(value: unknown): readonly MediaArtifactFile[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((output) => {
+    if (typeof output !== 'object' || output === null) return []
+    const record = output as Record<string, unknown>
+    const fileName = record['fileName']
+    const mimeType = record['mimeType']
+    return typeof fileName === 'string' && typeof mimeType === 'string' ? [{ fileName, mimeType }] : []
+  })
+}
+
 export function parseMediaJob(value: unknown): MediaJob | null {
   if (typeof value !== 'object' || value === null) return null
   const row = value as Record<string, unknown>
@@ -73,15 +97,7 @@ export function parseMediaJob(value: unknown): MediaJob | null {
     const found = row[key]
     return typeof found === 'number' && Number.isFinite(found) ? found : null
   }
-  const outputs = Array.isArray(row['outputs'])
-    ? row['outputs'].flatMap((output: unknown) => {
-        if (typeof output !== 'object' || output === null) return []
-        const record = output as Record<string, unknown>
-        const fileName = record['fileName']
-        const mimeType = record['mimeType']
-        return typeof fileName === 'string' && typeof mimeType === 'string' ? [{ fileName, mimeType }] : []
-      })
-    : []
+  const outputs = parseOutputs(row['outputs'])
   const error = row['error']
   return {
     id,
@@ -95,6 +111,21 @@ export function parseMediaJob(value: unknown): MediaJob | null {
     outputs,
     ...(typeof error === 'string' ? { error } : {}),
   }
+}
+
+/**
+ * The artifact files one conversation's generations left, as the harness's
+ * listing answers them.
+ *
+ * This is the record that survives a restart: the job registry is in memory,
+ * so a generation from before one answers only through the files its
+ * artifacts directory still holds. A row that does not parse is dropped, the
+ * way a jobs listing's is.
+ */
+export function parseMediaArtifactFiles(value: unknown): readonly MediaArtifactFile[] {
+  if (typeof value !== 'object' || value === null) return []
+  const rows = (value as Record<string, unknown>)['artifacts']
+  return parseOutputs(rows)
 }
 
 /**

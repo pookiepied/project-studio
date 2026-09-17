@@ -1,4 +1,4 @@
-import { parseMediaJobs, type MediaJob } from '../contracts'
+import { parseMediaArtifactFiles, parseMediaJobs, type MediaArtifactFile, type MediaJob } from '../contracts'
 import { isRecord } from '@/lib/guards'
 import type { HarnessResult, Requester } from './request'
 
@@ -39,6 +39,13 @@ export interface MediaClient {
   }): Promise<HarnessResult<{ readonly audio: string; readonly mimeType: string }>>
   /** The generation jobs one conversation started - images and videos - and a stop for one. */
   conversationMediaJobs(id: string): Promise<HarnessResult<readonly MediaJob[]>>
+  /**
+   * The finished generations one conversation holds, as the files its
+   * artifacts directory still answers. This is the half that survives a
+   * restart, when the jobs listing no longer knows the job that produced
+   * them.
+   */
+  conversationMediaArtifacts(id: string): Promise<HarnessResult<readonly MediaArtifactFile[]>>
   stopConversationMediaJob(id: string, jobId: string): Promise<HarnessResult<void>>
 }
 
@@ -80,6 +87,15 @@ export function mediaClient({ json, empty }: Requester): MediaClient {
         `${MEDIA_PATH}/jobs?conversationId=${encodeURIComponent(id)}`,
         undefined,
         parseMediaJobs,
+      )
+    },
+
+    conversationMediaArtifacts(id) {
+      return json(
+        'GET',
+        `${MEDIA_PATH}/artifacts/${encodeURIComponent(id)}`,
+        undefined,
+        parseMediaArtifactFiles,
       )
     },
 

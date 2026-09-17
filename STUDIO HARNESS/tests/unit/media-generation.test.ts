@@ -317,6 +317,36 @@ describe("the generation routes", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("lists a conversation's finished generations by the names their files carry", async () => {
+    await connectOpenAi();
+    const { adapter } = standIn("openai", () => ({ shape: "sync", result: Promise.resolve([PNG]) }));
+    const media = service([adapter]);
+    const started = await media.generateImage({ prompt: "x" }, { conversationId: "conv-1" });
+    const finished = await jobs.finished("conv-1", started.id);
+    expect(finished?.state).toBe("done");
+    const { app, credential } = routed(media);
+    const headers = { authorization: `Bearer ${credential}` };
+
+    // The same output the job's status reports, under the name its file was
+    // written with - the contract a card whose registry forgot the job reads.
+    const list = await app.request("http://harness.test/api/media/artifacts/conv-1", { headers });
+    expect(list.status).toBe(200);
+    const listed = (await list.json()) as { artifacts: { fileName: string; mimeType: string }[] };
+    expect(listed.artifacts).toEqual([{ fileName: `${started.id}-1.png`, mimeType: "image/png" }]);
+
+    // A conversation nothing was generated into answers empty, not an error:
+    // its directory exists from its first admitted prompt and holds nothing.
+    const empty = await app.request("http://harness.test/api/media/artifacts/conv-2", { headers });
+    expect(empty.status).toBe(200);
+    expect(((await empty.json()) as { artifacts: unknown[] }).artifacts).toEqual([]);
+
+    // A conversation id the directories could not have written.
+    const traversal = await app.request("http://harness.test/api/media/artifacts/..%2Fconv-2", {
+      headers,
+    });
+    expect(traversal.status).toBe(404);
+  });
+
   it("refuses an artifact name the registry could not have written", async () => {
     const media = service([]);
     const { app, credential } = routed(media);

@@ -100,6 +100,7 @@ export {
   type MeasuredContextUsage,
   type BackgroundJob,
   type MediaJob,
+  type MediaArtifactFile,
 } from './contracts'
 
 export {

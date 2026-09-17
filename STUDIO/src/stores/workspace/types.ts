@@ -14,6 +14,7 @@ import type {
   PlanSnapshot,
   BackgroundJob,
   MediaJob,
+  MediaArtifactFile,
   ProviderConnection,
 } from '@/platform/harness'
 
@@ -136,6 +137,12 @@ export interface BoundClient {
   readonly mediaJobs: {
     list: (conversationId: string) => Promise<HarnessResult<readonly MediaJob[]>>
     stop: (conversationId: string, jobId: string) => Promise<HarnessResult<void>>
+    /**
+     * The finished generations the conversation's artifacts directory still
+     * answers - the record that survives a restart, when `list` no longer
+     * knows the job that produced the files.
+     */
+    artifacts: (conversationId: string) => Promise<HarnessResult<readonly MediaArtifactFile[]>>
   }
   /**
    * One directory of the PC, listed by the harness, for the folder picker a

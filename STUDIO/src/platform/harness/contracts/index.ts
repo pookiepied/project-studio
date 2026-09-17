@@ -179,7 +179,9 @@ export {
 export {
   type BackgroundJob,
   type MediaJob,
+  type MediaArtifactFile,
   parseMediaJobs,
+  parseMediaArtifactFiles,
   parseBackgroundJobs,
   parseBackgroundJob,
 } from './jobs'

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { MediaArtifact } from '@/features/artifacts/kinds/MediaArtifact'
 import { useWorkspace } from '@/stores/workspace'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
-import { mediaCallArtifact, type FollowedJob, type MediaCallView } from './mediaCall'
+import { artifactPath, mediaCallArtifact, type FollowedJob, type MediaArtifactRef, type MediaCallView } from './mediaCall'
 
 /**
  * A generation call, drawn as the artifact it is.
@@ -12,7 +12,9 @@ import { mediaCallArtifact, type FollowedJob, type MediaCallView } from './media
  * what a generated picture looks like is decided once. This file only
  * supplies what a fence cannot: the job a video call started, followed
  * through the media routes - a poll every few seconds while it runs - until
- * its file lands, or the vendor's sentence when it does not.
+ * its file lands, or the vendor's sentence when it does not. A job the
+ * harness no longer holds - one from before a restart - is answered from the
+ * conversation's artifacts instead, which is the record that outlived it.
  */
 export function MediaCallArtifact({
   call,
@@ -23,8 +25,10 @@ export function MediaCallArtifact({
   view: MediaCallView
   conversationId: string
 }) {
-  const job = useFollowedJob(conversationId, view.kind === 'video' ? view.jobId : null)
-  const artifact = mediaCallArtifact(call, view, job, conversationId)
+  const jobId = view.kind === 'video' ? view.jobId : null
+  const job = useFollowedJob(conversationId, jobId)
+  const recovered = useRecoveredOutputs(conversationId, jobId, job === 'unknown')
+  const artifact = mediaCallArtifact(call, view, job, conversationId, recovered)
   return <MediaArtifact artifact={artifact} video={view.kind === 'video'} />
 }
 
@@ -71,4 +75,47 @@ function useFollowedJob(conversationId: string, jobId: string | null): FollowedJ
   }, [conversationId, jobId, mediaJobs])
 
   return job
+}
+
+/**
+ * The outputs a forgotten job left, as the conversation's artifacts directory
+ * still answers them.
+ *
+ * Asked once, when the registry has said the job is not its: a finished
+ * output never changes, so what the directory holds for this job's id is
+ * final. Neither is a harness that could not be asked re-asked here - the
+ * follow already owns that question, and a card that could not reach it has
+ * the not-kept sentence to show.
+ */
+function useRecoveredOutputs(
+  conversationId: string,
+  jobId: string | null,
+  forgotten: boolean,
+): readonly MediaArtifactRef[] {
+  const { mediaJobs } = useWorkspace()
+  const [recovered, setRecovered] = useState<readonly MediaArtifactRef[]>([])
+
+  useEffect(() => {
+    if (jobId === null || !forgotten) return
+    let cancelled = false
+    void mediaJobs.artifacts(conversationId).then((result) => {
+      if (cancelled || !result.ok) return
+      // A listing answers only the names the job registry writes - the job's
+      // own id, then its output's -<index>.<extension> - so the id before
+      // the first dash is the whole ownership question.
+      setRecovered(
+        result.value
+          .filter((file) => file.fileName.startsWith(`${jobId}-`))
+          .map((file) => ({
+            path: artifactPath(conversationId, file.fileName),
+            mimeType: file.mimeType,
+          })),
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [conversationId, jobId, forgotten, mediaJobs])
+
+  return recovered
 }

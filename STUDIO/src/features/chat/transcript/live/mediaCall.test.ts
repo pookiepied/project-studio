@@ -252,6 +252,18 @@ describe('the artifact a call becomes', () => {
     const forgotten = mediaCallArtifact(started, view, 'unknown', 'conv-1')
     expect(forgotten.status).toBe('cancelled')
     expect(forgotten.data?.error).toMatch(/restarted/)
+
+    // What the conversation's artifacts answer for that job is the landing
+    // the finished notice promised: the card turns around and carries it.
+    const recovered = mediaCallArtifact(started, view, 'unknown', 'conv-1', [
+      { path: '/api/media/artifacts/conv-1/media_k2x7-1.mp4', mimeType: 'video/mp4' },
+    ])
+    expect(recovered.status).toBe('done')
+    expect(recovered.data?.model).toBe('google/veo-3.1')
+    expect(recovered.data?.outputs).toEqual([
+      { path: '/api/media/artifacts/conv-1/media_k2x7-1.mp4', mimeType: 'video/mp4' },
+    ])
+    expect(recovered.data?.error).toBeUndefined()
   })
 })
 

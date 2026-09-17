@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { present } from '@/platform/harness/contracts/chunks'
 import { setAttachmentBytesTransport } from '@/platform/harness/attachments'
-import type { MediaJob } from '@/platform/harness'
+import type { MediaArtifactFile, MediaJob } from '@/platform/harness'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 
 import { ToolGroups } from './ToolGroups'
@@ -15,15 +15,19 @@ import { ToolGroups } from './ToolGroups'
  * A generation in the transcript, drawn as the artifact the gallery draws:
  * the shell's title and status, a frame per picture reserved before any
  * file exists, the picture from the bytes the harness serves, and a video
- * followed through the media routes until its file lands in the player.
+ * followed through the media routes until its file lands in the player -
+ * or recovered from the conversation's artifacts when the job itself is
+ * gone, which is what a restart leaves behind.
  */
 
 const listed: MediaJob[] = []
+const listedArtifacts: MediaArtifactFile[] = []
 const list = vi.fn(async () => ({ ok: true as const, value: listed }))
+const artifacts = vi.fn(async () => ({ ok: true as const, value: listedArtifacts }))
 
 // One object for the session, as the real store memoises it: a fresh one per
 // render would restart the follower's effect on every paint.
-const mediaJobs = { list, stop: async () => ({ ok: true as const, value: undefined }) }
+const mediaJobs = { list, stop: async () => ({ ok: true as const, value: undefined }), artifacts }
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({ mediaJobs, conversations: [] }),
 }))
@@ -34,7 +38,9 @@ afterEach(() => {
   cleanup()
   setAttachmentBytesTransport(null)
   listed.length = 0
+  listedArtifacts.length = 0
   list.mockClear()
+  artifacts.mockClear()
   vi.useRealTimers()
 })
 
@@ -249,5 +255,52 @@ describe('a video call', () => {
       await Promise.resolve()
     })
     expect(screen.getByText(/not kept/)).toBeTruthy()
+  })
+
+  it('recovers a forgotten job by reading the conversation’s artifacts, and plays the file', async () => {
+    // After a restart the jobs listing answers empty - the registry is in
+    // memory - and the artifacts listing is what still answers.
+    vi.useFakeTimers()
+    setAttachmentBytesTransport(async (path: string) => {
+      expect(path).toBe('/api/media/artifacts/conv/media_gone-1.mp4')
+      return bytesOf('mp4-bytes')
+    })
+    listedArtifacts.push({ fileName: 'media_gone-1.mp4', mimeType: 'video/mp4' })
+
+    render(
+      <ToolGroups
+        conversationId="conv"
+        live={false}
+        groups={groups(
+          call({
+            toolName: 'studio_video',
+            input: present({ prompt: 'waves at dusk' }),
+            output: present('Started video job media_gone with google/veo-3.1.'),
+          }),
+        )}
+      />,
+    )
+
+    // One turn: the follow asks, learns the job is not held, and stops. The
+    // next: the recovery asks once for the conversation's artifacts.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(artifacts).toHaveBeenCalledTimes(1)
+    expect(list).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByText('Video ready · google/veo-3.1')).toBeTruthy()
+
+    // The player arrives on its own chunk; give it a moment to land.
+    let video: HTMLVideoElement | null = null
+    for (let tries = 0; tries < 400 && video === null; tries += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10)
+      })
+      video = document.querySelector('video')
+    }
+    expect(video?.getAttribute('src')).toBe(`data:video/mp4;base64,${btoa('mp4-bytes')}`)
   })
 })

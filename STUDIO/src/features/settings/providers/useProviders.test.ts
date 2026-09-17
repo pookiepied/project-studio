@@ -58,6 +58,7 @@ function stubClient(overrides: {
     stopConversationBrowser: () => Promise.resolve(ok(false)),
     stopConversationComputer: () => Promise.resolve(ok(false)),
     conversationMediaJobs: () => Promise.resolve(ok([])),
+    conversationMediaArtifacts: () => Promise.resolve(ok([])),
     stopConversationMediaJob: () => Promise.resolve(ok(undefined)),
     createConnection: () => Promise.resolve(ok(KNOWN_VENDOR)),
     updateConnection: () => Promise.resolve(ok(KNOWN_VENDOR)),
