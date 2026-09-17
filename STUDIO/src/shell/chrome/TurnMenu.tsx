@@ -233,13 +233,20 @@ export function TurnMenu() {
 
                   Keyed remount rather than an `AnimatePresence` crossover, and
                   that was tried first: `mode="wait"` holds the new name back
-                  until the old one has finished leaving, which empties the
+                  until the old one had finished leaving, which empties the
                   label for a beat and delays the answer to the question just
                   asked. Overlapping the two instead needs the outgoing name
                   taken out of flow, which fights the truncation this label
                   depends on. The new name appearing at once and settling in is
                   both the simpler construction and the more honest one: the
-                  choice took effect immediately, so it should say so. */}
+                  choice took effect immediately, so it should say so.
+
+                  Under the strip's fold-to-mark breakpoint the words stand
+                  down and the mark is the whole control: a phone cannot give
+                  this pill its worst-case width and the centred title theirs,
+                  and the strip's own arithmetic (see `TopStrip`) is what
+                  decides where that line falls. The name is not lost - it is
+                  the trigger's tooltip and the menu's first row. */}
               <motion.span
                 key={model?.id ?? label}
                 initial={{ opacity: 0, y: -3 }}
@@ -248,10 +255,12 @@ export function TurnMenu() {
                 className="flex min-w-0 items-center gap-1.5"
               >
                 {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
-                <span className="min-w-0 truncate">{label}</span>
+                <span className="min-w-0 truncate @max-[48rem]:hidden">{label}</span>
               </motion.span>
               {warn ? (
-                <span className="shrink-0 tabular-nums text-muted-foreground">{percent}%</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground @max-[48rem]:hidden">
+                  {percent}%
+                </span>
               ) : null}
               <Icons.dropdown className="opacity-60" />
             </button>

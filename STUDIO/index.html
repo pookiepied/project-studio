@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- What the browser knows before any of the app runs: both schemes are
+         supported, and the chrome wears the light ground until the app
+         narrows `color-scheme` to the one in force (see `publishBrowserTheme`
+         in `design/theme/appearance.ts`, which owns both values from then
+         on). The metas stay in the document so a browser that never runs the
+         app's script still gets a sensible answer. -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" />
     <title>Studio</title>
   </head>
   <body>

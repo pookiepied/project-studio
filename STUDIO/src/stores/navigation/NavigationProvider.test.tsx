@@ -20,7 +20,7 @@ import { NavigationProvider, useNavigation } from './NavigationProvider'
  */
 
 function Probe() {
-  const { route, sidebarOpen, openChat, openSettings, leaveSettings, toggleSidebar } =
+  const { route, sidebarOpen, openChat, openSettings, leaveSettings, toggleSidebar, setCompactLayout } =
     useNavigation()
 
   return (
@@ -44,6 +44,9 @@ function Probe() {
       </button>
       <button type="button" onClick={toggleSidebar}>
         toggle sidebar
+      </button>
+      <button type="button" onClick={() => setCompactLayout(true)}>
+        go compact
       </button>
     </div>
   )
@@ -176,5 +179,57 @@ describe('leaving Settings', () => {
     expect(sidebarOpen()).toBe(true)
     click('leave settings')
     expect(sidebarOpen()).toBe(true)
+  })
+})
+
+describe('leaving Settings on a narrow window', () => {
+  // On a narrow window the column is a drawer over the page. Restoring the
+  // entry state there leaves the drawer open over the surface being returned
+  // to - the route changes underneath a panel that covers it, which is the
+  // reported "back does nothing". A drawer is dismissed on the way out,
+  // whatever the visit began with and whatever the user did with it inside.
+  it('dismisses the drawer even when the column was open at entry', () => {
+    mount()
+    click('toggle sidebar')
+    // The column was open when Settings was entered; restoring the entry
+    // state on a narrow window would leave the drawer over the page the
+    // user is returning to.
+    click('go compact')
+    click('open settings')
+    expect(sidebarOpen()).toBe(true)
+
+    click('leave settings')
+    expect(routeLabel()).toBe('route:home')
+    expect(sidebarOpen()).toBe(false)
+  })
+
+  it('dismisses the drawer even when the user moved it during the visit', () => {
+    mount()
+    click('go compact')
+    click('open chat')
+    click('open settings')
+    // Closed and reopened mid-visit: on a resident column that would restore.
+    click('toggle sidebar')
+    click('toggle sidebar')
+    expect(sidebarOpen()).toBe(true)
+
+    click('leave settings')
+    expect(sidebarOpen()).toBe(false)
+  })
+
+  it('returns to the desktop restore rule when the window is wide again', () => {
+    mount()
+    click('go compact')
+    click('open chat')
+    click('open settings')
+    click('leave settings')
+    expect(sidebarOpen()).toBe(false)
+
+    // Narrow again is not stated back; the desktop reading returns because
+    // the store defaults to it and nothing re-published compact.
+    click('open settings')
+    click('leave settings')
+    expect(routeLabel()).toBe('route:chat')
+    expect(sidebarOpen()).toBe(false)
   })
 })

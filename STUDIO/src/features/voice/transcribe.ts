@@ -104,13 +104,16 @@ export async function transcribeRecording(
 function worthRetrying(failure: HarnessFailure): boolean {
   if (failure.kind === 'not-reachable') return true
   if (failure.kind !== 'harness-error') return false
-  if (failure.message.includes('No transcription model is connected')) return false
+  // The harness names the slot by its product word, dictation - not the
+  // capability slot's own name. The match is against the sentence the slot
+  // resolver actually sends (see `LABELS` in the media resolver).
+  if (failure.message.includes('No dictation model is connected')) return false
   return failure.status === 429 || failure.status >= 500
 }
 
 function sentenceFor(message: string): string {
-  if (message.includes('No transcription model is connected')) {
-    return 'No transcription model is connected - pick one in Settings - Providers'
+  if (message.includes('No dictation model is connected')) {
+    return 'No dictation model is connected - pick one in Settings - Providers'
   }
   return `Dictation failed: ${message}`
 }

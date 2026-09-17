@@ -126,9 +126,18 @@ describe('a refusal a moment could change', () => {
     expect(bad.kind).toBe('note')
     expect(transcribe).toHaveBeenCalledTimes(1)
 
-    transcribe.mockResolvedValueOnce(refused(502, 'No transcription model is connected.'))
+    // The harness names the slot by its product word, dictation - not the
+    // capability slot's own name. The refusal is fed as the resolver's real
+    // sentence, and the seam's own sentence must come back - not the raw
+    // refusal wearing a "Dictation failed" prefix, which is what the fallback
+    // would produce if the match were broken.
+    transcribe.mockResolvedValueOnce(
+      refused(502, 'No dictation model is connected. Choose one in Settings - Providers.'),
+    )
     const unset = await transcribeRecording(note(new Blob([new Uint8Array([1])])))
-    expect(unset.kind === 'note' && unset.note).toContain('pick one in Settings')
+    expect(unset.kind === 'note' && unset.note).toBe(
+      'No dictation model is connected - pick one in Settings - Providers',
+    )
     expect(transcribe).toHaveBeenCalledTimes(2)
   })
 })

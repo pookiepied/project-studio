@@ -61,6 +61,14 @@ interface NavigationValue {
   leaveSettings: () => void
   toggleSidebar: () => void
   setPaletteOpen: (open: boolean) => void
+  /**
+   * Tells the store the window crossed the compact breakpoint, where the
+   * sidebar floats over the page rather than taking space from it. The shell
+   * is the one caller - it is where that fact is computed - and it publishes
+   * it here because the column's restore-on-leave rule below is a layout
+   * answer, not a navigation one.
+   */
+  setCompactLayout: (compact: boolean) => void
 }
 
 const NavigationContext = createContext<NavigationValue | null>(null)
@@ -92,6 +100,13 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [settingsReturn, setSettingsReturn] = useState<Route>(HOME)
   const [sidebarAtEntry, setSidebarAtEntry] = useState(false)
   const [sidebarMoved, setSidebarMoved] = useState(false)
+  /**
+   * Whether the window is narrow enough that the column floats. False until
+   * the shell says otherwise, which is the desktop reading and the safe
+   * default: the restore-on-leave rule below is written for the resident
+   * column first.
+   */
+  const [compact, setCompact] = useState(false)
 
   const go = useCallback(
     (next: Route) => {
@@ -99,14 +114,22 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       // control -- opening a conversation from the palette is also a leaving.
       // The column was opened for Settings' sake; when that reason ends it
       // returns to what it was, unless the user moved it in the meantime.
-      if (route.kind === 'settings' && next.kind !== 'settings' && !sidebarMoved) {
-        setSidebarOpen(sidebarAtEntry)
+      //
+      // On a narrow window the column is a drawer over the page, and
+      // restoring "as it was" would leave the drawer open over the surface
+      // being returned to: the route changes underneath a panel that covers
+      // it, which reads as the back control having done nothing. A drawer is
+      // summoned, not resident, so leaving Settings dismisses it whatever
+      // the entry state was.
+      if (route.kind === 'settings' && next.kind !== 'settings') {
+        if (compact) setSidebarOpen(false)
+        else if (!sidebarMoved) setSidebarOpen(sidebarAtEntry)
       }
       setMove(moveBetween(route, next))
       setRoute(next)
       setPaletteOpen(false)
     },
-    [route, sidebarMoved, sidebarAtEntry],
+    [route, sidebarMoved, sidebarAtEntry, compact],
   )
 
   const openSettings = useCallback(
@@ -149,6 +172,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         setSidebarOpen((open) => !open)
       },
       setPaletteOpen,
+      setCompactLayout: setCompact,
     }),
     [route, move, sidebarOpen, paletteOpen, go, openSettings, leaveSettings],
   )

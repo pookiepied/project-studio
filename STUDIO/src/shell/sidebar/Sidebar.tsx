@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { COLLAPSE, DURATION, EASE_OUT, SHELL, SPRING_PANEL } from '@/design/tokens'
+import { COLLAPSE, DURATION, EASE_OUT, RADIUS, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { StudioMark } from '@/components/brand'
 import { IconButton, NavRow, Tooltip } from '@/components/primitives'
@@ -161,23 +161,26 @@ export function Sidebar({
         transition={changingWhileClosed ? { duration: 0 } : SPRING_PANEL}
         onAnimationStart={() => onReflow?.(true)}
         onAnimationComplete={() => onReflow?.(false)}
-        // The border goes with the width when it collapses: left on, a closed
-        // sidebar leaves a 1px rule down the edge of the window — the ghost of
-        // a panel that is supposed to be gone. Floating, it always has an edge,
-        // because it always has content beside it.
-        // Only while floating. Resident, the sidebar has no edge of its own:
-        // the page's rounded corner is the edge, and the sunken ground shows
-        // through the notch it cuts. A hairline there drew a straight rule
-        // across the arc — the corner rounded on one side of the line and the
-        // panel stopped square on the other, which is the "it is round but the
-        // sidebar does not follow it" seam. Floating over the page it still
-        // needs one, because then it genuinely is a separate object.
-        style={{ borderRightWidth: compact ? 1 : 0 }}
+        // Two different objects, so two different edges. Wide, the column is
+        // the ground the window is built on - square, no edge of its own; the
+        // page is the object sitting on it, and the page carries the radius.
+        // Floating, the roles invert: the column is the object resting on the
+        // page, and an object carries the design language's own rounding on
+        // the edge it is rested against, with elevation doing the separating
+        // a hairline would otherwise fake. A hairline under a radius draws a
+        // straight rule across the arc - the same seam the page's own corner
+        // docblock in `AppShell` refuses - so the border stays with the
+        // resident layout that has a straight edge to draw it on.
+        style={{
+          ...(compact
+            ? {
+                borderTopRightRadius: RADIUS.xl,
+                borderBottomRightRadius: RADIUS.xl,
+              }
+            : { borderRightWidth: 0 }),
+        }}
         className={cn(
-          // Square. The sidebar is the ground the window is built on; the page
-          // is the object sitting on it, and the page is what carries the
-          // radius. See the note in `AppShell`.
-          'h-full overflow-hidden border-r bg-surface-sunken',
+          'h-full overflow-hidden bg-surface-sunken',
           compact ? 'absolute inset-y-0 left-0 z-30 shadow-panel' : 'relative z-20 shrink-0',
         )}
       >

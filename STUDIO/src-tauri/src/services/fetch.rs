@@ -11,12 +11,20 @@ use super::{apply_init, method_from_init, seam_client, validate_path, ServiceErr
 
 /// A bound on a request whose caller has already given up.
 ///
-/// The webview aborts at its own 12s timeout, but a Tauri invoke cannot be
-/// cancelled from JS: the command keeps running after the promise is
+/// The webview aborts at its own per-call timeout, but a Tauri invoke cannot
+/// be cancelled from JS: the command keeps running after the promise is
 /// abandoned. Without a timeout of our own, a wedged harness would hold the
-/// connection open forever. 30s is deliberately longer than the webview's
-/// 12s, so the timeout the user sees is the JS one, with its proper words.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// connection open forever.
+///
+/// The number is the largest budget any caller of this seam sets, plus
+/// headroom - the media routes (`/api/media/speech`, `/api/media/transcribe`)
+/// give read-aloud and dictation 150s because a provider may legitimately
+/// need them for a long passage. A seam timeout at or below a caller's budget
+/// would cut that caller off mid-flight and show its own words as the
+/// failure, which is why this is 165s and not less. Every other caller sets
+/// a shorter budget of its own (the client's 12s default, the probe's 12s),
+/// so the timeout the user sees stays the JS one, with its proper words.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(165);
 
 /// A response, flattened into the one shape that crosses the invoke boundary.
 ///
@@ -174,6 +182,16 @@ mod tests {
     use super::*;
 
     use crate::harness::test_support::ONE_HARNESS_AT_A_TIME;
+
+    /// The seam must outlive every caller's own budget, or it becomes the
+    /// failure the caller never sees coming: the media client gives read-aloud
+    /// and dictation 150s (`STUDIO/src/platform/harness/client/media.ts`),
+    /// and a slower cut of the same request would surface here as a dead
+    /// seam instead of the provider's answer.
+    #[test]
+    fn the_seam_timeout_clears_the_largest_caller_budget() {
+        assert!(REQUEST_TIMEOUT >= Duration::from_secs(150));
+    }
 
     /// Shuts the Harness down even when an assertion between start and stop
     /// panics, so a failure does not leak a Node process holding a loopback
