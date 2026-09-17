@@ -75,6 +75,14 @@ export function AppShell() {
     collapseRail,
   })
   const compact = useCompactLayout(railShown ? railWidth : 0)
+  const { setCompactLayout } = useNavigation()
+
+  // The store's leave-Settings rule is a layout answer (a drawer is dismissed
+  // where a resident column would be restored), so the shell - the one place
+  // the breakpoint is computed - publishes the fact there.
+  useEffect(() => {
+    setCompactLayout(compact)
+  }, [compact, setCompactLayout])
 
   /** The page only rounds when there is a sidebar beside it to rest on. */
   const rounded = sidebarShown && !compact
@@ -214,7 +222,11 @@ export function AppShell() {
           borderBottomRightRadius: railShown ? RADIUS.xl : 0,
         }}
       >
-        <TopStrip />
+        {/* The strip is page furniture, so it reads the page's own layout
+            facts from the shell: whether the sidebar is the floating drawer
+            (narrow window) and whether that drawer is on screen decide both
+            the toggle's place and the centred title's. */}
+        <TopStrip compact={compact} sidebarShown={sidebarShown} />
 
         {/*
           One surface handing over to the next, in the direction the hierarchy

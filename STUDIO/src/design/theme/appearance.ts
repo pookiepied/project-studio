@@ -224,6 +224,14 @@ export function resolveTheme(theme: Theme): ResolvedTheme {
  * because every step in the type scale is expressed in `styles/type.css` as a
  * multiple of these. One variable moves the whole system and keeps the icon
  * pairing intact; a per-element override would not.
+ *
+ * The resolved theme is also published to the browser itself, not only to the
+ * page: `color-scheme` on the root is the standard that tells every browser
+ * how to paint its own widgets and scrollbars, and the `theme-color` meta
+ * hands Safari, Chrome and the Android shell a colour for the surfaces they
+ * own - the address bar, the status bar. Browsers differ in how much of their
+ * chrome they hand over, and both channels degrade to no-op where a browser
+ * reads none of them, which is the correct direction to fail.
  */
 export function applyAppearance(appearance: Appearance): ResolvedTheme {
   const resolved = resolveTheme(appearance.theme)
@@ -237,5 +245,45 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
   root.style.setProperty('--code-offset', `${appearance.codeOffset}px`)
   root.classList.toggle('pointer-cursor', appearance.pointerCursor)
 
+  publishBrowserTheme(resolved)
+
   return resolved
+}
+
+/**
+ * The page's surface, as the browser chrome should wear it.
+ *
+ * Written as plain hex rather than read out of the palette variables: the
+ * meta travels to parsers that range from full CSS color support down to
+ * bare hex, and a value the browser cannot parse is simply dropped. Both
+ * values mirror `--surface` in `styles/palette.css` - the one colour each
+ * theme's ground is mixed from - and the paired test fails if the two drift,
+ * which is what keeps the mirror honest.
+ */
+const SURFACE_FOR_THEME: Readonly<Record<ResolvedTheme, string>> = {
+  light: '#ffffff',
+  dark: '#171717',
+}
+
+/**
+ * Tells the browser what this page currently looks like.
+ *
+ * `color-scheme` narrows the declaration `index.html` makes (both schemes
+ * supported) to the one in force, so user-agent widgets stop guessing;
+ * `theme-color` carries the surface to the browser chrome that shows it.
+ * One meta of each - the element is created if a page has none and updated
+ * in place afterwards, never duplicated.
+ */
+function publishBrowserTheme(resolved: ResolvedTheme): void {
+  const root = document.documentElement
+  root.style.colorScheme = resolved
+
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (meta === null) {
+    meta = document.createElement('meta')
+    meta.setAttribute('name', 'theme-color')
+    document.head.appendChild(meta)
+  }
+  const surface = SURFACE_FOR_THEME[resolved]
+  if (meta.getAttribute('content') !== surface) meta.setAttribute('content', surface)
 }

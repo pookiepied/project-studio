@@ -629,10 +629,13 @@ export function Composer({
               way send becomes stop while a reply streams.
 
               On an insecure origin the mic is not ours to ask for —
-              `getUserMedia` is a secure-context capability — so both voice
-              controls hide, and the reason takes the slot where the voice
-              button would be. A button that refuses when pressed is a worse
-              answer than a line that says so first. */}
+              `getUserMedia` is a secure-context capability — but the controls
+              keep their places and answer as disabled. Buttons that vanish
+              and return as the origin changes reshaped the whole cluster, and
+              a phone reading Studio over the LAN was left with a paragraph
+              where its controls had been; a greyed control with the reason as
+              its label says the same thing in the space the control already
+              owns. */}
           {/* Improve, once a take has landed: it acts on the field, so it
               sits with the controls that do, and it is the size they are.
               It leaves with the message - a send, an emptied field or another
@@ -655,23 +658,27 @@ export function Composer({
             ) : null}
           </AnimatePresence>
 
-          {voiceAvailable && (
-            <IconButton
-              label={dictation.stage === 'recording' ? 'Stop and transcribe' : 'Dictate'}
-              size="md"
-              active={dictation.stage === 'recording'}
-              disabled={dictation.stage === 'requesting' || dictation.stage === 'processing'}
-              onClick={() =>
-                dictation.stage === 'recording' ? void dictation.stop() : void dictation.start()
-              }
-            >
-              {dictation.stage === 'recording' ? (
-                <Icons.stop size="md" />
-              ) : (
-                <Icons.dictate size="md" />
-              )}
-            </IconButton>
-          )}
+          <IconButton
+            label={
+              voiceAvailable
+                ? dictation.stage === 'recording'
+                  ? 'Stop and transcribe'
+                  : 'Dictate'
+                : VOICE_UNAVAILABLE_REASON
+            }
+            size="md"
+            active={dictation.stage === 'recording'}
+            disabled={!voiceAvailable || dictation.stage === 'requesting' || dictation.stage === 'processing'}
+            onClick={() =>
+              dictation.stage === 'recording' ? void dictation.stop() : void dictation.start()
+            }
+          >
+            {dictation.stage === 'recording' ? (
+              <Icons.stop size="md" />
+            ) : (
+              <Icons.dictate size="md" />
+            )}
+          </IconButton>
 
           {/* While the microphone owns the field there is nothing to send and
               no voice mode to offer — the strip is the message in progress,
@@ -721,7 +728,7 @@ export function Composer({
                   )}
                 </IconButton>
               </motion.div>
-            ) : voiceAvailable ? (
+            ) : (
               <motion.div
                 key="voice"
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -734,31 +741,19 @@ export function Composer({
                     spoken conversation and replaces the field entirely. Two
                     features, so two marks — the previous build gave them
                     adjacent glyphs and they read as one control with a
-                    duplicate. */}
-                <IconButton label="Voice mode" size="md" onClick={voice.enter}>
+                    duplicate.
+
+                    On an insecure origin the control stays where it belongs
+                    and answers as disabled, its label carrying the reason —
+                    the same treatment the dictate control beside it gets. */}
+                <IconButton
+                  label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
+                  size="md"
+                  disabled={!voiceAvailable}
+                  onClick={voice.enter}
+                >
                   <Icons.voice size="md" />
                 </IconButton>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="voice-reason"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-              >
-                {/* The insecure-origin answer: the line says why the voice
-                    controls are not here, in their place, once — not a dialog
-                    and not a permanent rail of text. It is capped and
-                    right-aligned because it sits in the row's `auto` column:
-                    uncapped, the sentence's full width was the column's, and
-                    the field beside it was what got squeezed. */}
-                <p
-                  className="max-w-[10rem] text-right text-caption text-muted-foreground"
-                  role="note"
-                >
-                  {VOICE_UNAVAILABLE_REASON}
-                </p>
               </motion.div>
             )}
           </AnimatePresence>

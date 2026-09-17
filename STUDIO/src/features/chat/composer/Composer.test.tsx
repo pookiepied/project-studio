@@ -267,36 +267,46 @@ describe('paste and drop', () => {
 
 /**
  * The insecure-origin half of the parity table: microphone access is a
- * secure-context capability, so on plain HTTP the voice controls hide and a
- * line says why, in the slot where the voice button would be.
+ * secure-context capability, so on plain HTTP the voice controls answer as
+ * disabled - present in their places, greyed, with the reason as their
+ * label - instead of vanishing and taking the row's shape with them.
  */
 describe('voice on an insecure origin', () => {
   afterEach(() => {
     Reflect.deleteProperty(window, 'isSecureContext')
   })
 
-  it('hides the voice controls and says why in their place', () => {
+  it('keeps the voice controls in place and disabled, with the reason as their label', () => {
     Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true })
     const onSend = vi.fn(async () => ({ ok: true }))
     renderComposer(onSend)
 
+    // Both voice controls answer as disabled, and the reason is each one's
+    // label - the dictate control and voice mode carry the same sentence
+    // because they refuse for the same reason.
+    const disabled = screen.getAllByRole('button', {
+      name: 'Voice input needs a secure connection to Studio.',
+    })
+    expect(disabled).toHaveLength(2)
+    for (const control of disabled) expect(control.hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: 'Dictate' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Voice mode' })).toBeNull()
-    expect(screen.getByRole('note').textContent).toBe(
-      'Voice input needs a secure connection to Studio.',
-    )
+    // The line that used to stand where these buttons are is gone; the
+    // field's cluster is icons again.
+    expect(screen.queryByRole('note')).toBeNull()
     // Everything else still answers: the field and its send control are not
     // part of the degradation.
     expect(screen.getByRole('textbox')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Add context' })).toBeTruthy()
   })
 
-  it('keeps the voice controls on a secure origin', () => {
+  it('keeps the voice controls enabled on a secure origin', () => {
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
     const onSend = vi.fn(async () => ({ ok: true }))
     renderComposer(onSend)
 
     expect(screen.getByRole('button', { name: 'Dictate' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Voice mode' })).toBeTruthy()
+    const voice = screen.getByRole('button', { name: 'Voice mode' })
+    expect(voice.hasAttribute('disabled')).toBe(false)
   })
 })

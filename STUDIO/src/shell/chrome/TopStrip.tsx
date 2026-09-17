@@ -1,9 +1,11 @@
-import { SHELL } from '@/design/tokens'
+import { SHELL, SPRING_PANEL } from '@/design/tokens'
+import { motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
+import { cn } from '@/lib/cn'
 import { useNavigation } from '@/stores/navigation'
 import { useLiveWork, useWorkspace } from '@/stores/workspace'
 
@@ -28,8 +30,38 @@ import { useLiveWork, useWorkspace } from '@/stores/workspace'
  * provider's mark in the second, and in both it was a fraction shown apart
  * from its own denominator. It lives inside the model's menu now. What is
  * left on the strip is a percentage in the pill's own words, once it is news.
+ *
+ * ---- How the strip shares its width ---------------------------------------
+ *
+ * The header is a container, and the two ends answer to it rather than to
+ * fixed widths. The centred identity box caps itself at a width that leaves
+ * the ends their room (the turn pill may carry a long model name, so its
+ * worst case is what the centre reserves against), and below the breakpoint
+ * where that worst case no longer fits, the turn pill folds to its mark
+ * alone - the menu behind it is unchanged. The breakpoint is derived, not
+ * chosen: it is the width where centred title + worst-case pill + window
+ * controls stop fitting with air between them, which on phones and small
+ * tablets is most widths.
+ *
+ * ---- What the floating sidebar does to it ---------------------------------
+ *
+ * On a narrow window the sidebar is a drawer over the page, and the strip is
+ * page furniture: its toggle would sit under the drawer's brand band and its
+ * centred title would paint on top of the drawer's rows. While the drawer is
+ * out, the left cluster rides the drawer's own spring to its right edge -
+ * the same place the toggle occupies when the column is resident - and the
+ * title stands down until the drawer leaves. Desktop, where the column takes
+ * space instead of covering it, never sees either motion.
  */
-export function TopStrip() {
+export function TopStrip({
+  compact = false,
+  sidebarShown = false,
+}: {
+  /** The window is narrow: the sidebar floats over the page rather than beside it. */
+  compact?: boolean
+  /** The floating column is on screen (handed from the shell's handover state). */
+  sidebarShown?: boolean
+}) {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
   const { conversations } = useWorkspace()
   const { running } = useLiveWork()
@@ -44,15 +76,29 @@ export function TopStrip() {
 
   const turnRunning = conversation !== null && running.has(conversation.id)
 
+  // The drawer covers the strip's own left end, so the toggle rides with it.
+  // The strip itself stands down as a click surface while the drawer is out:
+  // it spans the window and would otherwise intercept presses meant for the
+  // drawer's brand band - the Settings route's back control lives exactly
+  // there. Its two end clusters stay live; everything between yields.
+  const drawerOut = compact && sidebarShown
+
   return (
     <header
       data-tauri-drag-region
-      className="absolute inset-x-0 top-0 z-30 flex items-center gap-1"
+      className={cn(
+        '@container absolute inset-x-0 top-0 z-30 flex items-center gap-1',
+        drawerOut && 'pointer-events-none',
+      )}
       style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
     >
       <TrafficLights />
 
-      <div className="ml-1 flex shrink-0 items-center gap-0.5">
+      <motion.div
+        animate={{ x: drawerOut ? SHELL.sidebar.expandedWidth : 0 }}
+        transition={SPRING_PANEL}
+        className={cn('ml-1 flex shrink-0 items-center gap-0.5', drawerOut && 'pointer-events-auto')}
+      >
         <IconButton
           label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
           tooltipSide="bottom"
@@ -61,7 +107,7 @@ export function TopStrip() {
         >
           <Icons.sidebar size="md" />
         </IconButton>
-      </div>
+      </motion.div>
 
       {/* Centred on the page, not on the window. The identity names the
           conversation, and the conversation lives in the page — so when the
@@ -82,18 +128,34 @@ export function TopStrip() {
           then overflows from the centre point to the right — the title sits
           half a column right of centre no matter what the surrounding rule
           says. `w-full` gives the box a definite width for the container
-          queries to resolve against; `max-w-[62%]` caps it, and the two
+          queries to resolve against; the max-width caps it, and the two
           `justify-center`s do the centring. Remove the `w-full` and the
-          shrink-to-fit comes back as zero, silently. */}
+          shrink-to-fit comes back as zero, silently.
+
+          ---- The cap is arithmetic, not taste ------------------------------
+
+          `62%` alone let the box reach under the turn pill: the pill's worst
+          case (a long model name, truncation at its cap) plus the window
+          controls is a fixed cost the centre has to leave, and 62% of a narrow
+          strip does not leave it. The cap is the smaller of the old share and
+          the whole strip minus that cost; under the fold-to-mark breakpoint
+          the cost collapses to the icon pill's, and the centre gets the room
+          back. The drawer being out hides the line entirely - a title
+          painting over the drawer's rows is overlap by another name. */}
       <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-        <div className="@container pointer-events-auto flex w-full min-w-0 max-w-[62%] justify-center">
-          {conversation ? (
+        <div className="@container pointer-events-auto flex w-full min-w-0 justify-center max-w-[min(62%,calc(100%-22rem))] @max-[48rem]:max-w-[min(62%,calc(100%-12rem))]">
+          {conversation !== null && !drawerOut ? (
             <IdentityLine conversation={conversation} running={turnRunning} />
           ) : null}
         </div>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+      <div
+        className={cn(
+          'ml-auto flex shrink-0 items-center gap-0.5',
+          drawerOut && 'pointer-events-auto',
+        )}
+      >
         {/* Wherever there is a turn to configure, and nowhere else.
 
             These are the settings for the *next message*, so the rule is
