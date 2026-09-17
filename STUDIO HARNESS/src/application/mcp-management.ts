@@ -116,6 +116,8 @@ export interface McpAdministration {
   get(id: string, context?: McpReadContext): McpServerView | undefined;
   save(input: McpServerInput, auth: AuthContext): McpServerView;
   remove(id: string, auth: AuthContext): Promise<boolean>;
+  /** Stops the connection and lets the reconciler start it again at once. */
+  restart(id: string, auth: AuthContext): Promise<McpServerView>;
   /** `null` clears the decision at this scope, so the wider scope applies. */
   setEnabled(scope: Scope, id: string, enabled: boolean | null, auth: AuthContext): void;
   setCredential(id: string, secret: string, auth: AuthContext): Promise<void>;
@@ -310,6 +312,33 @@ export class McpManagementService implements McpAdministration {
     await this.#supervisor.stop(id);
     this.#applyNow();
     return true;
+  }
+
+  /**
+   * Stops one connection and lets the reconciler bring it straight back.
+   *
+   * There is no stronger "restart" to expose, and that is the point: the
+   * supervisor's record of how to launch a connection *is* the record, so
+   * stopping and asking for what should be running is the whole of it, for
+   * wedged processes and changed secrets alike. A wedged relay is a process
+   * to restart; an in-process hang would have been the harness, which is one
+   * reason the capability is its own process (ADR 0049 §3).
+   *
+   * Studio's own connections are restartable like any other - they are
+   * launched from their recorded selves, so a restart cannot make the row's
+   * claim untrue, which is the only thing `#refuseIfOurs` guards.
+   *
+   * The returned view's status is what the supervisor knows right then -
+   * usually nothing, because the reconciler's wake is deferred behind a
+   * microtask and this answers with the connection already stopped. Whether
+   * it came back is the next connection_status read's story, which is what
+   * every caller of this one is told.
+   */
+  async restart(id: string, _auth: AuthContext): Promise<McpServerView> {
+    const record = this.#requireServer(id);
+    await this.#supervisor.stop(id);
+    this.#applyNow();
+    return this.#view(record);
   }
 
   /**

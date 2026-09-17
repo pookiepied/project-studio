@@ -486,6 +486,12 @@ describe("nothing the model chose reaches a process uncontained", () => {
       // and the kernel decide that call like any other. A driver the
       // sandbox contained could not move the pointer, which is its job.
       [join("src", "computer", "session.ts"), "drives the desktop, and is ours"],
+      // Downloads a connection the model asked for, in the relay's own trust
+      // domain: the customization bundle is a system-provenance server, so
+      // this continues the launcher's needsNetwork judgment, and a sandboxed
+      // npm would need the model to hold grants for ~/.studio - the friction
+      // the relay exists to avoid. One bounded, run-to-completion spawn.
+      [join("src", "customization", "installer.ts"), "downloads what the model asked for"],
     ]);
 
     const importers: string[] = [];

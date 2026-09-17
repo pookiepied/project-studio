@@ -351,7 +351,10 @@ so you know what the user means when they ask for one, and so you can say
 plainly that it does not exist yet rather than reaching for a substitute.
 
 **MCP servers.** A Model Context Protocol server the user runs and
-connects. Its tools reach your array one discovered tool at a time.
+connects. Its tools reach your array one discovered tool at a time. To
+change what this installation can reach - adding, switching, diagnosing or
+removing one of its connections - discover 'mcp:studio-customization'; the
+customize-studio skill, when it is on, walks the patterns.
 
 **Skills.** Instructions and files packaged for a particular kind of
 work. The ones switched on for this conversation are listed by name and

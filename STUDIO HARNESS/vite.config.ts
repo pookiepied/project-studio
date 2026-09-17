@@ -79,7 +79,12 @@ function studioServerEntry(): PluginOption {
             // The computer-use capability, the second server of Studio's
             // own (ADR 0055). Its PowerShell driver travels inside this
             // bundle as a string (`?raw`) and is written out at first use.
-            computer: "src/computer/server.ts"
+            computer: "src/computer/server.ts",
+            // The customization capability, the third of Studio's own. Its
+            // tools relay to the harness's own management routes over
+            // loopback, so the bundle carries no state of its own - the
+            // endpoint it needs is injected by the launcher at spawn.
+            customization: "src/customization/server.ts"
           },
           // Playwright resolves its own driver files by path at runtime and
           // cannot survive being bundled. It stays a real dependency, resolved

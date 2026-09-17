@@ -90,12 +90,16 @@ const server = serve(
     serverOptions: { requestTimeout: 0 },
   },
   (info) => {
+    // Published before the readiness guard's early return: a launch without
+    // the descriptor still binds, and the relay's launch contract reads this
+    // variable - an unpublished port here is a relay that retries forever
+    // with nothing to find.
+    process.env.PROJECT_STUDIO_BOUND_PORT = String(info.port);
     const readinessFd = Number.parseInt(
       process.env.PROJECT_STUDIO_READINESS_FD || "",
       10,
     );
     if (!Number.isInteger(readinessFd) || readinessFd < 0) return;
-    process.env.PROJECT_STUDIO_BOUND_PORT = String(info.port);
     const readiness = {
       type: "project-studio.harness.ready",
       version: 1,

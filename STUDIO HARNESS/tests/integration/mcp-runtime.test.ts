@@ -9,6 +9,7 @@ import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { conversationScope, projectScope } from "../../src/extend/selection.js";
 import type { McpProvenance } from "../../src/extend/mcp/registry.js";
+import { CUSTOMIZATION_SERVER_ID } from "../../src/extend/mcp/builtin.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
 import { openDatabase } from "../../src/storage/database.js";
@@ -104,7 +105,33 @@ describe("MCP application runtime", () => {
   // extension is actually running, which needs a machine that can run one.
   const temporaryDirectories: string[] = [];
 
+  // The relay boots with every runtime here, and its launcher publishes its
+  // endpoint only when the harness's own environment carries it - and waits
+  // for that publish rather than failing into the retry ladder, because a
+  // late relay is a conversation whose recorded instructions change under it
+  // (see the launcher). Nothing in this file binds a listen, so a port
+  // nobody listens on is exactly as good as the real thing: the relay's
+  // readiness is its own handshake, the same arrangement the first-note case
+  // below sets for itself. Snapshot and restore around each case, because
+  // these are process-global reads.
+  const previousEndpoint: Array<[string, string | undefined]> = [];
+
+  function holdEndpointEnvironment(): void {
+    for (const name of [
+      "PROJECT_STUDIO_ADMISSION_CREDENTIAL",
+      "PROJECT_STUDIO_BOUND_PORT",
+    ] as const) {
+      previousEndpoint.push([name, process.env[name]]);
+      process.env[name] = name === "PROJECT_STUDIO_ADMISSION_CREDENTIAL" ? "mcp-runtime-test" : "1";
+    }
+  }
+
   afterEach(async () => {
+    for (const [name, value] of previousEndpoint.reverse()) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    previousEndpoint.length = 0;
     while (temporaryDirectories.length > 0) {
       const directory = temporaryDirectories.pop();
       if (directory !== undefined) await rm(directory, { recursive: true, force: true });
@@ -135,6 +162,7 @@ describe("MCP application runtime", () => {
     // used to resolve a process-global connection, so this test got whichever
     // database was opened first in the worker and `PROJECT_STUDIO_STORE_PATH`
     // did nothing.
+    holdEndpointEnvironment();
     const database = openDatabase({ path: databasePath });
     const runtime = new StudioRuntime({
       database,
@@ -159,6 +187,25 @@ describe("MCP application runtime", () => {
     // has the database, so it writes through the owner like any other caller.
     new WorkspaceTrustStore(database).set(projectRoot, true);
     await runtime.start();
+    // The enablement's reconcile is fire-and-forget by the service's
+    // contract, so returning from `start` says nothing about the handshake.
+    // And the inventory settles on EVERY enabled record: since the relay
+    // joined the boot, a handshake still in flight - the relay's or the
+    // echo's - is the difference between the settled note this file's
+    // assertions read and the pending one. Waiting until neither is starting
+    // or failed is what the settle predicate itself would ask.
+    const answered = (id: string): boolean => {
+      const state = runtime.servers.get(id)?.status?.state;
+      return state === "ready" || state === "given-up" || state === "idle";
+    };
+    for (let attempt = 0; ; attempt += 1) {
+      if (answered("echo-server") && answered(CUSTOMIZATION_SERVER_ID)) break;
+      if (attempt > 300) {
+        const silent = ["echo-server", CUSTOMIZATION_SERVER_ID].filter((id) => !answered(id));
+        throw new Error(`an enabled server never answered for the inventory to settle on: ${silent.join(", ")}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
 
     return { runtime, database };
   }
@@ -510,6 +557,16 @@ describe("MCP application runtime", () => {
     await writeFile(script, SERVER, "utf8");
 
     const database = openDatabase({ path: databasePath });
+    // The relay boots with this runtime, and the launcher publishes its
+    // endpoint only when the harness's own environment carries it. Nothing
+    // in this test calls the harness - the relay's readiness is its own
+    // handshake - so a port nobody listens on is exactly as good as the
+    // real thing, and the note settles on the echo's schedule rather than
+    // the relay's retry ladder.
+    const previousCredential = process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL;
+    const previousPort = process.env.PROJECT_STUDIO_BOUND_PORT;
+    process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL = "first-note-test";
+    process.env.PROJECT_STUDIO_BOUND_PORT = "1";
     const runtime = new StudioRuntime({
       database,
       projectRoot,
@@ -603,6 +660,10 @@ describe("MCP application runtime", () => {
     } finally {
       await runtime.stop();
       database.close();
+      if (previousCredential === undefined) delete process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL;
+      else process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL = previousCredential;
+      if (previousPort === undefined) delete process.env.PROJECT_STUDIO_BOUND_PORT;
+      else process.env.PROJECT_STUDIO_BOUND_PORT = previousPort;
     }
   }, 30_000);
 });

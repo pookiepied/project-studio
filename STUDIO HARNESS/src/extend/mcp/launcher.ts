@@ -2,6 +2,7 @@ import type { SecureCredentialStore } from "../../credentials/credential-store.j
 import { containCommand, programRoots } from "../../sandbox/isolation/index.js";
 import { createSandboxPolicy } from "../../sandbox/policy.js";
 import { ExtendError } from "../errors.js";
+import { CUSTOMIZATION_SERVER_ID } from "./builtin.js";
 import type { McpChannel } from "./connection.js";
 import { HttpChannel } from "./http-channel.js";
 import { McpServerRegistry, type McpServerRecord } from "./registry.js";
@@ -151,11 +152,50 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
     // `provenance` is written by `registerBuiltInServers` and the save route
     // refuses it from outside (see `routes/mcp.ts`).
     if (record.provenance === "system") {
+      // The relay's accreditation, injected rather than configured. The
+      // customization server speaks the harness's own management routes, so
+      // it needs the credential the Host published and the port the listen
+      // actually bound - neither of which can live in the record, because the
+      // port does not exist until the harness binds, and a port inside the
+      // record would change its reach key at every launch and cost every
+      // conversation its approvals.
+      //
+      // The bind lands a few dozen milliseconds into a harness boot, and the
+      // first reconcile races it. Throwing and letting the supervisor's
+      // retry win that race a second later costs more than it looks: a turn
+      // arriving in the window records its instructions without the relay's
+      // tools, and when the relay joins - on the next turn, or on another
+      // process's resume of an in-flight submission - the recorded digest no
+      // longer matches, and the instructions signal lands in the middle of
+      // whatever is running. Inside a model-retry wait that is a hijacked
+      // turn: the signal rides in as the latest user entry and the attempt
+      // answers it instead of continuing the submission. So the launch waits
+      // out the bind itself - bounded, because `ensure` awaits this call,
+      // and the supervisor's retry remains the net if the wait expires.
+      let management = managementChildEnv(process.env);
+      if (
+        record.id === CUSTOMIZATION_SERVER_ID &&
+        (management.STUDIO_MANAGEMENT_URL === undefined ||
+          management.STUDIO_MANAGEMENT_CREDENTIAL === undefined)
+      ) {
+        management = await managementEnvOncePublished();
+      }
+      if (
+        record.id === CUSTOMIZATION_SERVER_ID &&
+        (management.STUDIO_MANAGEMENT_URL === undefined ||
+          management.STUDIO_MANAGEMENT_CREDENTIAL === undefined)
+      ) {
+        throw new ExtendError("internal", {
+          message:
+            "The harness's management endpoint is not published yet, so its customization relay cannot " +
+            "start. This is retried; once the harness's listen has bound, the next attempt goes through.",
+        });
+      }
       return StdioChannel.start({
         command: record.command,
         args: record.args,
         cwd,
-        env,
+        env: { ...env, ...management },
         ...(options.startupTimeoutMs === undefined
           ? {}
           : { startupTimeoutMs: options.startupTimeoutMs }),
@@ -211,4 +251,72 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
   };
 
   return { key, open };
+}
+
+/**
+ * How long a launch waits for the harness's own listen to publish itself.
+ *
+ * The bind lands within the first tens of milliseconds of a healthy boot, so
+ * five seconds is far past anything a real boot needs and short enough that a
+ * process which will never bind is not hung on it - the expiry re-raises the
+ * same refusal the pre-wait code threw, and the supervisor's retry takes over
+ * exactly as before.
+ */
+const MANAGEMENT_ENV_POLL_MS = 50;
+const MANAGEMENT_ENV_WAIT_MS = 5_000;
+
+/**
+ * Waits until `managementChildEnv` can produce both facts, re-reading the
+ * environment on every poll because nothing announces when the listen binds.
+ * Returns the last read, published or not - the caller decides what absence
+ * means.
+ */
+async function managementEnvOncePublished(): Promise<
+  Readonly<Record<string, string>>
+> {
+  const deadline = Date.now() + MANAGEMENT_ENV_WAIT_MS;
+  for (;;) {
+    const management = managementChildEnv(process.env);
+    if (
+      management.STUDIO_MANAGEMENT_URL !== undefined &&
+      management.STUDIO_MANAGEMENT_CREDENTIAL !== undefined
+    ) {
+      return management;
+    }
+    if (Date.now() >= deadline) return management;
+    await new Promise((resolve) => setTimeout(resolve, MANAGEMENT_ENV_POLL_MS));
+  }
+}
+
+/**
+ * The facts a customization relay needs, read from this process's own
+ * environment, and otherwise nothing.
+ *
+ * The credential travels by environment here rather than by bootstrap frame,
+ * because the relay is our own child, spawned inside the same trust domain
+ * that already published the credential to the harness - a second framing
+ * mechanism would be ceremony, not security. `PROJECT_STUDIO_HOME` rides
+ * along whenever the harness itself overrides the default, so the relay's
+ * `tools/` tree is the one the harness's own paths answer for; a divided
+ * home would have the relay downloading beside a database it cannot see.
+ */
+export function managementChildEnv(
+  reads: Readonly<Record<string, string | undefined>>,
+): Readonly<Record<string, string>> {
+  const credential = reads["PROJECT_STUDIO_ADMISSION_CREDENTIAL"];
+  const port = reads["PROJECT_STUDIO_BOUND_PORT"];
+  const home = reads["PROJECT_STUDIO_HOME"];
+  const granted: Record<string, string> = home === undefined ? {} : { PROJECT_STUDIO_HOME: home };
+  if (credential === undefined || credential === "" || port === undefined || port === "") {
+    return granted;
+  }
+  const hostname = reads["PROJECT_STUDIO_HARNESS_HOSTNAME"] ?? "127.0.0.1";
+  return {
+    ...granted,
+    // Bracketed, because the WHATWG parser reads a scoped IPv6 literal's
+    // second colon as a port: `::1:1234` throws, `::1` is exactly what a
+    // deliberate Host choice looks like.
+    STUDIO_MANAGEMENT_URL: `http://${hostname.includes(":") ? `[${hostname}]` : hostname}:${port}`,
+    STUDIO_MANAGEMENT_CREDENTIAL: credential,
+  };
 }

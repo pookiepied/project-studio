@@ -30,6 +30,9 @@ export const BROWSER_SERVER_ID = "studio-browser";
 /** The computer-use server's stable id. */
 export const COMPUTER_SERVER_ID = "studio-computer";
 
+/** The customization server's stable id. */
+export const CUSTOMIZATION_SERVER_ID = "studio-customization";
+
 /**
  * Where the built bundle is, from wherever this code is running.
  *
@@ -46,6 +49,11 @@ export function browserServerPath(): string | undefined {
 /** Where the computer server's bundle is, by the same search. */
 export function computerServerPath(): string | undefined {
   return bundledEntry("computer.mjs");
+}
+
+/** Where the customization server's bundle is, by the same search. */
+export function customizationServerPath(): string | undefined {
+  return bundledEntry("customization.mjs");
 }
 
 function bundledEntry(file: string): string | undefined {
@@ -123,6 +131,36 @@ function computerRecord(entry: string): McpServerInput {
 }
 
 /**
+ * What the customization server's row says.
+ *
+ * The third of Studio's own (ADR 0049 §3's shape, where the first two were
+ * the proof): its tools relay to the harness's own management routes, so the
+ * record carries no reach of its own to describe - what the sentence sells
+ * is the *work*: this is the door to changing what this installation can
+ * reach. `needsNetwork` is true because installing a connection by package
+ * downloads it, which the declaration exists to cover; like every system
+ * record it runs uncontained, so the flag states intent rather than drawing
+ * the boundary.
+ */
+function customizationRecord(entry: string): McpServerInput {
+  return {
+    id: CUSTOMIZATION_SERVER_ID,
+    title: "Studio Customization",
+    description:
+      "Manages what this installation of Studio itself can reach: installs, switches, repairs and " +
+      "removes its MCP connections, and reports what each one is doing. Discover it when the work is " +
+      "about Studio's own connections rather than the project's files.",
+    provenance: "system",
+    transport: "stdio",
+    command: process.execPath,
+    args: [entry],
+    env: {},
+    auth: "none",
+    needsNetwork: true,
+  };
+}
+
+/**
  * Puts the built-in servers in the registry, and switches them on by default.
  *
  * Called once at start. Both halves are idempotent, which they have to be: the
@@ -147,6 +185,15 @@ export function registerBuiltInServers(
   const computer = computerServerPath();
   if (computer !== undefined) {
     install(registry, selection, computerRecord(computer), platform() === "win32");
+  }
+
+  // On by default, like the browser: the feature the onboarding never needs
+  // to explain is the one that answers when the model is asked to change
+  // something. Its costs are a purpose sentence and, on discovery, its
+  // schemas - never a process until a conversation asks.
+  const customization = customizationServerPath();
+  if (customization !== undefined) {
+    install(registry, selection, customizationRecord(customization), true);
   }
 }
 

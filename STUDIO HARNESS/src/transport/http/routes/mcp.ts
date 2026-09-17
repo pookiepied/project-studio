@@ -245,6 +245,21 @@ export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> 
   });
 
   /**
+   * Stops the connection and lets the reconciler start it at once, for a
+   * wedged process or a just-changed secret. The body answers with what the
+   * supervisor says *now* - the story of whether it came back is the status
+   * read's, which is what every caller of this one is told.
+   */
+  routes.post("/servers/:id/restart", async (context) => {
+    try {
+      const record = await servers.restart(context.req.param("id"), authContext(context));
+      return context.json(record);
+    } catch (error) {
+      return context.json(failure(error), 400);
+    }
+  });
+
+  /**
    * The decision body, for every scope.
    *
    * `enabled` is a boolean or `null`, and `null` is not a spelling of `false`:
