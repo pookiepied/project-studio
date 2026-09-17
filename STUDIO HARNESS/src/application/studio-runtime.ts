@@ -62,7 +62,7 @@ import {
 } from "../platform/paths.js";
 import { SandboxError } from "../sandbox/errors.js";
 import { LocalSandbox } from "../sandbox/local-sandbox.js";
-import { createSandboxPolicy } from "../sandbox/policy.js";
+import { createSandboxPolicy, gitConfigRoots } from "../sandbox/policy.js";
 import { projectKey } from "../snapshots/shadow-repo.js";
 import { SnapshotStore } from "../snapshots/store.js";
 import { TurnSnapshots } from "../snapshots/turn.js";
@@ -915,7 +915,13 @@ export class StudioRuntime implements AgentHost {
   conversationExtraRoots(conversationId: string): readonly string[] {
     const projectId = this.#conversationProject(conversationId);
     const roots = this.#scopes.resolveRoots(projectId);
-    return [...roots.readRoots, ...roots.writeRoots.filter((root) => !roots.readRoots.includes(root))];
+    // The standing roots are plumbing, not choices: the block names what the
+    // person granted, so the git config files the policy owes every workspace
+    // stay out of this list rather than reading as an invitation.
+    const standing = new Set(gitConfigRoots());
+    return [...roots.readRoots, ...roots.writeRoots.filter((root) => !roots.readRoots.includes(root))].filter(
+      (root) => !standing.has(root),
+    );
   }
 
   /**

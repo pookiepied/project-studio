@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentBlock } from "../../src/context/environment.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
-import { createSandboxPolicy } from "../../src/sandbox/policy.js";
+import { createSandboxPolicy, gitConfigRoots } from "../../src/sandbox/policy.js";
 import { detectPresets, SANDBOX_PRESETS } from "../../src/sandbox/presets.js";
 import { systemScopeRefusal, validateCustomScopePath } from "../../src/sandbox/scope.js";
 import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
@@ -120,6 +120,49 @@ describe("the scope store", () => {
     // A project conversation sees both its own rows and the machine-wide ones.
     const projectRoots = scopes.resolveRoots("prj_other");
     expect(projectRoots.readRoots).toContain(resolve(directory));
+  });
+
+  it("resolves the git config as a standing read root", () => {
+    // Owed to every conversation that runs a contained git, not to any row
+    // the person chose: a contained git dies at exit 128 reading its
+    // configuration when the container cannot read these files.
+    const scopes = new SandboxScopeStore(db);
+    expect(scopes.resolveRoots("prj_a").readRoots).toEqual(
+      expect.arrayContaining([...gitConfigRoots()]),
+    );
+    expect(scopes.resolveRoots(undefined).readRoots).toEqual(
+      expect.arrayContaining([...gitConfigRoots()]),
+    );
+  });
+
+  it("names the git config files that exist, and nothing else", () => {
+    if (process.platform !== "win32") return;
+    // A fake home, because the assertion is about the shape - existing files
+    // in, missing ones out - and not about this machine's own config.
+    const home = workspace("home");
+    writeFileSync(join(home, ".gitconfig"), "[user]\n");
+    mkdirSync(join(home, ".config", "git"), { recursive: true });
+    writeFileSync(join(home, ".config", "git", "config"), "[core]\n");
+    writeFileSync(join(home, ".config", "git", "ignore"), "*.log\n");
+    expect(gitConfigRoots({ USERPROFILE: home })).toEqual([
+      join(home, ".gitconfig"),
+      join(home, ".config", "git", "config"),
+      join(home, ".config", "git", "ignore"),
+    ]);
+  });
+
+  it("leaves out what is absent, and answers empty for an empty home", () => {
+    if (process.platform !== "win32") return;
+    const home = workspace("bare-home");
+    writeFileSync(join(home, ".gitconfig"), "[user]\n");
+    expect(gitConfigRoots({ USERPROFILE: home })).toEqual([join(home, ".gitconfig")]);
+    expect(gitConfigRoots({ USERPROFILE: workspace("empty-home") })).toEqual([]);
+    expect(gitConfigRoots({})).toEqual([]);
+  });
+
+  it("is empty off Windows, where the home is not inside the container", () => {
+    if (process.platform === "win32") return;
+    expect(gitConfigRoots({ USERPROFILE: workspace("home") })).toEqual([]);
   });
 
   it("refuses a system path whatever source it arrives under", () => {

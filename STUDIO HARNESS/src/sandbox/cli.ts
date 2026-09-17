@@ -26,7 +26,7 @@ import { bwrapPath, probeContainment } from "./isolation/linux/bwrap.js";
 import { unprivilegedIdentity } from "./isolation/linux/identity.js";
 import { pastaPath, probeNetwork } from "./isolation/linux/network.js";
 import { LocalSandbox } from "./local-sandbox.js";
-import { createSandboxPolicy } from "./policy.js";
+import { createSandboxPolicy, gitConfigRoots } from "./policy.js";
 
 /**
  * `pnpm sandbox:release <project-directory>`
@@ -503,7 +503,9 @@ async function releaseStale(): Promise<void> {
   let failed = false;
   for (const entry of entries) {
     const sandbox = new LocalSandbox(
-      createSandboxPolicy({ workspaceRoot: entry.workspaceRoot }),
+      // The standing git-config roots ride along, so the file entries the
+      // policy granted are taken back too rather than left to accumulate.
+      createSandboxPolicy({ workspaceRoot: entry.workspaceRoot, readRoots: gitConfigRoots() }),
     );
     try {
       await sandbox.releaseIsolation();
@@ -585,7 +587,11 @@ async function main(): Promise<void> {
   }
 
   const workspaceRoot = resolve(target);
-  const sandbox = new LocalSandbox(createSandboxPolicy({ workspaceRoot }));
+  const sandbox = new LocalSandbox(
+    // As above: the standing roots are part of the policy, so they are part
+    // of what the release takes back.
+    createSandboxPolicy({ workspaceRoot, readRoots: gitConfigRoots() }),
+  );
 
   if (sandbox.isolationSupport.backend === undefined) {
     process.stdout.write(

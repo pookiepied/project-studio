@@ -215,6 +215,46 @@ function demotionRefusal(
   );
 }
 
+/** The first non-empty line of a stream, or undefined when it carried nothing. */
+function firstLine(text: string): string | undefined {
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed !== "") return trimmed;
+  }
+  return undefined;
+}
+
+/**
+ * What the model is told when the shell it was promised dies unstarted.
+ *
+ * The tool is registered under the interpreter the machine resolved first, so
+ * the description the model has already read names that shell, and from here
+ * on it runs under the next one. A description that says bash while the line
+ * is read by cmd is how `a ; b` becomes one command with a stray argument,
+ * so the note says which shell died - the first line it printed, which is
+ * the diagnostic, rather than the whole stream - and which one the rest of
+ * the session uses, with that shell's own statement of what it can and
+ * cannot do. The same lines the environment block carries, so the two cannot
+ * disagree about it.
+ */
+export function demotionNote(
+  from: Interpreter,
+  to: Interpreter,
+  stderr: string | undefined,
+): string {
+  const fatal = stderr === undefined ? undefined : firstLine(stderr);
+  const death =
+    fatal === undefined
+      ? `${from.label} could not be contained on this machine: the child died in its own library loader (exit ${String(STATUS_DLL_INIT_FAILED)}), before reading the line.`
+      : `${from.label} could not be contained on this machine: the child died in its own library loader (exit ${String(STATUS_DLL_INIT_FAILED)}), before reading the line: "${fatal}".`;
+  return [
+    death,
+    "",
+    `The rest of this session runs through ${to.label} instead.`,
+    ...to.statement,
+  ].join("\n");
+}
+
 /**
  * Whether the interpreter itself can start under containment.
  *
@@ -431,6 +471,29 @@ function createShellTool(
               "foreground with a timeout instead.",
           });
         }
+        // The interpreter is proven before the job exists: a background bash
+        // that cannot be contained dies in its loader inside the registry,
+        // where there is no retry point and the death reads as the job having
+        // failed. The probe runs at most once per interpreter per process, so
+        // this costs one spawn only when nobody has proved this interpreter
+        // yet. The approval was given for what this line runs; reusing it
+        // under the next shell is only honest while it runs the same
+        // programs, which is the same refusal the foreground path asks.
+        let backgroundNote: string | undefined;
+        if (
+          !interpreterStarted(interpreter) &&
+          !(await interpreterCanStart(context.sandbox, interpreter, cwd))
+        ) {
+          if (demoteInterpreter(interpreter)) {
+            const next = resolveInterpreter();
+            if (next !== undefined && next !== interpreter) {
+              const refusal = demotionRefusal(input, interpreter, next);
+              if (refusal !== undefined) return refusal;
+              backgroundNote = demotionNote(interpreter, next, undefined);
+              interpreter = next;
+            }
+          }
+        }
         try {
           const plan = await context.sandbox.spawnPlan("shell", {
             executable: interpreter.path,
@@ -451,6 +514,7 @@ function createShellTool(
               `output with jobs {"id": "${started.id}"}, and stop it with ` +
               `jobs {"id": "${started.id}", "stop": true} when you are done ` +
               "with it.",
+            ...(backgroundNote === undefined ? [] : ["", backgroundNote]),
           ].join("\n");
         } catch (error) {
           if (error instanceof ToolError) throw error;
@@ -539,8 +603,14 @@ function createShellTool(
             // the second starts the same programs.
             const refusal = demotionRefusal(input, interpreter, next);
             if (refusal !== undefined) return refusal;
+            // The dead attempt's own stream is the diagnostic, and the
+            // retry's answer would throw it away: the note carries both, so
+            // the model learns which shell died and which one the rest of the
+            // session uses, in the same breath as the command's answer.
+            const note = demotionNote(interpreter, next, result.stderr);
             interpreter = next;
             result = await spawn();
+            return [report(result), "", note].join("\n");
           }
         }
 

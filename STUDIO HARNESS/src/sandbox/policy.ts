@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { SandboxError } from "./errors.js";
 import { isInsideRoot } from "./paths.js";
@@ -103,6 +104,48 @@ function switchFromEnv(name: string, fallback: boolean): boolean {
   if (raw === "off" || raw === "false" || raw === "0" || raw === "no") return false;
   if (raw === "on" || raw === "true" || raw === "1" || raw === "yes") return true;
   return fallback;
+}
+
+/**
+ * The user's git configuration, as the files the contained git must read.
+ *
+ * Measured on Windows: when the container cannot read these, every repository
+ * operation dies at exit 128 with "unknown error occurred while reading the
+ * configuration files" - the program roots are already readable and the
+ * ancestors already walkable, so the config is the whole gap, and granting it
+ * turns `git init`, `status` and `log` from 128 to 0 with no warnings.
+ *
+ * File-scoped on purpose. The home as a read root would cost a propagating
+ * grant over the user's whole tree on every workspace and a tree-walk revoke
+ * on every release - which is exactly the accumulation `release --stale`
+ * exists to undo, and the revoke alone outlasts the launcher's own timeout.
+ * A file grant is one entry that `release` takes back with the policy's other
+ * roots, and the files' ancestors are already corridor-covered, so nothing
+ * here needs elevation. Only entries that exist are returned, because a grant
+ * on a missing path fails the containment it was meant to enable.
+ *
+ * Windows only. Elsewhere the home is not inside the container at all, so a
+ * missing config is "no such file" (a warning git tolerates) rather than
+ * "permission denied" (which it does not) - and a file that may not exist
+ * must not ride a bind.
+ */
+export function gitConfigRoots(env: NodeJS.ProcessEnv = process.env): readonly string[] {
+  if (process.platform !== "win32") return [];
+  const home = env.USERPROFILE ?? env.HOME ?? "";
+  if (home === "") return [];
+  const found: string[] = [];
+  for (const candidate of [
+    join(home, ".gitconfig"),
+    join(home, ".config", "git", "config"),
+    join(home, ".config", "git", "ignore"),
+  ]) {
+    try {
+      if (existsSync(candidate)) found.push(candidate);
+    } catch {
+      // An unreadable home probed by stat is an answer, not a grant.
+    }
+  }
+  return found;
 }
 
 /**

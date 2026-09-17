@@ -10,6 +10,7 @@ import {
   type SandboxScopeRow,
   type SandboxScopeSource,
 } from "./scope.js";
+import { gitConfigRoots } from "./policy.js";
 
 /**
  * The sole owner of `sandbox_scope`.
@@ -96,7 +97,9 @@ export class SandboxScopeStore {
    * Read where the policy is built. A conversation with no project reads the
    * machine-wide rows only. A write grant implies its read: the policy
    * requires every writable root to sit inside a readable one, so the write
-   * paths join both lists.
+   * paths join both lists. The user's git configuration rides along too -
+   * `gitConfigRoots` - because it is owed to every conversation that runs a
+   * contained git, not to any row the person chose.
    */
   resolveRoots(projectId: string | undefined): {
     readonly readRoots: readonly string[];
@@ -112,6 +115,9 @@ export class SandboxScopeStore {
       } else {
         if (!readRoots.includes(row.path)) readRoots.push(row.path);
       }
+    }
+    for (const root of gitConfigRoots()) {
+      if (!readRoots.includes(root)) readRoots.push(root);
     }
     return { readRoots, writeRoots };
   }

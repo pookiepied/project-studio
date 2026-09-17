@@ -1,12 +1,12 @@
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
-import { createSandboxPolicy } from "../../src/sandbox/policy.js";
+import { createSandboxPolicy, gitConfigRoots } from "../../src/sandbox/policy.js";
 
 /**
  * A granted path actually works, against real containment.
@@ -152,6 +152,55 @@ runner("git unblocks the interpreter", () => {
         await sandbox.releaseIsolation().catch(() => {});
       }
     } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
+runner("contained git reads the user's global config", () => {
+  it("initializes and reads a repository with the config as a read root", async () => {
+    if (process.platform !== "win32") return;
+    const { existsSync } = await import("node:fs");
+    const home = process.env.USERPROFILE ?? "";
+    if (home === "" || !existsSync(join(home, ".gitconfig"))) {
+      console.log("SKIP: this machine holds no user git config, so the grant has nothing to cover.");
+      return;
+    }
+    // The config is there, so the helper must see it: a skip here would let
+    // a broken helper pass by never measuring.
+    const roots = gitConfigRoots();
+    expect(roots.length).toBeGreaterThan(0);
+    const git = "C:\\Program Files\\Git\\cmd\\git.exe";
+    if (!existsSync(git)) {
+      console.log("SKIP: Git for Windows is not installed, so contained git cannot be measured.");
+      return;
+    }
+    const work = await mkdtemp(join(tmpdir(), "studio-git-config-"));
+    const sandbox = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: work, readRoots: [...roots] }),
+    );
+    try {
+      // The program's own directory, the way the shell tool grants it; the
+      // config roots above are the only other thing this run is given.
+      const programRoots = [dirname(git)];
+      const init = await sandbox.run("shell", {
+        executable: git,
+        args: ["init"],
+        cwd: work,
+        programRoots,
+        timeoutMs: 30_000,
+      });
+      expect(init.exitCode).toBe(0);
+      const status = await sandbox.run("shell", {
+        executable: git,
+        args: ["status"],
+        cwd: work,
+        programRoots,
+        timeoutMs: 30_000,
+      });
+      expect(status.exitCode).toBe(0);
+    } finally {
+      await sandbox.releaseIsolation().catch(() => {});
       await rm(work, { recursive: true, force: true });
     }
   }, 60_000);
