@@ -9,9 +9,11 @@ import {
   type CapabilitySlot,
   type ConnectionServes,
   type InvocationShape,
+  kindOfSlot,
   type MediaProtocol,
   type ModelPricing,
   type ProviderConnection,
+  type ProviderKind,
 } from "../../contracts/providers.js";
 import type { CapabilityState, ModelCapability, ReasoningLevel } from "../../contracts/models.js";
 import { capabilityFromPiModel } from "../language/local/catalog.js";
@@ -27,6 +29,7 @@ import {
 import { DECLARED_PROVIDERS, declaredProviderFor, type DeclaredModel } from "./declared-catalog.js";
 import { elevenlabsListing } from "./elevenlabs-media.js";
 import { falListing } from "./fal-media.js";
+import { curatedKinds } from "./curation.js";
 import { googleListing } from "./google-media.js";
 import type { MediaListing } from "./media-listing.js";
 import { openaiListing } from "./openai-media.js";
@@ -335,6 +338,37 @@ async function liveModelsFor(
  * rest, and the two halves are joined here under the vendor's one id.
  */
 export async function listLibraryProviders(): Promise<readonly LibraryProviderEntry[]> {
+  return (await everyLibraryProvider()).flatMap((entry) => curated(entry, curatedKinds()));
+}
+
+/**
+ * One entry cut to the kinds the curation offers, or nothing when it offers
+ * none. The wires and the capabilities narrow together, so a vendor offered
+ * for images alone does not advertise chat; the model count stays the
+ * vendor's whole, because it is a size and not a promise.
+ */
+function curated(
+  entry: LibraryProviderEntry,
+  offered: ReadonlyMap<string, ReadonlySet<ProviderKind>>,
+): readonly LibraryProviderEntry[] {
+  const kinds = offered.get(entry.id);
+  if (kinds === undefined) return [];
+  const serves: { -readonly [K in keyof ConnectionServes]: ConnectionServes[K] } = {};
+  if (kinds.has("language") && entry.serves.language !== undefined) serves.language = entry.serves.language;
+  if (kinds.has("media") && entry.serves.media !== undefined) serves.media = entry.serves.media;
+  if (kinds.has("retrieval") && entry.serves.retrieval !== undefined) serves.retrieval = entry.serves.retrieval;
+  if (Object.keys(serves).length === 0) return [];
+  return [
+    {
+      ...entry,
+      serves,
+      capabilities: entry.capabilities.filter((slot) => kinds.has(kindOfSlot(slot))),
+    },
+  ];
+}
+
+/** Every vendor the two catalogs can name, before the curation says which to offer. */
+async function everyLibraryProvider(): Promise<readonly LibraryProviderEntry[]> {
   const entries: LibraryProviderEntry[] = [];
   const seen = new Set<string>();
 

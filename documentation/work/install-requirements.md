@@ -68,3 +68,36 @@ this project reads a redirected private copy of the user's `AppData`, where
 the same path returned 188 bytes to an ordinary elevated shell and 57,140
 bytes to an agent shell. The profile root is not redirected, which makes the
 discrepancy easy to miss.
+
+## What the bundle carries, and what it still does not
+
+Added 2026-09-19. `bundle.resources` in `STUDIO/src-tauri/tauri.conf.json`
+lays the harness out as one installation under `harness/` in Tauri's
+resource directory: `package.json`, the built `dist/` files flattened beside
+it as `server.mjs` and its chunks, and the three directories the running
+harness reads relative to its installation root - `vendor/` (the binaries it
+ships), `skills/` (the system skills), `catalog/` (the provider curation).
+`installationRoot()` in `src/platform/paths.ts` walks up from `server.mjs`
+to the nearest `package.json`, so the flattened layout and the development
+layout (`dist/server.mjs` one level down) resolve to the same root without
+a second code path. The supervisor looks for `harness/server.mjs` at the
+resource directory of each platform, from the executable, because the eager
+start runs before a Tauri application handle exists - and takes it only when
+`node_modules/` sits beside it, because `tauri dev` copies the resources
+under `target/debug/` too, dependency-less, and that copy answering first is
+a harness that dies at its first import.
+
+Two things a packaged build still needs that no line here provides, stated
+so nobody reads the resource map as "packaging is done":
+
+- **A Node runtime.** The harness is a Node program; the supervisor spawns
+  `node` from the machine. A packaged app must either ship one or declare it
+  a prerequisite, and the check should happen at install time, not as a
+  "harness is not running" screen.
+- **`node_modules`.** `dist/server.mjs` imports its dependencies by bare
+  specifier (`@earendil-works/pi-ai`, `hono`, `@napi-rs/keyring` and the
+  rest), so it runs only beside an installed `node_modules`. Either the
+  bundle carries a production install of the harness's dependencies under
+  `harness/node_modules/`, or the build changes to bundle them in. The
+  keyring module is native and platform-specific, which is the one entry
+  that decides which of the two is right.
