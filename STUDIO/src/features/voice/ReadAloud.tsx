@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { speakText } from '@/features/voice/speak'
+import { narrate, type Narration, type NarrationState } from '@/features/voice/narration'
+import { openWebAudioSink } from '@/features/voice/webAudioSink'
 import { cn } from '@/lib/cn'
 import { WorkingDots } from '@/components/state'
 
@@ -11,82 +13,99 @@ import { WorkingDots } from '@/components/state'
  * Read aloud, as one control that grows into the player it needs.
  *
  * At rest it is the speaker button in the action row. Click it and the button
- * becomes a small pill: while the provider renders the audio, the pill shows
- * its working; from the first audible sample the pill IS the player — a
- * pause/play toggle, five bars that move while sound moves and hold still when
- * it does not, and a close that stops everything and puts the button back.
+ * becomes a small pill: while the provider renders the opening passage, the
+ * pill shows its working; from the first audible sample the pill IS the
+ * player — a pause/play toggle, five bars that move while sound moves and
+ * hold still when it does not, and a close that stops everything and puts
+ * the button back.
+ *
+ * The message is read as passages, each rendered while the one before it
+ * plays (`narration.ts`), so the wait is for one short render rather than
+ * for the whole message. A wait that runs long is said as much: the pill
+ * changes its word after a few seconds instead of leaving a person to
+ * wonder whether the click took.
+ *
+ * A refusal stays until it is dismissed. The old pill flashed its sentence
+ * for three seconds and put the button back, which for anyone who looked
+ * away was a button that did nothing; a sentence worth reading is worth
+ * leaving up, with a retry beside it for the refusals a retry can answer.
  *
  * No clock and no duration: until the provider answers, nobody knows how long
  * the audio is, and a progress bar that guesses would be a lie with a fill.
- * The bars say the one true thing available — sound is happening — and the
- * pause toggle says so as a state, not as a position.
  *
  * One instance per message, state entirely its own: two messages playing at
  * once is the browser's business to allow and the reader's to find confusing,
  * and stopping the first when the second starts is a second control nobody
- * asked for. The audio element dies with the component (unmount is cancel).
+ * asked for. The narration dies with the component (unmount is cancel).
  */
+
+/** How long a render may take before the pill admits it is taking a while. */
+const SLOW_AFTER_MS = 6_000
+
 export function ReadAloud({ text }: { text: string }) {
-  const [stage, setStage] = useState<'idle' | 'loading' | 'playing' | 'paused'>('idle')
-  const [note, setNote] = useState<string | null>(null)
-  const audio = useRef<HTMLAudioElement | null>(null)
+  const [state, setState] = useState<NarrationState | { stage: 'idle' }>({ stage: 'idle' })
+  const [slow, setSlow] = useState(false)
+  const narration = useRef<Narration | null>(null)
 
   const stop = useCallback(() => {
-    audio.current?.pause()
-    audio.current = null
-    setStage('idle')
+    narration.current?.stop()
+    narration.current = null
+    setState({ stage: 'idle' })
   }, [])
 
   // Unmount is cancel: a message scrolled away (or a conversation left) takes
   // its voice with it rather than speaking on.
   useEffect(
     () => () => {
-      audio.current?.pause()
-      audio.current = null
+      narration.current?.stop()
+      narration.current = null
     },
     [],
   )
 
+  useEffect(() => {
+    if (state.stage !== 'loading') {
+      setSlow(false)
+      return
+    }
+    const timer = window.setTimeout(() => setSlow(true), SLOW_AFTER_MS)
+    return () => window.clearTimeout(timer)
+  }, [state.stage])
+
   const begin = () => {
-    setNote(null)
-    setStage('loading')
-    void speakText(text).then((outcome) => {
-      if (outcome.kind === 'note') {
-        setNote(outcome.note)
-        setStage('idle')
-        window.setTimeout(() => setNote(null), 3200)
-        return
-      }
-      const player = new Audio(`data:${outcome.mimeType};base64,${outcome.audio}`)
-      player.onended = () => {
-        audio.current = null
-        setStage('idle')
-      }
-      audio.current = player
-      setStage('playing')
-      void player.play().catch(() => {
-        audio.current = null
-        setStage('idle')
-      })
+    narration.current?.stop()
+    // The narration says `loading` synchronously, before it is the current
+    // one and while the guard below still refuses it, so the pill says it
+    // here.
+    setState({ stage: 'loading' })
+    const started = narrate({
+      text,
+      speak: speakText,
+      openSink: openWebAudioSink,
+      onChange: (next) => {
+        // A narration that was stopped and replaced must not speak for the
+        // one that replaced it.
+        if (narration.current !== started) return
+        if (next.stage === 'done') {
+          narration.current = null
+          setState({ stage: 'idle' })
+          return
+        }
+        setState(next)
+      },
     })
+    narration.current = started
   }
 
   const toggle = () => {
-    const player = audio.current
-    if (player === null) return
-    if (player.paused) {
-      void player.play().catch(() => stop())
-      setStage('playing')
-    } else {
-      player.pause()
-      setStage('paused')
-    }
+    if (state.stage === 'paused') narration.current?.resume()
+    else narration.current?.pause()
   }
 
   return (
     <span className="relative inline-flex items-center">
       <AnimatePresence initial={false} mode="popLayout">
-        {stage === 'idle' ? (
+        {state.stage === 'idle' ? (
           <motion.span
             key="button"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -94,18 +113,9 @@ export function ReadAloud({ text }: { text: string }) {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
           >
-            {note !== null ? (
-              // The pill's one dishonesty guard: a refusal shows as a sentence
-              // long enough to read, then the button returns. It never types
-              // itself into the transcript.
-              <span className="whitespace-nowrap rounded-full bg-surface-raised px-2.5 py-1 text-caption text-muted-foreground shadow-raised">
-                {note}
-              </span>
-            ) : (
-              <IconButton label="Read aloud" size="sm" onClick={begin}>
-                <Icons.readAloud size="sm" />
-              </IconButton>
-            )}
+            <IconButton label="Read aloud" size="sm" onClick={begin}>
+              <Icons.readAloud size="sm" />
+            </IconButton>
           </motion.span>
         ) : (
           <motion.span
@@ -116,40 +126,60 @@ export function ReadAloud({ text }: { text: string }) {
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             className="flex items-center gap-1.5 rounded-full bg-surface-raised py-0.5 pr-1 pl-2.5 shadow-raised"
           >
-            {stage === 'loading' ? (
+            {state.stage === 'loading' ? (
               <>
                 <WorkingDots className="text-muted-foreground" />
-                <span className="text-caption text-muted-foreground">Reading aloud</span>
+                <span className="whitespace-nowrap text-caption text-muted-foreground">
+                  {slow ? 'Still rendering the voice' : 'Reading aloud'}
+                </span>
+              </>
+            ) : state.stage === 'failed' ? (
+              <>
+                {/* The refusal never types itself into the transcript: it
+                    lives in the pill, with the one remedy a pill can offer. */}
+                <span role="status" className="whitespace-nowrap text-caption text-muted-foreground">
+                  {state.note}
+                </span>
+                <PillButton label="Try again" onClick={begin}>
+                  <Icons.reload size="sm" />
+                </PillButton>
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  aria-label={stage === 'paused' ? 'Resume' : 'Pause'}
-                  onClick={toggle}
-                  className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-                >
-                  {stage === 'paused' ? (
-                    <Icons.play size="sm" />
-                  ) : (
-                    <Icons.pause size="sm" />
-                  )}
-                </button>
-                <VoiceBars moving={stage === 'playing'} />
+                <PillButton label={state.stage === 'paused' ? 'Resume' : 'Pause'} onClick={toggle}>
+                  {state.stage === 'paused' ? <Icons.play size="sm" /> : <Icons.pause size="sm" />}
+                </PillButton>
+                <VoiceBars moving={state.stage === 'playing'} />
               </>
             )}
-            <button
-              type="button"
-              aria-label="Stop reading aloud"
-              onClick={stop}
-              className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-            >
+            <PillButton label="Stop reading aloud" onClick={stop}>
               <Icons.close size="sm" />
-            </button>
+            </PillButton>
           </motion.span>
         )}
       </AnimatePresence>
     </span>
+  )
+}
+
+function PillButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
+    >
+      {children}
+    </button>
   )
 }
 
