@@ -497,10 +497,15 @@ export class ModelCatalog {
   ): ProviderModel {
     // The provider's own word outranks the catalog's: a row its list omits is
     // marked unavailable but never deleted, because the mark is one probe old
-    // and the next probe may disagree.
+    // and the next probe may disagree. The word is about language models
+    // only - the probe reads the chat listing - so a row that speaks,
+    // transcribes, paints or films is not judged by it: OpenRouter's speech
+    // models come from a listing of their own that the chat listing never
+    // names, and judging them by it emptied the read-aloud picker.
     const available =
       served === undefined ||
       model.origin !== "catalog" ||
+      !capabilityServesKind(model.capability, "language") ||
       served.servedIds.has(model.modelId);
     return validateProviderModel({
       ...model,

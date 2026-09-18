@@ -1,7 +1,7 @@
 import { HttpError, requestBinary, requestDirect } from "../../../net/http.js";
 import type { UrlAuthor } from "../../../net/destination.js";
 import { MediaError } from "../../../contracts/media.js";
-import type { DriverEndpoint } from "../drivers/types.js";
+import type { DriverEndpoint, SpeechSlotInput, TranscriptionSlotInput } from "../drivers/types.js";
 import type {
   Generation,
   ImageGenerationInput,
@@ -32,6 +32,14 @@ import type {
  * `https://queue.fal.run`; the model id is the path. Input images and first
  * frames travel as data URIs, which FAL takes in its `image_url` and
  * `image_urls` fields.
+ *
+ * Speech and transcription ride the same queue, and the person waits for
+ * them at the read-aloud pill or the composer rather than at a job card, so
+ * the adapter polls on the caller's behalf and answers bytes or words. The
+ * listing's `text-to-speech` endpoints were read for their schemas on
+ * 2026-09-19: every one names its text `text` or `prompt` (MiniMax and
+ * Gemini the latter) and answers `audio: { url, content_type }`; every
+ * `speech-to-text` endpoint takes `audio_url` and answers `text`.
  */
 
 const AUTHOR: UrlAuthor = "user";
@@ -39,6 +47,11 @@ const SUBMIT_TIMEOUT_MS = 60_000;
 const POLL_TIMEOUT_MS = 30_000;
 const DOWNLOAD_TIMEOUT_MS = 600_000;
 const OUTPUT_MAX_BYTES = 512 * 1024 * 1024;
+/** A spoken passage or a dictated sentence renders in seconds; the wait between asks is short to match. */
+const AUDIO_POLL_DELAY_MS = 500;
+/** The whole wait for one audio request, submit to bytes, matched to the other audio adapters. */
+const AUDIO_TIMEOUT_MS = 120_000;
+const SPEECH_FALLBACK_MIME = "audio/mpeg";
 
 function origin(endpoint: DriverEndpoint): string {
   return endpoint.baseUrl.replace(/\/+$/, "");
@@ -153,50 +166,62 @@ function outputUrls(result: Record<string, unknown>): readonly { url: string; co
       contentType: typeof value.content_type === "string" ? value.content_type : undefined,
     });
   };
-  for (const key of ["images", "image", "video", "videos", "output"]) take(result[key]);
+  for (const key of ["images", "image", "video", "videos", "audio", "output"]) take(result[key]);
   return found;
+}
+
+/** Where the queue says a request stands; `completed` is the moment its result can be read. */
+type QueueState =
+  | { readonly state: "queued" | "running"; readonly detail?: string }
+  | { readonly state: "completed" }
+  | { readonly state: "failed"; readonly message: string };
+
+async function statusOf(submitted: Submitted, endpoint: DriverEndpoint): Promise<QueueState> {
+  const answered = await requestDirect({
+    url: `${submitted.statusUrl}${submitted.statusUrl.includes("?") ? "&" : "?"}logs=1`,
+    author: AUTHOR,
+    method: "GET",
+    headers: headers(endpoint, false),
+    timeoutMs: POLL_TIMEOUT_MS,
+  }).catch((error: unknown) => {
+    throw unreachable("status", error);
+  });
+  if (answered.status >= 400) throw refused("status", answered.status, answered.body);
+  let status: unknown;
+  try {
+    status = JSON.parse(answered.body);
+  } catch {
+    return { state: "failed", message: "FAL's status was not JSON." };
+  }
+  if (!isRecord(status)) return { state: "failed", message: "FAL's status was not an object." };
+  switch (status.status) {
+    case "IN_QUEUE": {
+      const position = status.queue_position;
+      return {
+        state: "queued",
+        ...(typeof position === "number" ? { detail: `${String(position)} ahead in the queue` } : {}),
+      };
+    }
+    case "IN_PROGRESS": {
+      const detail = lastLog(status);
+      return { state: "running", ...(detail === undefined ? {} : { detail }) };
+    }
+    case "COMPLETED": {
+      if (typeof status.error === "string" && status.error.length > 0) {
+        return { state: "failed", message: status.error };
+      }
+      return { state: "completed" };
+    }
+    default:
+      return { state: "failed", message: `FAL reported an unknown state "${String(status.status)}".` };
+  }
 }
 
 function polled(submitted: Submitted, endpoint: DriverEndpoint, fallbackMime: string): Generation {
   const poll = async (): Promise<PollOutcome> => {
-    const answered = await requestDirect({
-      url: `${submitted.statusUrl}${submitted.statusUrl.includes("?") ? "&" : "?"}logs=1`,
-      author: AUTHOR,
-      method: "GET",
-      headers: headers(endpoint, false),
-      timeoutMs: POLL_TIMEOUT_MS,
-    }).catch((error: unknown) => {
-      throw unreachable("status", error);
-    });
-    if (answered.status >= 400) throw refused("status", answered.status, answered.body);
-    let status: unknown;
-    try {
-      status = JSON.parse(answered.body);
-    } catch {
-      return { state: "failed", message: "FAL's status was not JSON." };
-    }
-    if (!isRecord(status)) return { state: "failed", message: "FAL's status was not an object." };
-    switch (status.status) {
-      case "IN_QUEUE": {
-        const position = status.queue_position;
-        return {
-          state: "queued",
-          ...(typeof position === "number" ? { detail: `${String(position)} ahead in the queue` } : {}),
-        };
-      }
-      case "IN_PROGRESS": {
-        const detail = lastLog(status);
-        return { state: "running", ...(detail === undefined ? {} : { detail }) };
-      }
-      case "COMPLETED": {
-        if (typeof status.error === "string" && status.error.length > 0) {
-          return { state: "failed", message: status.error };
-        }
-        return { state: "done", outputs: await collect(submitted, endpoint, fallbackMime) };
-      }
-      default:
-        return { state: "failed", message: `FAL reported an unknown state "${String(status.status)}".` };
-    }
+    const status = await statusOf(submitted, endpoint);
+    if (status.state !== "completed") return status;
+    return { state: "done", outputs: await collect(submitted, endpoint, fallbackMime) };
   };
 
   const cancel = async (): Promise<void> => {
@@ -213,12 +238,8 @@ function polled(submitted: Submitted, endpoint: DriverEndpoint, fallbackMime: st
   return { shape: "poll", job: { id: submitted.id, poll, cancel } };
 }
 
-/** The result, read from the response URL and downloaded file by file. */
-async function collect(
-  submitted: Submitted,
-  endpoint: DriverEndpoint,
-  fallbackMime: string,
-): Promise<readonly MediaBytes[]> {
+/** The result as the vendor wrote it, read from the response URL. */
+async function resultOf(submitted: Submitted, endpoint: DriverEndpoint): Promise<Record<string, unknown>> {
   const answered = await requestDirect({
     url: submitted.responseUrl,
     author: AUTHOR,
@@ -236,7 +257,17 @@ async function collect(
   } catch {
     throw new MediaError("provider-refused", "FAL's result was not JSON.");
   }
-  const urls = isRecord(result) ? outputUrls(result) : [];
+  if (!isRecord(result)) throw new MediaError("provider-refused", "FAL's result was not an object.");
+  return result;
+}
+
+/** The result, read from the response URL and downloaded file by file. */
+async function collect(
+  submitted: Submitted,
+  endpoint: DriverEndpoint,
+  fallbackMime: string,
+): Promise<readonly MediaBytes[]> {
+  const urls = outputUrls(await resultOf(submitted, endpoint));
   if (urls.length === 0) {
     throw new MediaError("provider-refused", "FAL's result carried no file.");
   }
@@ -294,8 +325,65 @@ async function generateVideo(input: VideoGenerationInput, endpoint: DriverEndpoi
   return polled(await submit(input.modelId, body, endpoint), endpoint, "video/mp4");
 }
 
+/**
+ * One audio request waited out here rather than in the job registry: the
+ * caller is a person at a pill, and the driver contract answers bytes. The
+ * wait is bounded so a wedged queue is a refusal the pill can show and not
+ * a spinner it cannot end.
+ */
+async function awaitAudio(submitted: Submitted, endpoint: DriverEndpoint, what: string): Promise<void> {
+  const deadline = Date.now() + (endpoint.timeoutMs ?? AUDIO_TIMEOUT_MS);
+  for (;;) {
+    const status = await statusOf(submitted, endpoint);
+    if (status.state === "completed") return;
+    if (status.state === "failed") {
+      throw new MediaError("provider-refused", `FAL refused the ${what} request: ${status.message}`);
+    }
+    if (Date.now() >= deadline) {
+      throw new MediaError("provider-refused", `FAL did not finish the ${what} request in time.`, {
+        retryable: true,
+      });
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, AUDIO_POLL_DELAY_MS));
+  }
+}
+
+async function speak(input: SpeechSlotInput, endpoint: DriverEndpoint) {
+  // Both spellings of the text ride, as both spellings of the image URL do
+  // for the image endpoints: each model reads its own and ignores the other.
+  const body = {
+    text: input.text,
+    prompt: input.text,
+    ...(input.voiceId === undefined ? {} : { voice: input.voiceId }),
+  };
+  const submitted = await submit(input.modelId, body, endpoint);
+  await awaitAudio(submitted, endpoint, "speech");
+  const outputs = await collect(submitted, endpoint, SPEECH_FALLBACK_MIME);
+  const first = outputs[0];
+  if (first === undefined || first.bytes.length === 0) {
+    throw new MediaError("provider-refused", "FAL returned no audio.");
+  }
+  return { audio: Buffer.from(first.bytes).toString("base64"), mimeType: first.mimeType };
+}
+
+async function transcribe(input: TranscriptionSlotInput, endpoint: DriverEndpoint) {
+  const submitted = await submit(
+    input.modelId,
+    { audio_url: dataUrl({ bytes: input.audio, mimeType: input.mimeType }) },
+    endpoint,
+  );
+  await awaitAudio(submitted, endpoint, "transcription");
+  const result = await resultOf(submitted, endpoint);
+  if (typeof result.text !== "string") {
+    throw new MediaError("provider-refused", "FAL's transcription carried no text.");
+  }
+  return { text: result.text };
+}
+
 export const falMedia: MediaAdapter = {
   protocol: "fal",
+  speak,
+  transcribe,
   generateImage,
   generateVideo,
 };

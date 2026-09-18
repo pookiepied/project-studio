@@ -416,4 +416,35 @@ describe("provider model catalog", () => {
     expect(served.has(`openai/${first.modelId}`)).toBe(true);
     expect(served.has(`work-openai/${first.modelId}`)).toBe(false);
   });
+  it("marks language rows the probe omits unavailable, and leaves media rows to their own listing", async () => {
+    const google: ProviderConnectionDraft = {
+      id: "google",
+      displayName: "Google",
+      serves: { language: "google-generative-ai", media: "google" },
+      source: "local",
+      enabled: true,
+      catalogProvider: "google",
+    };
+    await connections.add(google);
+    const offline = new ModelCatalog({ db, connections, liveListings: false });
+    const chat = (await offline.listModels({ connectionId: "google", kind: "language" }))[0];
+    if (chat === undefined) {
+      throw new ProviderConfigurationError("The builtin Google catalog is empty.");
+    }
+
+    // The probe reads the chat listing, which never names a video or speech
+    // model; recorded here as a listing that names one chat model and
+    // nothing else.
+    offline.recordServedModels("google", [chat.modelId]);
+
+    const models = await offline.listModels({ connectionId: "google" });
+    const byId = new Map(models.map((model) => [model.modelId, model]));
+    expect(byId.get(chat.modelId)?.available).toBe(true);
+    const otherChat = models.find(
+      (model) => model.modelId !== chat.modelId && model.capability.textGeneration === "supported",
+    );
+    expect(otherChat?.available).toBe(false);
+    expect(byId.get("veo-3.1-generate-preview")?.available).toBe(true);
+    expect(byId.get("gemini-3.1-flash-tts-preview")?.available).toBe(true);
+  });
 });
