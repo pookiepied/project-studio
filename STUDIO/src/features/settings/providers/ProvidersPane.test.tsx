@@ -100,7 +100,7 @@ afterEach(() => {
  * The open dialog by name.
  *
  * Scoped rather than global because the footer button repeats the dialog's own
- * title - "Add connection" opens it and its close button reads "Close" - which
+ * title - "Add provider" opens it and its close button reads "Close" - which
  * is right on screen and ambiguous to a query.
  */
 function dialog(name: string): HTMLElement {
@@ -114,8 +114,8 @@ function dialog(name: string): HTMLElement {
  * "Custom endpoint" on that click.
  */
 function openCustomForm() {
-  fireEvent.click(screen.getByText('Add connection'))
-  fireEvent.click(within(dialog('Add connection')).getByText('Custom endpoint'))
+  fireEvent.click(screen.getByText('Add provider'))
+  fireEvent.click(within(dialog('Add provider')).getByText('Custom endpoint'))
 }
 
 /** The custom form's dialog, named by the title the form shows. */
@@ -152,7 +152,7 @@ describe('with no harness', () => {
     // there is no harness to accept.
     expect(screen.queryByText(/Could not read providers/)).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
-    expect(screen.queryByText('Add connection')).toBeNull()
+    expect(screen.queryByText('Add provider')).toBeNull()
   })
 
   it('sends no request at all', async () => {
@@ -441,17 +441,17 @@ describe('creating a connection', () => {
     // Tavily serves only retrieval, and belongs to the Tools page.
     const models = render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
-    fireEvent.click(screen.getByText('Add connection'))
-    const languagePicker = dialog('Add connection')
+    fireEvent.click(screen.getByText('Add provider'))
+    const languagePicker = dialog('Add provider')
     await within(languagePicker).findByText('OpenAI')
     within(languagePicker).getByText('Chat - Images')
     expect(within(languagePicker).queryByText('Tavily')).toBeNull()
     models.unmount()
 
     render(<ProvidersPane kind="retrieval" />)
-    await screen.findByText('Add connection')
-    fireEvent.click(screen.getByText('Add connection'))
-    const picker = dialog('Add connection')
+    await screen.findByText('Add provider')
+    fireEvent.click(screen.getByText('Add provider'))
+    const picker = dialog('Add provider')
     await within(picker).findByText('Tavily')
     within(picker).getByText('Web search')
     expect(within(picker).queryByText('OpenAI')).toBeNull()
@@ -554,6 +554,88 @@ describe('the Media page against a 121-model answer', () => {
     render(<ProvidersPane kind="language" />)
     await screen.findByText('OpenRouter')
     expect(screen.getByText('13 of 13 models offered')).toBeTruthy()
+  })
+})
+
+describe('the Media categories', () => {
+  const library = [
+    {
+      id: 'openai',
+      displayName: 'OpenAI',
+      serves: { language: 'openai-completions', media: 'openai' },
+      capabilities: ['textGeneration', 'imageGeneration', 'imageEditing', 'speechGeneration', 'transcription'],
+      modelCount: 50,
+    },
+    {
+      id: 'elevenlabs',
+      displayName: 'ElevenLabs',
+      serves: { media: 'elevenlabs' },
+      capabilities: ['speechGeneration', 'transcription'],
+      modelCount: 4,
+    },
+    {
+      id: 'minimax',
+      displayName: 'MiniMax',
+      serves: { media: 'minimax' },
+      capabilities: ['videoGeneration', 'speechGeneration'],
+      modelCount: 7,
+    },
+  ]
+  const openai = { ...KNOWN_VENDOR, id: 'openai', displayName: 'OpenAI', catalogProvider: 'openai', serves: { language: 'openai-completions', media: 'openai' } }
+  const eleven = { ...KNOWN_VENDOR, id: 'eleven', displayName: 'My ElevenLabs', catalogProvider: 'elevenlabs', serves: { media: 'elevenlabs' } }
+
+  it('shows under each category only the providers that serve it, tagged with what they serve there', async () => {
+    harnessConfigured()
+    stubFetch((url, method) => {
+      if (url.includes('/library')) return jsonResponse(library)
+      if (method === 'GET' && url.endsWith('/connections')) return jsonResponse([openai, eleven])
+      if (url.includes('/models')) return jsonResponse([])
+      return defaultRoute(url, method)
+    })
+    render(<ProvidersPane kind="media" />)
+
+    // Images: the image house, not the voice house.
+    await screen.findByText('OpenAI')
+    expect(screen.getByText('Images, Image editing')).toBeTruthy()
+    expect(screen.queryByText('My ElevenLabs')).toBeNull()
+
+    // Voice: both, each tagged with the voice slots it serves.
+    fireEvent.click(screen.getByRole('radio', { name: 'Voice' }))
+    await screen.findByText('My ElevenLabs')
+    expect(screen.getByText('OpenAI')).toBeTruthy()
+    expect(screen.getAllByText('Speech, Transcription')).toHaveLength(2)
+    expect(screen.getByText('Read aloud')).toBeTruthy()
+    expect(screen.getByText('Dictation')).toBeTruthy()
+
+    // Video: neither connection, and the empty sentence names the category.
+    fireEvent.click(screen.getByRole('radio', { name: 'Video' }))
+    await screen.findByText(/No provider serves video yet/)
+    expect(screen.queryByText('OpenAI')).toBeNull()
+  })
+
+  it('offers, when adding, only the vendors that serve the category, and says what for', async () => {
+    harnessConfigured()
+    stubFetch((url, method) => {
+      if (url.includes('/library')) return jsonResponse(library)
+      if (method === 'GET' && url.endsWith('/connections')) return jsonResponse([])
+      if (url.includes('/models')) return jsonResponse([])
+      return defaultRoute(url, method)
+    })
+    render(<ProvidersPane kind="media" />)
+    await screen.findByText('Add provider')
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Video' }))
+    // The category's own body, once the previous one has left: the button
+    // in the leaving body belongs to a component on its way out.
+    await screen.findByText(/No provider serves video yet/)
+    fireEvent.click(screen.getByText('Add provider'))
+    const picker = dialog('Add a provider for video')
+    await within(picker).findByText('MiniMax')
+    // Only the video half of what MiniMax serves is named here.
+    expect(within(picker).getByText('Video')).toBeTruthy()
+    expect(within(picker).queryByText(/Speech/)).toBeNull()
+    expect(within(picker).queryByText('OpenAI')).toBeNull()
+    expect(within(picker).queryByText('ElevenLabs')).toBeNull()
   })
 })
 
@@ -702,40 +784,43 @@ describe('the capability defaults', () => {
   it("renders each page's slots, and refuses to offer a picker nothing can fill", async () => {
     harnessConfigured()
     stubFetch()
-    // The Models page has the one language slot and none of the others.
+    // The Models page has the one language slot and none of the others,
+    // under a Defaults caption with the providers beneath it.
     const models = render(<ProvidersPane kind="language" />)
     await screen.findByText('Work Anthropic')
     expect(screen.getByText('Chat')).toBeTruthy()
-    for (const label of ['Images', 'Video', 'Speech', 'Web search']) {
+    expect(screen.getByText('Defaults')).toBeTruthy()
+    expect(screen.getByText('Providers')).toBeTruthy()
+    for (const label of ['Generate', 'Edit', 'Read aloud', 'Web search']) {
       expect(screen.queryByText(label)).toBeNull()
     }
     models.unmount()
 
-    // The Media page has the six media slots, in the contract's order. The
-    // only model the harness knows has textGeneration supported, so nothing
-    // fills an image slot and the row says so rather than rendering a dead
-    // picker.
+    // The Media page opens on Images, whose two slots are named by verb.
+    // The only model the harness knows has textGeneration supported, so
+    // nothing fills an image slot and the row says so rather than rendering
+    // a dead picker - in the slot's own product words, not the verb's.
     render(<ProvidersPane kind="media" />)
-    await screen.findByText('Images')
-    for (const label of ['Images', 'Image editing', 'Video', 'Speech', 'Transcription', 'Embeddings']) {
-      expect(screen.getByText(label)).toBeTruthy()
-    }
+    await screen.findByText('Generate')
+    expect(screen.getByText('Edit')).toBeTruthy()
     expect(screen.queryByText('Chat')).toBeNull()
+    expect(screen.queryByText('Read aloud')).toBeNull()
     expect(screen.getByText(/Connect a provider serving images to fill this slot/)).toBeTruthy()
     expect(screen.getByText(/Connect a provider serving image editing to fill this slot/)).toBeTruthy()
   })
 
-  it('shows the one honest sentence only where nothing invokes the slot yet', async () => {
+  it('keeps embeddings off the Media page until something invokes it', async () => {
     harnessConfigured()
     stubFetch()
     render(<ProvidersPane kind="media" />)
-    await screen.findByText('Images')
+    await screen.findByText('Generate')
 
-    // The image, video and voice slots are invoked now - the studio tools
-    // and the read-aloud and dictation features - so they carry no such
-    // sentence; embeddings still has no consumer, and says so once.
-    expect(screen.getAllByText(/in a later update/)).toHaveLength(1)
-    expect(screen.getByText(/No model with embeddings is connected.*embed through it/)).toBeTruthy()
+    for (const category of ['Video', 'Voice']) {
+      fireEvent.click(screen.getByRole('radio', { name: category }))
+      await screen.findByText(category === 'Video' ? 'Generate' : 'Read aloud')
+      expect(screen.queryByText('Embeddings')).toBeNull()
+      expect(screen.queryByText(/in a later update/)).toBeNull()
+    }
   })
 
   it('writes a default through PUT with the contract reference', async () => {
