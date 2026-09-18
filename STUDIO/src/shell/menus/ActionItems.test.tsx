@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { readDraft } from '@/features/chat/composer/drafts'
+import { readClipboardText } from '@/lib/clipboard'
 import { fieldAt } from '@/lib/field'
 import { ActionItems } from './ActionItems'
 
@@ -16,6 +17,11 @@ import { ActionItems } from './ActionItems'
  */
 
 const goHome = vi.fn()
+vi.mock('@/lib/clipboard', () => ({
+  copyText: vi.fn(async () => true),
+  readClipboardText: vi.fn(async () => ''),
+}))
+
 vi.mock('@/stores/navigation', () => ({
   useNavigation: () => ({
     goHome,
@@ -58,6 +64,40 @@ describe('the action lists', () => {
     expect(disabled('Cut')).toBe(true)
     expect(disabled('Copy')).toBe(true)
     expect(disabled('Paste')).toBe(false)
+  })
+
+  it('wakes Cut and Copy when Select all widens the selection under them', () => {
+    const field = fieldWith('hello', 2, 2)
+    render(<ActionItems kind="field" selection="" target={field} close={vi.fn()} />)
+    const disabled = (name: string) => screen.getByRole('menuitem', { name }).hasAttribute('disabled')
+    expect(disabled('Cut')).toBe(true)
+
+    // jsdom's `select()` does not raise `selectionchange`; the browser does,
+    // and the rows listen for it rather than for their own verb.
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Select all' }))
+    act(() => {
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    expect(field.selectionStart).toBe(0)
+    expect(field.selectionEnd).toBe(5)
+    expect(disabled('Cut')).toBe(false)
+    expect(disabled('Copy')).toBe(false)
+  })
+
+  it('pastes what the clipboard holds at the caret', async () => {
+    vi.mocked(readClipboardText).mockResolvedValueOnce('there')
+    const field = fieldWith('hello ', 6, 6)
+    const close = vi.fn()
+    render(<ActionItems kind="field" selection="" target={field} close={close} />)
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Paste' }))
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(field.value).toBe('hello there')
+    expect(close).toHaveBeenCalledTimes(1)
   })
 
   it('gives a selection its three verbs and none of the app\'s', () => {

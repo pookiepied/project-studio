@@ -1,3 +1,5 @@
+import { readDesktopClipboardText } from '@/platform/tauri'
+
 /**
  * Copy text, reporting whether it worked.
  *
@@ -55,9 +57,16 @@ function copyThroughSelection(text: string): boolean {
  * The clipboard's text, or the empty string when it cannot be read: a
  * runtime without the API, or one that refused. A paste that reads nothing
  * inserts nothing; it does not explain itself.
+ *
+ * On the desktop the read is Rust's (`readDesktopClipboardText`), because
+ * WebView2 refuses the webview's own `readText`; see that function. The
+ * browser path stays for a phone reading Studio over the LAN, where it is
+ * the only clipboard there is.
  */
 export async function readClipboardText(): Promise<string> {
   try {
+    const desktop = await readDesktopClipboardText()
+    if (desktop !== null) return desktop
     return await navigator.clipboard.readText()
   } catch {
     return ''

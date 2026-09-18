@@ -3,7 +3,10 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { copyText } from './clipboard'
+import { readDesktopClipboardText } from '@/platform/tauri'
+import { copyText, readClipboardText } from './clipboard'
+
+vi.mock('@/platform/tauri', () => ({ readDesktopClipboardText: vi.fn(async () => null) }))
 
 /**
  * The copy control's answer has to be true only when the clipboard really
@@ -57,5 +60,29 @@ describe('copyText', () => {
     delete (document as { execCommand?: unknown }).execCommand
 
     await expect(copyText('the words')).resolves.toBe(false)
+  })
+})
+
+describe('readClipboardText', () => {
+  it('takes the desktop read first, even when the browser API would answer', async () => {
+    vi.mocked(readDesktopClipboardText).mockResolvedValueOnce('from the desktop')
+    const readText = vi.fn(async () => 'from the webview')
+    Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+
+    await expect(readClipboardText()).resolves.toBe('from the desktop')
+    expect(readText).not.toHaveBeenCalled()
+  })
+
+  it('asks the browser when there is no desktop shell', async () => {
+    const readText = vi.fn(async () => 'from the webview')
+    Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+
+    await expect(readClipboardText()).resolves.toBe('from the webview')
+  })
+
+  it('reads nothing, quietly, when the desktop read refuses', async () => {
+    vi.mocked(readDesktopClipboardText).mockRejectedValueOnce(new Error('held by another application'))
+
+    await expect(readClipboardText()).resolves.toBe('')
   })
 })

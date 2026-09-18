@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator } from '@/components/primitives'
 import { writeDraft } from '@/features/chat/composer/drafts'
@@ -166,6 +167,12 @@ function quote(text: string): string {
  * so the field's owner sees an ordinary edit: `insertText` fires the input
  * event a controlled React field listens for, where setting `.value` would
  * change the screen behind React's back.
+ *
+ * The rows follow the field's selection while the menu is open, because
+ * "Select all" changes it without closing the menu, and Cut and Copy read
+ * once at mount stayed greyed over the text that had just been selected for
+ * them. `selectionchange` fires for a field's selection as well as the
+ * page's, so one listener covers the menu's own verb and the keyboard.
  */
 function FieldItems({
   field,
@@ -174,7 +181,7 @@ function FieldItems({
   field: HTMLTextAreaElement | HTMLInputElement | null
   close: () => void
 }) {
-  const selected = field ? field.value.slice(field.selectionStart ?? 0, field.selectionEnd ?? 0) : ''
+  const selected = useFieldSelection(field)
   const hasSelection = selected.length > 0
 
   const insert = (text: string) => {
@@ -182,7 +189,8 @@ function FieldItems({
     field.focus()
     // Chromium's `insertText` replaces the selection and fires `input`; the
     // fallback does the same by hand for a runtime without it.
-    if (!document.execCommand('insertText', false, text)) {
+    const command = typeof document.execCommand === 'function' && document.execCommand('insertText', false, text)
+    if (!command) {
       field.setRangeText(text, field.selectionStart ?? 0, field.selectionEnd ?? 0, 'end')
       field.dispatchEvent(new Event('input', { bubbles: true }))
     }
@@ -226,6 +234,8 @@ function FieldItems({
       >
         Paste
       </MenuItem>
+      {/* Stays open, like the selection menu's: selecting all is the first
+          half of Cut or Copy, and the rows above wake up to the new selection. */}
       <MenuItem
         icon={<Icons.check />}
         disabled={!field || field.value.length === 0}
@@ -238,4 +248,19 @@ function FieldItems({
       </MenuItem>
     </>
   )
+}
+
+/** The field's selected text, kept current for as long as the caller is mounted. */
+function useFieldSelection(field: HTMLTextAreaElement | HTMLInputElement | null): string {
+  const [selected, setSelected] = useState(() => selectionOf(field))
+  useEffect(() => {
+    const onSelectionChange = () => setSelected(selectionOf(field))
+    document.addEventListener('selectionchange', onSelectionChange)
+    return () => document.removeEventListener('selectionchange', onSelectionChange)
+  }, [field])
+  return selected
+}
+
+function selectionOf(field: HTMLTextAreaElement | HTMLInputElement | null): string {
+  return field ? field.value.slice(field.selectionStart ?? 0, field.selectionEnd ?? 0) : ''
 }
