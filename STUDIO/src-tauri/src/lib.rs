@@ -1,4 +1,5 @@
 mod harness;
+mod clipboard;
 mod permissions;
 mod remote;
 mod services;
@@ -822,6 +823,7 @@ pub fn run() {
       computer_indicator_hide,
       computer_indicator_stop,
       quit_app,
+      clipboard::read_clipboard_text,
       get_harness_endpoint,
       restart_harness,
       get_harness_status,

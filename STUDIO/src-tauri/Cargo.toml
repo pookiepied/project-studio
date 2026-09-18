@@ -144,7 +144,10 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # the Harness and every process it starts are assigned to one Job Object with
 # `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so an MCP child cannot outlive the Host
 # holding a port or a file lock (meta-task #89).
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects"] }
+# `Win32_System_DataExchange` and `Win32_System_Memory` are the clipboard read
+# behind the field menu's Paste (`clipboard.rs`): the webview's own
+# `readText` is refused by WebView2 whatever the permission handler answers.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory"] }
 
 # The permission grant (`permissions.rs`): WebView2's PermissionRequested,
 # answered by Studio instead of by a stall or by Edge's own prompt. The

@@ -19,3 +19,4 @@ export {
   signalAppReady,
 } from './window'
 export { suppressWebviewChrome } from './nativeMenus'
+export { readDesktopClipboardText } from './clipboard'

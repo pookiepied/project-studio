@@ -9,10 +9,10 @@
 //! `on_webview_ready`, so no builder can forget it: the microphone and the
 //! clipboard's text on Studio's own origin are allowed, every other kind
 //! denied, and a page that asks anyway gets its answer without a prompt.
-//! The clipboard read is the right-click menu's Paste (`lib/clipboard.ts`
-//! `readClipboardText`); Ctrl+V is the textarea's own and never asks. Before
-//! the read was allowed, Paste in that menu read nothing and inserted
-//! nothing, silently. Windows's own microphone privacy setting still rules:
+//! The clipboard grant is kept for any page that asks, but it is not what
+//! the right-click menu's Paste rests on: WebView2 refused the webview's
+//! `readText` with this handler attached and answering ALLOW, so that read
+//! is Rust's own (`clipboard.rs`). Windows's own microphone privacy setting still rules:
 //! when it refuses, `getUserMedia` rejects with `NotAllowedError` and the
 //! dictation strip's blocked face says so.
 
