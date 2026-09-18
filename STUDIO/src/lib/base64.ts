@@ -12,3 +12,11 @@ export function base64OfBytes(bytes: Uint8Array): string {
   }
   return btoa(binary)
 }
+
+/** The way back: audio home from the harness, as bytes a decoder takes. */
+export function bytesOfBase64(encoded: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+  for (let at = 0; at < binary.length; at += 1) bytes[at] = binary.charCodeAt(at)
+  return bytes
+}
