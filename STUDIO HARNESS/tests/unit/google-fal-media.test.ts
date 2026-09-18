@@ -353,4 +353,45 @@ describe("FAL through the queue", () => {
     if (generation?.shape !== "poll") throw new Error("expected poll");
     expect(await generation.job.poll()).toEqual({ state: "failed", message: "content policy: no" });
   });
+  it("speaks through the queue, waiting out the render and downloading the audio", async () => {
+    let polls = 0;
+    standIn.answers.set(
+      "/fal-ai/orpheus-tts",
+      json({ request_id: "req-tts", status_url: `${host()}/fal-ai/orpheus-tts/requests/req-tts/status` }),
+    );
+    standIn.answers.set("/fal-ai/orpheus-tts/requests/req-tts/status", () => {
+      polls += 1;
+      return json(polls < 2 ? { status: "IN_PROGRESS" } : { status: "COMPLETED" })();
+    });
+    standIn.answers.set(
+      "/fal-ai/orpheus-tts/requests/req-tts",
+      json({ audio: { url: `${host()}/files/voice.mp3`, content_type: "audio/mpeg" } }),
+    );
+    standIn.answers.set("/files/voice.mp3", () => ({ status: 200, type: "audio/mpeg", body: Buffer.from([1, 2, 3]) }));
+
+    const result = await falMedia.speak?.({ text: "Good morning.", modelId: "fal-ai/orpheus-tts", voiceId: "tara" }, endpoint());
+    expect(result).toEqual({ audio: Buffer.from([1, 2, 3]).toString("base64"), mimeType: "audio/mpeg" });
+    // Both spellings of the text ride, as both spellings of the image URL do.
+    expect(sentJson(standIn.seen[0])).toEqual({ text: "Good morning.", prompt: "Good morning.", voice: "tara" });
+    expect(polls).toBe(2);
+  });
+
+  it("refuses a speech request the queue completed with an error", async () => {
+    standIn.answers.set("/m", json({ request_id: "req-4", status_url: `${host()}/m/requests/req-4/status` }));
+    standIn.answers.set("/m/requests/req-4/status", json({ status: "COMPLETED", error: "text too long" }));
+    await expect(falMedia.speak?.({ text: "x", modelId: "m" }, endpoint())).rejects.toThrow(/text too long/);
+  });
+
+  it("transcribes through the queue, sending the recording as a data URL and reading the text", async () => {
+    standIn.answers.set("/fal-ai/wizper", json({ request_id: "req-stt", status_url: `${host()}/fal-ai/wizper/requests/req-stt/status` }));
+    standIn.answers.set("/fal-ai/wizper/requests/req-stt/status", json({ status: "COMPLETED" }));
+    standIn.answers.set("/fal-ai/wizper/requests/req-stt", json({ text: "Hello world", chunks: [] }));
+
+    const result = await falMedia.transcribe?.(
+      { audio: new Uint8Array([9, 9]), mimeType: "audio/webm", modelId: "fal-ai/wizper" },
+      endpoint(),
+    );
+    expect(result).toEqual({ text: "Hello world" });
+    expect(sentJson(standIn.seen[0])).toEqual({ audio_url: "data:audio/webm;base64,CQk=" });
+  });
 });
