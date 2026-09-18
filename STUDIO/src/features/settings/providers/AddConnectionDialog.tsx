@@ -3,6 +3,7 @@ import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
 import { Button, Dialog, MenuItem, Popover, TextField } from '@/components/primitives'
 import type {
+  CapabilitySlot,
   HarnessFailure,
   LanguageProtocol,
   LibraryProvider,
@@ -66,6 +67,7 @@ export function AddConnectionDialog({
   onProbe,
   library,
   customEndpoint = true,
+  purpose,
 }: {
   open: boolean
   onClose: () => void
@@ -80,6 +82,14 @@ export function AddConnectionDialog({
    * is no such thing as a custom media or search endpoint to name.
    */
   customEndpoint?: boolean
+  /**
+   * What the page is about, for the title ("Add a provider for images") and
+   * for the line under each vendor, which then names only the capabilities
+   * that page uses. Google serves eight things; a person adding it for
+   * images is choosing it for two of them, and the other six are noise
+   * here. Every capability when not given.
+   */
+  purpose?: { readonly name: string; readonly slots: readonly CapabilitySlot[] }
 }) {
   const [mode, setMode] = useState<Mode>({ kind: 'pick' })
   const [search, setSearch] = useState('')
@@ -204,7 +214,20 @@ export function AddConnectionDialog({
   }
 
   const title =
-    mode.kind === 'pick' ? 'Add connection' : mode.kind === 'custom' ? 'Custom endpoint' : mode.entry.displayName
+    mode.kind === 'pick'
+      ? purpose === undefined
+        ? 'Add provider'
+        : `Add a provider for ${purpose.name.toLowerCase()}`
+      : mode.kind === 'custom'
+        ? 'Custom endpoint'
+        : mode.entry.displayName
+
+  // The line under a vendor: what it serves that this page cares about.
+  const servesLine = (entry: LibraryProvider): string =>
+    entry.capabilities
+      .filter((slot) => purpose === undefined || purpose.slots.includes(slot))
+      .map((slot) => SLOT_LABELS[slot])
+      .join(' - ')
 
   const formReady =
     mode.kind === 'custom'
@@ -257,9 +280,7 @@ export function AddConnectionDialog({
                 <ProviderMark provider={entry.id} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-ui text-foreground">{entry.displayName}</span>
-                  <span className="block truncate text-caption text-muted-foreground">
-                    {entry.capabilities.map((slot) => SLOT_LABELS[slot]).join(' - ')}
-                  </span>
+                  <span className="block truncate text-caption text-muted-foreground">{servesLine(entry)}</span>
                 </span>
                 <span className="shrink-0 text-caption text-muted-foreground">
                   {entry.modelCount} {entry.modelCount === 1 ? 'model' : 'models'}

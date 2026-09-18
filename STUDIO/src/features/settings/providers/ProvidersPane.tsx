@@ -1,17 +1,23 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
-import { Button, MenuItem, Popover } from '@/components/primitives'
+import { Button, MenuItem, Popover, Segmented } from '@/components/primitives'
+import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Loading, StateNote } from '@/components/state'
 import {
   capabilityServesKind,
   connectionKinds,
   servesKindOf,
   SLOTS_BY_KIND,
+  type CapabilitySlot,
+  type LibraryProvider,
   type ProviderConnection,
   type ProviderKind,
   type ProviderModel,
 } from '@/platform/harness'
+import { SLOT_LABELS } from '@/domain/models/slots'
+import { MEDIA_CATEGORIES, SLOT_VERBS, mediaCategory, type MediaCategory } from '@/domain/models/categories'
 import { Pane } from '@/features/settings/panes/Pane'
 import { CredentialBadge } from './CredentialBadge'
 import { ProbeLine } from './ProbeLine'
@@ -49,10 +55,7 @@ const KIND_LABELS: Readonly<Record<ProviderKind, string>> = {
 /** The three pages, one per kind: what each is called and what it is for. */
 const PAGES: Readonly<Record<ProviderKind, { title: string; description: string }>> = {
   language: { title: 'Models', description: 'The models that answer in text, and where they come from.' },
-  media: {
-    title: 'Media',
-    description: 'Images, video, speech and transcription: which provider makes each, and with which model.',
-  },
+  media: { title: 'Media', description: 'Which provider makes each kind of media, and with which model.' },
   retrieval: {
     title: 'Tools',
     description: 'Web search and page reading: which service answers, and which is tried next.',
@@ -122,7 +125,85 @@ function NoHarness() {
 }
 
 
+/**
+ * What a page is about, once the person has chosen: the slots whose
+ * defaults it sets, and the vendors and connections that serve them.
+ *
+ * The Models and Tools pages are one purpose each. The Media page is three,
+ * one per category, and this is the shape the category resolves to - so the
+ * body below is written once against it, and the page's only extra work is
+ * the switch.
+ */
+interface Purpose {
+  readonly name: string
+  readonly slots: readonly CapabilitySlot[]
+}
+
+const PURPOSE_BY_KIND: Readonly<Record<'language' | 'retrieval', Purpose>> = {
+  language: { name: 'Chat', slots: SLOTS_BY_KIND.language },
+  retrieval: { name: 'Web tools', slots: SLOTS_BY_KIND.retrieval },
+}
+
 function ProviderList({ providers, kind }: { providers: Providers; kind: ProviderKind }) {
+  const [category, setCategory] = useState<MediaCategory>('images')
+
+  if (kind !== 'media') {
+    return <PurposeBody providers={providers} kind={kind} purpose={PURPOSE_BY_KIND[kind]} />
+  }
+
+  // The switch is the page's own, above everything: choosing a category is
+  // choosing which providers are even relevant, so it comes before either
+  // list. The content beneath fades between categories rather than
+  // snapping, so the thumb sliding and the rows changing read as one move.
+  const chosen = mediaCategory(category)
+  return (
+    <>
+      <div className="pb-4">
+        <Segmented
+          ariaLabel="Media category"
+          layoutId="media-category"
+          value={category}
+          onChange={setCategory}
+          options={MEDIA_CATEGORIES.map((entry) => ({ id: entry.id, label: entry.name }))}
+        />
+        <p className="mt-2.5 text-caption text-muted-foreground">{chosen.description}</p>
+      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={chosen.id}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+          className="flex flex-col divide-y"
+        >
+          <PurposeBody providers={providers} kind={kind} purpose={chosen} />
+        </motion.div>
+      </AnimatePresence>
+    </>
+  )
+}
+
+/**
+ * A run of rows under a small caption, the way the settings sidebar names its
+ * groups. A caption and a hairline, not a box: the page is one column, and
+ * the two sections are two parts of it, not two containers on it.
+ */
+function Section({ caption, children }: { caption: string; children: ReactNode }) {
+  return (
+    <section className="pt-5 first:pt-0">
+      <p className="mb-1 text-micro uppercase text-muted-foreground/80">{caption}</p>
+      <div className="flex flex-col divide-y">{children}</div>
+    </section>
+  )
+}
+
+/** Whether a vendor in the library serves any of the slots. */
+function libraryServes(entry: LibraryProvider, slots: readonly CapabilitySlot[]): boolean {
+  return entry.capabilities.some((slot) => slots.includes(slot))
+}
+
+function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind: ProviderKind; purpose: Purpose }) {
   const { view } = providers
   // The state comes first, ahead of the guard, the way `ConnectionRow` below
   // already does it. Hooks after a conditional return are only safe while the
@@ -143,50 +224,88 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
   // A model answers the kind question once per kind too: a joined row that
   // both chats and paints shows on both pages, which is what
   // `capabilityServesKind` is for.
-  const connections = view.connections.filter((record) => servesKindOf(record, kind))
-  const models = view.models.filter((model) => capabilityServesKind(model.capability, kind))
-  const library = view.library.filter((entry) => entry.serves[kind] !== undefined)
-  const slots = SLOTS_BY_KIND[kind]
+  //
+  // Within the kind, the purpose narrows further. A connection belongs to
+  // the Images category when its vendor serves an image slot - by the
+  // library's word when the vendor is in it, by its listed models when it is
+  // not - so the voice houses stay off the Images category and the image
+  // houses off Voice. A connection nothing can vouch for either way (no
+  // library entry, no models listed yet) stays on every category: a row
+  // that vanishes the moment it is added is worse than one that is not yet
+  // sorted. The models a row offers stay the whole kind's, not the
+  // category's: the row's selection is written back as one list, and a list
+  // narrowed to images would drop the same connection's video models on save.
+  const kindModels = view.models.filter((model) => capabilityServesKind(model.capability, kind))
+  const library = view.library.filter(
+    (entry) => entry.serves[kind] !== undefined && libraryServes(entry, purpose.slots),
+  )
+  const connections = view.connections.filter((record) => {
+    if (!servesKindOf(record, kind)) return false
+    const vendor = view.library.find((entry) => entry.id === record.catalogProvider)
+    if (vendor !== undefined) return libraryServes(vendor, purpose.slots)
+    const own = kindModels.filter((model) => model.connectionId === record.id)
+    if (own.length === 0) return true
+    return own.some((model) => purpose.slots.some((slot) => model.capability[slot] === 'supported'))
+  })
   const noun = NOUN_BY_KIND[kind]
+  // What a row says it does here. Under a media category that is the slots
+  // it serves of the category's; on the other pages, every kind its one key
+  // serves, in the contract's order: "Language, Media" for OpenAI.
+  const tagOf = (record: ProviderConnection): string => {
+    const vendor = view.library.find((entry) => entry.id === record.catalogProvider)
+    const served = vendor === undefined ? [] : vendor.capabilities.filter((slot) => purpose.slots.includes(slot))
+    if (kind === 'media' && served.length > 0) return served.map((slot) => SLOT_LABELS[slot]).join(', ')
+    return connectionKinds(record)
+      .map((entry) => KIND_LABELS[entry])
+      .join(', ')
+  }
 
   return (
     <>
-      {connections.length === 0 ? (
-        <p className="py-4 text-ui text-muted-foreground">
-          {kind === 'language'
-            ? 'No connections yet. Add one to give Studio somewhere to send a request.'
-            : kind === 'media'
-              ? 'No provider serves media yet. Add one, and the image, video and voice features find it here.'
-              : 'No provider serves search or page reading yet. Add one, and the web tools use it.'}
-        </p>
-      ) : (
-        connections.map((record) => (
-          <ConnectionRow
-            key={record.id}
-            record={record}
-            models={models}
-            noun={noun}
-            providers={providers}
-            onAddModel={() => setAddingModel(record)}
-            onRemove={() => setRemoving(record)}
-          />
-        ))
-      )}
+      {/* Defaults first: "which model does this use" is the question the page
+          is opened with, and the providers are how the answer is widened. */}
+      <Section caption="Defaults">
+        <DefaultsSection
+          slots={purpose.slots}
+          noun={noun}
+          titles={kind === 'media' ? SLOT_VERBS : {}}
+          defaults={view.defaults}
+          connections={connections}
+          models={kindModels}
+          onSet={(slot, ref) => void providers.setDefault(slot, ref)}
+        />
+      </Section>
 
-      <div className="py-3">
-        <Button variant="secondary" icon={<Icons.add />} onClick={() => setAdding(true)}>
-          Add connection
-        </Button>
-      </div>
+      <Section caption="Providers">
+        {connections.length === 0 ? (
+          <p className="py-3.5 text-ui text-muted-foreground">
+            {kind === 'language'
+              ? 'No provider yet. Add one to give Studio somewhere to send a request.'
+              : kind === 'media'
+                ? `No provider serves ${purpose.name.toLowerCase()} yet. Add one, and the defaults above can be filled.`
+                : 'No provider serves search or page reading yet. Add one, and the web tools use it.'}
+          </p>
+        ) : (
+          connections.map((record) => (
+            <ConnectionRow
+              key={record.id}
+              record={record}
+              tag={tagOf(record)}
+              models={kindModels}
+              noun={noun}
+              providers={providers}
+              onAddModel={() => setAddingModel(record)}
+              onRemove={() => setRemoving(record)}
+            />
+          ))
+        )}
 
-      <DefaultsSection
-        slots={slots}
-        noun={noun}
-        defaults={view.defaults}
-        connections={connections}
-        models={models}
-        onSet={(slot, ref) => void providers.setDefault(slot, ref)}
-      />
+        <div className="py-3">
+          <Button variant="secondary" icon={<Icons.add />} onClick={() => setAdding(true)}>
+            Add provider
+          </Button>
+        </div>
+      </Section>
 
       <AddConnectionDialog
         open={adding}
@@ -198,6 +317,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
         onProbe={(id) => providers.probe(id)}
         library={library}
         customEndpoint={kind === 'language'}
+        purpose={kind === 'media' ? purpose : undefined}
       />
 
       <RemoveConnectionDialog
@@ -225,6 +345,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
 
 function ConnectionRow({
   record,
+  tag,
   models: pageModels,
   noun,
   providers,
@@ -232,6 +353,8 @@ function ConnectionRow({
   onRemove,
 }: {
   record: ProviderConnection
+  /** What the row does here: "Images, Image editing" under that category, "Language, Media" on Models. */
+  tag: string
   /** This page's models, from which the row takes its own connection's. */
   models: readonly ProviderModel[]
   /** What this page calls one of them: "model" or "service". */
@@ -248,12 +371,6 @@ function ConnectionRow({
   const models = pageModels.filter((model) => model.connectionId === record.id)
   const probe = providers.probes.get(record.id)
   const probing = probe?.status === 'probing'
-
-  // Every kind the one key serves, in the contract's order: "Language, Media"
-  // for an OpenAI connection, "Retrieval" for Tavily.
-  const kindLabel = connectionKinds(record)
-    .map((kind) => KIND_LABELS[kind])
-    .join(', ')
 
   return (
     <div className="py-3">
@@ -277,7 +394,7 @@ function ConnectionRow({
         <div className="min-w-0 flex-1">
           <p className={cn('text-ui', record.enabled ? 'text-foreground' : 'text-muted-foreground')}>
             {record.displayName}
-            <span className="ml-1.5 text-caption text-muted-foreground">{kindLabel}</span>
+            <span className="ml-1.5 text-caption text-muted-foreground">{tag}</span>
             {record.enabled ? null : (
               <span className="ml-1.5 text-caption text-muted-foreground">Disabled</span>
             )}

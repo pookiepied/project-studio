@@ -71,6 +71,7 @@ const PLACEHOLDER_BY_SLOT: Readonly<Record<CapabilitySlot, string>> = {
 export function DefaultsSection({
   slots = ALL_SLOTS,
   noun = 'model',
+  titles = {},
   defaults,
   connections,
   models,
@@ -80,6 +81,14 @@ export function DefaultsSection({
   slots?: readonly CapabilitySlot[]
   /** What the page calls a choice: "model" unless the page says otherwise. */
   noun?: string
+  /**
+   * What a row is called where the page already says the medium: "Generate"
+   * under the Images category rather than "Images" again. Rows not named
+   * here keep the slot's product label. The sentence for an unfillable slot
+   * keeps the product label either way, because "a provider serving
+   * generate" is not a sentence.
+   */
+  titles?: Readonly<Partial<Record<CapabilitySlot, string>>>
   defaults: DefaultSelection
   connections: readonly ProviderConnection[]
   models: readonly ProviderModel[]
@@ -95,6 +104,7 @@ export function DefaultsSection({
           connections={connections}
           models={models}
           noun={noun}
+          title={titles[slot] ?? SLOT_LABELS[slot]}
           onSet={onSet}
         />
       ))}
@@ -108,6 +118,7 @@ function SlotRow({
   connections,
   models,
   noun,
+  title,
   onSet,
 }: {
   slot: CapabilitySlot
@@ -115,6 +126,7 @@ function SlotRow({
   connections: readonly ProviderConnection[]
   models: readonly ProviderModel[]
   noun: string
+  title: string
   onSet: (slot: CapabilitySlot, ref: ModelReferenceSlot | undefined) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -159,7 +171,7 @@ function SlotRow({
   return (
     <div className="flex items-start justify-between gap-6 py-3.5">
       <div className="min-w-0 flex-1">
-        <p className="text-ui text-foreground">{label}</p>
+        <p className="text-ui text-foreground">{title}</p>
 
         {current !== undefined && currentModel !== undefined ? (
           <p className="mt-0.5 flex items-center gap-1.5 text-caption text-muted-foreground">
