@@ -224,6 +224,13 @@ const KIND_SLOTS: Readonly<Record<"media" | "retrieval", readonly CapabilitySlot
   retrieval: ["webSearch", "webFetch"],
 };
 
+/** The kind a slot belongs to; the inverse of `KIND_SLOTS`, with text as language. */
+export function kindOfSlot(slot: CapabilitySlot): ProviderKind {
+  if (KIND_SLOTS.media.includes(slot)) return "media";
+  if (KIND_SLOTS.retrieval.includes(slot)) return "retrieval";
+  return "language";
+}
+
 /**
  * Whether a model can do this kind of work, whatever else it also does.
  *

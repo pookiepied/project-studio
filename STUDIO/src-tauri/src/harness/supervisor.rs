@@ -456,17 +456,34 @@ impl HarnessSupervisor {
     /// 2. `../STUDIO HARNESS/dist/server.mjs` relative to `src-tauri` (dev)
     /// 3. `./STUDIO HARNESS/dist/server.mjs` relative to current dir
     pub fn resolve_server_path(&self) -> Result<PathBuf, String> {
-        // 1. Try resource dir via exe location
+        // 1. The bundled resource, wherever this platform's bundler put it.
+        //    `bundle.resources` in tauri.conf.json lays the harness out under
+        //    `harness/` inside the resource directory, and Tauri's resource
+        //    directory is the executable's own directory on Windows (NSIS and
+        //    MSI), `Contents/Resources` beside `Contents/MacOS` on macOS, and
+        //    `../lib/<app>` from the binary on Linux. Read from the exe rather
+        //    than from `app.path().resource_dir()` because the eager start
+        //    runs before an application handle exists.
+        //
+        //    A copy counts only when it can run: `server.mjs` imports its
+        //    dependencies by bare specifier, so without `node_modules` beside
+        //    it the harness dies at its first import. `tauri dev` lays the
+        //    resources out under `target/debug/` too, dependency-less, and
+        //    that copy answering first turned every dev launch into
+        //    "Cannot find package '@hono/node-server'".
         if let Ok(exe) = std::env::current_exe() {
             if let Some(exe_dir) = exe.parent() {
-                // In dev, exe is target/debug/studio - resources not there
-                let candidate = exe_dir.join("../resources/harness/server.mjs");
-                if candidate.exists() {
-                    return Ok(resolved(candidate));
-                }
-                let candidate2 = exe_dir.join("resources/harness/server.mjs");
-                if candidate2.exists() {
-                    return Ok(candidate2);
+                let layouts = [
+                    exe_dir.join("harness"),
+                    exe_dir.join("../Resources/harness"),
+                    exe_dir.join("../lib/studio/harness"),
+                    exe_dir.join("resources/harness"),
+                ];
+                for root in layouts {
+                    let candidate = root.join("server.mjs");
+                    if candidate.exists() && root.join("node_modules").is_dir() {
+                        return Ok(resolved(candidate));
+                    }
                 }
             }
         }
