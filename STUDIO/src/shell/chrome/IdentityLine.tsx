@@ -169,7 +169,6 @@ export function IdentityLine({
             detach(conversation.id, conversation.title ?? 'Untitled')
             setMenuOpen(false)
           }}
-          note="Opens this conversation on its own."
         >
           Open in new window
         </MenuItem>
@@ -181,7 +180,6 @@ export function IdentityLine({
             itself. */}
         <MenuItem
           icon={<Icons.mcp />}
-          note="What this conversation can reach."
           onSelect={() => {
             setMenuOpen(false)
             setExtensionsOpen(true)
@@ -206,14 +204,12 @@ export function IdentityLine({
             setMenuOpen(false)
             goHome()
           }}
-          note="Kept indefinitely. Settings has the archive."
         >
           Archive
         </MenuItem>
         <MenuItem
           icon={<Icons.delete />}
           destructive
-          note="The conversation, its files and its transcript. Cannot be undone."
           onSelect={() => {
             setMenuOpen(false)
             setConfirmingDelete(true)

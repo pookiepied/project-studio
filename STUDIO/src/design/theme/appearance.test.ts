@@ -13,12 +13,19 @@ import { applyAppearance, DEFAULT_APPEARANCE } from './appearance'
  * `theme-color` meta - are what the browser's own chrome reads. They must
  * carry the resolved theme (a `system` choice included), update in place on
  * every change, and never duplicate their elements.
+ *
+ * In a plain browser the third fact is the canvas: the bars extend the
+ * page's ground, the page paints none of it, and the scheme's default - pure
+ * black in dark - is what shows instead. The root's background closes that,
+ * except under Tauri, where the window owns its own transparency.
  */
 
 afterEach(() => {
   document.head.innerHTML = ''
   document.documentElement.style.colorScheme = ''
+  document.documentElement.style.backgroundColor = ''
   document.documentElement.className = ''
+  Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
 })
 
 function themeColor(): string | null {
@@ -70,5 +77,20 @@ describe('publishBrowserTheme', () => {
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
     expect(document.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1)
     expect(themeColor()).toBe('#171717')
+  })
+
+  it('paints the canvas in a plain browser, where nothing else holds the ground', () => {
+    applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(23, 23, 23)')
+
+    applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'light' })
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(255, 255, 255)')
+  })
+
+  it('leaves the canvas to the window under Tauri, which owns its own transparency', () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true })
+
+    applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
+    expect(document.documentElement.style.backgroundColor).toBe('')
   })
 })

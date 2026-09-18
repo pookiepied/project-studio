@@ -103,3 +103,30 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The controls Safari decides to scale the page for.
+
+   When a focused control's computed text is under 16px, Safari on iOS (and
+   only iOS -- no other platform focus-zooms) scales the whole viewport in
+   to read it, and keeps the scale until it feels like letting go. In a 12px
+   interface that is every field: tapping the composer blew the page up, and
+   the send button had to be hunted down in the zoomed layout afterwards.
+
+   The threshold is WebKit's, not ours, so the value is the literal it is
+   compared against, not a token. 16px of interface text on a phone reads as
+   the platform's own, and the desktop keeps the 12px scale untouched: a
+   desktop pointer never matches `pointer: coarse`.
+
+   Unlayered, like the reduced-motion collapse above: the field's own
+   `text-ui` utility lives in a layer, and a layered rule, however ordered,
+   cannot beat this one. The composer's height measurement clones the element
+   with its classes, so the 16px line box is measured, not fought.
+   --------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

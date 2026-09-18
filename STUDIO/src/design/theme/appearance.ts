@@ -1,4 +1,5 @@
 import { openStore as openStoreFile } from '@/platform/store'
+import { isTauri } from '@/platform/tauri'
 import {
   CODE_OFFSET_CHOICES,
   DEFAULT_CODE_OFFSET,
@@ -270,13 +271,28 @@ const SURFACE_FOR_THEME: Readonly<Record<ResolvedTheme, string>> = {
  *
  * `color-scheme` narrows the declaration `index.html` makes (both schemes
  * supported) to the one in force, so user-agent widgets stop guessing;
- * `theme-color` carries the surface to the browser chrome that shows it.
- * One meta of each - the element is created if a page has none and updated
- * in place afterwards, never duplicated.
+ * `theme-color` carries the surface to the browser chrome that shows it;
+ * and in a plain browser the root's own background is painted with the
+ * surface, because the chrome's bars extend the page's ground and the page
+ * deliberately paints none -- see the note on the canvas below. One meta of
+ * each - the element is created if a page has none and updated in place
+ * afterwards, never duplicated.
  */
 function publishBrowserTheme(resolved: ResolvedTheme): void {
   const root = document.documentElement
   root.style.colorScheme = resolved
+
+  // The canvas behind the panel. `base.css` leaves `html` transparent so the
+  // desktop's window can be, but a browser tab has no window surface behind
+  // the page: the lacking ground falls through to the scheme's default, and
+  // WebKit's dark canvas is pure black. That is the black the phone's bars
+  // wore while the page sat on 0.205 -- in light mode the two coincided, so
+  // only dark ever looked wrong. Painting the root gives the bars, the
+  // rubber-band overscroll and the short-page gap the same ground the panel
+  // mixes, and the inline declaration outranks the layered transparent one.
+  // Skipped under Tauri: there the window owns its transparency and the
+  // settled design paints the surface from the panel inward.
+  if (!isTauri()) root.style.backgroundColor = SURFACE_FOR_THEME[resolved]
 
   let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
   if (meta === null) {

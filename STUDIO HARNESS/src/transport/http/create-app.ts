@@ -34,6 +34,7 @@ import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
 import { createSandboxRoutes } from "./routes/sandbox.js";
 import { createWebRoutes } from "./routes/web.js";
+import { streamHeartbeat } from "./sse-heartbeat.js";
 import type { FaviconSource } from "../../web/favicons.js";
 
 export interface CreateHttpAppOptions {
@@ -221,6 +222,14 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
         : { reopenCapabilityNote: options.reopenCapabilityNote }),
     }),
   );
+  // After the turn settings, before the agent router, so it answers for
+  // everything the mounted routes hold open. Both of this harness's readers
+  // give a run's stream 45 seconds between bytes and call it broken past
+  // that, on the documented belief that the harness heartbeats its stream;
+  // this is that habit, finally kept. Measured where it went wrong: a
+  // reasoning model thinking 86s before its first token, and an 88s shell
+  // tool, each breaking the read in the middle of working.
+  agentRoutes.use("*", streamHeartbeat());
   // The URL shape is ours and must not move: the webview, the Tauri IPC seam
   // and the tests all address `/agents/studio/<conversation id>`. Flue 2.0's
   // agent routers serve `/:id` relative to their mount, so the studio agent's
