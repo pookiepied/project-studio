@@ -152,9 +152,34 @@ export function revokeCorridor(path: string, sid: string): void {
   invokeLauncher(["revoke", "--sid", sid, "--path", path, "--mode", "corridor"]);
 }
 
+/**
+ * The narrowest ancestor entry: pass through and ask attributes, never list.
+ *
+ * Used on the AppContainer's own profile folder, which Windows hands every
+ * contained process as its `LOCALAPPDATA` (under `…\Packages\studio-<hash>`),
+ * and which the OS creates without an entry for the profile's own SID. A
+ * program that resolves that path — pnpm's startup does, by `realpath` — stats
+ * every component, and dies at the one folder with no answer for it.
+ */
+export function grantTraverse(path: string, sid: string): void {
+  invokeLauncher(["grant", "--sid", sid, "--path", path, "--mode", "traverse"]);
+}
+
+export function revokeTraverse(path: string, sid: string): void {
+  invokeLauncher(["revoke", "--sid", sid, "--path", path, "--mode", "traverse"]);
+}
+
 export interface TraversalOutcome {
   /** Ancestors granted to this workspace, so `release` can take them back. */
   readonly granted: readonly string[];
+  /**
+   * Ancestors whose corridor is held by `ALL APPLICATION PACKAGES`, meaning
+   * the machine's own setup, not this workspace. They are reported apart so
+   * the caller can remember them for the life of its process: nothing in the
+   * runtime's own路径 ever lifts a machine-held entry, so a yes stays yes,
+   * which is the same citizenship the `#advised` set grants its answers.
+   */
+  readonly machineHeld: readonly string[];
   /** Ancestors that need `pnpm sandbox:prepare`, in root-first order. */
   readonly needsElevation: readonly string[];
   /**
@@ -204,8 +229,13 @@ export function isFullPermissionList(error: unknown): boolean {
 export function ensureTraversable(
   paths: readonly string[],
   workspaceSid: string,
+  prior: {
+    readonly sidHeld: ReadonlySet<string>;
+    readonly machineHeld: ReadonlySet<string>;
+  } = { sidHeld: new Set<string>(), machineHeld: new Set<string>() },
 ): TraversalOutcome {
   const granted: string[] = [];
+  const machineHeld: string[] = [];
   const needsElevation: string[] = [];
   const refused: string[] = [];
   const seen = new Set<string>();
@@ -215,10 +245,26 @@ export function ensureTraversable(
       if (seen.has(ancestor)) continue;
       seen.add(ancestor);
 
+      // What a previous containment already learned, this one does not pay to
+      // learn again. Every answer here is one launcher process; a conversation
+      // that runs dozens of commands was paying dozens of them per command for
+      // answers that had not changed since the first. Both answers are
+      // remembered by callers that outlive this function, which is why they
+      // arrive as read-only facts: this function adds, it never retracts, and
+      // the caller decides what each remembers is worth.
+      if (prior.machineHeld.has(ancestor)) continue;
+      if (prior.sidHeld.has(ancestor)) {
+        granted.push(ancestor);
+        continue;
+      }
+
       // Either identity satisfies it. The machine-wide entry is what
       // `sandbox:prepare` leaves behind, and re-granting per workspace on top
       // of it would be a second entry that says the same thing.
-      if (holdsCorridor(ancestor, ALL_APPLICATION_PACKAGES)) continue;
+      if (holdsCorridor(ancestor, ALL_APPLICATION_PACKAGES)) {
+        machineHeld.push(ancestor);
+        continue;
+      }
       if (holdsCorridor(ancestor, workspaceSid)) {
         granted.push(ancestor);
         continue;
@@ -251,5 +297,5 @@ export function ensureTraversable(
     }
   }
 
-  return { granted, needsElevation, refused };
+  return { granted, machineHeld, needsElevation, refused };
 }

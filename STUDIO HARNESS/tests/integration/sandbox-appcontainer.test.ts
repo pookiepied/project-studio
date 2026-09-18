@@ -134,6 +134,22 @@ windows("a contained child on Windows", () => {
     expect(result.exitCode).toBe(0);
   }, 60_000);
 
+  it("resolves the container's own LocalAppData, which pnpm's startup does", async () => {
+    // Measured defect: Windows remaps `LOCALAPPDATA` to the profile's own
+    // folder (`…\Packages\studio-…\AC`) for every contained process, and the
+    // OS creates that folder without an entry for the profile's SID — so
+    // anything that resolved the path died at the folder's own name with
+    // `EPERM … lstat …\Packages\studio-…`, pnpm's startup being the program
+    // that did. One non-inheriting traverse entry, placed at mint, is the fix;
+    // this is the assertion that keeps it there.
+    const script = `
+      const { realpathSync } = require("fs");
+      try { realpathSync(process.env.LOCALAPPDATA); console.log("ok"); }
+      catch (error) { console.log(error.code ?? String(error)); }
+    `;
+    expect(await inside(sandbox, script)).toBe("ok");
+  }, 60_000);
+
   it("takes the corridor back off the user's folders when released", async () => {
     // Releasing has to undo the ancestor entries too, and it has to do it
     // without walking the tree. The first version revoked with inheritance

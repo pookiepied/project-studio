@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { SandboxError } from "../../errors.js";
 import type { SandboxPolicy } from "../../policy.js";
@@ -11,6 +13,7 @@ import type {
 import {
   containArgs,
   invokeLauncher,
+  invokeLauncherAsync,
   launcherInstalled,
   launcherPath,
 } from "./launcher.js";
@@ -25,10 +28,12 @@ import {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,
   ensureTraversable,
+  grantTraverse,
   holdsRead,
   holdsCorridor,
   isFullPermissionList,
   revokeCorridor,
+  revokeTraverse,
 } from "./traversal.js";
 
 /**
@@ -93,6 +98,59 @@ export function profileName(workspaceRoot: string): string {
   return `studio-${digest}`;
 }
 
+/**
+ * The path whose hash names this policy's container profile.
+ *
+ * The profile is per **anchor**, not per workspace, and the difference is the
+ * difference between a machine that pays for a new identity once and one that
+ * pays for it again with every conversation. The profile is the SID, and the
+ * SID is what every scope root gets granted to — so a new identity means
+ * re-placing every grant, which means Windows pushing inheritance down every
+ * file the presets name. Measured on this machine: each project-less
+ * conversation minted its own profile under its own workspace directory, and
+ * its first contained command bought the whole walk — about a hundred seconds
+ * of the harness unable to stream a byte — before the tool even ran. The
+ * policy's `profileAnchor`, when present, is the stable path all of those
+ * workspaces share, so the walk happens once for the anchor and never again.
+ *
+ * Exported because the same rule decides three things that must not drift:
+ * the name minted here, the SID `release` recovers, and the ledger rows a
+ * user reads.
+ */
+export function profileKey(
+  policy: Pick<SandboxPolicy, "workspaceRoot" | "profileAnchor">,
+): string {
+  return policy.profileAnchor ?? policy.workspaceRoot;
+}
+
+/**
+ * The folder the OS laid down for a profile, under the real LocalAppData.
+ *
+ * Windows hands a contained process a `LOCALAPPDATA` of `<this>\AC`, and it
+ * creates the folder without an entry for the profile's own SID — measured
+ * from inside the container as `EPERM … lstat …\Packages\studio-…`, raised by
+ * pnpm's startup while it resolved its own environment. Every component above
+ * and below the folder answers; only the folder itself does not, which is why
+ * one non-inheriting traverse entry (placed at mint, taken back at release)
+ * is the whole fix.
+ *
+ * Resolved from the environment first and the home directory second, because
+ * the harness's own environment is an allowlist and `LOCALAPPDATA` is not on
+ * it — `USERPROFILE` is, so `homedir()` answers in production while the
+ * variable answers in a test or a maintenance command.
+ */
+function profileRootDirectory(key: string): string | undefined {
+  let base = process.env.LOCALAPPDATA;
+  if (base === undefined || base === "") {
+    try {
+      base = join(homedir(), "AppData", "Local");
+    } catch {
+      return undefined;
+    }
+  }
+  return join(base, "Packages", profileName(key));
+}
+
 /** What has been arranged for one workspace, so it is arranged once. */
 interface PreparedContainer {
   readonly sid: string;
@@ -123,6 +181,12 @@ class WindowsAppContainerBackend implements IsolationBackend {
 
   /** Memoised because the probe creates and deletes a real profile. */
   #availability: boolean | undefined;
+  /**
+   * What has been arranged per profile key — the anchor when the policy names
+   * one, the workspace root when it does not. Keying by the anchor is what
+   * makes a later conversation's containment find the same container, the
+   * same SID, and the same grant answers as the one that paid for them.
+   */
   readonly #prepared = new Map<string, PreparedContainer>();
   /**
    * Ancestors the one-time setup advice has already been given for, so a
@@ -131,6 +195,50 @@ class WindowsAppContainerBackend implements IsolationBackend {
    * another drive is a shortfall the user has not been told about yet.
    */
   readonly #advised = new Set<string>();
+  /**
+   * Corridors this process has already verified the machine holds, and reads
+   * it has already verified `ALL APPLICATION PACKAGES` holds. Both are the
+   * machine's own entries: nothing this runtime does lifts them, so a
+   * measured yes stays yes for the life of the process, and each later
+   * containment skips the launchers that would only repeat the question.
+   * That repetition was not free: a conversation's every command re-asked the
+   * corridor of every ancestor of every root — dozens of launcher processes
+   * per command, all synchronous, all invisible until they were the
+   * difference between a tool call that answers in a moment and one the
+   * person watches. Measured on the machine this was built on, where the
+   * eleven preset grants put twenty-odd roots and their ancestors behind
+   * every question.
+   */
+  readonly #machineCorridorHolds = new Set<string>();
+  readonly #machineReadHolds = new Set<string>();
+  /**
+   * Grants this process has already placed for a given workspace SID, keyed
+   * `"mode:path"`, and the ancestors it has already proven that SID walks.
+   *
+   * These are the workspace-identity answers, kept beside the machine-wide
+   * sets above because they share the property that makes a cached yes safe:
+   * nothing this process does lifts them. The revoke path runs from the
+   * maintenance command, which is its own process — the same reasoning that
+   * lets `#machineCorridorHolds` keep its answers. What the cache buys is
+   * measured in launcher round-trips: with a stable anchor every later
+   * conversation re-enters `#prepare` with every grant already on the disk,
+   * and without this set each of the eleven roots pays one launcher
+   * round-trip to be told what the process already knew, per conversation,
+   * on the path between the model's message and its first command.
+   *
+   * The window where the cache could lie is a `sandbox:release` run while a
+   * conversation is live — the same window `#prepared` has always had — and
+   * the maintenance command has always been the thing a person runs between
+   * sessions, not during one.
+   */
+  readonly #sidGranted = new Map<string, Set<string>>();
+  readonly #sidTraverseHeld = new Map<string, Set<string>>();
+  /**
+   * Containments that are mid-preparation, per workspace, so two commands
+   * that race into the same cold workspace wait for one preparation instead
+   * of each walking every grant alone.
+   */
+  readonly #preparing = new Map<string, Promise<PreparedContainer>>();
 
   available(): boolean {
     if (this.#availability !== undefined) return this.#availability;
@@ -157,12 +265,20 @@ class WindowsAppContainerBackend implements IsolationBackend {
   }
 
   async contain(request: ContainmentRequest): Promise<ContainedCommand> {
-    const container = this.#prepare(request.policy);
+    const container = await this.#prepare(request.policy);
 
     // Every ancestor of everything the child will touch has to be statable, or
     // the program dies resolving its own path before it runs a line. Most of
     // the chain is granted here, silently; what is left is system-owned and
-    // needs one elevated command, named exactly.
+    // needs one elevated command, named exactly. What earlier questions in
+    // this process already answered arrives too, so none of the answers are
+    // bought twice — the memory lives on the process, the corridor lives on
+    // the disk, and nothing revokes a machine-held corridor, so the two
+    // cannot disagree while this process runs. The workspace identity's own
+    // traverse answers ride along for the same reason: with a stable anchor,
+    // a later conversation's corridor was placed by an earlier one, and the
+    // launcher round-trip that would re-measure each ancestor is a cost every
+    // command in every conversation would pay again.
     const traversal = ensureTraversable(
       [
         request.cwd,
@@ -171,13 +287,24 @@ class WindowsAppContainerBackend implements IsolationBackend {
         ...(request.programRoots ?? []),
       ],
       container.sid,
+      {
+        sidHeld: this.#heldTraverseFor(container.sid, container.traversed),
+        machineHeld: this.#machineCorridorHolds,
+      },
     );
-    for (const path of traversal.granted) container.traversed.add(path);
+    for (const path of traversal.granted) {
+      container.traversed.add(path);
+      this.#sidTraverseHeld.get(container.sid)?.add(path);
+    }
+    for (const path of traversal.machineHeld) this.#machineCorridorHolds.add(path);
     // Persisted here and not at release time, because the reader is a release
     // in a *different* process, and this process is the thing that dies. A
     // contain that fails below this line still granted part of a corridor, and
-    // part of a corridor is owed back all the same.
-    recordTraversed(request.policy.workspaceRoot, traversal.granted);
+    // part of a corridor is owed back all the same. Keyed by the profile
+    // anchor, beside the profile itself: the ledger row is per anchor now, and
+    // one row per anchor instead of one per conversation is half of what the
+    // anchor buys.
+    recordTraversed(profileKey(request.policy), traversal.granted);
     // Not fatal. The per-workspace entry works, and the machine-wide one is a
     // preference about accumulation, not a precondition of containment — so
     // the shortfall is reported and the run continues. It is reported on the
@@ -221,12 +348,19 @@ class WindowsAppContainerBackend implements IsolationBackend {
     // after the policy's roots so a program root that *is* the workspace keeps
     // the stronger mode — `grant` is keyed by mode, so a read grant cannot
     // replace a write one.
-    const programRoots = grantProgramRoots(container, request.programRoots ?? []);
+    // Learned where it is spent: the AAP-read question, once per directory
+    // per process, exactly like the corridor question above it.
+    const programRoots = await grantProgramRoots(
+      container,
+      request.programRoots ?? [],
+      this.#machineReadHolds,
+      this.#rememberedGrants(container.sid),
+    );
     if (programRoots.length > 0) {
       // Recorded here and not at release time, for the same reason the
       // corridor is: the reader is a release in a different process, and this
       // process is the one that dies.
-      recordProgramRoots(request.policy.workspaceRoot, programRoots);
+      recordProgramRoots(profileKey(request.policy), programRoots);
     }
     return {
       executable: launcherPath(),
@@ -253,12 +387,48 @@ class WindowsAppContainerBackend implements IsolationBackend {
    * Lazy rather than done when the sandbox is constructed, because a workspace
    * the agent never runs a command in should not gain a permission entry. The
    * cost of a sandbox has to be paid by the feature that needs it.
+   *
+   * Async because the grants are: with the anchors making a cold preparation
+   * rare, the one that does happen is a tree walk measured in minutes, and a
+   * synchronous launcher call would hold the harness's one thread still for
+   * all of it — freezing the conversation's stream, the keep-alives, and
+   * every other session in the process. Awaiting instead keeps the event loop
+   * breathing between grants, and a grant that takes a minute takes a minute
+   * without the client deciding the stream is dead. `#preparing` keeps two
+   * racing commands in the same workspace from both buying the walk.
    */
-  #prepare(policy: SandboxPolicy): PreparedContainer {
-    const key = policy.workspaceRoot;
+  async #prepare(policy: SandboxPolicy): Promise<PreparedContainer> {
+    const key = profileKey(policy);
+    const existing = this.#prepared.get(key);
+    if (existing !== undefined) {
+      // The grants still run below — the profile was found, but the roots may
+      // have grown since the last containment named them. A warm container is
+      // safe to finish without the in-flight lock: every grant it names is
+      // already answered by the process's own caches, so there is nothing here
+      // two racing containments could both walk.
+      return this.#finishPrepare(policy, existing);
+    }
+    const inFlight = this.#preparing.get(key);
+    if (inFlight !== undefined) return inFlight;
+    const prepared = this.#mintAndGrant(policy, key).finally(() => {
+      this.#preparing.delete(key);
+    });
+    this.#preparing.set(key, prepared);
+    return prepared;
+  }
+
+  /**
+   * Mints the profile when needed, then places the grants, under one lock.
+   *
+   * The whole run is inside `#preparing`'s promise so a second command racing
+   * into a cold workspace waits for the one walk instead of starting its own —
+   * on a cold machine that walk is minutes, and buying it twice is the exact
+   * delay the anchors exist to stop.
+   */
+  async #mintAndGrant(policy: SandboxPolicy, key: string): Promise<PreparedContainer> {
     let container = this.#prepared.get(key);
     if (container === undefined) {
-      const sid = invokeLauncher([
+      const sid = await invokeLauncherAsync([
         "profile-ensure",
         "--name",
         profileName(key),
@@ -280,16 +450,136 @@ class WindowsAppContainerBackend implements IsolationBackend {
       // the path and nothing can invert it, so without this a user looking at
       // `studio-9f86d081…` has no way to learn which project it belongs to.
       recordProfile(profileName(key), key);
+      // The profile's own folder, made resolvable to the container standing
+      // in it. Windows remaps `LOCALAPPDATA` to `<folder>\AC` for every
+      // contained process, and the folder the OS created carries no entry for
+      // the profile's own SID — so resolving that path dies at the folder's
+      // own name while everything above and below it answers. Placed at mint,
+      // so it is once per profile rather than once per command, and taken
+      // back by `release` before the profile is deleted.
+      const profileRoot = profileRootDirectory(key);
+      if (profileRoot !== undefined && existsSync(profileRoot)) {
+        try {
+          grantTraverse(profileRoot, sid);
+        } catch {
+          // Best-effort by construction: this entry is a resolution aid, not
+          // a grant any policy asked for, and a machine where it cannot be
+          // placed is a machine whose containers ran without it — one tool's
+          // startup is where its absence shows, not the whole sandbox. A
+          // profile whose folder the OS has not created yet lands here too.
+        }
+      }
     }
+    return this.#finishPrepare(policy, container);
+  }
 
+  /**
+   * Places every grant the policy's roots are owed, on an existing container.
+   *
+   * Split from the profile minting so a second containment of an already
+   * prepared workspace still answers for the roots it names that nobody has
+   * granted yet — the routine runs every contain, the mint runs once.
+   */
+  async #finishPrepare(
+    policy: SandboxPolicy,
+    container: PreparedContainer,
+  ): Promise<PreparedContainer> {
     // One grant per path, with the mode already resolved — not a read pass
     // followed by a write pass. `SetEntriesInAcl` *replaces* this trustee's
     // entry rather than adding to it, so two passes make the answer depend on
     // which ran last, and the workspace root is on both lists. Getting that
     // ordering wrong produced a sandbox that could read its own project and not
     // write to it, which is a plausible-looking sandbox and a useless agent.
-    for (const [path, mode] of grantsFor(policy)) grant(container, path, mode);
+    //
+    // A read the machine already grants every container — the ALL APPLICATION
+    // PACKAGES entry the OS itself keeps on Program Files — is skipped rather
+    // than rewritten. Writing an ACE needs WRITE_DAC, which an unelevated
+    // process does not hold there, so the rewrite answers error 5; and because
+    // the grant never landed, this loop re-failed it on every later contain,
+    // which made one preset row (the git preset's `C:\Program Files\Git`)
+    // stop *every* conversation's first contained command — while the very
+    // same directory, reached through the program-roots path below, worked,
+    // because that path has always asked the machine before writing. The
+    // policy's roots now ask the same question. Measured, not inferred: the
+    // launcher answers `could not set the permissions of C:\Program Files\Git
+    // (error 5)` here, and `holdsRead` answers true for the trustee the grant
+    // was about to duplicate.
+    //
+    // A failure is collected, not thrown: the loop runs to the end, so the
+    // one answer names every root that failed and the grantable ones still got
+    // what they came for. The call still fails — a policy short a granted root
+    // would fail the child further in, with a lesser error — but it fails
+    // after the work, instead of instead of it.
+    const shortfalls: GrantShortfall[] = [];
+    for (const [path, mode] of grantsFor(policy)) {
+      if (mode === "read") {
+        // The machine's read, asked and answered: this process already asked
+        // `ALL APPLICATION PACKAGES` about this very directory, and a yes
+        // stays a yes, so the check does not run again. The first asks are
+        // what teaches the set; the rest of the process's grants are the ones
+        // that benefit.
+        if (this.#machineReadHolds.has(path)) continue;
+        if (holdsRead(path, ALL_APPLICATION_PACKAGES)) {
+          this.#machineReadHolds.add(path);
+          continue;
+        }
+      }
+      if (this.#alreadyGranted(container, path, mode)) continue;
+      try {
+        await grant(container, path, mode, this.#rememberedGrants(container.sid));
+      } catch (error) {
+        shortfalls.push({ path, mode, error });
+      }
+    }
+    if (shortfalls.length > 0) {
+      throw new SandboxError("unavailable", { message: grantShortfall(shortfalls) });
+    }
     return container;
+  }
+
+  /**
+   * Whether this process has already answered this exact grant.
+   *
+   * Two memoised sources, asked in order. The machine's: an
+   * `ALL APPLICATION PACKAGES` read this process has verified, which covers
+   * the container by membership. Then the workspace identity's own: with a
+   * stable anchor, the disk already holds every grant a later conversation
+   * asks for, and the launcher round-trip that would re-measure each one is
+   * the difference between a first command that answers in a moment and one
+   * the person watches. Both sets are cached under the reasoning recorded on
+   * the fields themselves — nothing in this process revokes what they
+   * describe.
+   */
+  #alreadyGranted(container: PreparedContainer, path: string, mode: "read" | "write"): boolean {
+    if (this.#sidGranted.get(container.sid)?.has(`${mode}:${path}`) === true) return true;
+    if (mode === "read" && this.#sidGranted.get(container.sid)?.has(`write:${path}`) === true) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The traverse answers already held for one SID, the in-memory and cached
+   * sets merged, with the cache created on first ask.
+   */
+  #heldTraverseFor(sid: string, containerHeld: ReadonlySet<string>): ReadonlySet<string> {
+    let held = this.#sidTraverseHeld.get(sid);
+    if (held === undefined) {
+      held = new Set<string>();
+      this.#sidTraverseHeld.set(sid, held);
+    }
+    for (const path of containerHeld) held.add(path);
+    return held;
+  }
+
+  /** The grant answers held for one SID, created on first ask so it is written into. */
+  #rememberedGrants(sid: string): Set<string> {
+    let granted = this.#sidGranted.get(sid);
+    if (granted === undefined) {
+      granted = new Set<string>();
+      this.#sidGranted.set(sid, granted);
+    }
+    return granted;
   }
 
   /**
@@ -315,7 +605,11 @@ class WindowsAppContainerBackend implements IsolationBackend {
   }
 
   async release(policy: SandboxPolicy): Promise<void> {
-    const key = policy.workspaceRoot;
+    // The anchor, not the workspace root: the profile and its ledger row are
+    // per anchor, and a release that looked the workspace up by its own root
+    // would recover no SID and revoke nothing — exactly the silent non-release
+    // this method already had one defect named after.
+    const key = profileKey(policy);
     const container = this.#prepared.get(key);
     const sid = container?.sid ?? deriveExisting(key);
     if (sid === undefined) {
@@ -344,6 +638,15 @@ class WindowsAppContainerBackend implements IsolationBackend {
       // making `--stale` fail on every entry it was built for. Found by running
       // it on a deleted project, not by reading it.
       if (!existsSync(root)) continue;
+      // A root the workspace's identity holds nothing on has none of ours to
+      // take back, and asking anyway is the same unelevated WRITE_DAC the
+      // grant skipped: the machine-covered roots (the ALL APPLICATION PACKAGES
+      // read on Program Files, pointed at by the git preset) never got a
+      // per-workspace ACE, so the revoke loop must not try to lift one, or the
+      // release dies on exactly the grant the contain survived without. Where
+      // the SID does hold something, this is the question the launcher itself
+      // answers by rewriting the descriptor — asked read-only, first.
+      if (!holdsRead(root, sid)) continue;
       invokeLauncher(["revoke", "--sid", sid, "--path", root]);
     }
     // The program roots go too - the directories granted read so a contained
@@ -373,12 +676,38 @@ class WindowsAppContainerBackend implements IsolationBackend {
       if (!existsSync(ancestor)) continue;
       revokeCorridor(ancestor, sid);
     }
+    // The profile's own folder carries the traverse entry minting placed, and
+    // it goes before the profile does — afterwards the SID no longer resolves
+    // and the entry is an unreadable line in the user's folder properties,
+    // the same reason every workspace entry above goes first. A profile that
+    // predates this entry, or one whose folder is already gone, lands in the
+    // `existsSync`/no-op path rather than failing the release.
+    const profileRoot = profileRootDirectory(key);
+    if (profileRoot !== undefined && existsSync(profileRoot)) {
+      try {
+        revokeTraverse(profileRoot, sid);
+      } catch {
+        // Release is the cleanup path, and one entry it cannot lift must not
+        // leave the profile behind: the delete below still runs.
+      }
+    }
     invokeLauncher(["profile-delete", "--name", profileName(key)]);
     this.#prepared.delete(key);
     // Last, and only once the profile is actually gone. Forgetting first would
     // lose the one thing that can tell a user this workspace still has a
     // profile if the delete failed.
     forgetProfile(key);
+    // And the process's own answers for this SID die with the grants they
+    // describe. This is the one act this runtime performs that lifts what the
+    // caches described, so the caches stop describing it: a containment after
+    // this release must ask the launcher again, or it would skip grants that
+    // were just taken back and hand the child a workspace it cannot read. The
+    // cache holds answers for one identity, and other policies may share that
+    // identity through an anchor, so the whole set is dropped rather than
+    // pruned — a later containment re-asks and the launcher answers
+    // `already applied` in milliseconds for whatever survived.
+    this.#sidGranted.delete(sid);
+    this.#sidTraverseHeld.delete(sid);
   }
 
   /**
@@ -448,6 +777,63 @@ export function grantsFor(
   return modes;
 }
 
+/** One policy root the grant loop could not place, with the launcher's answer. */
+export interface GrantShortfall {
+  readonly path: string;
+  readonly mode: "read" | "write";
+  readonly error: unknown;
+}
+
+/**
+ * The one answer for every grant the policy's roots could not get.
+ *
+ * Exported because its content is a rule rather than a string, on the
+ * `prepareAdvice` precedent: it names every path, it repeats what the launcher
+ * actually answered, and it ends in the one command that fixes the reads. A
+ * policy short a grant fails the call — that part is not negotiable, the
+ * child would meet the same denial further in wearing a lesser error — but a
+ * failure collected in the loop rather than thrown from it lets this message
+ * carry the whole list at once, which is the difference between "here is
+ * everything that went without" and "access denied".
+ */
+export function grantShortfall(shortfalls: readonly GrantShortfall[]): string {
+  const listed = shortfalls
+    .map(
+      (entry) =>
+        `  (${entry.mode})  ${entry.path}\n` +
+        `        ${shortfallReason(entry.error)}`,
+    )
+    .join("\n");
+  const reads = shortfalls.filter((entry) => entry.mode === "read");
+  const writes = shortfalls.filter((entry) => entry.mode === "write");
+
+  let message =
+    "The sandbox could not finish this workspace's grants. Each one, and what\n" +
+    "the launcher answered for it:\n" +
+    listed +
+    "\n";
+
+  if (reads.length > 0) {
+    const folders = reads.map((entry) => `"${entry.path}"`).join(" ");
+    message +=
+      "\nA read like these is granted to every container at once, once, by the\n" +
+      "machine's setup step; the next conversation then skips the grant, because\n" +
+      "the machine already holds it. In a terminal opened as administrator, run:\n" +
+      `  pnpm sandbox:prepare --read ${folders}\n`;
+  }
+  if (writes.length > 0) {
+    message +=
+      "\nA write grant needs the directory to belong to the account, or the\n" +
+      "entry placed by an elevated hand. No preset ships one outside the\n" +
+      "account's own folders; a custom one that does meets this same limit.\n";
+  }
+  return message;
+}
+
+function shortfallReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * The one-time advice for directories accumulating a traverse entry each.
  *
@@ -469,7 +855,25 @@ export function prepareAdvice(paths: readonly string[]): string {
   );
 }
 
-function grant(container: PreparedContainer, path: string, mode: "read" | "write"): void {
+/**
+ * Places one grant, and records it in the process's answer set.
+ *
+ * Async because a read or write grant makes Windows walk the tree beneath the
+ * path — the walk that was measured at eighty seconds cold — and the caller
+ * has work to do while it runs. The `remembered` set is the process's own
+ * answer cache: a grant this process placed is a question this process never
+ * needs to ask the launcher again, for any later workspace standing on the
+ * same identity. The stronger-mode rule is unchanged: a read grant is
+ * silently skipped when write is already held, because `SetEntriesInAcl`
+ * replaces a trustee's entry rather than adding to it, and re-granting read
+ * over write would take the write away.
+ */
+async function grant(
+  container: PreparedContainer,
+  path: string,
+  mode: "read" | "write",
+  remembered?: Set<string>,
+): Promise<void> {
   const key = `${mode}:${path}`;
   if (container.granted.has(key)) return;
   // A path already granted at the stronger mode is left alone. `SetEntriesInAcl`
@@ -477,8 +881,10 @@ function grant(container: PreparedContainer, path: string, mode: "read" | "write
   // take the write away — the same downgrade that made the workspace read-only
   // the first time this ran.
   if (mode === "read" && container.granted.has(`write:${path}`)) return;
-  invokeLauncher(["grant", "--sid", container.sid, "--path", path, "--mode", mode]);
+  if (remembered?.has(key) === true) return;
+  await invokeLauncherAsync(["grant", "--sid", container.sid, "--path", path, "--mode", mode]);
   container.granted.add(key);
+  remembered?.add(key);
 }
 
 /**
@@ -507,7 +913,35 @@ function grant(container: PreparedContainer, path: string, mode: "read" | "write
 function grantProgramRoots(
   container: PreparedContainer,
   roots: readonly string[],
-): readonly string[] {
+  /**
+   * The reads this process has already verified the machine holds, learned
+   * here and answered from there. This function grants nothing it need not,
+   * so a yes it learned is the caller's to keep — the caller passes its own
+   * process-lifetime sets and this adds to them, the same citizenship the
+   * corridor's `machineHeld` answers carry. The caller also passes the
+   * process's own grant answers for this SID, so a program root one
+   * conversation already made readable is one no later containment in this
+   * process pays a launcher round-trip to re-ask.
+   */
+  machineHeldReads: Set<string>,
+  remembered?: Set<string>,
+): Promise<readonly string[]> {
+  return programRootsGrants(container, roots, machineHeldReads, remembered);
+}
+
+/**
+ * The body of the program-roots walk.
+ *
+ * Standalone rather than a method so the memoised sets it consults arrive as
+ * arguments — the same inputs the class keeps, handed in by the one caller
+ * that owns them.
+ */
+async function programRootsGrants(
+  container: PreparedContainer,
+  roots: readonly string[],
+  machineHeldReads: Set<string>,
+  remembered?: Set<string>,
+): Promise<readonly string[]> {
   const attributed: string[] = [];
   const ungrantable: string[] = [];
 
@@ -526,15 +960,29 @@ function grantProgramRoots(
     // so a hold observed here is recorded for release even when it came from
     // a containment this process did not run, which is how the grants of a
     // ledger entry written before this field existed are found again.
-    if (holdsRead(root, container.sid)) {
+    if (
+      container.granted.has(`read:${root}`) ||
+      container.granted.has(`write:${root}`) ||
+      (remembered?.has(`read:${root}`) === true || remembered?.has(`write:${root}`) === true)
+    ) {
       container.programRoots.add(root);
       attributed.push(root);
       continue;
     }
-    if (holdsRead(root, ALL_APPLICATION_PACKAGES)) continue;
+    if (holdsRead(root, container.sid)) {
+      container.programRoots.add(root);
+      remembered?.add(`read:${root}`);
+      attributed.push(root);
+      continue;
+    }
+    if (machineHeldReads.has(root)) continue;
+    if (holdsRead(root, ALL_APPLICATION_PACKAGES)) {
+      machineHeldReads.add(root);
+      continue;
+    }
 
     try {
-      grant(container, root, "read");
+      await grant(container, root, "read", remembered);
     } catch (error) {
       if (isFullPermissionList(error)) {
         // The list these entries go into is physically full. Same advice, and
@@ -576,15 +1024,16 @@ function grantProgramRoots(
 }
 
 /**
- * The SID of a workspace's profile when this process never prepared it.
+ * The SID of a profile when this process never prepared it.
  *
  * `release` has to work in a fresh process — the maintenance command in
  * `sandbox/cli.ts` is exactly that case — so it cannot depend on the in-memory
- * map that `contain` fills.
+ * map that `contain` fills. Takes the profile key, the same path whose hash
+ * names the profile the ledger recorded.
  */
-function deriveExisting(workspaceRoot: string): string | undefined {
+function deriveExisting(key: string): string | undefined {
   try {
-    const sid = invokeLauncher(["profile-ensure", "--name", profileName(workspaceRoot)]);
+    const sid = invokeLauncher(["profile-ensure", "--name", profileName(key)]);
     return sid.startsWith("S-1-15-2-") ? sid : undefined;
   } catch {
     return undefined;

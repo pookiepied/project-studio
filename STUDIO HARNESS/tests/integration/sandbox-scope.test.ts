@@ -205,3 +205,110 @@ runner("contained git reads the user's global config", () => {
     }
   }, 60_000);
 });
+
+runner("a preset row in a system-owned directory", () => {
+  // The arm every earlier verification missed. The git preset grants
+  // `C:\Program Files\Git` machine-wide; as a *policy* root it rides in every
+  // conversation's read roots, where the grant loop rewrote the machine's own
+  // ALL APPLICATION PACKAGES ACE with one the unelevated runtime is not
+  // allowed to place — `error 5` on the first contained command of every
+  // conversation, and, the grant never having landed, on every one after it.
+  // Reached as a *program* root the same directory always worked, because
+  // that path asks the machine before writing; this catches the policy roots
+  // up, and holds the release to the same question.
+  it("runs contained, and releases, on the machine's own read", async () => {
+    if (process.platform !== "win32") return;
+    const { existsSync } = await import("node:fs");
+    const { ALL_APPLICATION_PACKAGES, holdsRead } = await import(
+      "../../src/sandbox/isolation/index.js"
+    );
+    const preset = "C:\\Program Files\\Git";
+    if (!existsSync(preset)) {
+      console.log("SKIP: Git for Windows is not installed, so the preset row cannot be measured.");
+      return;
+    }
+    // The skip at grant time is the machine's read, so the machine's read is
+    // what this measurement rides on. Without it the unelevated grant is the
+    // measured error 5, which is the honest outcome — but the skip then cannot
+    // be what is being tested, and this prints why rather than half-asserting.
+    if (!holdsRead(preset, ALL_APPLICATION_PACKAGES)) {
+      console.log(
+        'SKIP: C:\\Program Files\\Git has no machine-wide read entry, so the grant '
+          + 'runs the unelevated path. In a terminal opened as administrator, run: '
+          + 'pnpm sandbox:prepare --read "C:\\Program Files\\Git", then re-run this test.',
+      );
+      return;
+    }
+
+    const work = await mkdtemp(join(tmpdir(), "studio-preset-acl-"));
+    const sandbox = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: work, readRoots: [preset] }),
+    );
+    try {
+      const result = await sandbox.run("shell", {
+        executable: process.execPath,
+        args: ["-e", "console.log('contained')"],
+        cwd: work,
+        timeoutMs: 30_000,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(`${result.stdout}${result.stderr}`.trim()).toBe("contained");
+
+      // The grant was skipped, so the ACE was never ours, so the release has
+      // to survive not finding one: this is the revoke-side error 5, and it
+      // killed `releaseIsolation` as surely as the grant killed the contain.
+      await expect(sandbox.releaseIsolation()).resolves.toBeUndefined();
+    } finally {
+      await sandbox.releaseIsolation().catch(() => {});
+      await rm(work, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
+runner("a workspace the process remembers after releasing", () => {
+  // The holds a process learns — the machine's corridors, the machine's reads
+  // — now survive the workspaces they were learned on, because they say
+  // something about the machine rather than about one workspace. What this
+  // arm buys is the proof that the surviving answers are still true: the
+  // release took the workspace's own corridor and grants back, the profile
+  // was deleted, and the second contain, trusting what it remembered, has to
+  // re-establish everything the release undid before the child can so much as
+  // resolve its own path. A memory that outlives its truth shows here as a
+  // second command that cannot start, which is the exact failure a memo that
+  // never learned to forget produces.
+  it("runs contained a second time after the first was released", async () => {
+    if (process.platform !== "win32") return;
+    const work = await mkdtemp(join(tmpdir(), "studio-remember-"));
+    const sandbox = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: work, readRoots: [work] }),
+    );
+    try {
+      const first = await sandbox.run("shell", {
+        executable: process.execPath,
+        args: ["-e", "console.log('first')"],
+        cwd: work,
+        timeoutMs: 30_000,
+      });
+      expect(first.exitCode).toBe(0);
+      expect(`${first.stdout}${first.stderr}`.trim()).toBe("first");
+
+      // Back to nothing: the corridor revoked, the grants lifted, the profile
+      // gone. What the process remembers is now the only thing standing
+      // between this command and a fresh block.
+      await expect(sandbox.releaseIsolation()).resolves.toBeUndefined();
+
+      const second = await sandbox.run("shell", {
+        executable: process.execPath,
+        args: ["-e", "console.log('second')"],
+        cwd: work,
+        timeoutMs: 30_000,
+      });
+      expect(second.exitCode).toBe(0);
+      expect(`${second.stdout}${second.stderr}`.trim()).toBe("second");
+      await expect(sandbox.releaseIsolation()).resolves.toBeUndefined();
+    } finally {
+      await sandbox.releaseIsolation().catch(() => {});
+      await rm(work, { recursive: true, force: true });
+    }
+  }, 120_000);
+});

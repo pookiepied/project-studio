@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -8,7 +8,12 @@ import { environmentBlock } from "../../src/context/environment.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy, gitConfigRoots } from "../../src/sandbox/policy.js";
-import { detectPresets, SANDBOX_PRESETS } from "../../src/sandbox/presets.js";
+import {
+  detectPresets,
+  SANDBOX_PRESETS,
+  toolchainEnvironment,
+  withToolchainDirectories,
+} from "../../src/sandbox/presets.js";
 import { systemScopeRefusal, validateCustomScopePath } from "../../src/sandbox/scope.js";
 import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
 import {
@@ -407,6 +412,221 @@ describe("the catalog", () => {
         "rust",
       ].sort(),
     );
+  });
+
+  it.runIf(process.platform === "win32")("detects the Python interpreter's own installation, newest first", () => {
+    // The measured defect this pins: the preset used to name only where
+    // Python *stores* things — the pip cache, the user site-packages — and
+    // never the place Python *is*. A contained shell that could not list the
+    // interpreter's directory answered `python` with `not recognized`, and a
+    // model that had just been told Python was granted reported that it
+    // "can't find any Python". The installation directory is the preset's
+    // first candidate, detected from the disk rather than from the PATH the
+    // process happened to inherit.
+    const home = mkdtempSync(join(tmpdir(), "studio-python-"));
+    directories.push(home);
+    for (const version of ["Python311", "Python312"]) {
+      mkdirSync(join(home, "Programs", "Python", version), { recursive: true });
+    }
+    const detected = detectPresets({ ...process.env, LOCALAPPDATA: home });
+    const python = detected.find((preset) => preset.id === "python");
+    expect(python).toBeDefined();
+    const installations = python?.paths.filter((path) => path.mode === "read") ?? [];
+    expect(installations.map((entry) => entry.path)).toEqual([
+      join(home, "Programs", "Python", "Python312"),
+      join(home, "Programs", "Python", "Python311"),
+    ]);
+  });
+
+  it.runIf(process.platform === "win32")("offers Flutter's own cache as a write grant beside the read-only SDK", () => {
+    // The measured defect this pins: the SDK was granted read-only, and the
+    // Flutter tool mutates `bin/cache` as part of running — version stamps,
+    // the startup lock, the Dart SDK download. A contained `flutter` therefore
+    // hung, silently, for as long as anyone was willing to watch. The SDK
+    // stays read because it is program files; the one directory Flutter owns
+    // and rewrites joins the write roots.
+    const home = mkdtempSync(join(tmpdir(), "studio-flutter-"));
+    directories.push(home);
+    mkdirSync(join(home, "flutter", "bin", "cache"), { recursive: true });
+    const detected = detectPresets({ ...process.env, HOME: home, USERPROFILE: home });
+    const android = detected.find((preset) => preset.id === "android-flutter");
+    expect(android).toBeDefined();
+    const cache = android?.paths.find(
+      (entry) => entry.path === join(home, "flutter", "bin", "cache"),
+    );
+    expect(cache?.mode).toBe("write");
+  });
+
+  it.runIf(process.platform === "win32")("offers corepack's cache with the other node caches", () => {
+    // Corepack manages the pnpm payload a `pnpm` command line actually runs.
+    // Its cache is a node cache like any other, and the measured reason it is
+    // listed here: a contained process is handed a `LOCALAPPDATA` under its
+    // own profile, so corepack starts empty and downloads pnpm again for
+    // every profile while the payload already sits on the disk.
+    const home = mkdtempSync(join(tmpdir(), "studio-corepack-"));
+    directories.push(home);
+    mkdirSync(join(home, "node", "corepack"), { recursive: true });
+    const detected = detectPresets({ ...process.env, LOCALAPPDATA: home });
+    const node = detected.find((preset) => preset.id === "node-caches");
+    expect(node).toBeDefined();
+    const cache = node?.paths.find((entry) => entry.path === join(home, "node", "corepack"));
+    expect(cache?.mode).toBe("write");
+  });
+});
+
+describe.runIf(process.platform === "win32")("the sandbox PATH's toolchain entries", () => {
+  it("appends a toolchain directory the inherited PATH was missing, behind the person's own entries", () => {
+    const home = mkdtempSync(join(tmpdir(), "studio-path-"));
+    directories.push(home);
+    const installed = join(home, "Programs", "Python", "Python311");
+    mkdirSync(installed, { recursive: true });
+    const env = {
+      ...process.env,
+      LOCALAPPDATA: home,
+      ProgramFiles: join(home, "Program Files"),
+      "ProgramFiles(x86)": join(home, "Program Files (x86)"),
+    };
+
+    const search = withToolchainDirectories("C:\\first", env);
+    expect(search).toContain(installed);
+    // The person's own PATH leads; the toolchain entry follows it.
+    expect(search.startsWith("C:\\first;")).toBe(true);
+  });
+
+  it("adds nothing twice, and reads the same back twice", () => {
+    const home = mkdtempSync(join(tmpdir(), "studio-path-once-"));
+    directories.push(home);
+    const installed = join(home, "Programs", "Python", "Python311");
+    mkdirSync(installed, { recursive: true });
+    const env = {
+      ...process.env,
+      LOCALAPPDATA: home,
+      ProgramFiles: join(home, "Program Files"),
+      "ProgramFiles(x86)": join(home, "Program Files (x86)"),
+    };
+
+    const once = withToolchainDirectories(installed, env);
+    expect(once).toContain(installed);
+    // Counted, so a name that is already on the PATH is never on it twice.
+    expect(once.split(";").filter((entry) => entry === installed)).toHaveLength(1);
+  });
+
+  it("leads with the real JDK when the person's java comes from an unfollowable shim", () => {
+    // The measured defect this pins: Oracle's `javapath` is a directory of
+    // symlinks whose target carries no ALL APPLICATION PACKAGES entry. A
+    // contained shell can list the shim and cannot follow it, so `java`
+    // answered `not recognized` while `java -version` in the person's own
+    // terminal worked. The installation's real `bin` leads instead.
+    const home = mkdtempSync(join(tmpdir(), "studio-java-shim-"));
+    directories.push(home);
+    const programFiles = join(home, "Program Files");
+    const realBin = join(programFiles, "Java", "jdk-17", "bin");
+    mkdirSync(realBin, { recursive: true });
+    writeFileSync(join(realBin, "java.exe"), "", "utf8");
+    const shim = join(programFiles, "javapath");
+    symlinkSync(realBin, shim, "junction");
+    const env = {
+      ...process.env,
+      ProgramFiles: programFiles,
+      "ProgramFiles(x86)": join(home, "Program Files (x86)"),
+    };
+
+    const search = withToolchainDirectories(shim, env);
+    expect(search.startsWith(`${realBin};`)).toBe(true);
+    // The shim keeps its place, it is simply no longer what java resolves to.
+    expect(search.split(";")).toContain(shim);
+  });
+
+  it("keeps the person's PATH leading when no shim stands in front of java", () => {
+    const home = mkdtempSync(join(tmpdir(), "studio-java-real-"));
+    directories.push(home);
+    const programFiles = join(home, "Program Files");
+    const realBin = join(programFiles, "Java", "jdk-17", "bin");
+    mkdirSync(realBin, { recursive: true });
+    writeFileSync(join(realBin, "java.exe"), "", "utf8");
+    const env = {
+      ...process.env,
+      ProgramFiles: programFiles,
+      "ProgramFiles(x86)": join(home, "Program Files (x86)"),
+    };
+
+    const search = withToolchainDirectories("C:\\first", env);
+    expect(search.startsWith("C:\\first;")).toBe(true);
+    expect(search).not.toContain(realBin);
+  });
+
+  it("rebuilds the Visual Studio environment a developer prompt would set", () => {
+    // The measured defect this pins: `rustc` finds MSVC through the registry,
+    // and an AppContainer has no registry, so every link failed — first
+    // LNK1181 for the missing kernel32.lib, then LNK1101 from a mismatched
+    // mspdb140.dll picked out of the general PATH. Rebuilt from the disk,
+    // the toolchain links.
+    const home = mkdtempSync(join(tmpdir(), "studio-msvc-"));
+    directories.push(home);
+    const programFiles = join(home, "Program Files");
+    const programFilesX86 = join(home, "Program Files (x86)");
+    const toolsRoot = join(
+      programFiles,
+      "Microsoft Visual Studio",
+      "2022",
+      "Community",
+      "VC",
+      "Tools",
+      "MSVC",
+      "14.38.33130",
+    );
+    const hostBin = join(toolsRoot, "bin", "Hostx64", "x64");
+    mkdirSync(hostBin, { recursive: true });
+    writeFileSync(join(hostBin, "link.exe"), "", "utf8");
+    const kitsRoot = join(programFilesX86, "Windows Kits", "10");
+    const sdkVersion = "10.0.26100.0";
+    for (const [directory, file] of [
+      [join(kitsRoot, "Lib", sdkVersion, "um", "x64"), "kernel32.lib"],
+      [join(kitsRoot, "Lib", sdkVersion, "ucrt", "x64"), "libucrt.lib"],
+    ] as const) {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, file), "", "utf8");
+    }
+    for (const include of ["ucrt", "shared", "um"]) {
+      mkdirSync(join(kitsRoot, "Include", sdkVersion, include), { recursive: true });
+    }
+    mkdirSync(join(home, "node", "corepack"), { recursive: true });
+    mkdirSync(join(home, "pnpm", "store"), { recursive: true });
+    const env = {
+      ...process.env,
+      LOCALAPPDATA: home,
+      ProgramFiles: programFiles,
+      "ProgramFiles(x86)": programFilesX86,
+    };
+
+    const search = withToolchainDirectories("C:\\first", env);
+    expect(search.startsWith(`${hostBin};`)).toBe(true);
+
+    const toolchain = toolchainEnvironment(env);
+    expect(toolchain["VCToolsVersion"]).toBe("14.38.33130");
+    expect(toolchain["WindowsSDKVersion"]).toBe(`${sdkVersion}\\`);
+    expect(toolchain["LIB"]?.split(";")).toContain(
+      join(kitsRoot, "Lib", sdkVersion, "ucrt", "x64"),
+    );
+    expect(toolchain["INCLUDE"]?.split(";")).toContain(
+      join(kitsRoot, "Include", sdkVersion, "shared"),
+    );
+    // The node caches ride beside the MSVC variables, for the same reason: a
+    // contained process cannot find them where the OS would look.
+    expect(toolchain["COREPACK_HOME"]).toBe(join(home, "node", "corepack"));
+    expect(toolchain["pnpm_config_store_dir"]).toBe(join(home, "pnpm", "store"));
+  });
+
+  it("adds no toolchain environment when Visual Studio is not installed", () => {
+    const home = mkdtempSync(join(tmpdir(), "studio-nomsvc-"));
+    directories.push(home);
+    const env = {
+      ...process.env,
+      LOCALAPPDATA: join(home, "localappdata"),
+      ProgramFiles: join(home, "Program Files"),
+      "ProgramFiles(x86)": join(home, "Program Files (x86)"),
+    };
+    expect(toolchainEnvironment(env)).toEqual({});
   });
 });
 

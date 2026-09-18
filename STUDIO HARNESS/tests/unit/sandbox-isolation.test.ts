@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, parse } from "node:path";
+import { join, parse, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -30,10 +30,12 @@ import {
   profileText,
   PROFILE_PATH,
 } from "../../src/sandbox/isolation/linux/apparmor.js";
-import { containArgs } from "../../src/sandbox/isolation/windows/launcher.js";
+import { containArgs, invokeLauncherAsync } from "../../src/sandbox/isolation/windows/launcher.js";
 import {
   grantsFor,
+  grantShortfall,
   prepareAdvice,
+  profileKey,
   profileName,
 } from "../../src/sandbox/isolation/windows/appcontainer.js";
 import { isFullPermissionList } from "../../src/sandbox/isolation/windows/traversal.js";
@@ -650,6 +652,53 @@ describe("the Windows launcher's argument rules", () => {
     expect(first.length).toBeLessThanOrEqual(64);
     expect(first).toMatch(/^studio-[0-9a-f]{32}$/);
   });
+
+  describe("the anchor a profile is named from", () => {
+    it("names the anchor when the policy carries one, and the workspace root when it does not", () => {
+      const anchor = ROOT + join("studio", "anchors", "shared");
+      const anchored = createSandboxPolicy({ workspaceRoot: workspace, profileAnchor: anchor });
+      // Resolved by the policy, so the hash is of one shape of the path.
+      expect(profileKey(anchored)).toBe(resolve(anchor));
+      expect(profileKey(createSandboxPolicy({ workspaceRoot: workspace }))).toBe(
+        resolve(workspace),
+      );
+    });
+
+    it("gives every conversation on one anchor the same identity", () => {
+      // The property the anchors exist for: two workspaces standing in
+      // different conversation directories, under the same anchor, mint the
+      // same profile — which is what lets the second one skip the entire
+      // grant walk the first one paid for.
+      const anchor = ROOT + join("studio", "anchors", "shared");
+      const first = profileName(
+        profileKey(createSandboxPolicy({ workspaceRoot: ROOT + join("a"), profileAnchor: anchor })),
+      );
+      const second = profileName(
+        profileKey(createSandboxPolicy({ workspaceRoot: ROOT + join("b"), profileAnchor: anchor })),
+      );
+      expect(first).toBe(second);
+      // And a project standing outside the anchor stays its own identity.
+      expect(
+        profileName(profileKey(createSandboxPolicy({ workspaceRoot: ROOT + join("p") }))),
+      ).not.toBe(first);
+    });
+  });
+});
+
+describe("the async launcher's failure shape", () => {
+  it("raises the classified error, with the launcher's own answer, on failure", async () => {
+    // The async wrapper exists so a slow grant keeps the harness streaming;
+    // its error contract has to be the same one every sync caller already
+    // relies on — a `SandboxError("unavailable")` carrying the launcher's
+    // stderr, because that message is what the shortfall text quotes. A
+    // vendor root that holds no launcher fails the spawn, which is the one
+    // failure this can exercise on any machine.
+    await expect(
+      invokeLauncherAsync(["profile-ensure", "--name", "studio-test-probe"], {
+        vendorRoot: join(tmpdir(), "studio-no-vendor-here"),
+      }),
+    ).rejects.toThrow(SandboxError);
+  });
 });
 
 describe("the advice given while containment is still working", () => {
@@ -673,6 +722,54 @@ describe("the advice given while containment is still working", () => {
     // wrong advice the elevation failure once gave for every error.
     const advice = prepareAdvice(["C:\\Users\\pooki"]);
     expect(advice.toLowerCase()).not.toContain("administrator");
+  });
+});
+
+describe("the answer a grant shortfall gives", () => {
+  // The measured case: the git preset's row lives in `C:\Program Files\Git`,
+  // which the machine covers with its own ALL APPLICATION PACKAGES read and
+  // guards against an unelevated WRITE_DAC. The grant died, every conversation
+  //'s first contained command died with it, and the difference between that
+  // and a one-time setup step is this message.
+
+  const denied = (path: string): Error =>
+    new Error(
+      "The Windows sandbox launcher failed: " +
+        `could not set the permissions of ${path} (error 5)`,
+    );
+
+  it("names every failed root, its mode, and what the launcher answered", () => {
+    const text = grantShortfall([
+      { path: "C:\\Program Files\\Git", mode: "read", error: denied("C:\\Program Files\\Git") },
+      { path: "C:\\Program Files\\Java", mode: "write", error: denied("C:\\Program Files\\Java") },
+    ]);
+    expect(text).toContain("(read)  C:\\Program Files\\Git");
+    expect(text).toContain("(write)  C:\\Program Files\\Java");
+    // The launcher's own answer, not a paraphrase: the Win32 status is the
+    // thing a search or a finding doc is written from.
+    expect(text).toContain("error 5");
+  });
+
+  it("gives the one elevated command, covering every failed read at once", () => {
+    const text = grantShortfall([
+      { path: "C:\\Program Files\\Git", mode: "read", error: denied("C:\\Program Files\\Git") },
+      { path: "C:\\Program Files\\Dive", mode: "read", error: denied("C:\\Program Files\\Dive") },
+    ]);
+    expect(text).toContain(
+      'pnpm sandbox:prepare --read "C:\\Program Files\\Git" "C:\\Program Files\\Dive"',
+    );
+    expect(text.toLowerCase()).toContain("administrator");
+  });
+
+  it("leaves the elevated read command out when only a write failed", () => {
+    // There would be nothing for `--read` to do, and a command that touches
+    // nothing is one more thing to run without knowing why.
+    const text = grantShortfall([
+      { path: "C:\\Program Files\\Java", mode: "write", error: denied("C:\\Program Files\\Java") },
+    ]);
+    expect(text).not.toContain("pnpm sandbox:prepare --read");
+    // The write counsel, named by a phrase that survives its own wrapping.
+    expect(text).toContain("elevated hand");
   });
 });
 

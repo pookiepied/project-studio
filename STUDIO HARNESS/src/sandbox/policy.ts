@@ -54,6 +54,31 @@ export interface SandboxPolicy {
    * policy resolves any absolute path and runs any command uncontained.
    */
   readonly trusted: boolean;
+  /**
+   * The stable identity for this policy's container profile, when the
+   * workspace root itself is not one.
+   *
+   * The profile is named by hashing this path when present, and the workspace
+   * root when not — which makes it a choice about *how often the machine pays
+   * for a new identity*, because every new profile means a new SID, and a new
+   * SID means re-granting every scope root to it, which means Windows pushing
+   * inheritance down hundreds of thousands of files. Measured on this
+   * machine: a conversation with no project used to mint its own profile
+   * under `data/conversations/<id>/workspace`, so the person's first command
+   * in every fresh conversation bought the entire walk again, and each of
+   * those conversations left nine permanent entries behind on the trees the
+   * presets name. Anchoring the profile to the conversations directory makes
+   * that once, ever, per install — and the per-conversation entries stop
+   * accumulating entirely.
+   *
+   * The anchor is a *scope* decision, not a convenience: a project's
+   * conversations keep their own per-project identity, because a project's
+   * scope rows are granted to a SID that a project-less conversation's
+   * container must not carry. Only conversations standing nowhere get the
+   * shared identity, and what they can reach through it is exactly the
+   * machine-wide scope they were granted.
+   */
+  readonly profileAnchor?: string;
 }
 
 export interface SandboxPolicyInput {
@@ -64,6 +89,7 @@ export interface SandboxPolicyInput {
   readonly allowExec?: boolean;
   readonly allowNetwork?: boolean;
   readonly trusted?: boolean;
+  readonly profileAnchor?: string;
 }
 
 /**
@@ -203,6 +229,7 @@ export function createSandboxPolicy(input: SandboxPolicyInput): SandboxPolicy {
         DEFAULT_CAPABILITY_SWITCHES.allowNetwork,
       ),
     trusted: input.trusted ?? false,
+    ...(input.profileAnchor === undefined ? {} : { profileAnchor: resolve(input.profileAnchor) }),
   };
 }
 

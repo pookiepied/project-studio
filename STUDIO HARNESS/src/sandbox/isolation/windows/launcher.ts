@@ -1,6 +1,7 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { shippedBinaryDirectory } from "../../../platform/paths.js";
 import { SandboxError } from "../../errors.js";
@@ -80,6 +81,50 @@ export function invokeLauncher(
       timeout: 60_000,
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
+  } catch (error) {
+    throw new SandboxError("unavailable", {
+      message: `The Windows sandbox launcher failed: ${describe(error)}`,
+    });
+  }
+}
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Runs one launcher subcommand without holding the event loop still.
+ *
+ * Same contract as {@link invokeLauncher} — argument vector, trimmed stdout,
+ * `SandboxError("unavailable")` instead of a raw spawn error — but the call
+ * awaits rather than blocks, and it exists because of what blocking costs here.
+ * While `execFileSync` runs, the harness's one thread cannot write a byte: the
+ * conversation's stream, the keep-alive comments written every fifteen seconds,
+ * everything waits. A cold first grant of the preset roots was measured at a
+ * hundred seconds of exactly that silence, which the client reads as a dead
+ * stream and reports. The synchronous form stays for the quick administrative
+ * calls — profile creation, `check`, the traverse corridor, where no tree is
+ * walked — and every propagation-bearing grant goes through this one.
+ */
+export async function invokeLauncherAsync(
+  args: readonly string[],
+  options: { readonly vendorRoot?: string } = {},
+): Promise<string> {
+  const executable = launcherPath(options.vendorRoot ?? shippedBinaryDirectory());
+  try {
+    const { stdout } = await execFileAsync(executable, [...args], {
+      encoding: "utf8",
+      windowsHide: true,
+      // Ten minutes, and only here. This wrapper exists for the calls that walk
+      // trees, and the walk is the whole budget: the same `grant` that took a
+      // minute warm took eighty seconds cold. The synchronous minute stays for
+      // everything else — checks, profile operations, traverse entries — which
+      // have no walk in them and fail in milliseconds when they fail at all.
+      // The alternative to a generous ceiling is not a faster grant; it is a
+      // killed child and a tree whose entries were pushed half way down, which
+      // is a machine that has to be repaired by hand.
+      timeout: 600_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    return stdout.trim();
   } catch (error) {
     throw new SandboxError("unavailable", {
       message: `The Windows sandbox launcher failed: ${describe(error)}`,
