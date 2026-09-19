@@ -22,9 +22,9 @@ import { TurnMenu } from './TurnMenu'
  *
  * The picker is deliberately two surfaces: a short first level (the default,
  * the recents, the door) and the library dialog behind it, organised as
- * families first and a model's own facts one drill deeper. Most tests below
- * therefore walk that path: into a family, onto a model's row, into its
- * facts, and out through the explicit button.
+ * connections first and a model's own facts one drill deeper. Most tests
+ * below therefore walk that path: into a connection, onto a model's row,
+ * into its facts, and out through the explicit button.
  */
 
 const BASE_URL = 'http://127.0.0.1:4319'
@@ -159,14 +159,9 @@ async function openLibrary() {
   await screen.findByRole('textbox', { name: 'Search models' })
 }
 
-/** The family index inside the library - the rows that name the families. */
-function familyIndex() {
-  return within(screen.getByRole('navigation', { name: 'Model families' }))
-}
-
-/** Walks from the landing into a family's page through the index. */
-async function openFamilyInLibrary(name: string | RegExp) {
-  fireEvent.click(familyIndex().getByRole('button', { name: name }))
+/** Walks from the landing into a connection's page. */
+async function openConnectionInLibrary(name: string | RegExp) {
+  fireEvent.click(await screen.findByRole('button', { name }))
 }
 
 beforeEach(() => {
@@ -238,29 +233,28 @@ describe('the model picker', () => {
     expect(within(menu).getByText('Default model')).toBeTruthy()
   })
 
-  it('organises the library by family: the landing names the vendor, its page lists the models', async () => {
+  it('organises the library by connection: the landing names the connection, its page lists the models', async () => {
     harnessConfigured()
     mountPicker()
     stubFetch(defaultRoute([REASONING_MODEL]))
 
     await openLibrary()
-    // The landing is the catalog's shape, not its rows: one card for the
-    // family, wearing the model's own author mark (resolved from the vendor
-    // the connection draws from) and naming the connection that serves it.
-    const card = await screen.findByRole('button', { name: /Work Anthropic/ })
-    expect(card.textContent).toContain('Anthropic')
-    expect(card.textContent).toContain('1 model')
+    // The landing is the catalog's shape, not its rows: one row for the
+    // connection, under the name the person gave it, wearing the vendor's
+    // mark and counting what it serves.
+    const row = await screen.findByRole('button', { name: /Work Anthropic/ })
+    expect(row.textContent).toContain('1 model')
     expect(document.querySelector('[data-provider="anthropic"]')).not.toBeNull()
     // No model rows on the landing: a library opens on its index, not a wall.
     expect(screen.queryByRole('button', { name: /claude-sonnet-4\.5/ })).toBeNull()
 
-    // Into the family, the model is a row; onto the row, its own page.
-    await openFamilyInLibrary(/Anthropic/)
+    // Into the connection, the model is a row; onto the row, its own page.
+    await openConnectionInLibrary(/Work Anthropic/)
     fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
     await screen.findByText('Input price')
   })
 
-  it('narrows the library as the search is typed, grouped by family, and says so when nothing matches', async () => {
+  it('narrows the library as the search is typed, grouped by connection, and says so when nothing matches', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
     mountPicker()
@@ -269,11 +263,11 @@ describe('the model picker', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
       target: { value: 'jamba' },
     })
-    // The needle matches by name; the other model's row is gone. The family
-    // header stays - the family still owns the one model that matched.
+    // The needle matches by name; the other model's row is gone. The
+    // connection heading stays - it still serves the one model that matched.
     expect(await screen.findByRole('button', { name: /jamba-large-1\.7/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /claude-sonnet/ })).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Anthropic' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Work Anthropic' })).toBeTruthy()
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
       target: { value: 'nothing at all' },
@@ -287,7 +281,7 @@ describe('the model picker', () => {
     mountPicker()
 
     await openLibrary()
-    await openFamilyInLibrary(/Anthropic/)
+    await openConnectionInLibrary(/Work Anthropic/)
     fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
 
     // The wire record's own facts, shown rather than buried: prices per
@@ -299,7 +293,7 @@ describe('the model picker', () => {
     expect(screen.getByText('Vision')).toBeTruthy()
 
     // The back row is named for where it returns to, and it does return.
-    fireEvent.click(screen.getByRole('button', { name: 'Anthropic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Work Anthropic' }))
     expect(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ })).toBeTruthy()
   })
 
@@ -327,7 +321,7 @@ describe('the model picker', () => {
     fireEvent.click(screen.getByText('open chat'))
 
     await openLibrary()
-    await openFamilyInLibrary(/Anthropic/)
+    await openConnectionInLibrary(/Work Anthropic/)
     // Opening a model's page writes nothing: the facts appear, the dial rests
     // on medium, and the index is untouched until the button.
     fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
@@ -368,7 +362,7 @@ describe('the model picker', () => {
     // Four picks, three seats: the oldest falls off the list entirely.
     for (const name of ['jamba-large-1\\.7', 'vox-small-1', 'kappa-mini', 'delta-pro']) {
       await openLibrary()
-      await openFamilyInLibrary(/Anthropic/)
+      await openConnectionInLibrary(/Work Anthropic/)
       fireEvent.click(await screen.findByRole('button', { name: new RegExp(name) }))
       fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
       const plain = name.replace('\\.', '.')
@@ -427,7 +421,7 @@ describe('the model picker', () => {
     fireEvent.click(screen.getByText('open chat'))
 
     await openLibrary()
-    await openFamilyInLibrary(/Anthropic/)
+    await openConnectionInLibrary(/Work Anthropic/)
     fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
     await waitFor(() => {
@@ -451,7 +445,7 @@ describe('the model picker', () => {
     mountPicker()
 
     await openLibrary()
-    await openFamilyInLibrary(/Anthropic/)
+    await openConnectionInLibrary(/Work Anthropic/)
     fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
 
     // One dial in the details pane, whose steps are the model's own levels:
@@ -760,7 +754,7 @@ describe('the library on the way out', () => {
     // is gone from the DOM. The library's own page transition keeps an
     // outgoing view mounted, and nothing in jsdom drives that exit to
     // completion - so its presence proves nothing either way.
-    expect(familyIndex().getByRole('button', { name: /Anthropic/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Work Anthropic/ })).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveProperty('value', '')
   })
 })

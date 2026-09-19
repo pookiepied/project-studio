@@ -17,6 +17,7 @@ export function Dialog({
   footer,
   width = '26rem',
   height,
+  layout = 'scroll',
   children,
 }: {
   open: boolean
@@ -31,6 +32,15 @@ export function Dialog({
    * separately needs the box itself to be of known height first.
    */
   height?: string
+  /**
+   * `scroll` (the default): the body scrolls as a whole, and the panel is as
+   * tall as its content up to the screen. `fill`: the body is a box of the
+   * panel's height that does not scroll, for content that scrolls a region
+   * of its own - a page with a fixed search field over a list. Without it a
+   * child sized to the body's height overflowed the body's own padding, and
+   * two scrollbars appeared, one inside the other.
+   */
+  layout?: 'scroll' | 'fill'
   children: ReactNode
 }) {
   return (
@@ -81,7 +91,14 @@ export function Dialog({
           </IconButton>
         </header>
 
-        <div className="studio-scroll-bounded min-h-0 flex-1 overflow-y-auto px-4 pb-4">{children}</div>
+        <div
+          className={cn(
+            'min-h-0 flex-1 px-4 pb-4',
+            layout === 'fill' ? 'flex flex-col overflow-hidden' : 'studio-scroll-bounded overflow-y-auto',
+          )}
+        >
+          {children}
+        </div>
 
         {footer ? (
           <footer className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3">

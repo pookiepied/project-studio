@@ -54,11 +54,12 @@ describe('priceHint', () => {
 })
 
 describe('rowCapabilities', () => {
-  it('names only confirmed capabilities, in family-differentiating order', () => {
-    expect(rowCapabilities(model({ toolCalling: 'supported', vision: 'supported', reasoning: 'unknown' }))).toEqual([
-      'tools',
-      'vision',
-    ])
+  it('names only confirmed capabilities, in sibling-differentiating order', () => {
+    expect(
+      rowCapabilities(model({ toolCalling: 'supported', vision: 'supported', reasoning: 'unknown' })).map(
+        (capability) => capability.id,
+      ),
+    ).toEqual(['tools', 'vision'])
     expect(rowCapabilities(model({ toolCalling: 'unsupported', vision: 'unsupported', reasoning: 'unsupported' }))).toEqual([])
   })
 })

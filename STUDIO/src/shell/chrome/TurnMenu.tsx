@@ -526,7 +526,7 @@ function ModelPanel({
           facts about each model, one step away. A picker is for choosing;
           browsing two hundred rows is a different activity and gets a page
           that can hold it. */}
-      <MenuItem icon={<Icons.search />} onSelect={onOpenLibrary}>
+      <MenuItem icon={<Icons.library />} onSelect={onOpenLibrary}>
         Model library…
       </MenuItem>
     </>

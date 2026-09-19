@@ -3,15 +3,22 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { surfaceVariants, type SurfaceMove } from '@/design/tokens'
 import { Button, Dialog, TextField } from '@/components/primitives'
-import { Icons } from '@/components/icons'
 import { Loading, StateNote } from '@/components/state'
 import type { HarnessFailure } from '@/platform/harness'
 import { findCatalogModel } from '@/domain/models/catalog'
-import { familyCatalog, familyName } from '@/domain/models/families'
-import { familyView, modelView, viewKey, viewMove, viewOf, FAMILIES_VIEW, type LibraryView } from './library/views'
-import { LibraryIndex } from './library/LibraryIndex'
-import { FamilyGrid } from './library/FamilyGrid'
-import { FamilyModels } from './library/FamilyModels'
+import { connectionCatalog } from '@/domain/models/connections'
+import { familyName } from '@/domain/models/families'
+import {
+  CONNECTIONS_VIEW,
+  connectionView,
+  modelView,
+  viewKey,
+  viewMove,
+  viewOf,
+  type LibraryView,
+} from './library/views'
+import { ConnectionList } from './library/ConnectionList'
+import { ConnectionModels } from './library/ConnectionModels'
 import { SearchResults } from './library/SearchResults'
 import { ModelDetail } from './library/ModelDetail'
 import type { CatalogState } from './CatalogStateNote'
@@ -34,22 +41,26 @@ const STAGE_VARIANTS = surfaceVariants()
  *
  * ---- The three levels ------------------------------------------------------
  *
- * The library reads like one: families first, then a family's models, then a
- * model's own page. The old layout put the list and the facts side by side in
- * two panes, and the panes fought - one scroll continued underneath the other,
- * and the details waited empty for a selection. Each level here owns the
- * stage outright and scrolls alone, and no level exists before its content
- * does, so there is no empty state to dress up. The index on the left keeps
- * the hierarchy one click wide: family to family without climbing back
- * through the landing.
+ * The library reads like one: connections first, then a connection's models,
+ * then a model's own page. Each level owns the stage outright and scrolls
+ * alone, and no level exists before its content does, so there is no empty
+ * state to dress up. The first axis was the model family for a while - the
+ * vendor whose mark a model wears - and it was the wrong one: the author is
+ * a guess wherever a host names its models bare, so the same model showed up
+ * under two families and a custom endpoint became one. The connection is the
+ * fact every row carries for certain (`domain/models/connections`).
+ *
+ * There used to be an index column beside the stage as well, naming the
+ * same things the landing named. The window this app lives in is small; one
+ * list is the whole page, and the back row is the way up.
  *
  * ---- Search -----------------------------------------------------------------
  *
  * The search field rides above every page, and a needle turns the stage into
- * results grouped by family - the one view that crosses families, which is
- * the point of it. Opening a model from results keeps the needle in the
- * field; the model page's back row is named for where it returns to, so
- * "Search results" and a family's name are honest labels rather than a
+ * results grouped by connection - the one view that crosses connections,
+ * which is the point of it. Opening a model from results keeps the needle in
+ * the field; the model page's back row is named for where it returns to, so
+ * "Search results" and a connection's name are honest labels rather than a
  * generic "Back".
  *
  * ---- Why the pages move like routes ----------------------------------------
@@ -75,7 +86,7 @@ export function ModelLibraryDialog({
   onEnsure: () => Promise<boolean>
 }) {
   const [query, setQuery] = useState('')
-  const [familyAuthor, setFamilyAuthor] = useState<string | null>(null)
+  const [connectionId, setConnectionId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningChoice | null>(null)
   const [move, setMove] = useState<SurfaceMove>('push')
@@ -91,7 +102,7 @@ export function ModelLibraryDialog({
   useEffect(() => {
     if (!open) {
       setQuery('')
-      setFamilyAuthor(null)
+      setConnectionId(null)
       setDetailId(null)
       setReasoningLevel(null)
       setMove('push')
@@ -99,48 +110,47 @@ export function ModelLibraryDialog({
   }, [open])
 
   const ready = catalog.phase.status === 'ready'
-  const families = useMemo(
-    () => (ready ? familyCatalog(catalog.models) : []),
+  const connections = useMemo(
+    () => (ready ? connectionCatalog(catalog.models) : []),
     [ready, catalog],
   )
 
-  // Search groups what the needle matches, across every family at once - the
-  // one view that is not one family deep.
+  // Search groups what the needle matches, across every connection at once -
+  // the one view that is not one connection deep.
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!ready || needle === '') return []
     const matching = catalog.models.filter((candidate) =>
-      [candidate.name, candidate.modelId, candidate.author, candidate.connectionName]
+      [candidate.name, candidate.modelId, familyName(candidate.author), candidate.connectionName]
         .join('\n')
         .toLowerCase()
         .includes(needle),
     )
-    return familyCatalog(matching)
+    return connectionCatalog(matching)
   }, [ready, catalog, query])
 
-  const connections = useMemo(
-    () => new Set(catalog.models.map((model) => model.connectionId)).size,
-    [catalog],
-  )
-
-  const view = viewOf(query, detailId, familyAuthor)
+  const view = viewOf(query, detailId, connectionId)
   const detailModel = view.kind === 'model' ? findCatalogModel(catalog.models, view.id) : undefined
-  // A detail page whose model the catalog no longer has falls back to the
-  // page underneath rather than rendering a hole.
+  const openConnection = connections.find((connection) => connection.id === connectionId)
+  // A page whose content the catalog no longer has falls back to the page
+  // underneath rather than rendering a hole.
   const stage =
-    view.kind === 'model' && detailModel === undefined ? viewOf('', null, familyAuthor) : view
+    (view.kind === 'model' && detailModel === undefined) ||
+    (view.kind === 'connection' && openConnection === undefined)
+      ? CONNECTIONS_VIEW
+      : view
   const searching = query.trim() !== ''
 
   // Every change of page names the move it is making; the stage animates by it.
   const go = (next: LibraryView) => setMove(viewMove(view, next))
-  const openFamilies = () => {
-    go(FAMILIES_VIEW)
-    setFamilyAuthor(null)
+  const openConnections = () => {
+    go(CONNECTIONS_VIEW)
+    setConnectionId(null)
     setDetailId(null)
   }
-  const openFamily = (author: string) => {
-    go(familyView(author))
-    setFamilyAuthor(author)
+  const selectConnection = (id: string) => {
+    go(connectionView(id))
+    setConnectionId(id)
     setDetailId(null)
   }
   const openModel = (id: string) => {
@@ -149,11 +159,11 @@ export function ModelLibraryDialog({
     setReasoningLevel(null)
   }
   const back = () => {
-    go(viewOf('', null, familyAuthor))
+    go(viewOf('', null, connectionId))
     setDetailId(null)
   }
   const onQuery = (value: string) => {
-    go(viewOf(value, null, familyAuthor))
+    go(viewOf(value, null, connectionId))
     setQuery(value)
     setDetailId(null)
   }
@@ -174,98 +184,86 @@ export function ModelLibraryDialog({
       open={open}
       onClose={onClose}
       title="Model library"
-      // Two thirds of the window, and a definite height: the three levels
-      // scroll independently, which needs a box of known height to scroll in.
-      // Wide enough that an aggregator's catalog reads as a page rather than a
-      // scroll, capped so it never pretends to be the whole app.
-      width="min(72rem, 74vw)"
-      height="min(46rem, 100%)"
+      // A reading column, not a second window: wide enough for a name, three
+      // marks, a context and a price on one line, and no wider. A definite
+      // height, because the stage scrolls inside it.
+      width="min(36rem, 92vw)"
+      height="min(34rem, 100%)"
+      layout="fill"
+      // The one action the library has, shown on the one page it applies to.
       footer={
-        <>
-          <Button variant="ghost" onClick={onOpenSettings}>
-            <Icons.settings /> Add models in Settings...
-          </Button>
+        stage.kind === 'model' ? (
           <Button variant="primary" disabled={detailModel === undefined} onClick={use}>
             Use this model
           </Button>
-        </>
+        ) : undefined
       }
     >
       {catalog.phase.status === 'loading' ? (
         <Loading label="Loading the model library" />
       ) : catalog.phase.status === 'ready' ? (
-        <div className="flex h-full min-h-0">
-          <LibraryIndex
-            families={families}
-            activeFamily={searching ? null : familyAuthor}
-            familiesActive={!searching && familyAuthor === null}
-            total={catalog.models.length}
-            onSelectFamily={openFamily}
-            onOpenFamilies={openFamilies}
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <TextField
+            value={query}
+            onChange={onQuery}
+            placeholder={`Search ${catalog.models.length} models`}
+            ariaLabel="Search models"
+            autoFocus
           />
-
-          <div className="flex min-w-0 flex-1 flex-col gap-2 pl-4">
-            <TextField
-              value={query}
-              onChange={onQuery}
-              placeholder={`Search ${catalog.models.length} models`}
-              ariaLabel="Search models"
-              autoFocus
-            />
-            {/* The stage: exactly one page at a time, absolute while exiting so
-                two pages crossfade in place instead of stacking. The move
-                reaches the animation as `custom` because AnimatePresence
-                freezes an exiting element's props -- the last-rendered exit is
-                the PREVIOUS move's, so a back out of a drill-in would leave to
-                the wrong side. Variants re-read the move as it plays. */}
-            <div className="relative min-h-0 flex-1">
-              <AnimatePresence initial={false} custom={move}>
-                <motion.div
-                  key={viewKey(stage)}
-                  custom={move}
-                  variants={STAGE_VARIANTS}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  className="absolute inset-0"
-                >
-                  <div className="studio-scroll-bounded h-full overflow-y-auto pr-1">
-                    {stage.kind === 'families' ? (
-                      <FamilyGrid
-                        families={families}
-                        models={catalog.models}
-                        connections={connections}
-                        onSelect={openFamily}
-                      />
-                    ) : stage.kind === 'family' ? (
-                      families
-                        .filter((family) => family.author === stage.author)
-                        .map((family) => (
-                          <FamilyModels
-                            key={family.author}
-                            family={family}
-                            onSelect={(model) => openModel(model.id)}
-                          />
-                        ))
-                    ) : stage.kind === 'model' && detailModel !== undefined ? (
-                      <ModelDetail
-                        model={detailModel}
-                        backLabel={searching ? 'Search results' : familyAuthor !== null ? familyName(familyAuthor) : 'All families'}
-                        reasoningLevel={reasoningLevel}
-                        onReasoning={setReasoningLevel}
-                        onBack={back}
-                      />
-                    ) : (
-                      <SearchResults
-                        query={query.trim()}
-                        families={results}
-                        onSelect={(model) => openModel(model.id)}
-                      />
-                    )}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-            </div>
+          {/* The stage: exactly one page at a time, absolute while exiting so
+              two pages crossfade in place instead of stacking. The move
+              reaches the animation as `custom` because AnimatePresence
+              freezes an exiting element's props -- the last-rendered exit is
+              the PREVIOUS move's, so a back out of a drill-in would leave to
+              the wrong side. Variants re-read the move as it plays. */}
+          <div className="relative min-h-0 flex-1">
+            <AnimatePresence initial={false} custom={move}>
+              <motion.div
+                key={viewKey(stage)}
+                custom={move}
+                variants={STAGE_VARIANTS}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="absolute inset-0"
+              >
+                <div className="studio-scroll-bounded h-full overflow-y-auto pr-1">
+                  {stage.kind === 'connections' ? (
+                    <ConnectionList
+                      connections={connections}
+                      onSelect={selectConnection}
+                      onOpenSettings={onOpenSettings}
+                    />
+                  ) : stage.kind === 'connection' && openConnection !== undefined ? (
+                    <ConnectionModels
+                      connection={openConnection}
+                      onSelect={(model) => openModel(model.id)}
+                      onBack={openConnections}
+                    />
+                  ) : stage.kind === 'model' && detailModel !== undefined ? (
+                    <ModelDetail
+                      model={detailModel}
+                      backLabel={
+                        searching
+                          ? 'Search results'
+                          : openConnection !== undefined
+                            ? openConnection.name
+                            : 'All connections'
+                      }
+                      reasoningLevel={reasoningLevel}
+                      onReasoning={setReasoningLevel}
+                      onBack={back}
+                    />
+                  ) : (
+                    <SearchResults
+                      query={query.trim()}
+                      connections={results}
+                      onSelect={(model) => openModel(model.id)}
+                    />
+                  )}
+                </div>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       ) : (
@@ -337,4 +335,3 @@ function CatalogFailure({
     </div>
   )
 }
-

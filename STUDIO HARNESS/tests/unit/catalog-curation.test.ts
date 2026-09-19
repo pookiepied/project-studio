@@ -18,7 +18,7 @@ import { languageCatalogProviders } from "../../src/gateway/language/pi-catalog.
  * widening to everything.
  */
 
-/** The language vendors curated in on 2026-09-19. */
+/** The language vendors curated in on 2026-09-19 (Vercel AI Gateway went the same day). */
 const CURATED_LANGUAGE = [
   "anthropic",
   "openai",
@@ -33,7 +33,6 @@ const CURATED_LANGUAGE = [
   "baseten",
   "nvidia",
   "openrouter",
-  "vercel-ai-gateway",
   "cloudflare-workers-ai",
   "github-copilot",
   "opencode",
