@@ -26,7 +26,6 @@ interface ScopeRow {
   path: string;
   mode: string;
   source: string;
-  preset_id: string | null;
   granted_at: number;
 }
 
@@ -36,7 +35,6 @@ function toRow(row: ScopeRow): SandboxScopeRow {
     path: row.path,
     mode: readScopeMode(row.mode),
     source: readScopeSource(row.source),
-    presetId: row.preset_id,
     grantedAt: row.granted_at,
   };
 }
@@ -127,13 +125,12 @@ export class SandboxScopeStore {
     readonly path: string;
     readonly mode: SandboxScopeMode;
     readonly source: SandboxScopeSource;
-    readonly presetId?: string | undefined;
   }): SandboxScopeRow {
     const absolute = normalizeScopePath(entry.path);
     // Every source, not only the typed one. A volume root or a system
-    // directory is the end of containment whichever way it arrived - a preset
-    // whose candidates drifted, or a question the model phrased - and the
-    // person who wants that wants `trusted`, which the refusal names. Only the
+    // directory is the end of the boundary whichever way it arrived - typed,
+    // or a question the model phrased - and the person who wants that wants
+    // `trusted`, which the refusal names. Only the
     // existence and absoluteness checks are particular to a typed path, and
     // `validateCustomScopePath` runs the refusal as part of its own work.
     const refusal = systemScopeRefusal(absolute);
@@ -150,20 +147,13 @@ export class SandboxScopeStore {
     try {
       this.#db
         .prepare(
-          `INSERT INTO sandbox_scope (project_id, path, mode, source, preset_id, granted_at)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO sandbox_scope (project_id, path, mode, source, granted_at)
+           VALUES (?, ?, ?, ?, ?)
            ON CONFLICT (project_id, path)
            DO UPDATE SET mode = excluded.mode, source = excluded.source,
-             preset_id = excluded.preset_id, granted_at = excluded.granted_at`,
+             granted_at = excluded.granted_at`,
         )
-        .run(
-          entry.projectId,
-          absolute,
-          entry.mode,
-          entry.source,
-          entry.presetId ?? null,
-          at,
-        );
+        .run(entry.projectId, absolute, entry.mode, entry.source, at);
     } catch (error) {
       throw storageErrorFrom(error);
     }
@@ -172,7 +162,6 @@ export class SandboxScopeStore {
       path: absolute,
       mode: entry.mode,
       source: entry.source,
-      presetId: entry.presetId ?? null,
       grantedAt: at,
     };
   }

@@ -44,7 +44,7 @@ import {
   PermissionKernel,
   type PermissionApprover,
 } from "../permissions/kernel.js";
-import type { ExecutionMode } from "../permissions/mode.js";
+import { requiresUndo, type ExecutionMode } from "../permissions/mode.js";
 import { posture, WorkspaceTrustStore } from "../permissions/trust.js";
 import { createErrorReporter } from "../observability/error-reporter.js";
 import type { Logger } from "../observability/logger.js";
@@ -1327,7 +1327,7 @@ export class StudioRuntime implements AgentHost {
    * consent, nothing widened.
    */
   #conversationMode(conversationId: string): ExecutionMode {
-    return this.#conversations.get(conversationId)?.permissionMode ?? "manual";
+    return this.#conversations.get(conversationId)?.permissionMode ?? "ask";
   }
 
   /**
@@ -1551,7 +1551,7 @@ export class StudioRuntime implements AgentHost {
     // by conversation as well is #72/#83/#84/#85; see the field's comment.
     //
     // `required` reads the mode through the same per-conversation closure,
-    // which keeps Full Auto's undo guarantee tied to the conversation that
+    // which keeps Auto's undo guarantee tied to the conversation that
     // asked for it. Today every conversation's workspace root is its own
     // (`agents/studio.ts` passes the conversation's directory and nothing
     // overrides `projectId`), so one entry here is one conversation's; if a
@@ -1562,7 +1562,7 @@ export class StudioRuntime implements AgentHost {
     if (snapshots === undefined) {
       snapshots = new TurnSnapshots({
         store: new SnapshotStore({ workspaceRoot: projectRoot }),
-        required: () => mode() === "full-auto",
+        required: () => requiresUndo(mode()),
         reporter,
       });
       this.#turnSnapshots.set(projectId, snapshots);

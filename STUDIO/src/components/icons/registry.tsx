@@ -29,7 +29,7 @@ import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
-  MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
+  MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
@@ -142,13 +142,13 @@ const REGISTRY = {
 
   // — Model and permission ------------------------------------------------
   //
-  // The permission triad is not shields. A shield says the app is a hazard
+  // The permission pair is not shields. A shield says the app is a hazard
   // being contained, which is the developer-tool reading of these modes and the
-  // wrong one here: choosing "manual" is not raising a guard, it is asking to
+  // wrong one here: choosing "ask" is not raising a guard, it is asking to
   // be consulted. It is a transport control instead, because that is what the
   // modes actually are — how far ahead the app may run before it stops for
-  // you. Pause, then write, then run on. Anyone who has used a media player can
-  // read it.
+  // you. Pause, or run on. Anyone who has used a media player can read it.
+  // The pen that sat between them went with the third mode (ADR 0057).
 
   // A bulb reads as an idea arriving, which is what a reasoning run is: the
   // live event the families above reserve "thinking" for. The gauge beside it
@@ -166,8 +166,7 @@ const REGISTRY = {
   // published mark, so `Plug` is free again -- but it still describes reach
   // rather than supply, which is why it is not the answer here either.
   providers: { mark: Boxes },
-  permissionManual: { mark: Pause },
-  permissionEdits: { mark: PenLine },
+  permissionAsk: { mark: Pause },
   permissionAuto: { mark: FastForward },
 
   // — Projects and source control -----------------------------------------
@@ -288,7 +287,7 @@ const REGISTRY = {
 
   // — Confirmation and destructive ----------------------------------------
   check: { mark: Check },
-  // Turning something off that stays installed. Not `permissionManual`, which
+  // Turning something off that stays installed. Not `permissionAsk`, which
   // is a Pause and belongs to the execution modes: a provider you switched off
   // is not a provider waiting to be asked about.
   disable: { mark: Ban },

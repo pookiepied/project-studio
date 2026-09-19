@@ -157,7 +157,7 @@ export interface ExecutionPosture {
  * application wires a real posture; see `T-12`.
  */
 export const UNGATED_POSTURE: ExecutionPosture = {
-  mode: () => "manual",
+  mode: () => "ask",
   trust: () => "trusted",
 };
 

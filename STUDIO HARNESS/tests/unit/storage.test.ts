@@ -207,6 +207,63 @@ describe("migrations", () => {
     handle.close();
   });
 
+  it("rewrites the three old modes as two, in the safe direction, when migration 25 runs", () => {
+    // ADR 0057. Manual and Auto Edit both become Ask: the only mode wider
+    // than "edit without asking, ask before running" is one nobody chose.
+    // Full Auto becomes Auto, the same consent under its new name. An unset
+    // row stays unset, because writing it would turn an absence into a
+    // choice.
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle, MIGRATIONS.slice(0, 24));
+    const insert = handle.prepare(
+      "INSERT INTO conversation (id, created_at, last_turn_at, permission_mode) VALUES (?, 0, 0, ?)",
+    );
+    insert.run("manual", "manual");
+    insert.run("edit", "auto-edit");
+    insert.run("full", "full-auto");
+    insert.run("unset", null);
+
+    migrate(handle);
+
+    const modeOf = (id: string): string | null =>
+      (handle.prepare("SELECT permission_mode FROM conversation WHERE id = ?").get(id) as {
+        permission_mode: string | null;
+      }).permission_mode;
+    expect(modeOf("manual")).toBe("ask");
+    expect(modeOf("edit")).toBe("ask");
+    expect(modeOf("full")).toBe("auto");
+    expect(modeOf("unset")).toBeNull();
+    handle.close();
+  });
+
+  it("drops the preset scope rows and their column when migration 25 runs", () => {
+    // A preset row was written by a tick in settings that no longer exists;
+    // custom and question rows are the person's own words and stay.
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle, MIGRATIONS.slice(0, 24));
+    const insert = handle.prepare(
+      "INSERT INTO sandbox_scope (project_id, path, mode, source, preset_id, granted_at) VALUES (?, ?, 'read', ?, ?, 0)",
+    );
+    insert.run("", "/tools/git", "preset", "git");
+    insert.run("prj", "/data", "custom", null);
+    insert.run("prj", "/downloads", "question", null);
+
+    migrate(handle);
+
+    const rows = handle
+      .prepare("SELECT path, source FROM sandbox_scope ORDER BY path")
+      .all() as { path: string; source: string }[];
+    expect(rows).toEqual([
+      { path: "/data", source: "custom" },
+      { path: "/downloads", source: "question" },
+    ]);
+    const columns = (handle.prepare("PRAGMA table_info(sandbox_scope)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    expect(columns).not.toContain("preset_id");
+    handle.close();
+  });
+
   it("cascades model rows when a connection record is deleted after migration 13", () => {
     const handle = new DatabaseSync(":memory:");
     migrate(handle);

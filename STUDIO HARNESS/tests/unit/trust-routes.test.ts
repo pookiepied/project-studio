@@ -82,7 +82,7 @@ function authorized(path: string, init: RequestInit = {}): Promise<Response> {
 function kernelVerdict() {
   const instance = new PermissionKernel({
     grants: new PermissionGrantStore(db),
-    posture: posture({ mode: () => "manual", trust }),
+    posture: posture({ mode: () => "ask", trust }),
   });
   instance.register(WRITE);
   return instance.evaluate(WRITE.id, SCOPE, {

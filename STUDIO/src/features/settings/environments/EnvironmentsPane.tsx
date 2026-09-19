@@ -4,7 +4,7 @@ import { Button, IconButton, Segmented } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
 import { useEnvironments } from '@/features/settings/environments/useEnvironments'
-import type { FolderTrust, SandboxLevel, ShellInfo, ShellKind } from '@/platform/harness'
+import type { FolderTrust, SandboxLevel, SandboxScopeRow, ShellInfo, ShellKind } from '@/platform/harness'
 
 // A JSX string attribute is not escaped, so the two backslashes written
 // here would both reach the input. Held as a value instead.
@@ -24,13 +24,21 @@ const SHELL_NAMES: Record<ShellKind, string> = {
  *
  * Where commands actually run. Five parts, in this order: the shell that
  * runs them, whether the project's folders are vouched for at all, this
- * project's level, the scope the next grant will take, and everything
+ * project's reach, the scope the next grant will take, and everything
  * granted with where it came from. The detected-toolchain presets that used
  * to sit between the last two went with the Windows container (ADR 0057):
  * they named the folders a container had to be let into, and with no
- * container the machine's own PATH answers. Scope and level are kept apart
+ * container the machine's own PATH answers. Scope and reach are kept apart
  * here the same way they are kept apart everywhere else: granting a path
- * never changes a level.
+ * never changes the reach.
+ *
+ * "Reach" is the page's word for what the harness stores as the level
+ * (`contained` / `trusted`). The stored words described an OS container,
+ * and since ADR 0057 there is none on Windows: what the level decides now is
+ * whether the project's folder plus the grants below are the boundary the
+ * file tools stop at - anything outside becomes a question - or whether the
+ * whole machine is in reach without one. The ids on the wire are unchanged;
+ * only the words a person reads are.
  *
  * The shell comes first because it is machine-wide and every command on the
  * page below runs through it. The choice is the person's (ADR 0057): the
@@ -100,7 +108,12 @@ function Body({
 }: {
   projects: readonly { readonly id: string; readonly name: string }[]
   projectId: string | null
-  scope: { readonly project: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly machineWide: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly level: SandboxLevel; readonly trust: readonly FolderTrust[] }
+  scope: {
+    readonly project: readonly SandboxScopeRow[]
+    readonly machineWide: readonly SandboxScopeRow[]
+    readonly level: SandboxLevel
+    readonly trust: readonly FolderTrust[]
+  }
   shell: ShellInfo
   lastError: string | null
   refreshing: boolean
@@ -216,21 +229,21 @@ function Body({
         />
       ) : (
         <Row
-          label="This project's level"
+          label="What this project can reach"
           hint={
             scope.level === 'trusted'
-              ? 'Trusted: the project\u2019s own files are no longer the boundary. Commands run uncontained.'
-              : 'Contained: commands can read and write the project and what is granted below, and nothing else.'
+              ? 'The whole machine: the project\u2019s own files are no longer the boundary, and a path outside them is not asked about.'
+              : 'The project and what is granted below. A path outside them becomes a question, and a yes becomes a grant in the list below.'
           }
         >
           <Segmented
             layoutId="settings-sandbox-level"
-            ariaLabel="This project's level"
+            ariaLabel="What this project can reach"
             value={scope.level}
             onChange={(value) => onSetLevel(projectId, value)}
             options={[
-              { id: 'contained', label: 'Contained' },
-              { id: 'trusted', label: 'Trusted' },
+              { id: 'contained', label: 'Project and grants' },
+              { id: 'trusted', label: 'Whole machine' },
             ]}
           />
         </Row>
@@ -238,8 +251,8 @@ function Body({
 
       {projectId !== null && scope.level === 'trusted' ? (
         <StateNote
-          title="Trusted removes the wall"
-          detail="Docker and the walk-up class live here, not in the list below. A Docker path preset would be a containment bypass wearing a preset's clothes: if this project needs Docker, trusted is the choice, stated in those words."
+          title="The whole machine is in reach"
+          detail="Every file on this machine can be read and written by this project's conversations without a question, in whichever mode. The permission mode still decides whether a write or a command asks first; this only removes the boundary a question would have named."
         />
       ) : null}
 
@@ -307,7 +320,7 @@ function Body({
       <div className="py-3.5">
         <p className="text-ui text-foreground">Custom path</p>
         <p className="mt-0.5 text-caption text-muted-foreground">
-          An absolute path that exists. Volume roots and system directories are refused — a grant there is the end of containment, and the project that wants that wants trusted instead.
+          An absolute path that exists. Volume roots and system directories are refused — a grant there is the whole machine by another name, and the project that wants that chooses it above instead.
         </p>
         <div className="mt-2 flex items-center gap-2">
           <input

@@ -24,11 +24,10 @@ import { executionModeSchema, type ExecutionMode } from "../permissions/mode.js"
  *
  * `permissionMode` is the same shape of fact for the execution mode: the
  * per-conversation answer to "what does an unapproved call do", stored in the
- * harness's own vocabulary (`manual` / `auto-edit` / `full-auto`) and
- * validated at every boundary that accepts one. It never reads as null - the
- * store maps an unset row to Manual before this schema sees it, because an
- * absent consent IS Manual and a nullable mode would put a fourth state
- * beside three real ones.
+ * harness's own vocabulary (`ask` / `auto`) and validated at every boundary
+ * that accepts one. It never reads as null - the store maps an unset row to
+ * Ask before this schema sees it, because an absent consent IS Ask and a
+ * nullable mode would put a third state beside two real ones.
  */
 
 const conversationIdSchema = v.pipe(v.string(), v.minLength(1));

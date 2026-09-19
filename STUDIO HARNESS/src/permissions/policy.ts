@@ -106,9 +106,9 @@ export const BASE_POLICY: readonly PolicyRule[] = [
      * The only thing standing between an unattended mode and third-party code.
      *
      * It must stay a **policy** `ask`: ADR 0018 lets a mode resolve a *default*
-     * `ask` and never a policy one, so a verdict reached here survives Full
-     * Auto and a verdict reached by `defaultVerdict` does not. Keying this on
-     * anything a connected server could satisfy would make Full Auto plus one
+     * `ask` and never a policy one, so a verdict reached here survives Auto
+     * and a verdict reached by `defaultVerdict` does not. Keying this on
+     * anything a connected server could satisfy would make Auto plus one
      * installed server into unattended arbitrary action.
      */
     evaluate: ({ capability }) =>
@@ -119,11 +119,11 @@ export const BASE_POLICY: readonly PolicyRule[] = [
   {
     id: "git-network",
     reason: "Git reaching the network always needs approval.",
-    // K-04: `git` declares `read`/`write` so Auto Edit would push without
-    // asking. Rather than declare every git call `network` (which would refuse
-    // `git log` on LocalSandbox), force the network subcommands to ask via
-    // policy. This survives Auto Edit because policy `ask` is never resolved
-    // by a mode. Duplicated from `tools/git/classify.ts` to avoid a layer
+    // K-04: `git` declares `read`/`write`, so a standing allow rule for the
+    // project's writes - or Auto - would push without asking. Rather than
+    // declare every git call `network` (which would refuse `git log` on
+    // LocalSandbox), force the network subcommands to ask via policy. This
+    // survives both because policy `ask` is never resolved by a mode. Duplicated from `tools/git/classify.ts` to avoid a layer
     // inversion between permissions and tools.
     evaluate: ({ capability, resource }) => {
       if (capabilityKey(capability.id) !== "native/git") return undefined;

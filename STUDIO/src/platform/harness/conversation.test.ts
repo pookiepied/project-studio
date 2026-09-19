@@ -191,7 +191,7 @@ describe('submitting a turn', () => {
     await client.submitTurn('hello', {
       modelId: null,
       reasoningLevel: 'default',
-      permissionMode: 'full-auto',
+      permissionMode: 'auto',
     })
 
     const init = calls[0]?.args['init'] as { body: string }
@@ -201,7 +201,7 @@ describe('submitting a turn', () => {
       kind: 'user',
       body: 'hello',
       reasoningLevel: 'default',
-      permissionMode: 'full-auto',
+      permissionMode: 'auto',
     })
 
     await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' })

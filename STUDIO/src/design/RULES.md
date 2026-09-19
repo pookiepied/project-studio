@@ -276,9 +276,9 @@ text was not.
 **One mark, one concept.** Enforced at startup in development. Once a shape
 means two things, neither reading is safe.
 
-Permission modes are a **transport control** — pause, write, run on — not
+Permission modes are a **transport control** — pause, or run on — not
 shields. A shield says the app is a hazard being contained, which is the
-developer-tool reading and the wrong one: choosing "manual" is not raising a
+developer-tool reading and the wrong one: choosing "ask" is not raising a
 guard, it is asking to be consulted.
 
 Project marks are **abstract, not pictorial**. A flask says the project is an

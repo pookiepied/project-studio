@@ -196,7 +196,7 @@ Foundations landed first, because every tool stands on them:
   hold their own copy of that rule inline, and one of them disagreed — which is how `shell` came to
   write with no undo behind it. See ADR 0020.
 - **`src/permissions/trust.ts` and `mode.ts`** — workspace trust as a precondition ahead of policy
-  and grants, and three modes that resolve a *default* `ask` and never a policy one. See ADR 0018.
+  and grants, and two modes (ADR 0057; three before it) that resolve a *default* `ask` and never a policy one. See ADR 0018.
 - **`src/tools/bounds.ts`** — a deadline, real mid-call cancellation, and a concurrency queue on
   every call. `runProcess` bounded a subprocess; this bounds a call, which is what a tool hanging in
   pure JavaScript needs. See ADR 0017.
@@ -244,7 +244,7 @@ browser (ADR 0049) and the computer (ADR 0055). On 2026-09-15 the computer's fir
 typed into the person's own window, and ADR 0055 §7 now fixes the rule: the driver never acts
 on a window it did not open, focus, read or click, the person sees every screenshot in the
 transcript and a rail tab, and a small always-on-top pill says "Studio is using your computer"
-while a turn drives it. Consent for the screen under Full Auto remains open.
+while a turn drives it. Consent for the screen under Auto remains open.
 
 ### Phase 12: Skills
 

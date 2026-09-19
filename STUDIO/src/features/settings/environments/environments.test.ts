@@ -13,24 +13,22 @@ describe('parseSandboxScopeRow', () => {
     path: 'C:\\Users\\ada\\.cargo',
     mode: 'write',
     source: 'question',
-    presetId: null,
     grantedAt: 1_000,
   }
 
-  it('accepts a question grant with no preset', () => {
+  it('accepts a question grant', () => {
     expect(parseSandboxScopeRow(ROW)?.source).toBe('question')
   })
 
-  it('accepts a preset grant naming its preset', () => {
-    const parsed = parseSandboxScopeRow({ ...ROW, source: 'preset', presetId: 'rust' })
-    expect(parsed?.presetId).toBe('rust')
+  it('refuses the retired preset source, which migration 25 removed', () => {
+    expect(parseSandboxScopeRow({ ...ROW, source: 'preset' })).toBeNull()
   })
 
   it('refuses a mode outside read and write', () => {
     expect(parseSandboxScopeRow({ ...ROW, mode: 'execute' })).toBeNull()
   })
 
-  it('refuses a source outside the three', () => {
+  it('refuses a source outside the two', () => {
     expect(parseSandboxScopeRow({ ...ROW, source: 'dialog' })).toBeNull()
   })
 })

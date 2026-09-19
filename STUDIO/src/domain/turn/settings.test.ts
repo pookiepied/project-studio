@@ -12,7 +12,7 @@ import type { Conversation, TurnSettings } from '@/domain/conversation/types'
 const WINDOW: TurnSettings = {
   modelId: 'openai/gpt-4o',
   reasoningLevel: 'high',
-  permission: 'edits',
+  permission: 'ask',
 }
 
 const CONVERSATION: Conversation = {
@@ -33,9 +33,7 @@ describe('effectiveTurnSettings', () => {
   })
 
   it('falls back to the window setting where nothing is stored', () => {
-    const fresh: Conversation = { ...CONVERSATION, permissionMode: 'manual' }
-    expect(effectiveTurnSettings(fresh, WINDOW).permission).toBe('manual')
-    expect(effectiveTurnSettings(null, WINDOW).permission).toBe('edits')
+    expect(effectiveTurnSettings(null, WINDOW).permission).toBe('ask')
   })
 
   it('keeps the model and reasoning rules it always had', () => {

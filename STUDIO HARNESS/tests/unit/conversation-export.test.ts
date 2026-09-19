@@ -717,7 +717,7 @@ describe("grouping, provenance, and counts", () => {
       archived: false,
       modelId: null,
       reasoningLevel: null,
-      permissionMode: "manual",
+      permissionMode: "ask",
       createdAt: 0,
       lastTurnAt: 0,
     };

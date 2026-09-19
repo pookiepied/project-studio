@@ -67,7 +67,7 @@ export const IMPROVE_AGENT_ID = "improve";
  * behaviour and is stored verbatim rather than folded into a synonym.
  *
  * `permissionMode` is the execution mode the turn is sent under, in the
- * harness's own vocabulary (`manual` / `auto-edit` / `full-auto`) - the one
+ * harness's own vocabulary (`ask` / `auto`) - the one
  * spelling every wire value is validated against, with no translation before
  * it. It is a consent, so it settles into the index like the other two:
  * before the run is admitted, so the posture the run is decided under is the

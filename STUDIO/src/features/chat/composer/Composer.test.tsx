@@ -13,7 +13,7 @@ import type { TurnImageWire } from '@/platform/harness'
 // mechanics alone.
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
-    settings: { permission: 'manual' },
+    settings: { permission: 'ask' },
     setSettings: vi.fn(),
     // The permission control now reads the conversation's stored mode; this
     // test runs on a surface with no conversations, so the window setting is

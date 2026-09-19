@@ -63,7 +63,7 @@ const CONVERSATION: Conversation = {
   archived: false,
   modelId: null,
   reasoningLevel: null,
-  permissionMode: 'manual',
+  permissionMode: 'ask',
 }
 
 function tree(conversation: Conversation) {

@@ -71,7 +71,7 @@ afterEach(() => {
   db.close();
 });
 
-function kernel(mode: ExecutionMode = "manual") {
+function kernel(mode: ExecutionMode = "ask") {
   const instance = new PermissionKernel({
     grants,
     posture: posture({ mode: () => mode, trust }),
@@ -143,27 +143,38 @@ describe("execution modes", () => {
     trust.set(ROOT, true);
   });
 
-  it("asks about a write in Manual", () => {
-    expect(verdict(kernel("manual"), WRITE).verdict).toBe("ask");
+  it("asks about a write in Ask", () => {
+    expect(verdict(kernel("ask"), WRITE).verdict).toBe("ask");
   });
 
-  it("allows a write in Auto Edit", () => {
-    expect(verdict(kernel("auto-edit"), WRITE).verdict).toBe("allow");
+  it("asks before running code in Ask", () => {
+    expect(verdict(kernel("ask"), SHELL).verdict).toBe("ask");
   });
 
-  it("still asks before running code in Auto Edit", () => {
-    expect(verdict(kernel("auto-edit"), SHELL).verdict).toBe("ask");
+  it("allows a write in Auto", () => {
+    expect(verdict(kernel("auto"), WRITE).verdict).toBe("allow");
   });
 
-  it("allows running code in Full Auto", () => {
-    expect(verdict(kernel("full-auto"), SHELL).verdict).toBe("allow");
+  it("allows running code in Auto", () => {
+    expect(verdict(kernel("auto"), SHELL).verdict).toBe("allow");
   });
 
   it("explains itself with the mode rather than with a default", () => {
-    const decision = verdict(kernel("auto-edit"), WRITE);
+    const decision = verdict(kernel("auto"), WRITE);
 
     expect(decision.source).toBe("default");
-    expect(decision.reason).toBe(describeMode("auto-edit"));
+    expect(decision.reason).toBe(describeMode("auto"));
+  });
+
+  it("lets a rule the person wrote resolve an ask in Ask, which is where Auto Edit went", () => {
+    // ADR 0057: "edit without asking, ask before running" is one allow rule
+    // under Ask - this project, always - rather than a mode. The grant store
+    // is consulted before the mode, so the rule holds in Ask.
+    const k = kernel("ask");
+    grants.grant(WRITE.id, SCOPE, "always", `${ROOT}/**`);
+
+    expect(verdict(k, WRITE).verdict).toBe("allow");
+    expect(verdict(k, SHELL).verdict).toBe("ask");
   });
 });
 
@@ -172,43 +183,37 @@ describe("what a mode may not do", () => {
     trust.set(ROOT, true);
   });
 
-  it("does not override a policy ask, even in Full Auto", () => {
+  it("does not override a policy ask, even in Auto", () => {
     // BASE_POLICY forces an ask before a connected server runs code. If a mode
     // could resolve that, every rule in the policy would be advisory.
-    expect(verdict(kernel("full-auto"), CONNECTED_SHELL).verdict).toBe("ask");
+    expect(verdict(kernel("auto"), CONNECTED_SHELL).verdict).toBe("ask");
   });
 
   it("leaves a policy ask sourced to the policy, not the mode", () => {
-    expect(verdict(kernel("full-auto"), CONNECTED_SHELL).source).toBe("policy");
+    expect(verdict(kernel("auto"), CONNECTED_SHELL).source).toBe("policy");
   });
 });
 
 describe("the mode resolver on its own", () => {
-  it("never resolves an ask in Manual", () => {
-    expect(resolveAsk("manual", WRITE)).toBe("ask");
-    expect(resolveAsk("manual", READ)).toBe("ask");
+  it("never resolves an ask in Ask", () => {
+    expect(resolveAsk("ask")).toBe("ask");
   });
 
-  it("bounds Auto Edit by effect", () => {
-    expect(resolveAsk("auto-edit", WRITE)).toBe("allow");
-    expect(resolveAsk("auto-edit", SHELL)).toBe("ask");
-  });
-
-  it("does not check provenance, because the policy already did", () => {
-    // A connected server's write tool is resolved like any other write here.
-    // What protects it is the policy rule above, in one place rather than two.
-    expect(resolveAsk("auto-edit", capability("w", ["write"], "third-party"))).toBe("allow");
+  it("resolves every default ask in Auto", () => {
+    expect(resolveAsk("auto")).toBe("allow");
   });
 
   it("requires undo only where nobody is watching", () => {
-    expect(requiresUndo("manual")).toBe(false);
-    expect(requiresUndo("auto-edit")).toBe(false);
-    expect(requiresUndo("full-auto")).toBe(true);
+    expect(requiresUndo("ask")).toBe(false);
+    expect(requiresUndo("auto")).toBe(true);
   });
 
-  it("recognises only the three modes", () => {
-    expect(isExecutionMode("full-auto")).toBe(true);
-    expect(isExecutionMode("yolo")).toBe(false);
+  it("recognises only the two modes, and not the three they replaced", () => {
+    expect(isExecutionMode("auto")).toBe(true);
+    expect(isExecutionMode("ask")).toBe(true);
+    for (const retired of ["manual", "auto-edit", "full-auto", "yolo"]) {
+      expect(isExecutionMode(retired)).toBe(false);
+    }
   });
 });
 
@@ -244,7 +249,7 @@ describe("the ungated posture", () => {
   it("is what the harness did before trust existed", () => {
     // Named rather than inlined so it is visible in review that a caller using
     // it has skipped a safeguard.
-    expect(UNGATED_POSTURE.mode()).toBe("manual");
+    expect(UNGATED_POSTURE.mode()).toBe("ask");
     expect(UNGATED_POSTURE.trust(undefined)).toBe("trusted");
   });
 });

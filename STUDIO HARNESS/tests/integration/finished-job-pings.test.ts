@@ -104,7 +104,7 @@ async function harnessWith(): Promise<Harness> {
   new ConversationStore(database).record({
     id: "cnv_ping",
     firstMessage: "First",
-    permissionMode: "full-auto",
+    permissionMode: "auto",
   });
   new WorkspaceTrustStore(database).set(conversationWorkspaceDirectory("cnv_ping"), true);
 

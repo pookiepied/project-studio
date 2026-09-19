@@ -111,7 +111,7 @@ describe("the scope store", () => {
   it("applies machine-wide rows to a conversation with no project", () => {
     const scopes = new SandboxScopeStore(db);
     const directory = workspace("shared");
-    scopes.grant({ projectId: "", path: directory, mode: "read", source: "preset", presetId: "git" });
+    scopes.grant({ projectId: "", path: directory, mode: "read", source: "custom" });
 
     const roots = scopes.resolveRoots(undefined);
     expect(roots.readRoots).toContain(resolve(directory));
@@ -166,9 +166,8 @@ describe("the scope store", () => {
 
   it("refuses a system path whatever source it arrives under", () => {
     // The typed path is not the only way a system directory can reach the
-    // store. A preset whose candidates drifted, and a question the model
-    // phrased, both arrive here too, and a grant on a system directory is the
-    // end of containment however it was written.
+    // store. A question the model phrased arrives here too, and a grant on a
+    // system directory is the end of the boundary however it was written.
     const scopes = new SandboxScopeStore(db);
     const guarded =
       // The backslash is escaped. Written singly it was not an escape at all
@@ -176,7 +175,7 @@ describe("the scope store", () => {
       // -- so on a machine with no SystemRoot this asserted the opposite of
       // what it says.
       process.platform === "win32" ? (process.env.SystemRoot ?? "C:\\Windows") : "/etc";
-    for (const source of ["preset", "question"] as const) {
+    for (const source of ["custom", "question"] as const) {
       expect(() =>
         scopes.grant({ projectId: "prj_a", path: guarded, mode: "read", source }),
       ).toThrow(/trusted/i);

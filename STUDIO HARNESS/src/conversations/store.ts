@@ -56,16 +56,16 @@ function toReasoningChoice(value: string | null): ReasoningChoice | null {
 }
 
 /**
- * The stored execution mode, read back as one of the three real ones.
+ * The stored execution mode, read back as one of the two real ones.
  *
  * There is no null here on purpose: the column is nullable (migration 17
- * writes nothing a user did not choose), but an absent answer IS Manual - a
+ * writes nothing a user did not choose), but an absent answer IS Ask - a
  * consent nobody recorded is a consent that was not given. A value that no
  * longer parses reads the same way, for the same reason an unreadable level
  * reads as unset: a corrupted answer must never widen what a run may do.
  */
 function toExecutionMode(value: string | null): ExecutionMode {
-  return isExecutionMode(value) ? value : "manual";
+  return isExecutionMode(value) ? value : "ask";
 }
 
 function toRecord(row: Row): ConversationRecord {

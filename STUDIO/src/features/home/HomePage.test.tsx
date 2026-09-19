@@ -25,7 +25,7 @@ import { HomePage } from './HomePage'
 
 const workspace = {
   beginConversation: vi.fn(),
-  settings: { permission: 'manual' },
+  settings: { permission: 'ask' },
   setSettings: vi.fn(),
   // The send path reads the catalog to judge whether the turn's model can
   // see images; an empty catalog means "unknown", which passes.

@@ -742,17 +742,16 @@ describe('readConversationSnapshot', () => {
 
 describe('execution mode translation', () => {
   it('round-trips every mode through the wire vocabulary', () => {
-    for (const domain of ['manual', 'edits', 'auto'] as const) {
+    for (const domain of ['ask', 'auto'] as const) {
       expect(executionModeFromWire(executionModeToWire(domain))).toBe(domain)
     }
   })
 
   it('uses the harness names and only those', () => {
-    // The submission boundary refuses `edits` and `auto` on purpose: the mode
-    // is a consent, and the translation belongs to this side of the boundary.
-    expect(executionModeToWire('manual')).toBe('manual')
-    expect(executionModeToWire('edits')).toBe('auto-edit')
-    expect(executionModeToWire('auto')).toBe('full-auto')
+    // The two vocabularies coincide since ADR 0057; the seam is still the
+    // one place a picker word becomes a wire value.
+    expect(executionModeToWire('ask')).toBe('ask')
+    expect(executionModeToWire('auto')).toBe('auto')
   })
 })
 

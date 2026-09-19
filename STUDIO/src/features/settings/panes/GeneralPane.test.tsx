@@ -15,7 +15,7 @@ import { GeneralPane } from './GeneralPane'
  */
 
 const workspace = vi.hoisted(() => ({
-  settings: { permission: 'manual' },
+  settings: { permission: 'ask' },
   setSettings: vi.fn(),
 }))
 

@@ -122,8 +122,6 @@ describe("every reader agrees with the table", () => {
       const capability = descriptor([effect]);
 
       expect(hasElevatedEffect(capability)).toBe(elevated);
-      // Auto Edit is exactly "nothing elevated", so it must never disagree.
-      expect(resolveAsk("auto-edit", capability)).toBe(elevated ? "ask" : "allow");
     });
   }
 
@@ -141,9 +139,9 @@ describe("every reader agrees with the table", () => {
     expect(defaultVerdict(descriptor(["read", "write"])).verdict).toBe("ask");
   });
 
-  it("still asks in Manual and still allows in Full Auto", () => {
-    expect(resolveAsk("manual", descriptor(["read"]))).toBe("ask");
-    expect(resolveAsk("full-auto", descriptor(["execute"]))).toBe("allow");
+  it("still asks in Ask and still allows in Auto, whatever the effect", () => {
+    expect(resolveAsk("ask")).toBe("ask");
+    expect(resolveAsk("auto")).toBe("allow");
   });
 });
 
@@ -188,6 +186,5 @@ describe("what each shipped tool declares", () => {
   it("still under-declares git, which is K-04", () => {
     expect(GIT_DESCRIPTOR.effects).not.toContain("network");
     expect(hasElevatedEffect(GIT_DESCRIPTOR)).toBe(false);
-    expect(resolveAsk("auto-edit", GIT_DESCRIPTOR)).toBe("allow");
   });
 });

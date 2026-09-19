@@ -337,10 +337,10 @@ export class PermissionKernel {
 
     // The mode resolves *this* `ask` and no other. An `ask` from a policy rule
     // returned above and never reaches here, which is the invariant that keeps
-    // BASE_POLICY from becoming advisory: Full Auto still prompts before a
+    // BASE_POLICY from becoming advisory: Auto still prompts before a
     // connected server runs code.
     const mode = this.#posture.mode();
-    if (resolveAsk(mode, capability) === "allow") {
+    if (resolveAsk(mode) === "allow") {
       return {
         verdict: "allow",
         source: "default",

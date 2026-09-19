@@ -367,8 +367,7 @@ describe("a project conversation stands in the project's folders", () => {
         projectId: "",
         path: shared,
         mode: "read",
-        source: "preset",
-        presetId: "git",
+        source: "custom",
       });
       const project = state.projects.create({
         id: "prj_wide",
