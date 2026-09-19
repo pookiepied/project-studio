@@ -1,6 +1,8 @@
 # ADR 0047 - A Contained Command Can Find the Programs It May Run
 
-**Status:** Accepted · 2026-08-31
+**Status:** Superseded by [ADR 0057](0057-the-gate-is-the-boundary.md) ·
+accepted 2026-08-31, superseded 2026-09-19. There is no contained command on
+Windows any more; the shell runs with the machine's own `PATH`.
 **Extends:** [ADR 0041](0041-containment-is-the-kernel-s-job.md) - containment
 is the kernel's job, and this closes the one gap that decision left open.
 **Relates to:** [ADR 0046](0046-the-shell-takes-a-command-line.md) - the shell

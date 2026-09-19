@@ -1,6 +1,10 @@
 # ADR 0041 — Containment is the kernel's job
 
-**Status:** Accepted · 2026-08-15 · extended 2026-08-16 with the Linux backend
+**Status:** Accepted · 2026-08-15 · extended 2026-08-16 with the Linux backend ·
+**superseded in part by [ADR 0057](0057-the-gate-is-the-boundary.md)** on
+2026-09-19: the Windows AppContainer backend, its grants, ledger and CLI are
+removed, and the gate is the boundary there. The Linux `bwrap` backend and
+its measurements stand, as an opt-in fence under the gate.
 **Relates to:** [ADR 0039](0039-a-child-inherits-nothing-it-was-not-given.md) —
 the same taxonomy of children, the other axis. 0039 says what a child *inherits*;
 this says what a child can *reach*.

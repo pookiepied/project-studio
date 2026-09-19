@@ -1,7 +1,7 @@
 # Sandbox simplification — the plan
 
-**Status:** Proposed, parked behind the provider curation work · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
-**Decision owed:** an ADR that supersedes the Windows half of
+**Status:** In progress — step 1 (the ADR) done as [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
+**Decision:** ADR 0057, which supersedes the Windows half of
 [ADR 0041](../decisions/0041-containment-is-the-kernel-s-job.md) and
 [ADR 0047](../decisions/0047-a-contained-command-can-find-the-programs-it-may-run.md),
 and narrows [ADR 0018](../decisions/0018-trust-and-modes.md) to two modes.

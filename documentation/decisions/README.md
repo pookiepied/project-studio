@@ -57,7 +57,8 @@ wrong answer, and why we believed it, is the useful part.
 | [0038](0038-a-grant-belongs-to-an-agent.md) | A grant belongs to an agent — the third column of a scope, and why `always` could not outlive a conversation until it did |
 | [0039](0039-a-child-inherits-nothing-it-was-not-given.md) | A child process inherits nothing it was not given — one rule, three named policies, and why the allowlist lives in two languages |
 | [0040](0040-one-bootstrap-protocol-two-transports.md) | One bootstrap protocol, two transports — how the credential reaches the Harness on a platform with no `dup2` |
-| [0041](0041-containment-is-the-kernel-s-job.md) | Containment is the kernel's job — a launcher that applies an AppContainer, why availability is probed and registration is not, and what it writes to the user's disk |
+| [0041](0041-containment-is-the-kernel-s-job.md) | Containment is the kernel's job — a launcher that applies an AppContainer, why availability is probed and registration is not, and what it writes to the user's disk — **Windows half superseded by 0057** |
+| [0057](0057-the-gate-is-the-boundary.md) | The gate is the boundary — the Windows AppContainer sandbox is removed, `bwrap` stays as an opt-in fence, two modes, a scope question is a rule and not an ACL |
 | [0024](0024-capabilities-are-on-and-the-list-is-honest.md) | Capabilities are on, and the list is honest |
 | [0036](0036-user-decisions-are-durable.md) | A user decision is durable — approvals and answers live in SQL, never in process memory |
 
@@ -68,6 +69,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0017](0017-call-bounds.md) | Call bounds |
 | [0019](0019-running-a-chosen-program.md) | Running a chosen program — `execute` as uncontained by consent |
 | [0046](0046-the-shell-takes-a-command-line.md) | The shell takes a command line — an interpreter chosen per machine, every named program approved, and `npm` working on Windows at last |
+| [0047](0047-a-contained-command-can-find-the-programs-it-may-run.md) | A contained command can find the programs it may run — **superseded by 0057** |
 
 ### Network
 | | |
