@@ -43,6 +43,8 @@ import {
 import { createHttpApp } from "./transport/http/create-app.js";
 import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
 import { Studio } from "./agents/studio.js";
+import { compactConversation, compactionReadiness } from "./conversations/compaction.js";
+import { CommandRegistry } from "./extend/commands/registry.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
 import { ConnectionStore } from "./gateway/connections/connection-store.js";
@@ -353,6 +355,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     const app = createHttpApp({
       servers: runtime.servers,
       skills: runtime.skills,
+      commands: new CommandRegistry(),
       // Awaited before the run renders. `start()` memoises, so this costs one
       // wait on the first submission after a harness starts and nothing at
       // all afterwards - and it is what lets a capability Studio ships be
@@ -381,6 +384,22 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       database,
       titling,
       contextUsage,
+      // Manual compaction: the cool-down reads the same tracker the meter
+      // reads and the same window the render hands Flue, so the button, the
+      // refusal and the threshold all stand on one set of numbers.
+      compaction: {
+        readiness: (conversationId) =>
+          compactionReadiness(
+            contextUsage.get(conversationId),
+            runtime.modelLimits(runtime.conversationTurnSettings(conversationId).modelId),
+          ),
+        compact: (conversationId) =>
+          compactConversation(conversationId, {
+            agent: Studio,
+            usage: contextUsage.get(conversationId),
+            limits: runtime.modelLimits(runtime.conversationTurnSettings(conversationId).modelId),
+          }),
+      },
       backgroundJobs: runtime.backgroundJobs,
       browser: { stop: (conversationId) => runtime.stopBrowser(conversationId) },
       computer: { stop: (conversationId) => runtime.stopComputer(conversationId) },

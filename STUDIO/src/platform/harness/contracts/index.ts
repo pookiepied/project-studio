@@ -158,6 +158,20 @@ export {
 } from './skills'
 
 export {
+  type CommandRecord,
+  type CommandProblem,
+  type CommandListing,
+  type CommandSource,
+  type CommandDetail,
+  type CommandProvenance,
+  type CommandKind,
+  parseCommand,
+  parseCommandListing,
+  parseCommandDetail,
+  parseCommandExpansion,
+} from './commands'
+
+export {
   type SandboxLevel,
   type SandboxScopeMode,
   type SandboxScopeSource,
@@ -180,6 +194,8 @@ export {
 export {
   type MeasuredContextUsage,
   parseMeasuredContextUsage,
+  type CompactionReadiness,
+  parseCompactionReadiness,
 } from './context'
 
 export {
@@ -197,4 +213,5 @@ export {
   readConversationSnapshot,
   type ChunkFacts,
   type ConversationSnapshotFacts,
+  type CompactionFacts,
 } from './chunks'

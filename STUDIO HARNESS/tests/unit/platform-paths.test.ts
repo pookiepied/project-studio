@@ -103,6 +103,7 @@ describe("the Studio home", () => {
       join(workspace, "config"),
       join(workspace, "data"),
       join(workspace, "skills"),
+      join(workspace, "commands"),
     ]);
     expect(durableDirectories()).not.toContain(cacheDirectory());
   });

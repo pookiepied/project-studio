@@ -1,4 +1,6 @@
 import {
+  DEFAULT_MODEL_NAME,
+  DEFAULT_MODEL_PROVIDER,
   defaultModelReference,
   ProviderConfigurationError,
   type ModelDescriptor,
@@ -348,4 +350,38 @@ function firstNumber(values: readonly (number | "unknown")[]): number | undefine
     if (typeof value === "number") return value;
   }
   return undefined;
+}
+
+/**
+ * The window and output cap of one stored reference, from the bootstrapped
+ * source, synchronously - the two numbers the compaction policy stands on.
+ *
+ * Read the same way the reasoning levels are: the agent render cannot await,
+ * and the registry resolves a descriptor without touching the keychain. Null
+ * is the stable alias. Before the bootstrap ran, and for a reference that
+ * does not resolve, both answer unknown, which the policy reads as "no
+ * threshold" rather than as any particular size.
+ */
+export function bootstrappedModelLimits(modelId: string | null): {
+  readonly contextWindow: number | "unknown";
+  readonly maxOutputTokens: number | "unknown";
+} {
+  const registry = productionCoordinator.current?.registry;
+  const source = registry?.hasSource("local") ? "local" : registry?.hasSource("test") ? "test" : undefined;
+  if (registry === undefined || source === undefined) {
+    return { contextWindow: "unknown", maxOutputTokens: "unknown" };
+  }
+  try {
+    const descriptor = registry.resolveDescriptor({
+      source,
+      provider: DEFAULT_MODEL_PROVIDER,
+      model: modelId ?? DEFAULT_MODEL_NAME,
+    });
+    return {
+      contextWindow: descriptor.capability.contextWindow,
+      maxOutputTokens: descriptor.capability.maxOutputTokens,
+    };
+  } catch {
+    return { contextWindow: "unknown", maxOutputTokens: "unknown" };
+  }
 }

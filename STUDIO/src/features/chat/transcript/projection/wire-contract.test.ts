@@ -314,3 +314,40 @@ describe('a cold start on a mixed conversation', () => {
     expect(failure.reason).toContain('rate limit')
   })
 })
+
+describe('the compaction records of a snapshot', () => {
+  it('reads none from an unpatched runtime, and the records from a patched one', () => {
+    const bare = readConversationSnapshot(MIXED_HISTORY)
+    if (bare === null) throw new Error('unreadable snapshot')
+    expect(bare.compactions).toEqual([])
+
+    const patched = readConversationSnapshot({
+      ...(MIXED_HISTORY as Record<string, unknown>),
+      compactions: [
+        {
+          id: 'cmp_1',
+          timestamp: '2026-09-19T10:00:00.000Z',
+          afterMessageId: 'msg_2',
+          firstKeptEntryId: 'msg_2',
+          summary: '## Goal\nShip it.',
+          tokensBefore: 171_500,
+          details: { readFiles: ['a.ts'], modifiedFiles: [] },
+          usage: { input: 150_000, output: 6_000 },
+        },
+        // A malformed record is dropped, not the whole snapshot.
+        { id: 'cmp_2' },
+      ],
+    })
+    if (patched === null) throw new Error('unreadable snapshot')
+    expect(patched.compactions).toEqual([
+      {
+        id: 'cmp_1',
+        timestamp: '2026-09-19T10:00:00.000Z',
+        afterMessageId: 'msg_2',
+        firstKeptEntryId: 'msg_2',
+        summary: '## Goal\nShip it.',
+        tokensBefore: 171_500,
+      },
+    ])
+  })
+})

@@ -184,6 +184,7 @@ export function applyChunk(draft: Draft, chunk: ChunkFacts, arrivedAt: number | 
         offset: null,
         messages: [message],
         settlements: [],
+        compactions: [],
       })
       const appended = seeded[0]
       // Also the exit for a system message appended live (an abort advisory

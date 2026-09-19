@@ -674,6 +674,8 @@ describe('readConversationSnapshot', () => {
           error: { present: false, name: null, type: null, message: null },
         },
       ],
+      // Absent on the wire from an unpatched runtime: no compactions.
+      compactions: [],
     })
   })
 

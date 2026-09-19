@@ -32,6 +32,7 @@ import { projectClient, type ProjectClient } from './projects'
 import { providerClient, type ProviderClient } from './providers'
 import { createRequester, type HarnessClientOptions } from './request'
 import { skillClient, type SkillClient } from './skills'
+import { commandClient, type CommandClient } from './commands'
 
 export type {
   HarnessAddress,
@@ -45,6 +46,7 @@ export interface HarnessClient
   extends ProviderClient,
     McpClient,
     SkillClient,
+    CommandClient,
     MediaClient,
     ConversationIndexClient,
     DecisionClient,
@@ -56,6 +58,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     ...providerClient(request),
     ...mcpClient(request),
     ...skillClient(request),
+    ...commandClient(request),
     ...mediaClient(request),
     ...conversationIndexClient(request),
     ...decisionClient(request),

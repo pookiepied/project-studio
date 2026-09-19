@@ -21,6 +21,12 @@ vi.mock('@/stores/workspace', () => ({
     conversations: [],
     setConversationPermission: vi.fn(),
   }),
+  // The slash's "/compact" reads the compacting set; nothing here compacts.
+  useLiveWork: () => ({
+    compacting: new Set<string>(),
+    markCompacting: vi.fn(),
+    bumpContext: vi.fn(),
+  }),
 }))
 
 type Receipt = { readonly ok: boolean }

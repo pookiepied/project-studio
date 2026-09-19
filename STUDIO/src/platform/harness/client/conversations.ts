@@ -3,6 +3,7 @@ import {
   parseBackgroundJobs,
   parseConversationRecord,
   parseConversationRecords,
+  parseCompactionReadiness,
   parseMeasuredContextUsage,
   parseOrphanSweepOutcome,
   parseOrphanTrees,
@@ -11,6 +12,7 @@ import {
   type ConversationCreateDraft,
   type ConversationPatch,
   type ConversationRecord,
+  type CompactionReadiness,
   type MeasuredContextUsage,
   type OrphanSweepOutcome,
   type OrphanTrees,
@@ -54,6 +56,18 @@ export interface ConversationIndexClient {
    * failure - the caller estimates instead.
    */
   conversationContext(id: string): Promise<HarnessResult<MeasuredContextUsage | null>>
+  /**
+   * Whether the conversation may be compacted by hand now. Read from the
+   * same route as the measurement; null when the harness offers no manual
+   * compaction at all.
+   */
+  conversationCompaction(id: string): Promise<HarnessResult<CompactionReadiness | null>>
+  /**
+   * Compacts the conversation now. The call lasts as long as the summariser
+   * takes; a refusal - the cool-down, a running turn - is a failure whose
+   * message is the reason.
+   */
+  compactConversation(id: string): Promise<HarnessResult<void>>
   /**
    * Records a decision for one conversation, where the conversation lives.
    *
@@ -173,6 +187,14 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
 
     conversationContext(id) {
       return json('GET', conversationPath(id, '/context'), undefined, parseMeasuredContextUsage)
+    },
+
+    conversationCompaction(id) {
+      return json('GET', conversationPath(id, '/context'), undefined, parseCompactionReadiness)
+    },
+
+    compactConversation(id) {
+      return empty('POST', conversationPath(id, '/compact'))
     },
 
     setConversationMcpServerEnabled(conversationId, serverId, enabled) {

@@ -127,6 +127,19 @@ export type TranscriptItem =
       /** The settlement's own sentence; null when none arrived. */
       readonly reason: string | null
     }
+  | {
+      /**
+       * Where the conversation was compacted. The items above it are still
+       * the log and still readable; from here the model reads the summary
+       * instead of them. One line at rest, the summary behind a disclosure.
+       */
+      readonly kind: 'compaction'
+      readonly id: string
+      readonly summary: string
+      /** What the window held when the compaction ran. */
+      readonly tokensBefore: number
+      readonly timestamp: string | null
+    }
 
 /**
  * Words this window sent, which the log has not echoed back yet.

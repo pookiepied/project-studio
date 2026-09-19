@@ -95,6 +95,7 @@ describe('seeding from history', () => {
         },
       ],
       settlements: [],
+      compactions: [],
     })
 
     expect(items.map((item) => item.kind)).toEqual(['user', 'assistant'])
@@ -132,6 +133,7 @@ describe('seeding from history', () => {
         },
       ],
       settlements: [],
+      compactions: [],
     })
     const reply = items[0]
     if (reply.kind !== 'assistant') throw new Error('expected an assistant item')
@@ -165,6 +167,7 @@ describe('seeding from history', () => {
         },
       ],
       settlements: [],
+      compactions: [],
     })
     const reply = items[0]
     if (reply.kind !== 'assistant') throw new Error('expected an assistant item')
@@ -172,6 +175,62 @@ describe('seeding from history', () => {
     if (tools.kind !== 'tools') throw new Error('expected a tools segment')
     expect(tools.groups[0].calls[0].output).toMatchObject({ present: false })
     expect(tools.groups[0].calls[0].errorText).toBeNull()
+  })
+})
+
+describe('a compaction in the history', () => {
+  const said = (id: string, text: string) =>
+    ({
+      id,
+      role: 'user',
+      submissionId: null,
+      timestamp: null,
+      model: null,
+      usage: null,
+      parts: [{ kind: 'text', text, state: 'done' }],
+    }) as const
+
+  it('stands after the message it followed, with the messages above it kept', () => {
+    // The record is a marker beside the log, not a cut in it: everything the
+    // person said before the compaction is still on the page, and the row
+    // sits where the model's memory now begins.
+    const items = seededFrom({
+      version: 1,
+      conversationId: CONVERSATION,
+      offset: '12_3',
+      messages: [said('u1', 'first'), said('u2', 'second'), said('u3', 'third')],
+      settlements: [],
+      compactions: [
+        {
+          id: 'c1',
+          timestamp: null,
+          afterMessageId: 'u2',
+          firstKeptEntryId: 'u2',
+          summary: '## Goal - keep going.',
+          tokensBefore: 172_000,
+        },
+      ],
+    })
+
+    expect(items.map((item) => item.kind)).toEqual(['user', 'user', 'compaction', 'user'])
+    const marker = items[2]
+    if (marker.kind !== 'compaction') throw new Error('expected the marker')
+    expect(marker.summary).toContain('keep going')
+    expect(marker.tokensBefore).toBe(172_000)
+  })
+
+  it('stands at the top when it followed no projected message', () => {
+    const items = seededFrom({
+      version: 1,
+      conversationId: CONVERSATION,
+      offset: '12_3',
+      messages: [said('u1', 'first')],
+      settlements: [],
+      compactions: [
+        { id: 'c1', timestamp: null, afterMessageId: null, firstKeptEntryId: 'u1', summary: 's', tokensBefore: 0 },
+      ],
+    })
+    expect(items.map((item) => item.kind)).toEqual(['compaction', 'user'])
   })
 })
 
@@ -370,6 +429,7 @@ describe('replay and redelivery', () => {
             },
           ],
           settlements: [],
+          compactions: [],
         },
         position: at(3),
       }),
@@ -500,6 +560,7 @@ describe('a reset rebuilds the indexes content lands through', () => {
               },
             ],
             settlements: [],
+            compactions: [],
           },
           position: at(2),
         },
@@ -541,6 +602,7 @@ describe('seeded turns honour what their submission settled as', () => {
           parts: [{ kind: 'text', text: 'half a senten', state: 'streaming' }],
         },
       ],
+      compactions: [],
       settlements: [
         { submissionId: SUBMISSION, outcome: 'failed', result: { present: false, value: undefined }, error: { present: false, name: null, type: null, message: null } },
       ],
@@ -566,6 +628,7 @@ describe('seeded turns honour what their submission settled as', () => {
           parts: [{ kind: 'text', text: 'done writing', state: 'done' }],
         },
       ],
+      compactions: [],
       settlements: [
         { submissionId: SUBMISSION, outcome: 'aborted', result: { present: false, value: undefined }, error: { present: false, name: null, type: null, message: null } },
       ],
@@ -851,6 +914,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           parts: [],
         })),
       ],
+      compactions: [],
       settlements: [
         {
           submissionId: SUBMISSION,
@@ -925,6 +989,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           parts: [{ kind: 'text', text: 'Submission was aborted.', state: 'done' }],
         },
       ],
+      compactions: [],
       settlements: [
         {
           submissionId: SUBMISSION,
@@ -1079,6 +1144,7 @@ describe('the span a reasoning run is measured over', () => {
         },
       ],
       settlements: [],
+      compactions: [],
     })
     const reply = items.at(-1)
     if (reply?.kind !== 'assistant') throw new Error('expected an assistant item')
@@ -1221,6 +1287,7 @@ describe('the file run', () => {
       conversationId: CONVERSATION,
       offset: '0_0',
       settlements: [],
+      compactions: [],
       messages: [
         {
           id: 'u1',
@@ -1420,6 +1487,7 @@ describe('the file run', () => {
         },
       ],
       settlements: [],
+      compactions: [],
     }
     const seeded = seededFrom(snapshot)
     const live = applyChunks(

@@ -44,6 +44,20 @@ interface LiveWorkValue {
   readonly contextReports: ReadonlyMap<string, ContextReport>
   /** Reports what the open conversation's transcript currently costs. */
   markContextReport: (conversationId: string, report: ContextReport | null) => void
+  /**
+   * Conversations being compacted by hand right now. The witness is the
+   * control that asked for it, in the top strip; the reader is the page,
+   * which shows the state, and the strip itself, which disables the control.
+   */
+  readonly compacting: ReadonlySet<string>
+  markCompacting: (conversationId: string, active: boolean) => void
+  /**
+   * A counter per conversation that the page's measurement read depends on,
+   * bumped when something other than a turn ending has changed the figure -
+   * a compaction by hand - so the page reads it again.
+   */
+  readonly contextRevisions: ReadonlyMap<string, number>
+  bumpContext: (conversationId: string) => void
 }
 
 const LiveWorkContext = createContext<LiveWorkValue | null>(null)
@@ -101,7 +115,8 @@ export function LiveWorkProvider({
           held.pending === report.pending &&
           held.measured?.fresh === report.measured?.fresh &&
           held.measured?.cached === report.measured?.cached &&
-          held.measured?.reply === report.measured?.reply
+          held.measured?.reply === report.measured?.reply &&
+          held.measured?.estimated === report.measured?.estimated
         ) {
           return current
         }
@@ -113,9 +128,49 @@ export function LiveWorkProvider({
     [],
   )
 
+  const [compacting, setCompacting] = useState<ReadonlySet<string>>(() => new Set())
+  const markCompacting = useCallback((conversationId: string, active: boolean) => {
+    setCompacting((current) => {
+      if (current.has(conversationId) === active) return current
+      const next = new Set(current)
+      if (active) next.add(conversationId)
+      else next.delete(conversationId)
+      return next
+    })
+  }, [])
+
+  const [contextRevisions, setContextRevisions] = useState<ReadonlyMap<string, number>>(
+    () => new Map<string, number>(),
+  )
+  const bumpContext = useCallback((conversationId: string) => {
+    setContextRevisions((current) => {
+      const next = new Map(current)
+      next.set(conversationId, (current.get(conversationId) ?? 0) + 1)
+      return next
+    })
+  }, [])
+
   const value = useMemo<LiveWorkValue>(
-    () => ({ running, markRunning, contextReports, markContextReport }),
-    [running, markRunning, contextReports, markContextReport],
+    () => ({
+      running,
+      markRunning,
+      contextReports,
+      markContextReport,
+      compacting,
+      markCompacting,
+      contextRevisions,
+      bumpContext,
+    }),
+    [
+      running,
+      markRunning,
+      contextReports,
+      markContextReport,
+      compacting,
+      markCompacting,
+      contextRevisions,
+      bumpContext,
+    ],
   )
 
   return <LiveWorkContext.Provider value={value}>{children}</LiveWorkContext.Provider>

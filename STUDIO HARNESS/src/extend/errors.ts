@@ -15,6 +15,8 @@ export type ExtendFailure =
   | "internal"
   /** Named something that is not installed on this machine. */
   | "not_installed"
+  /** What was written or named does not make a valid extension. */
+  | "invalid"
   /** Installed, but this project has not switched it on. */
   | "not_enabled"
   /** A request was sent and no answer came back in time. */
@@ -27,6 +29,7 @@ export type ExtendFailure =
 const MESSAGE_BY_FAILURE: Record<ExtendFailure, string> = {
   internal: "Something is wired incorrectly inside Project Studio.",
   not_installed: "That is not installed.",
+  invalid: "That is not a valid definition.",
   not_enabled: "That is not switched on for this project.",
   timed_out: "The server did not answer in time.",
   cancelled: "The request was stopped before the server answered.",

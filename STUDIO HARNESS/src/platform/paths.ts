@@ -189,6 +189,11 @@ export function userSkillsDirectory(): string {
   return studioPath("skills");
 }
 
+/** The person's own slash commands, one Markdown file each. */
+export function userCommandsDirectory(): string {
+  return studioPath("commands");
+}
+
 /** Per-project state the application owns, keyed by project id. */
 export function projectsDirectory(): string {
   return studioPath("data", "projects");
@@ -325,7 +330,7 @@ export function conversationTrashDirectory(conversationId: string): string {
  * durable directory cannot be added and then forgotten by the backup.
  */
 export function durableDirectories(): readonly string[] {
-  return [configDirectory(), studioPath("data"), userSkillsDirectory()];
+  return [configDirectory(), studioPath("data"), userSkillsDirectory(), userCommandsDirectory()];
 }
 
 /**

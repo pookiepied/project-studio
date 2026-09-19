@@ -78,6 +78,38 @@ allowBuilds:
 #      and tail-positioned, so it never actually defeated per-turn prompt
 #      caching - the reason for removal is duplication, not caching.
 #
+#   6. dispatch-*.mjs, projectConversationUi and
+#      projectAgentConversationSnapshot - the compaction records on the
+#      active path are projected into the history snapshot as
+#      `compactions`, each naming the projected message it follows and
+#      the entry the model's memory now begins at. Upstream skips the
+#      record in the UI walk and answers a compaction with a snapshot
+#      reset that carries no trace of it, so a client could never show
+#      where a conversation was shortened, or what the summary kept. The
+#      messages before the cut are still projected; the record is a marker
+#      beside them, not a cut in what the person can read.
+#
+#   7. builtin-providers-*.mjs, createNodeAgentCoordinator - `compactInstance`
+#      opens one agent instance's session exactly as a submission opens it
+#      and runs the engine's own `session.compact()` (`runCompaction
+#      ("manual")`), refusing with SessionBusyError while a submission is
+#      queued or running; the claim loop yields to a compaction in flight.
+#      dispatch-*.mjs publishes it as
+#      globalThis.__projectStudioCompactAgentInstance, beside
+#      getAgentInstance, because the chunk's export map is minified;
+#      conversation-stream-store-*.mjs exports the session handler factory
+#      under a long name for the same reason. Upstream 2.0.3 has the manual
+#      path complete and no door to it from outside a running agent.
+#
+#   8. dispatch-*.mjs, assertCompaction / runSummarizationCall /
+#      generateSummary, and the `compact` call in
+#      conversation-stream-store-*.mjs - `compaction.prompts` on the model
+#      config: the summariser's system, summary, update and turn-prefix
+#      prompts and its reasoning level, each defaulting to the shipped one.
+#      types-*.d.mts declares the field. Studio's own prompts live in
+#      src/context/compaction-prompt.ts; the engine's are a fixed constant
+#      upstream with no hook.
+#
 #   How to re-derive at the next upgrade: every hunk carries its own recipe
 #   in a `[project-studio patch]` comment, and every recipe says to anchor
 #   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of

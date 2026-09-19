@@ -9,6 +9,8 @@ import type { QuestionBroker } from "../../application/question-broker.js";
 import type { McpAdministration } from "../../application/mcp-management.js";
 import type { SkillAdministration } from "../../application/skill-management.js";
 import { createSkillRoutes } from "./routes/skills.js";
+import { createCommandRoutes } from "./routes/commands.js";
+import type { CommandRegistry } from "../../extend/commands/registry.js";
 import type { ProviderAdministration } from "../../gateway/connections/management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
 import type { MediaAdministration } from "../../gateway/media/service.js";
@@ -22,6 +24,7 @@ import type { ConversationTitlingPort } from "../../conversations/titling.js";
 import type { BackgroundJobs } from "../../process/background.js";
 import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
+import type { CompactionReadiness } from "../../conversations/compaction.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMediaRoutes } from "./routes/media.js";
 import type { TextImproverPort } from "../../application/text-improver.js";
@@ -42,6 +45,11 @@ export interface CreateHttpAppOptions {
   readonly servers: McpAdministration;
   /** The skill administration surface, the same kind of port as `servers`. */
   readonly skills: SkillAdministration;
+  /**
+   * The slash commands, when composed. Optional for tests; production wires
+   * it, because a composition without it has a slash that knows nothing.
+   */
+  readonly commands?: CommandRegistry;
   /**
    * Re-asks a conversation's capability note, called by the turn-settings
    * middleware between submissions. A port of the same shape as `servers`:
@@ -95,6 +103,14 @@ export interface CreateHttpAppOptions {
    * `options`, so this only has to reach the shape it declares.
    */
   readonly contextUsage?: ContextUsageTracker;
+  /**
+   * Manual compaction and its readiness, when a runtime was composed.
+   * `createConversationRoutes` reads it through `options`.
+   */
+  readonly compaction?: {
+    readiness(conversationId: string): CompactionReadiness;
+    compact(conversationId: string): Promise<void>;
+  };
   /**
    * The runtime's background commands, for the panel that lists them.
    * `createConversationRoutes` reads it through `options`, so this only has to
@@ -178,6 +194,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
 
   app.route("/api/mcp", createMcpRoutes(options.servers));
   app.route("/api/skills", createSkillRoutes(options.skills));
+  if (options.commands !== undefined) {
+    app.route("/api/commands", createCommandRoutes(options.commands));
+  }
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route(

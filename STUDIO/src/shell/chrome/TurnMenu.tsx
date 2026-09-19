@@ -29,6 +29,12 @@ import { loadRecentModelIds, rememberRecentModel } from '@/domain/models/recents
 import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 import { useNavigation } from '@/stores/navigation'
 import { useLiveWork, useWorkspace } from '@/stores/workspace'
+import { useCompactNow } from '@/features/chat/compaction/useCompactNow'
+import {
+  createHarnessClient,
+  resolveHarnessAddress,
+  type CompactionReadiness,
+} from '@/platform/harness'
 import { cn } from '@/lib/cn'
 import { capital } from '@/lib/text'
 
@@ -108,7 +114,8 @@ export function TurnMenu() {
     catalog,
     ensureStore,
   } = useWorkspace()
-  const { contextReports, running } = useLiveWork()
+  const { contextReports, running, contextRevisions } = useLiveWork()
+  const { compacting, compactNow: compact } = useCompactNow()
   const { route, openSettings } = useNavigation()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('root')
@@ -141,6 +148,7 @@ export function TurnMenu() {
       : contextBreakdown(
           contextReports.get(active.id) ?? EMPTY_REPORT,
           model?.contextWindow ?? null,
+          model?.capability.maxOutputTokens ?? null,
         )
   const turnRunning = active !== null && running.has(active.id)
 
@@ -149,6 +157,36 @@ export function TurnMenu() {
   useEffect(() => {
     if (!open) setView('root')
   }, [open])
+
+  // Whether "Compact now" may run, asked when the menu opens and again after
+  // anything that changes the answer - a turn ending, a compaction. The
+  // harness decides (the cool-down lives there, beside the threshold), and
+  // the control shows the sentence it answers with.
+  const [readiness, setReadiness] = useState<CompactionReadiness | null>(null)
+  const [compactError, setCompactError] = useState<string | null>(null)
+  const activeId = active?.id ?? null
+  const isCompacting = activeId !== null && compacting.has(activeId)
+  const revision = activeId === null ? 0 : (contextRevisions.get(activeId) ?? 0)
+  useEffect(() => {
+    if (!open || activeId === null) return
+    let watching = true
+    void (async () => {
+      const address = await resolveHarnessAddress()
+      if (address === null || !watching) return
+      const result = await createHarnessClient(address).conversationCompaction(activeId)
+      if (!watching) return
+      setReadiness(result.ok ? result.value : null)
+    })()
+    return () => {
+      watching = false
+    }
+  }, [open, activeId, turnRunning, revision, isCompacting])
+
+  const compactNow = () => {
+    if (activeId === null || isCompacting) return
+    setCompactError(null)
+    void compact(activeId).then(setCompactError)
+  }
 
   const chooseModel = (
     modelId: string | null,
@@ -291,6 +329,11 @@ export function TurnMenu() {
             reasoningLabel={reasoningLabel(model, effective.reasoningLevel)}
             hasReasoningControl={model !== undefined && model.reasoningLevels.length > 0}
             following={following}
+            compaction={
+              activeId === null
+                ? null
+                : { readiness, compacting: isCompacting, error: compactError, onCompact: compactNow }
+            }
           />
         )}
         </MenuViews>
@@ -358,6 +401,7 @@ function ModelPanel({
   onChoose,
   onOpenReasoning,
   onOpenLibrary,
+  compaction,
 }: {
   catalog: ReturnType<typeof useWorkspace>['catalog']
   model: CatalogModel | undefined
@@ -372,6 +416,13 @@ function ModelPanel({
   onChoose: (modelId: string | null) => void
   onOpenReasoning: () => void
   onOpenLibrary: () => void
+  /** "Compact now", on a conversation: whether it may run, and the action. Null off one. */
+  compaction: {
+    readiness: CompactionReadiness | null
+    compacting: boolean
+    error: string | null
+    onCompact: () => void
+  } | null
 }) {
   const [detailed, setDetailed] = useState(false)
 
@@ -464,6 +515,25 @@ function ModelPanel({
             </p>
           ) : null}
 
+          {/* The window's consequences, said before the next message is sent
+              rather than as the error after it. A conversation larger than
+              the model just picked is compacted on that message - the
+              request overflows, the runtime compacts and retries once - and
+              the person should choose knowing. A model with no window has no
+              percentage to draw and no threshold to compact at; the provider's
+              refusal is the only trigger left. */}
+          {breakdown !== null && model !== undefined && breakdown.windowDeclared && breakdown.total > breakdown.window ? (
+            <p className="text-micro text-foreground">
+              This conversation is larger than this model's window. It will be
+              compacted on the next message.
+            </p>
+          ) : breakdown !== null && model !== undefined && !breakdown.windowDeclared ? (
+            <p className="text-micro text-muted-foreground/80">
+              The meter stands in {formatTokens(breakdown.window)} for the window, and the
+              conversation is compacted only once the provider refuses a request.
+            </p>
+          ) : null}
+
           {breakdown === null ? null : (
             <>
               <ContextTank breakdown={breakdown} running={running} />
@@ -499,7 +569,38 @@ function ModelPanel({
         </>
       ) : null}
 
-      {head || hasReasoningControl ? <MenuSeparator /> : null}
+      {/* Compacting by hand, beside the meter it empties. Present whenever
+          the harness offers it, and disabled with the harness's own sentence
+          when the cool-down or a running turn refuses it - the reason is
+          the useful part, and a control that vanished would not carry it. */}
+      {compaction !== null && compaction.readiness !== null ? (
+        <>
+          {hasReasoningControl ? null : <MenuSeparator />}
+          <MenuItem
+            icon={<Icons.compaction />}
+            disabled={compaction.compacting || running || !compaction.readiness.available}
+            hint={
+              compaction.compacting
+                ? undefined
+                : running
+                  ? 'Finish or stop the run first'
+                  : compaction.readiness.available
+                    ? undefined
+                    : compaction.readiness.reason
+            }
+            onSelect={compaction.onCompact}
+          >
+            {compaction.compacting ? 'Compacting…' : 'Compact now'}
+          </MenuItem>
+          {compaction.error !== null ? (
+            <p role="alert" className="px-2 pb-1 text-micro text-danger">
+              {compaction.error}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+
+      {head || hasReasoningControl || compaction?.readiness ? <MenuSeparator /> : null}
       <MenuItem selected={selected === null} onSelect={() => onChoose(null)}>
         Default model
       </MenuItem>

@@ -19,6 +19,7 @@ const SNAPSHOT = {
   offset: '4_2',
   messages: [],
   settlements: [],
+  compactions: [],
 }
 
 const NOW = () => 1_700_000_000_000
