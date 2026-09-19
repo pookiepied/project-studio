@@ -15,14 +15,17 @@ import { gitConfigRoots } from "./policy.js";
 /**
  * The sole owner of `sandbox_scope`.
  *
- * One table, one reader that takes both scopes: a project row and a
- * machine-wide row (the empty project id) are the same decision at different
- * scopes. A conversation with no project reads the machine-wide rows only.
- * The level lives on the project, not here - see `ProjectStore`.
+ * One table, one reader that takes all three scopes: a conversation row (a
+ * conversation id, migration 26), a project row, and a machine-wide row (the
+ * empty project id) are the same decision at different scopes. A conversation
+ * reads its own rows, its project's rows when it has a project, and the
+ * machine-wide rows. The level lives on the project, not here - see
+ * `ProjectStore`.
  */
 
 interface ScopeRow {
   project_id: string;
+  conversation_id: string;
   path: string;
   mode: string;
   source: string;
@@ -32,6 +35,7 @@ interface ScopeRow {
 function toRow(row: ScopeRow): SandboxScopeRow {
   return {
     projectId: row.project_id,
+    conversationId: row.conversation_id,
     path: row.path,
     mode: readScopeMode(row.mode),
     source: readScopeSource(row.source),
@@ -46,20 +50,21 @@ export class SandboxScopeStore {
     this.#db = db;
   }
 
-  /** Every row for one project, plus the machine-wide rows beside them. */
-  list(projectId: string | undefined): readonly SandboxScopeRow[] {
+  /**
+   * Every row one conversation reads: its own, its project's, and the
+   * machine-wide ones. Either id may be absent; the machine-wide rows
+   * always answer.
+   */
+  list(projectId: string | undefined, conversationId?: string): readonly SandboxScopeRow[] {
     try {
-      if (projectId === undefined || projectId === "") {
-        const rows = this.#db
-          .prepare("SELECT * FROM sandbox_scope WHERE project_id = '' ORDER BY path ASC")
-          .all() as unknown as ScopeRow[];
-        return rows.map(toRow);
-      }
       const rows = this.#db
         .prepare(
-          "SELECT * FROM sandbox_scope WHERE project_id = ? OR project_id = '' ORDER BY project_id ASC, path ASC",
+          `SELECT * FROM sandbox_scope
+            WHERE (conversation_id = '' AND (project_id = '' OR project_id = ?))
+               OR (conversation_id = ? AND conversation_id <> '')
+            ORDER BY conversation_id DESC, project_id ASC, path ASC`,
         )
-        .all(projectId) as unknown as ScopeRow[];
+        .all(projectId ?? "", conversationId ?? "") as unknown as ScopeRow[];
       return rows.map(toRow);
     } catch (error) {
       throw storageErrorFrom(error);
@@ -70,7 +75,9 @@ export class SandboxScopeStore {
   listProject(projectId: string): readonly SandboxScopeRow[] {
     try {
       const rows = this.#db
-        .prepare("SELECT * FROM sandbox_scope WHERE project_id = ? ORDER BY path ASC")
+        .prepare(
+          "SELECT * FROM sandbox_scope WHERE project_id = ? AND conversation_id = '' ORDER BY path ASC",
+        )
         .all(projectId) as unknown as ScopeRow[];
       return rows.map(toRow);
     } catch (error) {
@@ -81,7 +88,29 @@ export class SandboxScopeStore {
   listMachineWide(): readonly SandboxScopeRow[] {
     try {
       const rows = this.#db
-        .prepare("SELECT * FROM sandbox_scope WHERE project_id = '' ORDER BY path ASC")
+        .prepare(
+          "SELECT * FROM sandbox_scope WHERE project_id = '' AND conversation_id = '' ORDER BY path ASC",
+        )
+        .all() as unknown as ScopeRow[];
+      return rows.map(toRow);
+    } catch (error) {
+      throw storageErrorFrom(error);
+    }
+  }
+
+  /**
+   * Every conversation row there is, for the settings pane.
+   *
+   * All of them rather than one conversation's, because the pane is where a
+   * person finds the grant they may not remember making, and a grant made in
+   * a conversation they closed last week is exactly that one.
+   */
+  listConversations(): readonly SandboxScopeRow[] {
+    try {
+      const rows = this.#db
+        .prepare(
+          "SELECT * FROM sandbox_scope WHERE conversation_id <> '' ORDER BY conversation_id ASC, path ASC",
+        )
         .all() as unknown as ScopeRow[];
       return rows.map(toRow);
     } catch (error) {
@@ -92,18 +121,22 @@ export class SandboxScopeStore {
   /**
    * The extra roots a conversation may reach, beyond its workspace.
    *
-   * Read where the policy is built. A conversation with no project reads the
-   * machine-wide rows only. A write grant implies its read: the policy
-   * requires every writable root to sit inside a readable one, so the write
-   * paths join both lists. The user's git configuration rides along too -
-   * `gitConfigRoots` - because it is owed to every conversation that runs a
-   * contained git, not to any row the person chose.
+   * Read where the policy is built. A conversation reads its own rows, its
+   * project's when it has one, and the machine-wide rows. A write grant
+   * implies its read: the policy requires every writable root to sit inside
+   * a readable one, so the write paths join both lists. The user's git
+   * configuration rides along too - `gitConfigRoots` - because it is owed to
+   * every conversation that runs a contained git, not to any row the person
+   * chose.
    */
-  resolveRoots(projectId: string | undefined): {
+  resolveRoots(
+    projectId: string | undefined,
+    conversationId?: string,
+  ): {
     readonly readRoots: readonly string[];
     readonly writeRoots: readonly string[];
   } {
-    const rows = this.list(projectId ?? "");
+    const rows = this.list(projectId ?? "", conversationId);
     const readRoots: string[] = [];
     const writeRoots: string[] = [];
     for (const row of rows) {
@@ -122,6 +155,8 @@ export class SandboxScopeStore {
 
   grant(entry: {
     readonly projectId: string;
+    /** Set for a conversation grant; the row then belongs to no project. */
+    readonly conversationId?: string;
     readonly path: string;
     readonly mode: SandboxScopeMode;
     readonly source: SandboxScopeSource;
@@ -143,22 +178,31 @@ export class SandboxScopeStore {
     if (entry.projectId !== "" && entry.projectId.trim() === "") {
       throw new StorageError("invalid", { message: "A project scope needs a project id." });
     }
+    const conversationId = entry.conversationId ?? "";
+    if (conversationId.trim() !== conversationId || (entry.conversationId !== undefined && conversationId === "")) {
+      throw new StorageError("invalid", { message: "A conversation scope needs a conversation id." });
+    }
+    // A conversation row belongs to the conversation, not to whichever
+    // project it happened to be filed under: it is read by the conversation
+    // id alone, so the project id is the empty string.
+    const projectId = conversationId === "" ? entry.projectId : "";
     const at = Date.now();
     try {
       this.#db
         .prepare(
-          `INSERT INTO sandbox_scope (project_id, path, mode, source, granted_at)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT (project_id, path)
+          `INSERT INTO sandbox_scope (project_id, conversation_id, path, mode, source, granted_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (project_id, conversation_id, path)
            DO UPDATE SET mode = excluded.mode, source = excluded.source,
              granted_at = excluded.granted_at`,
         )
-        .run(entry.projectId, absolute, entry.mode, entry.source, at);
+        .run(projectId, conversationId, absolute, entry.mode, entry.source, at);
     } catch (error) {
       throw storageErrorFrom(error);
     }
     return {
-      projectId: entry.projectId,
+      projectId,
+      conversationId,
       path: absolute,
       mode: entry.mode,
       source: entry.source,
@@ -166,13 +210,30 @@ export class SandboxScopeStore {
     };
   }
 
+  /** Removes one project or machine-wide row. */
   revoke(projectId: string, path: string): boolean {
     const absolute = normalizeScopePath(path);
     try {
       return (
         this.#db
-          .prepare("DELETE FROM sandbox_scope WHERE project_id = ? AND path = ?")
+          .prepare(
+            "DELETE FROM sandbox_scope WHERE project_id = ? AND conversation_id = '' AND path = ?",
+          )
           .run(projectId, absolute).changes > 0
+      );
+    } catch (error) {
+      throw storageErrorFrom(error);
+    }
+  }
+
+  /** Removes one conversation row. */
+  revokeConversation(conversationId: string, path: string): boolean {
+    const absolute = normalizeScopePath(path);
+    try {
+      return (
+        this.#db
+          .prepare("DELETE FROM sandbox_scope WHERE conversation_id = ? AND path = ?")
+          .run(conversationId, absolute).changes > 0
       );
     } catch (error) {
       throw storageErrorFrom(error);
@@ -183,8 +244,23 @@ export class SandboxScopeStore {
   clearProject(projectId: string): number {
     try {
       return Number(
-        this.#db.prepare("DELETE FROM sandbox_scope WHERE project_id = ?").run(projectId)
-          .changes,
+        this.#db
+          .prepare("DELETE FROM sandbox_scope WHERE project_id = ? AND conversation_id = ''")
+          .run(projectId).changes,
+      );
+    } catch (error) {
+      throw storageErrorFrom(error);
+    }
+  }
+
+  /** Removes every row for one conversation. What the purge calls. */
+  clearConversation(conversationId: string): number {
+    if (conversationId === "") return 0;
+    try {
+      return Number(
+        this.#db
+          .prepare("DELETE FROM sandbox_scope WHERE conversation_id = ?")
+          .run(conversationId).changes,
       );
     } catch (error) {
       throw storageErrorFrom(error);

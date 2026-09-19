@@ -27,6 +27,8 @@ export type SandboxLevel = "contained" | "trusted";
 
 export interface SandboxScopeRow {
   readonly projectId: string;
+  /** The conversation this row belongs to, or the empty string for a project or machine-wide row. */
+  readonly conversationId: string;
   readonly path: string;
   readonly mode: SandboxScopeMode;
   readonly source: SandboxScopeSource;

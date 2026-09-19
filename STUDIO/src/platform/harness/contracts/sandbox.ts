@@ -24,6 +24,12 @@ export type SandboxScopeSource = (typeof SANDBOX_SCOPE_SOURCES)[number]
 
 export interface SandboxScopeRow {
   readonly projectId: string
+  /**
+   * The conversation this row was granted to alone, or the empty string for a
+   * project or machine-wide row (migration 26). A conversation row is read by
+   * that conversation and by no other, and goes when the conversation does.
+   */
+  readonly conversationId: string
   readonly path: string
   readonly mode: SandboxScopeMode
   readonly source: SandboxScopeSource
@@ -53,6 +59,8 @@ export interface FolderTrust {
 export interface SandboxScopeInfo {
   readonly project: readonly SandboxScopeRow[]
   readonly machineWide: readonly SandboxScopeRow[]
+  /** Every row granted to one conversation alone, across all conversations. */
+  readonly conversations: readonly SandboxScopeRow[]
   readonly level: SandboxLevel
   /** One row per folder of the project asked about; empty when none was. */
   readonly trust: readonly FolderTrust[]
@@ -61,6 +69,8 @@ export interface SandboxScopeInfo {
 export function parseSandboxScopeRow(value: unknown): SandboxScopeRow | null {
   if (!isRecord(value)) return null
   const projectId = typeof value['projectId'] === 'string' ? value['projectId'] : null
+  // Absent on a harness older than migration 26, and absent means none.
+  const conversationId = typeof value['conversationId'] === 'string' ? value['conversationId'] : ''
   const path = text(value['path'])
   const mode = oneOf(SANDBOX_SCOPE_MODES, value['mode'])
   const source = oneOf(SANDBOX_SCOPE_SOURCES, value['source'])
@@ -68,7 +78,7 @@ export function parseSandboxScopeRow(value: unknown): SandboxScopeRow | null {
   if (projectId === null || path === null || mode === null || source === null || grantedAt === null) {
     return null
   }
-  return { projectId, path, mode, source, grantedAt }
+  return { projectId, conversationId, path, mode, source, grantedAt }
 }
 
 export function parseFolderTrust(value: unknown): FolderTrust | null {
@@ -84,10 +94,14 @@ export function parseSandboxScopeInfo(value: unknown): SandboxScopeInfo | null {
   if (!isRecord(value)) return null
   const project = listOf(parseSandboxScopeRow, value['project'])
   const machineWide = listOf(parseSandboxScopeRow, value['machineWide'])
+  // Absent on a harness older than migration 26, and absent means none.
+  const conversations = value['conversations'] === undefined ? [] : listOf(parseSandboxScopeRow, value['conversations'])
   const level = oneOf(SANDBOX_LEVELS, value['level'])
   const trust = listOf(parseFolderTrust, value['trust'])
-  if (project === null || machineWide === null || level === null || trust === null) return null
-  return { project, machineWide, level, trust }
+  if (project === null || machineWide === null || conversations === null || level === null || trust === null) {
+    return null
+  }
+  return { project, machineWide, conversations, level, trust }
 }
 
 /*

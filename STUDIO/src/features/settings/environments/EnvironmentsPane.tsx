@@ -89,6 +89,7 @@ export function EnvironmentsPane() {
           onSetIsolation={(enabled) => void environments.setIsolation(enabled)}
           onSetTrust={(root, trusted) => void environments.setTrust(root, trusted)}
           onRevoke={(id, path) => void environments.revoke(id, path)}
+          onRevokeConversation={(id, path) => void environments.revokeConversation(id, path)}
           onGrantCustom={(id, path, mode) => void environments.grantCustom(id, path, mode)}
         />
       ) : null}
@@ -111,6 +112,7 @@ function Body({
   onSetIsolation,
   onSetTrust,
   onRevoke,
+  onRevokeConversation,
   onGrantCustom,
 }: {
   projects: readonly { readonly id: string; readonly name: string }[]
@@ -118,6 +120,7 @@ function Body({
   scope: {
     readonly project: readonly SandboxScopeRow[]
     readonly machineWide: readonly SandboxScopeRow[]
+    readonly conversations: readonly SandboxScopeRow[]
     readonly level: SandboxLevel
     readonly trust: readonly FolderTrust[]
   }
@@ -132,6 +135,7 @@ function Body({
   onSetIsolation: (enabled: boolean) => void
   onSetTrust: (root: string, trusted: boolean) => void
   onRevoke: (id: string, path: string) => void
+  onRevokeConversation: (conversationId: string, path: string) => void
   onGrantCustom: (id: string, path: string, mode: 'read' | 'write') => void
 }) {
   const [customPath, setCustomPath] = useState('')
@@ -324,7 +328,7 @@ function Body({
         <p className="mt-0.5 text-caption text-muted-foreground">
           Every row for this project and machine-wide, with its source. A question grant is the one you may not remember making.
         </p>
-        {scope.project.length === 0 && scope.machineWide.length === 0 ? (
+        {scope.project.length === 0 && scope.machineWide.length === 0 && scope.conversations.length === 0 ? (
           <p className="mt-2 text-caption text-muted-foreground">Nothing granted beyond the workspace.</p>
         ) : null}
         {scope.project.map((row) => (
@@ -352,6 +356,23 @@ function Body({
               </p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => onRevoke('', row.path)}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        {/* The grants one conversation was given alone: the answer the
+            folder question recommends. Listed across every conversation,
+            because this is where a person finds the one they do not
+            remember; each ends with its conversation anyway. */}
+        {scope.conversations.map((row) => (
+          <div key={`cnv:${row.conversationId}:${row.path}`} className="mt-2 flex items-start justify-between gap-6">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-caption text-foreground">{row.path}</p>
+              <p className="text-caption text-muted-foreground">
+                {row.mode} · {row.source} · one conversation ({row.conversationId})
+              </p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => onRevokeConversation(row.conversationId, row.path)}>
               Remove
             </Button>
           </div>

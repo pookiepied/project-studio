@@ -10,6 +10,7 @@ import { ExtensionSelectionStore } from "../../../extend/selection.js";
 import { PermissionGrantStore } from "../../../permissions/grant-store.js";
 import { PlanItemStore } from "../../../plan/plan-items.js";
 import { PendingQuestionStore } from "../../../questions/pending-questions.js";
+import { SandboxScopeStore } from "../../../sandbox/scope-store.js";
 import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
 import {
   listOrphanConversationTrees,
@@ -126,6 +127,7 @@ export function createConversationRoutes(
   const selection = new ExtensionSelectionStore(options.database);
   const plans = new PlanItemStore(options.database);
   const questions = new PendingQuestionStore(options.database);
+  const folders = new SandboxScopeStore(options.database);
 
   routes.get("/", (context) => {
     try {
@@ -270,6 +272,7 @@ export function createConversationRoutes(
           selection,
           plans,
           questions,
+          folders,
           flueJournalPath: resolveFlueJournalPath(),
         },
         [id],
@@ -300,6 +303,7 @@ export function createConversationRoutes(
           selection,
           plans,
           questions,
+          folders,
           flueJournalPath: resolveFlueJournalPath(),
         },
         idsForPurge(await body(context)),

@@ -25,12 +25,14 @@ import type { SandboxScopeStore } from "./scope-store.js";
  */
 
 export const SCOPE_QUESTION_OPTIONS = {
+  conversation: "allow-conversation",
   project: "allow-project",
   everywhere: "allow-everywhere",
   deny: "dont-allow",
 } as const;
 
 export type ScopeQuestionChoice =
+  | typeof SCOPE_QUESTION_OPTIONS.conversation
   | typeof SCOPE_QUESTION_OPTIONS.project
   | typeof SCOPE_QUESTION_OPTIONS.everywhere
   | typeof SCOPE_QUESTION_OPTIONS.deny;
@@ -54,10 +56,12 @@ export interface ScopeQuestion {
  * `request_folder`; it is shown after the question so the person decides on
  * the stated purpose and not on a bare path.
  *
- * `hasProject` decides the options. With a project there are two ways to say
- * yes - this project, or everywhere - and they write different rows. With no
- * project both would write the machine-wide row, so a conversation with no
- * project is offered one yes and told what it means.
+ * The first yes is always "this conversation", and it is the recommended
+ * one: it is the cheapest answer, it ends with the conversation, and it is
+ * what the person most often means. `hasProject` decides whether "this
+ * project" is offered between it and "everywhere"; a conversation with no
+ * project has no project row to write. Everywhere is last, on purpose:
+ * always should be chosen, not landed on because it was the only yes.
  */
 export function buildScopeQuestion(options: {
   readonly resolvedPath: string;
@@ -83,29 +87,29 @@ export function buildScopeQuestion(options: {
       question: `${actor} needs to ${verb} ${resolvedPath}, which is ${boundary}.${reason}`,
       header: "Folder",
       multiSelect: false,
+      recommendedOptionId: SCOPE_QUESTION_OPTIONS.conversation,
       options: [
+        {
+          id: SCOPE_QUESTION_OPTIONS.conversation,
+          label: "Allow it for this conversation (Recommended)",
+          description: `Grants ${mode} on ${resolvedPath} until this conversation is deleted, ${retry}.`,
+        },
         ...(hasProject
           ? [
               {
                 id: SCOPE_QUESTION_OPTIONS.project,
                 label: "Allow it for this project",
-                description: `Grants ${mode} on ${resolvedPath} for this project, ${retry}.`,
-              },
-              {
-                id: SCOPE_QUESTION_OPTIONS.everywhere,
-                label: "Allow it for every project",
-                description: `Grants ${mode} on ${resolvedPath} everywhere, ${retry}.`,
+                description: `Grants ${mode} on ${resolvedPath} for every conversation in this project, ${retry}.`,
               },
             ]
-          : [
-              {
-                id: SCOPE_QUESTION_OPTIONS.everywhere,
-                label: "Allow it",
-                description:
-                  `Grants ${mode} on ${resolvedPath} machine-wide - every project and every ` +
-                  `conversation with no project - ${retry}.`,
-              },
-            ]),
+          : []),
+        {
+          id: SCOPE_QUESTION_OPTIONS.everywhere,
+          label: "Allow it everywhere",
+          description:
+            `Grants ${mode} on ${resolvedPath} machine-wide - every project and every ` +
+            `conversation - ${retry}.`,
+        },
         {
           id: SCOPE_QUESTION_OPTIONS.deny,
           label: "Don't allow it",
@@ -144,6 +148,16 @@ export function applyScopeAnswer(
     return { choice: "stopped", granted: false };
   }
   const chosen = options.answer?.optionIds?.[0];
+  if (chosen === SCOPE_QUESTION_OPTIONS.conversation) {
+    store.grant({
+      projectId: "",
+      conversationId: options.conversationId,
+      path: options.resolvedPath,
+      mode: options.mode,
+      source: "question",
+    });
+    return { choice: chosen, granted: true };
+  }
   if (chosen === SCOPE_QUESTION_OPTIONS.project) {
     if (options.projectId === undefined || options.projectId === "") {
       store.grant({

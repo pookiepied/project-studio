@@ -1138,6 +1138,41 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 26,
+    name: "conversation_scope_grants",
+    up(db) {
+      // A third scope for a folder grant: this conversation. The folder
+      // question the model asks (ADR 0057, `request_folder`) used to offer
+      // only the two durable answers, project and machine-wide, because under
+      // the container a grant was an ACL entry and asking was expensive. A
+      // grant is a row now, and the cheapest, safest yes - "for this
+      // conversation" - was the one missing. It is stored like the others,
+      // so it survives a restart, lists in Settings, and can be removed
+      // there; it goes with the conversation when the conversation is purged.
+      //
+      // `conversation_id` is the empty string for a project or machine-wide
+      // row, for the same reason `project_id` is empty for machine-wide: one
+      // reader, one table, and no nullable column inside a primary key. The
+      // key has to grow, and SQLite cannot alter one in place, so the table
+      // is rebuilt and the rows carried across.
+      db.exec(`
+        CREATE TABLE sandbox_scope_next (
+          project_id       TEXT NOT NULL,
+          conversation_id  TEXT NOT NULL DEFAULT '',
+          path             TEXT NOT NULL,
+          mode             TEXT NOT NULL,
+          source           TEXT NOT NULL,
+          granted_at       INTEGER NOT NULL,
+          PRIMARY KEY (project_id, conversation_id, path)
+        ) STRICT;
+        INSERT INTO sandbox_scope_next (project_id, conversation_id, path, mode, source, granted_at)
+          SELECT project_id, '', path, mode, source, granted_at FROM sandbox_scope;
+        DROP TABLE sandbox_scope;
+        ALTER TABLE sandbox_scope_next RENAME TO sandbox_scope;
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

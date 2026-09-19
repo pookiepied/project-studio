@@ -63,6 +63,8 @@ export interface ProjectClient {
   }): Promise<HarnessResult<void>>
   /** Takes one grant back. */
   revokeScope(projectId: string, path: string): Promise<HarnessResult<void>>
+  /** Removes a folder granted to one conversation alone. */
+  revokeConversationScope(conversationId: string, path: string): Promise<HarnessResult<void>>
   /**
    * One directory of the PC, listed by the harness: the folder picker a
    * browser tab needs, since the file system being chosen is the PC's, not
@@ -171,6 +173,13 @@ export function projectClient({ json, empty }: Requester): ProjectClient {
       return empty(
         'DELETE',
         `${SANDBOX_PATH}/scope?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(path)}`,
+      )
+    },
+
+    revokeConversationScope(conversationId, path) {
+      return empty(
+        'DELETE',
+        `${SANDBOX_PATH}/scope?conversationId=${encodeURIComponent(conversationId)}&path=${encodeURIComponent(path)}`,
       )
     },
 

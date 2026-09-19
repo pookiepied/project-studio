@@ -16,6 +16,7 @@ import { conversationScope, ExtensionSelectionStore } from "../../src/extend/sel
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { PlanItemStore } from "../../src/plan/plan-items.js";
 import { PendingQuestionStore } from "../../src/questions/pending-questions.js";
+import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
 import {
   conversationWorkspaceDirectory,
   conversationsDirectory,
@@ -76,6 +77,7 @@ function dependencies(
     selection: new ExtensionSelectionStore(db),
     plans: new PlanItemStore(db),
     questions: new PendingQuestionStore(db),
+    folders: new SandboxScopeStore(db),
     flueJournalPath,
   };
 }
@@ -312,6 +314,31 @@ describe("a complete purge", () => {
     expect(outcome.removed).toEqual(["cnv_planned"]);
     expect(plans.list("cnv_planned").items).toEqual([]);
     expect(plans.list("cnv_other").items).not.toEqual([]);
+  });
+
+  it("removes the folders granted to the conversation alone, and no other grant", async () => {
+    // "Allow it for this conversation" was allowed for exactly as long as the
+    // conversation exists (migration 26). The project and machine-wide rows
+    // are the person's durable decisions and are not the purge's to touch.
+    const store = new ConversationStore(db);
+    const flueJournalPath = journalFile();
+    store.record({ id: "cnv_granted", firstMessage: "Granted" });
+    seedJournal(flueJournalPath, "cnv_granted");
+    const folders = new SandboxScopeStore(db);
+    const directory = mkdtempSync(join(tmpdir(), "studio-purge-scope-"));
+    try {
+      folders.grant({ projectId: "", conversationId: "cnv_granted", path: directory, mode: "read", source: "question" });
+      folders.grant({ projectId: "", conversationId: "cnv_other", path: directory, mode: "read", source: "question" });
+      folders.grant({ projectId: "", path: directory, mode: "read", source: "custom" });
+
+      const outcome = await purgeConversations(dependencies(store, flueJournalPath), ["cnv_granted"]);
+
+      expect(outcome.removed).toEqual(["cnv_granted"]);
+      expect(folders.listConversations().map((row) => row.conversationId)).toEqual(["cnv_other"]);
+      expect(folders.listMachineWide()).toHaveLength(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("removes the conversation's questions with the rest of it, settled ones too", async () => {
