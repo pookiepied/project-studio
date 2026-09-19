@@ -36,8 +36,9 @@ import { defineStudioTool, type ToolDefinition } from "../types.js";
  * yes is a stored rule - for this conversation, which is the recommended
  * answer and ends with the conversation; for the project; or everywhere -
  * applied to this run as well, and a no is remembered for the rest of the
- * conversation so the same folder is not asked about twice. Nothing here
- * can widen reach without a person choosing to.
+ * turn so the same folder is not asked about twice in it - and no longer,
+ * so "try again" in the next message works. Nothing here can widen reach
+ * without a person choosing to.
  *
  * Like `ask_user_question` it declares `read` and nothing else: asking
  * observes a person's intent and changes no state until they answer, and a
@@ -61,8 +62,9 @@ export const REQUEST_FOLDER_DESCRIPTOR: CapabilityDescriptor = {
     "Name the folder as an absolute path, say whether you need to read or write in it, and " +
     "give one plain sentence saying what for; the person sees exactly that. If they say " +
     "yes the folder is reachable at once, for this conversation or more widely as they choose. If " +
-    "they say no, do the work another way or say what you cannot do; do not ask for the " +
-    "same folder again. A volume root or the system directory cannot be asked for.",
+    "they say no, do the work another way or say what you cannot do, and do not ask for " +
+    "the same folder again unless they bring it up. A volume root or the system directory " +
+    "cannot be asked for.",
   inputSchema: {
     type: "object",
     properties: {
@@ -209,8 +211,8 @@ export function createRequestFolderTool(
           path,
           outcome: "declined",
           message:
-            `The person already declined ${path} in this conversation. Do the work ` +
-            "another way, or say what you cannot do without it.",
+            `The person already declined ${path} this turn. Do the work another way, ` +
+            "or say what you cannot do without it.",
         };
       }
 
@@ -285,7 +287,7 @@ export function createRequestFolderTool(
           outcome: "declined",
           message:
             `The person did not allow ${path}. Do the work another way, or say what you ` +
-            "cannot do without it. Do not ask for this folder again.",
+            "cannot do without it. Do not ask for this folder again unless the person brings it up.",
         };
       }
 

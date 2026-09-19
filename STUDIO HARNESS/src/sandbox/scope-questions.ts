@@ -113,7 +113,9 @@ export function buildScopeQuestion(options: {
         {
           id: SCOPE_QUESTION_OPTIONS.deny,
           label: "Don't allow it",
-          description: "Refuses the path, and this conversation will not ask about it again.",
+          description:
+            "Refuses the path for the rest of this turn. Say so in your next message if you " +
+            "change your mind, and the model can ask again.",
         },
       ],
     },
@@ -194,11 +196,16 @@ export function applyScopeAnswer(
 
 /**
  * The paths one conversation has declined, so the same question is not asked
- * again in it.
+ * again in the same turn.
  *
- * In memory, per conversation, for the life of the process. A decline is a
- * real answer but not a durable one: the next conversation asks again, which
- * is the difference between "do not nag me" and "never ask anyone again".
+ * In memory, per conversation, cleared when the person's next message starts
+ * a run. A decline is a real answer but a short one, and the length is the
+ * point: within one turn it stops the model from asking the same thing in a
+ * loop, which is the nagging it exists to prevent; across turns it would
+ * also stop the person, who says "try again" and finds the model cannot. The
+ * harness cannot tell a change of mind from a nag by reading the message, so
+ * it does not try: the person's next message is the line, and a model that
+ * asks again unprompted costs them one more click on the same answer.
  */
 export class ScopeDeclines {
   readonly #declined = new Map<string, Set<string>>();
@@ -217,7 +224,7 @@ export class ScopeDeclines {
     entries.add(absolute);
   }
 
-  /** Drops one conversation's declines. What a purge calls. */
+  /** Drops one conversation's declines. What a new run calls, and a purge. */
   clearConversation(conversationId: string): void {
     this.#declined.delete(conversationId);
   }

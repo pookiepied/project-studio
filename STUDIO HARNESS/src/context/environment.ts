@@ -540,9 +540,10 @@ function reachStatement(): readonly string[] {
     "person's Downloads, another project, a data directory - ask for it with",
     "the request_folder tool before touching it. Name the folder as an",
     "absolute path, say whether you need to read or write, and say what for.",
-    "The person decides; a yes makes it reachable at once, and a no is final",
-    "for this conversation. Do not go looking for a way around a refusal and",
-    "do not pretend you looked.",
+    "The person decides; a yes makes it reachable at once, and a no holds",
+    "for the rest of this turn - do not ask for the same folder again until",
+    "they bring it up. Do not go looking for a way around a refusal and do",
+    "not pretend you looked.",
     "",
   ];
 }

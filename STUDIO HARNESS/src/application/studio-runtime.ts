@@ -1271,9 +1271,9 @@ export class StudioRuntime implements AgentHost {
   /**
    * Whether one conversation has declined one resolved path.
    *
-   * A declined path is not asked twice in that conversation. The record lives
+   * A declined path is not asked twice in the same turn. The record lives
    * here, beside the access logs, because it is conversation-scoped runtime
-   * state rather than a durable row - the next conversation asks again.
+   * state rather than a durable row - the next run clears it.
    */
   scopeDeclined(conversationId: string, resolvedPath: string): boolean {
     return this.#declines.isDeclined(conversationId, resolvedPath);
@@ -1409,6 +1409,11 @@ export class StudioRuntime implements AgentHost {
   }
 
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory {
+    // A folder the person declined was declined for the turn that asked. This
+    // runs once per run - the person's next message - so the slate is clean
+    // when they say "try again", and still full for the rest of the turn
+    // that heard no (`ScopeDeclines`).
+    this.#declines.clearConversation(options.conversationId);
     const conversationProject = this.#conversationProject(options.conversationId);
     // The chain this conversation's enablement resolves through, computed once
     // and read by both of the readers below: the discovery's answers and the

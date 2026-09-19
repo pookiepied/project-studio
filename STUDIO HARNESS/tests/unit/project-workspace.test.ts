@@ -392,6 +392,47 @@ describe("a project conversation stands in the project's folders", () => {
     }
   }, 30_000);
 
+  it("applies a conversation grant to that conversation, and clears a decline at the next run", async () => {
+    // The two halves of the folder question's memory (ADR 0057): a yes for
+    // this conversation is a row it reads at every run; a no is held only
+    // for the turn that heard it, so "try again" in the next message asks
+    // again.
+    const state = await harness();
+    try {
+      const first = await makeDirectory(join(state.root, "repo"));
+      const downloads = await makeDirectory(join(state.root, "downloads"));
+      await writeFile(join(downloads, "model.bin"), "x");
+      const project = state.projects.create({
+        id: "prj_cnv",
+        name: "Cnv",
+        icon: "arc",
+        folders: [{ name: "repo", path: first }],
+      });
+      state.conversations.record({ id: "cnv_one", firstMessage: "Hello", projectId: project.id });
+      state.conversations.record({ id: "cnv_two", firstMessage: "Hello", projectId: project.id });
+      state.scopes.grant({
+        projectId: "",
+        conversationId: "cnv_one",
+        path: downloads,
+        mode: "read",
+        source: "question",
+      });
+
+      const one = await environmentFor(state, "cnv_one");
+      expect(await one.readFile(join(downloads, "model.bin"))).toBe("x");
+      const two = await environmentFor(state, "cnv_two");
+      await expect(two.readFile(join(downloads, "model.bin"))).rejects.toThrow(SandboxError);
+
+      state.runtime.markScopeDeclined("cnv_two", downloads);
+      expect(state.runtime.scopeDeclined("cnv_two", downloads)).toBe(true);
+      // The next run - the person's next message - starts clean.
+      await environmentFor(state, "cnv_two");
+      expect(state.runtime.scopeDeclined("cnv_two", downloads)).toBe(false);
+    } finally {
+      await stop(state);
+    }
+  }, 30_000);
+
   it("takes the first folder by position, not by insertion", async () => {
     const state = await harness();
     try {
