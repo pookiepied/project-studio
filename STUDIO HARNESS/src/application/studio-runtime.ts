@@ -1436,6 +1436,10 @@ export class StudioRuntime implements AgentHost {
       agentId: options.agentId,
       conversationId: options.conversationId,
       projectId,
+      // No project, so `projectId` is the key of this conversation's own
+      // folder; said out loud, so the kernel does not store an "always"
+      // that means "this conversation" under a name that promises more.
+      ...(conversationProject === undefined && options.projectId === undefined ? { standalone: true } : {}),
     };
     // Read where the policy is built. A conversation with no project reads the
     // machine-wide rows only; a filed conversation reads both. The level lives

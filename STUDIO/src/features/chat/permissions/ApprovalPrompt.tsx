@@ -24,8 +24,10 @@ import type { ApprovalAnswer, GrantDuration } from '@/platform/harness'
  * answers the harness accepts: a verdict and how long an allow lasts. The
  * narrowest duration is selected first, so a hurried Enter answers with the
  * smallest grant on offer. `always` is a real grant that outlives the
- * conversation, and naming that consequence is what makes it read as the
- * heavier choice rather than a third setting on a dial.
+ * conversation - it holds for every conversation of the project - and
+ * naming that consequence is what makes it read as the heavier choice
+ * rather than a third setting on a dial. With no project it is not offered:
+ * there is nothing beyond this conversation for it to mean.
  *
  * A deny is an ordinary outcome, not a refusal to be styled as an error: the
  * model receives the verdict and keeps going, so Deny sits at the same calm
@@ -51,9 +53,17 @@ export function ApprovalPrompt({
   questions,
   answeringId,
   onAnswer,
+  hasProject = true,
 }: {
   /** This conversation's pending questions, oldest first; non-empty by contract. */
   readonly questions: readonly PermissionQuestion[]
+  /**
+   * Whether the conversation belongs to a project. "Always" means every
+   * conversation in this project, and with no project there is nothing for
+   * it to mean beyond "this conversation" - so the rung is not offered rather
+   * than offered under a label that promises more than it stores.
+   */
+  readonly hasProject?: boolean
   /** The question an answer is currently in flight for, if any. */
   readonly answeringId: string | null
   readonly onAnswer: (id: string, answer: ApprovalAnswer) => Promise<void>
@@ -101,7 +111,7 @@ export function ApprovalPrompt({
             options={[
               { id: 'once' as const, label: 'Just once' },
               { id: 'conversation' as const, label: 'This conversation' },
-              { id: 'always' as const, label: 'Always' },
+              ...(hasProject ? [{ id: 'always' as const, label: 'Always' }] : []),
             ]}
           />
           <div className="flex items-center gap-1.5">
@@ -171,8 +181,8 @@ function consequence(duration: GrantDuration, folder: boolean): string {
       : 'Studio stops asking about this for the rest of this conversation.'
   }
   return folder
-    ? 'Studio stops asking about this folder, in this conversation and in later ones.'
-    : 'Studio stops asking about this, in this conversation and in later ones.'
+    ? 'Studio stops asking about this folder in every conversation of this project.'
+    : 'Studio stops asking about this in every conversation of this project.'
 }
 
 /**

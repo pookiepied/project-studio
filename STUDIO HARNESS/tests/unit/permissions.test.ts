@@ -262,6 +262,26 @@ describe("grants", () => {
     expect(after.source).toBe("grant");
   });
 
+  it("stores an always approval as a conversation grant when the conversation has no project", async () => {
+    // A conversation with no project carries a project key derived from its
+    // own folder, so a standing grant there could reach no other
+    // conversation anyway. Stored as this conversation's, it holds exactly as
+    // long and goes with the conversation instead of outliving it.
+    const kernel = new PermissionKernel({ grants, approver: approver("allow", "always") });
+    kernel.register(capability("write_file", ["write"]));
+    const id = { namespace: "native", name: "write_file" } as const;
+    const standalone: ExecutionScope = { ...SCOPE, projectId: "workspace-abc123", standalone: true };
+
+    await kernel.authorize(id, standalone);
+
+    const [stored] = grants.list();
+    expect(stored?.conversationId).toBe(standalone.conversationId);
+    expect(kernel.evaluate(id, standalone).verdict).toBe("allow");
+    // A project conversation keeps its always as a standing grant.
+    await kernel.authorize(id, SCOPE);
+    expect(grants.list().some((row) => row.conversationId === undefined)).toBe(true);
+  });
+
   it("stores nothing for a once-only approval", async () => {
     const kernel = new PermissionKernel({
       grants,

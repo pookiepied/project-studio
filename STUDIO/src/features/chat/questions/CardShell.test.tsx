@@ -85,6 +85,23 @@ describe('the shared card shell', () => {
     expect(container.querySelector('svg.lucide-message-circle-question-mark')).not.toBeNull()
   })
 
+  it('offers Always only when the conversation belongs to a project', () => {
+    // "Always" means every conversation in this project. With no project
+    // there is nothing beyond this conversation for it to mean, so the rung
+    // is not shown rather than shown under a label that promises more.
+    const withProject = render(
+      <ApprovalPrompt questions={[approvalQuestion]} answeringId={null} onAnswer={vi.fn()} hasProject />,
+    )
+    expect(withProject.queryByText('Always')).not.toBeNull()
+    withProject.unmount()
+
+    const without = render(
+      <ApprovalPrompt questions={[approvalQuestion]} answeringId={null} onAnswer={vi.fn()} hasProject={false} />,
+    )
+    expect(without.queryByText('Always')).toBeNull()
+    expect(without.queryByText('This conversation')).not.toBeNull()
+  })
+
   it('arrives on the house entrance rather than popping in', () => {
     const { container } = render(
       <ApprovalPrompt

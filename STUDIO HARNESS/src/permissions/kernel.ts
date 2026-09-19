@@ -424,10 +424,16 @@ export class PermissionKernel {
       );
     }
 
+    // "Always" means this project. A conversation with no project has no
+    // project for it to mean, and its project key reaches no other
+    // conversation; stored as a conversation grant, it holds exactly as long
+    // and goes with the conversation instead of outliving it as an orphan.
+    const duration =
+      answer.duration === "always" && scope.standalone === true ? "conversation" : answer.duration;
     const grant = this.#grants.grant(
       id,
       scope,
-      answer.duration,
+      duration,
       chosen?.pattern,
       definitionHash,
     );

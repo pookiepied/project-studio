@@ -190,6 +190,13 @@ export interface ExecutionScope {
   /** The project whose resources are reachable, when one is bound. */
   readonly projectId: string | undefined;
   /**
+   * Set when the conversation belongs to no project and `projectId` is a key
+   * derived from its own folder. A standing grant keyed there would reach no
+   * other conversation, so "always" is stored as "this conversation" - the
+   * same reach, and cleaned up with the conversation instead of left behind.
+   */
+  readonly standalone?: boolean;
+  /**
    * The agent making the call. A subagent runs under its own identity so its
    * grants cannot be inherited from the parent by accident.
    */
