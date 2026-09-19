@@ -65,7 +65,6 @@ import { SandboxError } from "../sandbox/errors.js";
 import { LocalSandbox } from "../sandbox/local-sandbox.js";
 import { createSandboxPolicy, gitConfigRoots } from "../sandbox/policy.js";
 import { isInsideRoot } from "../sandbox/paths.js";
-import { toolchainEnvironment, withToolchainDirectories } from "../sandbox/presets.js";
 import { projectKey } from "../snapshots/shadow-repo.js";
 import { SnapshotStore } from "../snapshots/store.js";
 import { TurnSnapshots } from "../snapshots/turn.js";
@@ -1519,23 +1518,19 @@ export class StudioRuntime implements AgentHost {
       // - it is a list of file extensions - so it is the cheapest half of
       // making the grant above actually work.
       //
-      // The interpreter directories are appended rather than trusted from the
-      // process PATH alone, because the process PATH is a snapshot of
-      // whatever environment started this harness, and that snapshot has
-      // already been measured missing a toolchain the machine plainly has:
-      // `flutter` resolved and `python` did not, in the same process, from
-      // the same resolver. `withToolchainDirectories` adds what the disk
-      // actually has, behind the person's own entries - and ahead of them
-      // for the two cases where the entry that would win cannot work in a
-      // container: a JDK behind an unfollowable `javapath` shim, and the
-      // Visual Studio host tools that `rustc` cannot find through the
-      // registry. `toolchainEnvironment` supplies the rest of what a
-      // developer command prompt would have set, rebuilt from the disk, so
-      // a contained compiler can link at all.
+      // The PATH is the process's own, as the person's environment set it.
+      // It used to be rebuilt from the disk - toolchain directories appended,
+      // a JDK's shim replaced, the Visual Studio environment reconstructed -
+      // because a contained child could not read the registry or follow a
+      // shim, and because the snapshot this process inherited had once been
+      // measured missing a Python the machine had. The first reason went
+      // with the Windows container (ADR 0057). The second is a fact about how
+      // the harness was started, and the fix for it is starting it from an
+      // environment that has the toolchain, not a second PATH resolver that
+      // guesses where installers put things.
       environment: {
-        PATH: withToolchainDirectories(process.env.PATH ?? ""),
+        ...(process.env.PATH === undefined ? {} : { PATH: process.env.PATH }),
         ...(process.env.PATHEXT === undefined ? {} : { PATHEXT: process.env.PATHEXT }),
-        ...toolchainEnvironment(process.env),
       },
     });
     const sandbox = new LocalSandbox(policy);

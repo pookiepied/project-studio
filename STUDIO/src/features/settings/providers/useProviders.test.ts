@@ -113,7 +113,6 @@ function stubClient(overrides: {
     getScope: () => refuse(),
     grantScope: () => refuse(),
     revokeScope: () => refuse(),
-    listPresets: () => refuse(),
     browseFolders: () => refuse(),
     setSandboxLevel: () => refuse(),
     setFolderTrust: () => refuse(),

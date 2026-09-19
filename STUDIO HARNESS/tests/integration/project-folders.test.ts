@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { CAN_CONTAIN } from "../helpers/contained.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { ConversationStore } from "../../src/conversations/store.js";
@@ -18,15 +19,21 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
 
 /**
  * A command run in a project conversation can write the project's second
- * folder - against real containment, not against the policy object.
+ * folder - through the real tool surface, not against the policy object.
  *
  * The whole task in one command: a conversation filed under a project stands
  * in the project's first folder, the person's other folders ride the policy
- * as write roots, and a contained child process - the kind of thing a model
- * actually starts - can write into the second one. Without the roots, the
- * same command is refused. This is `sandbox-scope.test.ts`'s shape, taken one
- * level up: through the project conversation's own tool surface, gate,
- * kernel, and sandbox, with Full Auto resolving the ask the way a run does.
+ * as write roots, and a child process - the kind of thing a model actually
+ * starts - can write into the second one. This is `sandbox-scope.test.ts`'s
+ * shape, taken one level up: through the project conversation's own tool
+ * surface, gate, kernel, and sandbox, with Full Auto resolving the ask the
+ * way a run does.
+ *
+ * The second half - the same command refused a directory that is nobody's
+ * root - is a fact about the container, and runs only where one exists. On
+ * Windows there is none since ADR 0057: an approved command runs as the
+ * person, and the gate's refusal of a write outside the roots is asserted on
+ * the sandbox's own file operations in the unit suite instead.
  *
  * Every directory here is one the test created and removes afterwards.
  */
@@ -96,11 +103,10 @@ async function shellOf(harnessState: Harness, conversationId: string, projectRoo
   return shell;
 }
 
-describe("a project conversation under real containment", () => {
+describe("a project conversation and its folders", () => {
   it(
     "runs a command that writes the project's second folder",
     async () => {
-      if (process.platform !== "win32") return;
       const state = await harness();
       const first = join(state.root, "repo");
       const second = join(state.root, "assets");
@@ -139,8 +145,10 @@ describe("a project conversation under real containment", () => {
       await shell.execute("call-1", { command: line });
       expect(existsSync(target)).toBe(true);
 
-      // And the boundary still holds one step beyond the folders: the same
-      // kind of command cannot write a directory that is nobody's root here.
+      // And, where a container exists, the boundary still holds one step
+      // beyond the folders: the same kind of command cannot write a directory
+      // that is nobody's root here.
+      if (!CAN_CONTAIN) return;
       const denied = join(outside, "planted.txt");
       const deniedLine =
         `node -e "require('fs').writeFileSync(process.argv[1], 'planted')" "${denied}"`;

@@ -453,8 +453,6 @@ describe("nothing the model chose reaches a process uncontained", () => {
       // `LocalSandbox.spawnPlan`, which performs the isolation check and
       // builds the environment from policy exactly as `run` does.
       [join("src", "process", "background.ts"), "outlives the call that started it"],
-      // Configures the sandbox. Cannot use the sandbox.
-      [join("src", "sandbox", "isolation", "windows", "launcher.ts"), "builds the container"],
       // Asks the kernel whether it will hand out a user namespace, by trying.
       // The answer cannot be reached any other way, and a backend that guessed
       // it would be the exact failure this whole seam exists to prevent.
@@ -463,8 +461,8 @@ describe("nothing the model chose reaches a process uncontained", () => {
       // its own and is refused by the same kernel restriction.
       [join("src", "sandbox", "isolation", "linux", "network.ts"), "probes the network"],
       // Runs `apparmor_parser` to load and unload the profile that lets the
-      // sandbox exist at all. Cannot go through the sandbox for the same reason
-      // the Windows launcher cannot, and reached only from `sandbox/cli.ts`,
+      // sandbox exist at all. Cannot go through the sandbox it configures,
+      // and reached only from `sandbox/cli.ts`,
       // only when the caller is root. The command itself is deliberately absent
       // from this list: it drove the parser directly until the undo order bug
       // moved that here, and keeping the shell-out in one module is what let

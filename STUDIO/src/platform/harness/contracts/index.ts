@@ -162,11 +162,9 @@ export {
   type SandboxScopeRow,
   type FolderTrust,
   type SandboxScopeInfo,
-  type DetectedPreset,
   parseSandboxScopeRow,
   parseFolderTrust,
   parseSandboxScopeInfo,
-  parseDetectedPresets,
   type FolderListing,
   parseFolderListing,
 } from './sandbox'

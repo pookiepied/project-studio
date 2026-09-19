@@ -1,6 +1,6 @@
 # Sandbox simplification — the plan
 
-**Status:** In progress — step 1 (the ADR) done as [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
+**Status:** In progress — steps 1 to 3 done (ADR, seam, deletion); next is step 4, the shell. Step 1 is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
 **Decision:** ADR 0057, which supersedes the Windows half of
 [ADR 0041](../decisions/0041-containment-is-the-kernel-s-job.md) and
 [ADR 0047](../decisions/0047-a-contained-command-can-find-the-programs-it-may-run.md),

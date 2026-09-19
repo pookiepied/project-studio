@@ -13,10 +13,12 @@ const CUSTOM_PATH_PLACEHOLDER = 'C:\\Tools\\data'
 /**
  * Environments.
  *
- * Where commands actually run. Five parts, in this order: whether the
+ * Where commands actually run. Four parts, in this order: whether the
  * project's folders are vouched for at all, this project's level, the scope
- * the next grant will take, the detected toolchains, and everything granted
- * with where it came from. Scope and level are kept apart here the same way
+ * the next grant will take, and everything granted with where it came from.
+ * The detected-toolchain presets that used to sit between the last two went
+ * with the Windows container (ADR 0057): they named the folders a container
+ * had to be let into, and with no container the machine's own PATH answers. Scope and level are kept apart here the same way
  * they are kept apart everywhere else: granting a path never changes a level.
  *
  * Trust comes first because it is the precondition the other three sit
@@ -49,14 +51,12 @@ export function EnvironmentsPane() {
           projects={view.projects}
           projectId={view.projectId}
           scope={view.scope}
-          presets={view.presets}
           lastError={environments.lastError}
           refreshing={environments.refreshing}
           onRefresh={() => void environments.refresh()}
           onSelectProject={(id) => void environments.selectProject(id)}
           onSetLevel={(id, level) => void environments.setLevel(id, level)}
           onSetTrust={(root, trusted) => void environments.setTrust(root, trusted)}
-          onGrantPreset={(id, presetId, path, mode) => void environments.grantPreset(id, presetId, path, mode)}
           onRevoke={(id, path) => void environments.revoke(id, path)}
           onGrantCustom={(id, path, mode) => void environments.grantCustom(id, path, mode)}
         />
@@ -69,28 +69,24 @@ function Body({
   projects,
   projectId,
   scope,
-  presets,
   lastError,
   refreshing,
   onRefresh,
   onSelectProject,
   onSetLevel,
   onSetTrust,
-  onGrantPreset,
   onRevoke,
   onGrantCustom,
 }: {
   projects: readonly { readonly id: string; readonly name: string }[]
   projectId: string | null
   scope: { readonly project: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly machineWide: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly level: SandboxLevel; readonly trust: readonly FolderTrust[] }
-  presets: readonly { readonly id: string; readonly title: string; readonly description: string; readonly paths: readonly { readonly path: string; readonly mode: 'read' | 'write' }[] }[]
   lastError: string | null
   refreshing: boolean
   onRefresh: () => void
   onSelectProject: (id: string | null) => void
   onSetLevel: (id: string, level: SandboxLevel) => void
   onSetTrust: (root: string, trusted: boolean) => void
-  onGrantPreset: (id: string, presetId: string, path: string, mode: 'read' | 'write') => void
   onRevoke: (id: string, path: string) => void
   onGrantCustom: (id: string, path: string, mode: 'read' | 'write') => void
 }) {
@@ -104,39 +100,6 @@ function Body({
   // the machine there is nothing to choose: grants can only be machine-wide.
   const [grantScope, setGrantScope] = useState<'project' | 'everywhere'>('project')
   const grantEverywhere = projectId === null || grantScope === 'everywhere'
-
-  const covers = (rows: readonly { readonly path: string }[], path: string): boolean =>
-    rows.some((row) => row.path.toLowerCase() === path.toLowerCase())
-
-  const grantedHere = (path: string): boolean =>
-    projectId !== null && covers(scope.project, path)
-  const grantedEverywhere = (path: string): boolean => covers(scope.machineWide, path)
-
-  const revokeCovering = (path: string): void => {
-    // The label says where a path is granted; the click takes up exactly
-    // what it named, wherever the covering rows are.
-    if (projectId !== null && grantedHere(path)) onRevoke(projectId, path)
-    if (grantedEverywhere(path)) onRevoke('', path)
-  }
-
-  const presetButtonLabel = (path: string): string => {
-    const here = grantedHere(path)
-    const wide = grantedEverywhere(path)
-    if (here && wide) return 'Granted here and everywhere (revoke)'
-    if (here) return 'Granted for this project (revoke)'
-    if (wide) return 'Granted everywhere (revoke)'
-    return grantEverywhere ? 'Grant everywhere' : 'Grant for this project'
-  }
-
-  const pressPresetButton = (presetId: string, path: string, mode: 'read' | 'write'): void => {
-    if (grantedHere(path) || grantedEverywhere(path)) {
-      revokeCovering(path)
-      return
-    }
-    // `projectId ?? ''` only ever falls through when the grant is
-    // machine-wide by construction, where the id is the empty string anyway.
-    onGrantPreset(grantEverywhere ? '' : (projectId ?? ''), presetId, path, mode)
-  }
 
   return (
     <div>
@@ -253,39 +216,6 @@ function Body({
       {lastError === null ? null : (
         <StateNote title="The harness refused that change" detail={lastError} />
       )}
-
-      <div className="py-3.5">
-        <p className="text-ui text-foreground">Detected toolchains</p>
-        <p className="mt-0.5 text-caption text-muted-foreground">
-          Only what is actually on this machine, with the path found. A preset that is not detected is not shown. Grant one to the scope chosen above, or machine-wide when no project is selected.
-        </p>
-        {presets.length === 0 ? (
-          <p className="mt-2 text-caption text-muted-foreground">
-            None of the eight toolchains were found. We look for Git, Rust, Node caches, Python, Java, Android and Flutter, Go, and .NET.
-          </p>
-        ) : null}
-        {presets.map((preset) => (
-          <div key={preset.id} className="mt-3 rounded-md border p-3">
-            <p className="text-ui text-foreground">{preset.title}</p>
-            <p className="text-caption text-muted-foreground">{preset.description}</p>
-            {preset.paths.map((entry) => (
-              <div key={entry.path} className="mt-2 flex items-start justify-between gap-6">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-caption text-foreground">{entry.path}</p>
-                  <p className="text-caption text-muted-foreground">{entry.mode}</p>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => pressPresetButton(preset.id, entry.path, entry.mode)}
-                >
-                  {presetButtonLabel(entry.path)}
-                </Button>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
 
       <div className="py-3.5">
         <p className="text-ui text-foreground">Everything granted, and where it came from</p>

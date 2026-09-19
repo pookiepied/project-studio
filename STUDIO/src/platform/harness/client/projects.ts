@@ -1,11 +1,9 @@
 import {
-  parseDetectedPresets,
   parseFolderListing,
   parseFolderTrust,
   parseProjectRecord,
   parseProjectRecords,
   parseSandboxScopeInfo,
-  type DetectedPreset,
   type FolderListing,
   type FolderTrust,
   type ProjectCreateDraft,
@@ -57,12 +55,9 @@ export interface ProjectClient {
     readonly path: string
     readonly mode: SandboxScopeMode
     readonly source?: SandboxScopeSource
-    readonly presetId?: string
   }): Promise<HarnessResult<void>>
   /** Takes one grant back. */
   revokeScope(projectId: string, path: string): Promise<HarnessResult<void>>
-  /** The toolchains actually on this machine, with the paths found. */
-  listPresets(): Promise<HarnessResult<readonly DetectedPreset[]>>
   /**
    * One directory of the PC, listed by the harness: the folder picker a
    * browser tab needs, since the file system being chosen is the PC's, not
@@ -157,7 +152,6 @@ export function projectClient({ json, empty }: Requester): ProjectClient {
         path: input.path,
         mode: input.mode,
         ...(input.source === undefined ? {} : { source: input.source }),
-        ...(input.presetId === undefined ? {} : { presetId: input.presetId }),
       })
     },
 
@@ -166,10 +160,6 @@ export function projectClient({ json, empty }: Requester): ProjectClient {
         'DELETE',
         `${SANDBOX_PATH}/scope?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(path)}`,
       )
-    },
-
-    listPresets() {
-      return json('GET', `${SANDBOX_PATH}/presets`, undefined, parseDetectedPresets)
     },
 
     browseFolders(path) {

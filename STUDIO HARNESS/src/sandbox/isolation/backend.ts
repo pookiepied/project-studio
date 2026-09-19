@@ -6,10 +6,10 @@ import type { SandboxPolicy } from "../policy.js";
  * What a way of containing a child has to be able to do, and how the harness
  * decides which one it has.
  *
- * Deliberately narrow, and deliberately free of any platform name. The two
- * implementations behind this interface are a Windows AppContainer launcher we
- * build and a Linux `bwrap` the OS supplies; neither is named here, and a third
- * one would need no change to this file.
+ * Deliberately narrow, and deliberately free of any platform name. The one
+ * implementation behind this interface today is the Linux `bwrap` the OS
+ * supplies; a Windows AppContainer launcher stood beside it until ADR 0057.
+ * Neither is named here, and another one would need no change to this file.
  */
 
 /** A command as it would run with no containment at all. */
@@ -98,10 +98,9 @@ export interface IsolationBackend {
    * Whether this host can use it right now. Measured, never assumed.
    *
    * A **probe**, not a declaration: on Linux the backend is `bwrap`, an
-   * external binary that may simply not be installed, and on Windows the
-   * launcher has to be present and the OS has to let an unelevated process
-   * create a profile. A backend that claims support it cannot deliver is worse
-   * than no backend at all.
+   * external binary that may simply not be installed, and whose kernel may
+   * refuse it a user namespace even when it is. A backend that claims
+   * support it cannot deliver is worse than no backend at all.
    */
   available(): boolean;
   /**
@@ -126,10 +125,11 @@ export interface IsolationBackend {
    * machine for this policy.
    *
    * Separate from `contain` because the two have genuinely different
-   * lifetimes: containment is per call and this is per workspace. It exists
-   * because the Windows backend writes permission entries into the user's own
-   * project directory, and a feature that adds to a security descriptor
-   * without ever removing anything is a feature that quietly grows.
+   * lifetimes: containment is per call and this is per workspace. It was
+   * written for the Windows backend, which put permission entries into the
+   * user's own project directory and owed them back; `bwrap` leaves nothing
+   * behind and answers with a no-op. Kept on the seam so a future backend
+   * that writes anything to the machine has a place to undo it.
    */
   release(policy: SandboxPolicy): Promise<void>;
 }

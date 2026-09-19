@@ -1,5 +1,5 @@
 /**
- * The sandbox's scope: levels, rows, folder trust, detected presets, and the
+ * The sandbox's scope: levels, rows, folder trust, and the
  * folder listing the picker browses.
  */
 
@@ -59,18 +59,6 @@ export interface SandboxScopeInfo {
   readonly trust: readonly FolderTrust[]
 }
 
-export interface DetectedPresetPath {
-  readonly path: string
-  readonly mode: SandboxScopeMode
-}
-
-export interface DetectedPreset {
-  readonly id: string
-  readonly title: string
-  readonly description: string
-  readonly paths: readonly DetectedPresetPath[]
-}
-
 export function nullablePresetId(value: unknown): { ok: true; value: string | null } | { ok: false } {
   if (value === null) return { ok: true, value: null }
   const parsed = text(value)
@@ -108,26 +96,6 @@ export function parseSandboxScopeInfo(value: unknown): SandboxScopeInfo | null {
   const trust = listOf(parseFolderTrust, value['trust'])
   if (project === null || machineWide === null || level === null || trust === null) return null
   return { project, machineWide, level, trust }
-}
-
-export function parseDetectedPreset(value: unknown): DetectedPreset | null {
-  if (!isRecord(value)) return null
-  const id = text(value['id'])
-  const title = text(value['title'])
-  const description = typeof value['description'] === 'string' ? value['description'] : null
-  const paths = listOf((entry: unknown) => {
-    if (!isRecord(entry)) return null
-    const path = text(entry['path'])
-    const mode = oneOf(SANDBOX_SCOPE_MODES, entry['mode'])
-    if (path === null || mode === null) return null
-    return { path, mode }
-  }, value['paths'])
-  if (id === null || title === null || description === null || paths === null) return null
-  return { id, title, description, paths }
-}
-
-export function parseDetectedPresets(value: unknown): readonly DetectedPreset[] | null {
-  return listOf(parseDetectedPreset, value)
 }
 
 /*

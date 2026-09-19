@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   createHarnessClient,
   resolveHarnessAddress,
-  type DetectedPreset,
   type HarnessClient,
   type HarnessFailure,
   type ProjectRecord,
@@ -18,7 +17,6 @@ export type EnvironmentsView =
       readonly projects: readonly ProjectRecord[]
       readonly projectId: string | null
       readonly scope: SandboxScopeInfo
-      readonly presets: readonly DetectedPreset[]
     }
   | { readonly status: 'failed'; readonly error: HarnessFailure }
 
@@ -36,12 +34,6 @@ export interface Environments {
    * repository share the one answer and this reload shows it in both.
    */
   setTrust: (root: string, trusted: boolean) => Promise<HarnessFailure | null>
-  grantPreset: (
-    projectId: string,
-    presetId: string,
-    path: string,
-    mode: 'read' | 'write',
-  ) => Promise<HarnessFailure | null>
   grantCustom: (
     projectId: string,
     path: string,
@@ -83,10 +75,9 @@ export function useEnvironments(): Environments {
     if (!background) setView({ status: 'loading' })
     else setRefreshing(true)
 
-    const [projectsResult, scopeResult, presetsResult] = await Promise.all([
+    const [projectsResult, scopeResult] = await Promise.all([
       handle.listProjects(),
       handle.getScope(selected ?? undefined),
-      handle.listPresets(),
     ])
     if (!live.current) return
     setRefreshing(false)
@@ -99,10 +90,6 @@ export function useEnvironments(): Environments {
       setView({ status: 'failed', error: scopeResult.error })
       return
     }
-    if (!presetsResult.ok) {
-      setView({ status: 'failed', error: presetsResult.error })
-      return
-    }
     const projects = projectsResult.value
     const next = selected ?? projects[0]?.id ?? null
     projectId.current = next
@@ -113,10 +100,10 @@ export function useEnvironments(): Environments {
         setView({ status: 'failed', error: rescoped.error })
         return
       }
-      setView({ status: 'ready', projects, projectId: next, scope: rescoped.value, presets: presetsResult.value })
+      setView({ status: 'ready', projects, projectId: next, scope: rescoped.value })
       return
     }
-    setView({ status: 'ready', projects, projectId: next, scope: scopeResult.value, presets: presetsResult.value })
+    setView({ status: 'ready', projects, projectId: next, scope: scopeResult.value })
   }, [connect])
 
   useEffect(() => {
@@ -158,8 +145,6 @@ export function useEnvironments(): Environments {
     selectProject,
     setLevel: (id, level) => mutate((handle) => handle.setSandboxLevel(id, level)),
     setTrust: (root, trusted) => mutate((handle) => handle.setFolderTrust(root, trusted)),
-    grantPreset: (id, presetId, path, mode) =>
-      mutate((handle) => handle.grantScope({ projectId: id, path, mode, source: 'preset', presetId })),
     grantCustom: (id, path, mode) =>
       mutate((handle) => handle.grantScope({ projectId: id, path, mode, source: 'custom' })),
     revoke: (id, path) => mutate((handle) => handle.revokeScope(id, path)),

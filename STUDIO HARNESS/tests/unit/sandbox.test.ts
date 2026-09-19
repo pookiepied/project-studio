@@ -11,6 +11,7 @@ import type {
 } from "../../src/contracts/capabilities.js";
 import { CAN_CONTAIN } from "../helpers/contained.js";
 import { SandboxError } from "../../src/sandbox/errors.js";
+import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { isInsideRoot } from "../../src/sandbox/paths.js";
 import {
@@ -325,12 +326,18 @@ describe("isolation is claimed honestly", () => {
     // and decided by measured support. Written this way rather than gated with
     // `itContained`, because "what happens when the host cannot contain" is
     // precisely what this test is about.
+    //
+    // Three states, not two, since ADR 0057. A host with a backend that
+    // works admits; a host with a backend that does not work refuses, because
+    // a registered backend enforces; a host with no backend at all - Windows
+    // and macOS - admits, because there the gate is the boundary and nothing
+    // was promised that the machine cannot keep.
     const permissive = new LocalSandbox(
       createSandboxPolicy({ workspaceRoot: workspace, allowExec: true }),
     );
     const attempt = () => permissive.assertSupports(descriptor(["execute"]));
 
-    if (CAN_CONTAIN) expect(attempt).not.toThrow();
+    if (CAN_CONTAIN || !hostIsolation().enforcing) expect(attempt).not.toThrow();
     else expect(attempt).toThrow(SandboxError);
   });
 

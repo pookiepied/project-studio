@@ -30,7 +30,6 @@ const environments = vi.hoisted(() => {
     refresh: vi.fn(async () => {}),
     selectProject: vi.fn(async (_id: string | null) => {}),
     setLevel: vi.fn(async () => null),
-    grantPreset: vi.fn(async () => null),
     grantCustom: vi.fn(async () => null),
     revoke: vi.fn(async () => null),
     setTrust: vi.fn(async () => null),
@@ -57,8 +56,8 @@ function scopeRow(path: string, projectId: string): SandboxScopeRow {
     projectId,
     path,
     mode: 'read',
-    source: 'preset',
-    presetId: 'git',
+    source: 'custom',
+    presetId: null,
     grantedAt: 1_000,
   }
 }
@@ -87,14 +86,6 @@ function ready(scope: {
       level: 'contained',
       trust: scope.trust ?? [],
     },
-    presets: [
-      {
-        id: 'git',
-        title: 'Git',
-        description: 'The Git installation.',
-        paths: [{ path: GIT, mode: 'read' }],
-      },
-    ],
   }
 }
 
@@ -104,14 +95,6 @@ function noProjects(): void {
     projects: [],
     projectId: null,
     scope: { project: [], machineWide: [], level: 'contained', trust: [] },
-    presets: [
-      {
-        id: 'git',
-        title: 'Git',
-        description: 'The Git installation.',
-        paths: [{ path: GIT, mode: 'read' }],
-      },
-    ],
   }
 }
 
@@ -120,9 +103,9 @@ describe('EnvironmentsPane', () => {
     noProjects()
     render(<EnvironmentsPane />)
 
-    // The preset path and the custom path are both grantable, and the only
-    // scope there is to grant is machine-wide.
-    expect(screen.getAllByRole('button', { name: 'Grant everywhere' }).length).toBeGreaterThan(0)
+    // The custom path is grantable, and the only scope there is to grant is
+    // machine-wide.
+    expect(screen.getByRole('button', { name: 'Grant everywhere' })).not.toBeNull()
     expect(screen.getByLabelText('Absolute path')).not.toBeNull()
     expect(screen.getByText('No project selected')).not.toBeNull()
     // No project means no level to choose.
@@ -131,46 +114,19 @@ describe('EnvironmentsPane', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Grants below apply to' })).toBeNull()
   })
 
-  it('grants a preset machine-wide when no project is selected', async () => {
-    noProjects()
-    render(<EnvironmentsPane />)
-
-    // Two machine-wide grant buttons are on screen (the preset's and the
-    // custom path's); the first is the preset's.
-    const [presetGrant] = screen.getAllByRole('button', { name: 'Grant everywhere' })
-    if (presetGrant === undefined) throw new Error('No machine-wide grant button.')
-    fireEvent.click(presetGrant)
-    expect(environments.grantPreset).toHaveBeenCalledWith('', 'git', GIT, 'read')
-  })
-
   it('names the project as the scope at the moment of the click, and grants there', () => {
     ready({})
     render(<EnvironmentsPane />)
 
-    // The preset path's button: presets render above the custom-path field,
-    // so its grant button is the first with this name.
-    const [presetGrant] = screen.getAllByRole('button', { name: 'Grant for this project' })
-    if (presetGrant === undefined) throw new Error('No project grant button.')
-    fireEvent.click(presetGrant)
-    expect(environments.grantPreset).toHaveBeenCalledWith('prj_a', 'git', GIT, 'read')
-  })
-
-  it('switching the scope to everywhere grants machine-wide instead', () => {
-    ready({})
-    render(<EnvironmentsPane />)
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Everywhere' }))
-    const [presetGrant] = screen.getAllByRole('button', { name: 'Grant everywhere' })
-    if (presetGrant === undefined) throw new Error('No machine-wide grant button.')
-    fireEvent.click(presetGrant)
-    // The empty project id is the machine-wide scope.
-    expect(environments.grantPreset).toHaveBeenCalledWith('', 'git', GIT, 'read')
+    fireEvent.change(screen.getByLabelText('Absolute path'), {
+      target: { value: 'C:\\Tools\\data' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Grant for this project' }))
+    expect(environments.grantCustom).toHaveBeenCalledWith('prj_a', 'C:\\Tools\\data', 'read')
   })
 
   it('grants a custom path machine-wide from the same choice', () => {
-    // The preset path already carries a machine-wide row, so the only
-    // "Grant everywhere" button on screen is the custom path's.
-    ready({ machineWide: [scopeRow(GIT, '')] })
+    ready({})
     render(<EnvironmentsPane />)
 
     fireEvent.change(screen.getByLabelText('Absolute path'), {
@@ -181,29 +137,21 @@ describe('EnvironmentsPane', () => {
     expect(environments.grantCustom).toHaveBeenCalledWith('', 'C:\\Tools\\data', 'read')
   })
 
-  it('says where a path is granted, and revokes it where it lives', () => {
+  it('lists a machine-wide grant with its source, and removes it machine-wide', () => {
     ready({ machineWide: [scopeRow(GIT, '')] })
     render(<EnvironmentsPane />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Granted everywhere (revoke)' }))
+    expect(screen.getByText('read · custom · everywhere')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(environments.revoke).toHaveBeenCalledWith('', GIT)
   })
 
-  it('revokes a project grant for the project, not machine-wide', () => {
+  it('removes a project grant for the project, not machine-wide', () => {
     ready({ project: [scopeRow(GIT, 'prj_a')] })
     render(<EnvironmentsPane />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Granted for this project (revoke)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(environments.revoke).toHaveBeenCalledWith('prj_a', GIT)
-  })
-
-  it('says so when a path is granted at both scopes, and takes both up', () => {
-    ready({ project: [scopeRow(GIT, 'prj_a')], machineWide: [scopeRow(GIT, '')] })
-    render(<EnvironmentsPane />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Granted here and everywhere (revoke)' }))
-    expect(environments.revoke).toHaveBeenCalledWith('prj_a', GIT)
-    expect(environments.revoke).toHaveBeenCalledWith('', GIT)
   })
 })
 

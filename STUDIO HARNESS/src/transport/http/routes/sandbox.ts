@@ -8,7 +8,6 @@ import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admissio
 import type { WorkspaceTrustStore } from "../../../permissions/trust.js";
 import type { ProjectStore } from "../../../projects/store.js";
 import { browseFolders } from "../../../sandbox/browse.js";
-import { detectPresets } from "../../../sandbox/presets.js";
 import type { SandboxScopeStore } from "../../../sandbox/scope-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
 
@@ -180,14 +179,6 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
       const removed = scopes.revoke(projectId, path);
       if (!removed) return context.json({ error: "No such scope." }, 404);
       return context.body(null, 204);
-    } catch (error) {
-      return context.json(failure(error), statusOf(error));
-    }
-  });
-
-  routes.get("/presets", (context) => {
-    try {
-      return context.json(detectPresets());
     } catch (error) {
       return context.json(failure(error), statusOf(error));
     }

@@ -342,11 +342,11 @@ export class LocalSandbox {
   /**
    * Removes what containment left on the user's machine for this workspace.
    *
-   * On Windows that is a permission entry on their project directory and a
-   * profile registered with the OS. Neither is large and neither is hidden, but
-   * a feature that only ever adds to a security descriptor is a feature that
-   * grows without bound, so the removal exists and is reachable — `pnpm
-   * sandbox:release` in `sandbox/cli.ts` is its delivery path.
+   * Nothing, for the backend that remains: a namespace evaporates with the
+   * process it contained. The hook stays on the seam because the Windows
+   * backend it was written for (ADR 0041) did leave permission entries
+   * behind, and a future backend that writes anything to the machine owes the
+   * same undo.
    */
   async releaseIsolation(): Promise<void> {
     await this.#isolationSupport.backend?.release(this.#policy);
