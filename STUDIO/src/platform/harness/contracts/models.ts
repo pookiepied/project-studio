@@ -312,3 +312,42 @@ export function parseProviderIcon(value: unknown): ProviderIcon | null {
   if (svg === null || svg.length === 0) return null
   return { svg }
 }
+
+/**
+ * `GET /api/providers/model-facts?modelId=` — what the catalog knows about a
+ * slug typed by hand: the numbers most hosts state for it and whether it
+ * reasons and reads images. `found: false` is the ordinary answer for a
+ * model nobody has listed; the form then asks the person instead.
+ */
+export type ModelFacts =
+  | { readonly found: false }
+  | {
+      readonly found: true
+      readonly entries: number
+      readonly contextWindow: number | null
+      readonly maxOutputTokens: number | null
+      readonly reasoning: boolean
+      readonly reasoningLevels: readonly ReasoningLevel[]
+      readonly vision: boolean
+    }
+
+export function parseModelFacts(value: unknown): ModelFacts | null {
+  if (!isRecord(value)) return null
+  if (value['found'] === false) return { found: false }
+  if (value['found'] !== true) return null
+  const entries = value['entries']
+  if (typeof entries !== 'number') return null
+  const reasoningLevels = parseReasoningLevels(value['reasoningLevels'])
+  if (reasoningLevels === null) return null
+  const positive = (field: unknown): number | null =>
+    typeof field === 'number' && field > 0 ? field : null
+  return {
+    found: true,
+    entries,
+    contextWindow: positive(value['contextWindow']),
+    maxOutputTokens: positive(value['maxOutputTokens']),
+    reasoning: value['reasoning'] === true,
+    reasoningLevels,
+    vision: value['vision'] === true,
+  }
+}

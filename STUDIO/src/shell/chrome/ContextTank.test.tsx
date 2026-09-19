@@ -21,11 +21,14 @@ import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 afterEach(cleanup)
 
 function tank(
-  measured: { fresh: number; cached: number; reply: number } | null,
+  measured: { fresh: number; cached: number; reply: number; estimated?: boolean } | null,
   pending: number,
   window: number | 'unknown' | null = 200_000,
 ) {
-  const breakdown = contextBreakdown({ measured, pending }, window)
+  const breakdown = contextBreakdown(
+    { measured: measured === null ? null : { estimated: false, ...measured }, pending },
+    window,
+  )
   render(
     <>
       <ContextTank breakdown={breakdown} running={false} />

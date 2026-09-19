@@ -1,8 +1,11 @@
 # Compaction — the brief
 
-**Status:** Research and design · **Opened:** 2026-09-19
-**Decision proposed, not yet taken.** Nothing here is built. §8 is the order
-it would be built in once the open choices in §7 are settled.
+**Status:** Built · **Opened:** 2026-09-19 · **Landed:** 2026-09-19
+Steps 1 to 4 of §8 are in. The open choices of §7 were taken as
+recommended: reserve = max(20k, 15%), cool-down 30% and one measured turn,
+the summariser-model setting deferred (step 5), the patches landed here
+first (upstream still to do). What landed, and where it differs from the
+plan, is in §9 at the end.
 
 This is the captured version of a long spoken brief, checked against the
 code and against Flue's own source rather than transcribed. Where the brief
@@ -385,3 +388,43 @@ of work. Recorded here so it is not lost; not scheduled here.
    that mechanism is designed.
 5. **Summariser model setting**, if not folded into step 3.
 6. Measure with C-01's fixture; revisit §4.1 with numbers.
+
+## 9. What landed
+
+- **Window facts.** `GET /api/providers/model-facts?modelId=` reads Pi's
+  catalog (which is generated from models.dev, so one source covers both);
+  the Add Model form pre-fills the window, output cap, reasoning and vision
+  from it, says how many entries it rests on, and states under an empty
+  window what that costs. The model menu warns when the conversation is
+  larger than the chosen model's window, and says the compaction rule for
+  a model with none.
+- **Policy.** `compaction-policy.ts` hands Flue the reserve of §4.2 (with
+  Flue's own two guards kept: never above the model's output cap, a third
+  of a small window) and Studio's prompts; `context/compaction-prompt.ts`
+  is §4.6 - Overview, Reminders, the not-work rule, and the summariser at
+  low reasoning because of the budget risk noted in §4.2.
+- **Events and the meter.** The tracker ignores the summariser's own turns
+  and writes the provisional row of §4.9 after a compaction, marked
+  `estimated`; the meter draws it with a tilde and the line where the
+  harness compacts. The transcript shows a `compaction` marker where the
+  cut happened, with the summary behind a disclosure; the messages above
+  it stay.
+- **Three runtime patches** (hunks 6-8 in `pnpm-workspace.yaml`): the
+  snapshot carries the compaction records; a manual-compaction door for an
+  agent instance, published on `globalThis`; `compaction.prompts`.
+- **Manual compaction.** `POST /api/conversations/:id/compact` under the
+  cool-down of §4.7, and `GET .../context` carries the readiness so
+  "Compact now" in the model menu is disabled with the reason.
+- **Commands.** `/api/commands` and a Commands page in Settings: the
+  person's own commands are one Markdown file each in `~/.studio/commands`,
+  in Claude Code's format, written by hand or in the editor; Studio ships
+  `/review` and `/explain`; `/compact` is the built-in action. The composer
+  offers the list as `/` is typed and expands a prompt command on the
+  harness before sending.
+
+Not built, and why: the live "Compacting..." row for an *automatic*
+compaction (it runs inside the turn, which already shows as working; the
+event does not reach the webview through the conversation stream); the
+summariser-model setting (§4.4, step 5); the upstream pull requests. The
+expanded prompt of a command is what the transcript shows, because it is
+what the model was given.

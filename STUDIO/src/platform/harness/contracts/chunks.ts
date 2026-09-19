@@ -216,6 +216,44 @@ export interface ConversationSnapshotFacts {
   readonly offset: string | null
   readonly messages: readonly ConversationMessageFacts[]
   readonly settlements: readonly SettlementFacts[]
+  /**
+   * Where the conversation was shortened, each after the message it
+   * followed. Studio's own patch on the runtime projects these; a snapshot
+   * from an unpatched runtime carries none, which reads as no compactions.
+   */
+  readonly compactions: readonly CompactionFacts[]
+}
+
+/**
+ * One compaction record: the summary the model now reads instead of
+ * everything before `firstKeptEntryId`, and where in the projected
+ * conversation it happened.
+ */
+export interface CompactionFacts {
+  readonly id: string
+  readonly timestamp: string | null
+  /** The projected message this record follows; null before the first. */
+  readonly afterMessageId: string | null
+  readonly firstKeptEntryId: string
+  readonly summary: string
+  /** What the window held when the compaction ran. */
+  readonly tokensBefore: number
+}
+
+function readCompaction(value: unknown): CompactionFacts | null {
+  if (!isRecord(value)) return null
+  const id = text(value['id'])
+  const firstKeptEntryId = text(value['firstKeptEntryId'])
+  const summary = text(value['summary'])
+  if (id === null || firstKeptEntryId === null || summary === null) return null
+  return {
+    id,
+    timestamp: text(value['timestamp']),
+    afterMessageId: text(value['afterMessageId']),
+    firstKeptEntryId,
+    summary,
+    tokensBefore: finiteNumber(value['tokensBefore']) ?? 0,
+  }
 }
 
 /**
@@ -401,6 +439,15 @@ export function readConversationSnapshot(value: unknown): ConversationSnapshotFa
     if (settlement === null) return null
     settlements.push(settlement)
   }
+  // Absent from an unpatched runtime; a malformed record is dropped rather
+  // than failing the whole snapshot, because a marker is not the transcript.
+  const compactions: CompactionFacts[] = []
+  if (Array.isArray(value['compactions'])) {
+    for (const item of value['compactions']) {
+      const compaction = readCompaction(item)
+      if (compaction !== null) compactions.push(compaction)
+    }
+  }
 
   return {
     version: version ?? 0,
@@ -408,6 +455,7 @@ export function readConversationSnapshot(value: unknown): ConversationSnapshotFa
     offset: text(value['offset']),
     messages,
     settlements,
+    compactions,
   }
 }
 

@@ -1173,6 +1173,22 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 27,
+    name: "context_usage_estimated",
+    up(db) {
+      // A compaction empties the window and no request has measured the
+      // result yet. Until one does, the tracker writes a provisional row -
+      // the summary plus the kept tail plus the fixed overhead - so the meter
+      // stops reading "full" about a conversation that was just shortened.
+      // The flag is what lets the meter call that row an estimate; the next
+      // measured turn writes over it with the flag cleared.
+      db.exec(`
+        ALTER TABLE conversation_context_usage
+          ADD COLUMN estimated INTEGER NOT NULL DEFAULT 0;
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

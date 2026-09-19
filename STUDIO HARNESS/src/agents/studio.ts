@@ -11,6 +11,7 @@ import {
   conversationWorkspaceDirectory,
 } from "../platform/paths.js";
 import { environmentBlock, environmentFacts } from "../context/environment.js";
+import { compactionConfigFor } from "../conversations/compaction-policy.js";
 import { STUDIO_SYSTEM_PROMPT } from "../context/system-prompt.js";
 import {
   DEFAULT_MODEL_PROVIDER,
@@ -122,8 +123,14 @@ export function Studio({ id }: AgentProps) {
   const runtime = getStudioRuntime();
   const settings = runtime.conversationTurnSettings(id);
   const supported = runtime.supportedReasoningLevels(settings.modelId);
+  // The compaction policy rides the same hook: Flue compacts the conversation
+  // when the provider's reported usage passes `window - reserve`, and the
+  // reserve is Studio's rule (compaction-policy.ts), as are the summariser's
+  // prompts (context/compaction-prompt.ts). A model with no known window
+  // gets the prompts and no reserve - the overflow path is what remains.
   useModel(studioModelSpecifier(settings), {
     thinkingLevel: studioThinkingLevel(settings, supported),
+    compaction: compactionConfigFor(runtime.modelLimits?.(settings.modelId)),
   });
   // The project's folders, in the order the person arranged them. The first
   // is where a turn stands; the rest reach the model as roots beside it. An

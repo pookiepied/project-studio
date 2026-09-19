@@ -33,7 +33,11 @@ const workspace = {
 }
 const openChat = vi.fn()
 
-vi.mock('@/stores/workspace', () => ({ useWorkspace: () => workspace }))
+vi.mock('@/stores/workspace', () => ({
+  useWorkspace: () => workspace,
+  // The composer's slash reads the compacting set; nothing here compacts.
+  useLiveWork: () => ({ compacting: new Set<string>(), markCompacting: vi.fn(), bumpContext: vi.fn() }),
+}))
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ openChat }) }))
 
 // jsdom has no ResizeObserver; the composer's field measures itself with one.

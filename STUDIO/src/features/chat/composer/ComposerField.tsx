@@ -96,6 +96,7 @@ export function ComposerField({
   inset,
   placeholder,
   handleRef,
+  onKeyDownCapture,
 }: {
   value: string
   onChange: (value: string) => void
@@ -118,6 +119,12 @@ export function ComposerField({
   inset: { readonly left: number; readonly right: number }
   placeholder: string
   handleRef?: Ref<ComposerFieldHandle>
+  /**
+   * First look at a key, for the slash picker: true means the key was the
+   * picker's (an arrow moving its row, Enter taking one) and the field does
+   * nothing further with it. Absent or false, the key is the field's.
+   */
+  onKeyDownCapture?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
 
@@ -230,6 +237,10 @@ export function ComposerField({
       onChange={(event) => onChange(event.target.value)}
       onPaste={onPaste}
       onKeyDown={(event) => {
+        if (onKeyDownCapture?.(event) === true) {
+          event.preventDefault()
+          return
+        }
         if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
         event.preventDefault()
         onSubmit()

@@ -6,6 +6,7 @@ import {
   type HarnessFailure,
   type HarnessResult,
   type LibraryProvider,
+  type ModelFacts,
   type ProbeResult,
   type ProviderConnection,
   type ProviderConnectionDraft,
@@ -71,6 +72,8 @@ export interface Providers {
     slot: CapabilitySlot,
     ref: ModelReferenceSlot | undefined,
   ) => Promise<HarnessResult<void>>
+  /** What the catalog knows about a slug; a read, so nothing is re-read after. */
+  lookupModelFacts: (modelId: string) => Promise<HarnessResult<ModelFacts>>
   addManualModel: (
     connectionId: string,
     model: ManualModelInput,
@@ -225,6 +228,12 @@ export function useProviders(connect: HarnessConnect = connectToHarness): Provid
     [mutate],
   )
 
+  const lookupModelFacts = useCallback(async (modelId: string) => {
+    const target = client.current
+    if (target === null) return { ok: false, error: NO_HARNESS } as const
+    return target.lookupModelFacts(modelId)
+  }, [])
+
   const addManualModel = useCallback(
     (connectionId: string, model: ManualModelInput) =>
       mutate((target) => target.addManualModel(connectionId, model)),
@@ -282,6 +291,7 @@ export function useProviders(connect: HarnessConnect = connectToHarness): Provid
     remove,
     probe,
     setDefault,
+    lookupModelFacts,
     addManualModel,
     setModelOverride,
     removeModel,

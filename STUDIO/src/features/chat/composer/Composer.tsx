@@ -18,6 +18,8 @@ import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/draf
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { ImproveButton } from '@/features/chat/composer/ImproveButton'
 import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
+import { SlashSuggestions } from '@/features/chat/composer/SlashSuggestions'
+import { useSlashCommands } from '@/features/chat/composer/useSlashCommands'
 import { DictationBar, TextLanding, landingDuration, useDictation } from '@/features/voice'
 import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
 import type { TurnImageWire } from '@/platform/harness'
@@ -277,6 +279,44 @@ export function Composer({
   const focus = useCallback(() => field.current?.focus(), [])
   useTypeToFocus(true, focus)
 
+  // The slash: the picker while a name is typed, and what a command does
+  // when sent. A refused action - "/compact" under the cool-down - leaves
+  // its sentence here, in the place the picker's refusals take.
+  const slash = useSlashCommands(text, conversationId)
+  const [commandNote, setCommandNote] = useState<string | null>(null)
+  const pickSuggestion = (id: string) => {
+    setText(`/${id} `)
+    setCommandNote(null)
+  }
+  const slashKey = (event: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    const rows = slash.suggestions
+    if (rows === null || rows.length === 0 || event.nativeEvent.isComposing) return false
+    if (event.key === 'ArrowDown') {
+      slash.setSelected((slash.selected + 1) % rows.length)
+      return true
+    }
+    if (event.key === 'ArrowUp') {
+      slash.setSelected((slash.selected - 1 + rows.length) % rows.length)
+      return true
+    }
+    if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey)) {
+      const picked = rows[slash.selected]
+      if (picked === undefined) return false
+      // A command that takes nothing is run on Enter, as it would be once
+      // picked; Tab only completes the name either way.
+      if (event.key === 'Enter' && picked.argumentHint === '' && text.trim() === `/${picked.id}`) {
+        return false
+      }
+      pickSuggestion(picked.id)
+      return true
+    }
+    if (event.key === 'Escape') {
+      setText(text.trimEnd() + ' ')
+      return true
+    }
+    return false
+  }
+
   // OR, never a fallback. The page passes a boolean for the whole POST round
   // trip — `false`, because the turn has not started streaming yet — so
   // `turnRunning` alone would leave the field open for the length of the
@@ -328,8 +368,28 @@ export function Composer({
     const outgoing = text
     const carried = images
     setSending(true)
-    void onSend(outgoing, carried).then(
+    setCommandNote(null)
+    // Words go straight out. A command is resolved first: an action runs
+    // here and the field clears; a prompt command sends its expansion in
+    // place of the words.
+    const dispatched = !slash.isCommand(outgoing)
+      ? onSend(outgoing, carried)
+      : slash.resolve(outgoing).then((outcome) => {
+          if (outcome.kind === 'done') {
+            setSending(false)
+            setCommandNote(outcome.note)
+            if (textRef.current === outgoing) {
+              setText('')
+              clearDraft(conversationId)
+              setMultiline(false)
+            }
+            return null
+          }
+          return onSend(outcome.kind === 'prompt' ? outcome.text : outgoing, carried)
+        })
+    void dispatched.then(
       (receipt) => {
+        if (receipt === null) return
         setSending(false)
         // Clear only what the harness actually took, and only if the
         // field still holds exactly that — words typed during the round
@@ -452,6 +512,20 @@ export function Composer({
           pick's honest remainder — a file the rules refused, named where the
           person can still do something about it. */}
       <PendingImages images={images} onRemove={removeImage} />
+      {/* The slash picker, while a name is being typed. */}
+      {slash.suggestions !== null ? (
+        <SlashSuggestions
+          commands={slash.suggestions}
+          selected={slash.selected}
+          onPick={(command) => pickSuggestion(command.id)}
+          onHover={slash.setSelected}
+        />
+      ) : null}
+      {commandNote !== null ? (
+        <p className="mb-2 text-caption text-muted-foreground" role="status">
+          {commandNote}
+        </p>
+      ) : null}
       {/* Improve's one sentence when it could not run - no model, harness
           down. A rare line, in the place the picker's refusals take. */}
       {improveOffer.offer?.note ? (
@@ -591,6 +665,7 @@ export function Composer({
                   value={text}
                   onChange={setText}
                   onSubmit={submit}
+                  onKeyDownCapture={slashKey}
                   onMultilineChange={setMultiline}
                   onPaste={(event) => {
                     const files = Array.from(event.clipboardData.files)

@@ -95,6 +95,9 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     name: 'Agent',
     sections: [
       { id: 'skills', name: 'Skills', icon: Icons.skill },
+      // Under Agent beside skills: a command is a prompt the person keeps,
+      // and what it drives is the agent, not the program.
+      { id: 'commands', name: 'Commands', icon: Icons.command },
       { id: 'hooks', name: 'Hooks', icon: Icons.hook },
     ],
   },

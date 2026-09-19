@@ -62,6 +62,12 @@ export interface MeasuredContext {
   readonly cached: number
   /** What the model produced, reasoning included where a provider bills it so. */
   readonly reply: number
+  /**
+   * The figure is the harness's estimate after a compaction, not a
+   * provider's report: the summary plus the kept tail plus a fixed allowance,
+   * until the next turn measures the shortened conversation.
+   */
+  readonly estimated: boolean
 }
 
 /**
@@ -144,7 +150,7 @@ export function contextReport(
     const reply = measured.output
     if (fresh + cached + reply > 0) {
       return {
-        measured: { fresh, cached, reply },
+        measured: { fresh, cached, reply, estimated: measured.estimated },
         pending: running ? Math.round(charactersSinceLastSend(items) / CHARS_PER_TOKEN) : 0,
       }
     }
@@ -191,12 +197,43 @@ export interface ContextBreakdown {
   readonly free: number
   /** The total as a fraction of the window, clamped to one. */
   readonly used: number
+  /**
+   * Where the harness compacts this conversation, in tokens, or null for a
+   * model with no declared window - which is compacted only when its
+   * provider refuses a request.
+   */
+  readonly compactsAt: number | null
+}
+
+/**
+ * Where the harness compacts, for a model with a window.
+ *
+ * The same rule the harness hands Flue (`compaction-policy.ts` there): a
+ * reserve of 20k or 15% of the window, whichever is larger, never more than
+ * the model can write, and a third of a window too small for that. Stated
+ * here so the meter can draw the line; the harness's copy is the one that
+ * decides, and the two must agree or the line lies.
+ */
+const RESERVE_FLOOR_TOKENS = 20_000
+const RESERVE_SHARE = 0.15
+
+export function compactionPoint(
+  contextWindow: number,
+  maxOutputTokens: number | 'unknown' | null | undefined,
+): number {
+  let reserve = Math.max(RESERVE_FLOOR_TOKENS, Math.floor(contextWindow * RESERVE_SHARE))
+  if (typeof maxOutputTokens === 'number' && maxOutputTokens > 0) {
+    reserve = Math.min(reserve, maxOutputTokens)
+  }
+  if (reserve * 2 >= contextWindow) reserve = Math.max(1024, Math.floor(contextWindow / 3))
+  return contextWindow - reserve
 }
 
 /** The report against one model's window, which is what the ring draws. */
 export function contextBreakdown(
   report: ContextReport,
   contextWindow: number | 'unknown' | null,
+  maxOutputTokens: number | 'unknown' | null = null,
 ): ContextBreakdown {
   const declared = typeof contextWindow === 'number' && contextWindow > 0
   const window = declared ? contextWindow : FALLBACK_WINDOW
@@ -208,6 +245,7 @@ export function contextBreakdown(
     total,
     free: Math.max(0, window - total),
     used: Math.min(1, total / window),
+    compactsAt: declared ? compactionPoint(contextWindow, maxOutputTokens) : null,
   }
 }
 

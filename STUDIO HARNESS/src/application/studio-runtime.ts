@@ -14,6 +14,7 @@ import {
 } from "../contracts/models.js";
 import {
   bootstrappedModelRegistry,
+  bootstrappedModelLimits,
   bootstrappedSupportedReasoningLevels,
 } from "../gateway/language/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
@@ -426,6 +427,17 @@ export interface AgentHost {
    * `runThinkingLevelForChoice` so a stored "default" rests on medium.
    */
   supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
+  /**
+   * The window and output cap of one stored reference, read the same way
+   * and for the same reason: the render feeds them to the compaction policy,
+   * which needs the window to place its threshold. Unknown for a model that
+   * declares none, and the policy then sets no threshold at all. Optional so
+   * a test double that predates compaction still satisfies the host.
+   */
+  modelLimits?(modelId: string | null): {
+    readonly contextWindow: number | "unknown";
+    readonly maxOutputTokens: number | "unknown";
+  };
   /**
    * The extra roots one conversation may reach beyond its workspace.
    *
@@ -898,6 +910,13 @@ export class StudioRuntime implements AgentHost {
 
   supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[] {
     return bootstrappedSupportedReasoningLevels(modelId);
+  }
+
+  modelLimits(modelId: string | null): {
+    readonly contextWindow: number | "unknown";
+    readonly maxOutputTokens: number | "unknown";
+  } {
+    return bootstrappedModelLimits(modelId);
   }
 
   /**

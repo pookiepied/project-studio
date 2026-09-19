@@ -29,6 +29,7 @@ import type {
   ManualModelInput,
 } from "../../../gateway/connections/model-catalog.js";
 import type { ProviderAdministration } from "../../../gateway/connections/management.js";
+import { lookupModelFacts } from "../../../gateway/catalog/model-facts.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -214,6 +215,18 @@ export function createProviderRoutes(
   routes.get("/library", async (context) =>
     context.json(await providers.listLibrary()),
   );
+
+  // What the catalog knows about a slug, for the Add Model form to pre-fill.
+  // Pure over the installed catalog, so it needs nothing from the service;
+  // `found: false` is the ordinary answer for a model nobody has listed.
+  routes.get("/model-facts", (context) => {
+    const modelId = context.req.query("modelId") ?? "";
+    if (modelId.trim() === "") {
+      return context.json(failure(new ProviderConfigurationError("modelId is required.")), 400);
+    }
+    const facts = lookupModelFacts(modelId);
+    return context.json(facts === undefined ? { found: false } : { found: true, ...facts });
+  });
 
   routes.get("/icons/:id", async (context) => {
     try {

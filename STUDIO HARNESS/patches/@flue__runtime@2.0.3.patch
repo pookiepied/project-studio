@@ -1,8 +1,131 @@
+diff --git a/dist/builtin-providers-DW08g5fh.mjs b/dist/builtin-providers-DW08g5fh.mjs
+index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa0089269b89c 100644
+--- a/dist/builtin-providers-DW08g5fh.mjs
++++ b/dist/builtin-providers-DW08g5fh.mjs
+@@ -1,12 +1,12 @@
+ import { f as createCallHandle, r as createCwdSandbox, u as abortErrorFor } from "./sandbox-DAJ0daML.mjs";
+ import { f as getPreparedToolAdapter } from "./result-DfjetCf9.mjs";
+-import { A as SubmissionConflictError, C as SessionNotFoundError, J as createConversationIdentity, N as SubmissionTimeoutError, W as normalizeLogAttributes, X as generateAttemptId, it as generateOwnerId, k as SubmissionAbortedError, ut as isKeyDerivedSubmissionId, y as RuntimeUnavailableError, z as classifyError } from "./errors-CsDcT_C4.mjs";
++import { A as SubmissionConflictError, C as SessionNotFoundError, J as createConversationIdentity, N as SubmissionTimeoutError, S as SessionBusyError, W as normalizeLogAttributes, X as generateAttemptId, it as generateOwnerId, k as SubmissionAbortedError, ut as isKeyDerivedSubmissionId, y as RuntimeUnavailableError, z as classifyError } from "./errors-CsDcT_C4.mjs";
+ import { L as agentStreamPath, dt as createActionScopeName, f as configureFlueRuntime, ft as createSessionStorageKey, g as resetFlueRuntimeForTests, h as getFlueRuntime, l as resolveAgentDurability, o as getRegisteredFlueAgents, pt as createTaskSessionName, s as registerFlueAgents, ut as assertPublicSessionName, vt as createAgentOutputChannel } from "./dispatch-nU3cIlT-.mjs";
+ import { c as setProvider, r as hasProvider, s as resolveModel } from "./providers-B1VyW-aH.mjs";
+ import { t as createHookStateBuffer } from "./use-persistent-state-DUUiJyWP.mjs";
+ import { n as dispatchGlobalEvent, t as createCoordinatorEventEmitter } from "./events-BhCLb2HD.mjs";
+ import { n as createMcpConnectionCache, t as createMcpConnection } from "./mcp-zuSf52GJ.mjs";
+-import { C as renderAgentFunctionWithStructure, D as SUBMISSION_SESSION_NAME, E as SUBMISSION_HARNESS_NAME, R as LEASE_DURATION_MS, S as assertRenderStructureInvariance, T as skillCatalogEntries, _ as submissionSyntheticRequest, a as admitInstanceContact, b as createPublicSession, c as createDispatchAgentSubmissionInput, d as isInstanceContactRejection, f as materializeSubmissionAttachments, g as settleUnclaimableSubmission, h as serializeSubmissionError, l as ensureInstanceIdentity, m as reconcileInterruptedSubmission, o as adoptKeyedSubmissionReplay, p as processSubmission, s as createDirectAgentSubmissionInput, t as InMemoryConversationStreamStore, u as finalizePendingSettlement, v as unreadySubmissionDeadline, w as discoverSessionContext, x as digestInstructions, y as Session } from "./conversation-stream-store-CXwRWonS.mjs";
++import { projectStudioSessionHandler as createAgentSubmissionSessionHandler, C as renderAgentFunctionWithStructure, D as SUBMISSION_SESSION_NAME, E as SUBMISSION_HARNESS_NAME, R as LEASE_DURATION_MS, S as assertRenderStructureInvariance, T as skillCatalogEntries, _ as submissionSyntheticRequest, a as admitInstanceContact, b as createPublicSession, c as createDispatchAgentSubmissionInput, d as isInstanceContactRejection, f as materializeSubmissionAttachments, g as settleUnclaimableSubmission, h as serializeSubmissionError, l as ensureInstanceIdentity, m as reconcileInterruptedSubmission, o as adoptKeyedSubmissionReplay, p as processSubmission, s as createDirectAgentSubmissionInput, t as InMemoryConversationStreamStore, u as finalizePendingSettlement, v as unreadySubmissionDeadline, w as discoverSessionContext, x as digestInstructions, y as Session } from "./conversation-stream-store-CXwRWonS.mjs";
+ import { i as InMemoryAttachmentStore } from "./format-version-Bmc1L_3t.mjs";
+ import { r as ConversationRecordWriter } from "./sql-agent-execution-store-RrAtlpSL.mjs";
+ import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+@@ -698,6 +698,12 @@ function createNodeAgentCoordinator(options) {
+ 	/** Unique identifier for this coordinator instance. Used as the owner
+ 	*  for lease-based submission ownership. */
+ 	const ownerId = generateOwnerId();
++	// [project-studio patch] Instances whose conversation is being compacted
++	// by hand (see compactInstance below). The claim loop leaves their
++	// submissions queued until the compaction has written its record, so a
++	// prompt admitted meanwhile never opens a second session over the same
++	// conversation. Anchor on `compactInstance` and `runClaimPass`.
++	const compactingInstances = /* @__PURE__ */ new Set();
+ 	/** Heartbeat interval handle; started with the claim loop. */
+ 	let heartbeatInterval = null;
+ 	/** Periodic lease-scan wake timer; wakes the claim loop so expired
+@@ -881,6 +887,8 @@ function createNodeAgentCoordinator(options) {
+ 		let progressed = false;
+ 		for (const submission of runnable) {
+ 			if (activeSubmissions.has(submission.submissionId)) continue;
++			// [project-studio patch] Yield to a manual compaction in flight.
++			if (compactingInstances.has(agentStreamPath(submission.input.agent, submission.input.id))) continue;
+ 			const claimed = await submissions.claimSubmission({
+ 				submissionId: submission.submissionId,
+ 				attemptId: generateAttemptId(),
+@@ -1317,6 +1325,69 @@ function createNodeAgentCoordinator(options) {
+ 				activityLease?.release();
+ 			}
+ 		},
++		// [project-studio patch] Compact one agent instance's conversation now.
++		//
++		// The engine's manual path - `session.compact()`, which runs
++		// `runCompaction("manual")` and emits `compaction_start { reason:
++		// "manual" }` then `compaction` - is complete in 2.0.3 but reachable
++		// only from inside a running agent, where it compacts a tool's scratch
++		// session rather than the agent's own. Nothing public reaches the
++		// agent's conversation from outside a submission, so a "/compact" in a
++		// UI had no door. This is that door: the instance's session is opened
++		// exactly as a submission opens it (same render, same durable
++		// conversation, same writer), the compaction runs under the session's
++		// one-operation-at-a-time rule, and the record lands in the same
++		// append-only log a threshold compaction writes to. No submission is
++		// admitted or settled, because nothing was asked of the model on the
++		// person's behalf; the summariser's own turns are observable as
++		// `turn` events with `purpose: "compaction"`, as they are for the
++		// automatic path.
++		//
++		// Refused with `SessionBusyError` while the instance has a submission
++		// queued or running, and while a compaction is already in flight -
++		// "finish or stop the run first" is the whole answer. Rejects when the
++		// summarisation fails or is aborted; resolves as a no-op when there is
++		// nothing to compact, as the engine's own method does. The delivery
++		// handed to the render is a signal of the reserved `compaction` type
++		// with an empty body: it is never recorded, and the reserved name says
++		// what the render is for. Anchor on `createAgentSubmissionSessionHandler`
++		// and `session.compact()`, never on a bundle filename or a line number.
++		async compactInstance(agentName, instanceId) {
++			if (stopping) throw new RuntimeUnavailableError({ state: "draining" });
++			const agent = agents.find((record) => record.name === agentName)?.agent;
++			if (!agent) throw new Error("[flue] compaction target agent \"" + agentName + "\" has no agent definition.");
++			const instanceKey = agentStreamPath(agentName, instanceId);
++			if (compactingInstances.has(instanceKey)) throw new SessionBusyError({
++				session: SUBMISSION_SESSION_NAME,
++				activeOperation: "compact"
++			});
++			const pending = [...await submissions.listRunningSubmissions(), ...await submissions.listRunnableSubmissions()];
++			if (pending.some((submission) => submission.input.agent === agentName && submission.input.id === instanceId)) throw new SessionBusyError({
++				session: SUBMISSION_SESSION_NAME,
++				activeOperation: "prompt"
++			});
++			const activityLease = activityGate?.enter();
++			compactingInstances.add(instanceKey);
++			try {
++				const input = await createDirectAgentSubmissionInput({
++					agent: agentName,
++					id: instanceId,
++					message: {
++						kind: "signal",
++						type: "compaction",
++						body: ""
++					}
++				});
++				const conversationWriter = await getConversationWriter(input);
++				const ctx = makeSubmissionContext(input, conversationWriter)(input.submissionId);
++				await createAgentSubmissionSessionHandler(agent, input, (session) => session.compact())(ctx);
++				await ctx.flushEventCallbacks();
++			} finally {
++				compactingInstances.delete(instanceKey);
++				activityLease?.release();
++				wake();
++			}
++		},
+ 		async abortInstance(agentName, instanceId) {
+ 			const sessionKey = createSessionStorageKey(agentName, instanceId, SUBMISSION_HARNESS_NAME, SUBMISSION_SESSION_NAME);
+ 			const affected = await submissions.requestSessionAbort(sessionKey);
+@@ -1588,6 +1659,8 @@ async function assembleNodeAgentRuntime(options) {
+ 		activityGate,
+ 		createAgentAdmission: (agentName, instanceId) => coordinator.createAdmission(agentName, instanceId),
+ 		abortAgentInstance: (agentName, instanceId) => coordinator.abortInstance(agentName, instanceId),
++		// [project-studio patch] The manual-compaction door, see compactInstance.
++		compactAgentInstance: (agentName, instanceId) => coordinator.compactInstance(agentName, instanceId),
+ 		conversationStreamStore,
+ 		attachmentStore
+ 	};
 diff --git a/dist/conversation-stream-store-CXwRWonS.mjs b/dist/conversation-stream-store-CXwRWonS.mjs
-index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..88fa0cb5937385e6c70989af6d198cb069b3deb2 100644
+index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..102ea0eda7faf33c26fbd96c353532f4c83bbe3a 100644
 --- a/dist/conversation-stream-store-CXwRWonS.mjs
 +++ b/dist/conversation-stream-store-CXwRWonS.mjs
-@@ -426,12 +426,32 @@
+@@ -423,14 +423,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
+ 			parts.push(`- **${agent.name}**${desc}`);
+ 		}
+ 	} else pushSection("## Available Agents", "", "None. No subagents are currently declared, so the `task` tool has no valid `agent` value — do not call it unless an agent is introduced later in the conversation.");
 -	pushSection(`Date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", {
 -		weekday: "short",
 -		year: "numeric",
@@ -41,7 +164,6 @@ index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..88fa0cb5937385e6c70989af6d198cb0
  		if (env.directoryListing && env.directoryListing.length > 0) parts.push("", "Directory structure:", env.directoryListing.join("\n"));
  	}
  	return parts.join("\n");
- }
 @@ -3999,20 +4019,77 @@ var Session = class {
  		}
  	}
@@ -123,8 +245,32 @@ index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..88fa0cb5937385e6c70989af6d198cb0
  			delayMs,
  			error: assistant.errorMessage
  		});
+@@ -4083,6 +4160,8 @@ var Session = class {
+ 				estimatedTokens
+ 			});
+ 			terminalPending = true;
++			// [project-studio patch] The host's prompts ride the config; see assertCompaction.
++			const compactionPrompts = compactionConfig?.prompts;
+ 			const result = await compact(preparation, summarizationModel, this.compactionAbortController.signal, {
+ 				start: (purpose, model, context, options) => {
+ 					const handle = { turnId: generateTurnId() };
+@@ -4102,7 +4181,7 @@ var Session = class {
+ 					this.emitTurn(handle.turnId, purpose, response, request.info, error);
+ 					this.modelRequests.delete(handle.turnId);
+ 				}
+-			});
++			}, compactionPrompts);
+ 			if (this.compactionAbortController.signal.aborted) {
+ 				const abortError = abortErrorFor(this.compactionAbortController.signal);
+ 				this.emit({
+@@ -5816,4 +5895,4 @@ var SqliteConversationStreamStore = class {
+ 	}
+ };
+ //#endregion
+-export { isSubmissionPayload as A, renderAgentFunctionWithStructure as C, SUBMISSION_SESSION_NAME as D, SUBMISSION_HARNESS_NAME as E, sameSubmissionChunks as F, DURABILITY_DEFAULT_MAX_ATTEMPTS as I, DURABILITY_DEFAULT_TIMEOUT_MS as L, hydratePersistedSubmissionAttachments as M, matchesPersistedSubmissionAttachments as N, admitSubmissionWithBackend as O, prepareSubmissionAttachments as P, LEASE_DURATION_MS as R, assertRenderStructureInvariance as S, skillCatalogEntries as T, submissionSyntheticRequest as _, admitInstanceContact as a, createPublicSession as b, createDispatchAgentSubmissionInput as c, isInstanceContactRejection as d, materializeSubmissionAttachments as f, settleUnclaimableSubmission as g, serializeSubmissionError as h, ensureSqlConversationStreamTables as i, parseAcceptedAt as j, clampLimit as k, ensureInstanceIdentity as l, reconcileInterruptedSubmission as m, SqliteConversationStreamStore as n, adoptKeyedSubmissionReplay as o, processSubmission as p, StreamListenerRegistry as r, createDirectAgentSubmissionInput as s, InMemoryConversationStreamStore as t, finalizePendingSettlement as u, unreadySubmissionDeadline as v, discoverSessionContext as w, digestInstructions as x, Session as y };
++export { createAgentSubmissionSessionHandler as projectStudioSessionHandler, isSubmissionPayload as A, renderAgentFunctionWithStructure as C, SUBMISSION_SESSION_NAME as D, SUBMISSION_HARNESS_NAME as E, sameSubmissionChunks as F, DURABILITY_DEFAULT_MAX_ATTEMPTS as I, DURABILITY_DEFAULT_TIMEOUT_MS as L, hydratePersistedSubmissionAttachments as M, matchesPersistedSubmissionAttachments as N, admitSubmissionWithBackend as O, prepareSubmissionAttachments as P, LEASE_DURATION_MS as R, assertRenderStructureInvariance as S, skillCatalogEntries as T, submissionSyntheticRequest as _, admitInstanceContact as a, createPublicSession as b, createDispatchAgentSubmissionInput as c, isInstanceContactRejection as d, materializeSubmissionAttachments as f, settleUnclaimableSubmission as g, serializeSubmissionError as h, ensureSqlConversationStreamTables as i, parseAcceptedAt as j, clampLimit as k, ensureInstanceIdentity as l, reconcileInterruptedSubmission as m, SqliteConversationStreamStore as n, adoptKeyedSubmissionReplay as o, processSubmission as p, StreamListenerRegistry as r, createDirectAgentSubmissionInput as s, InMemoryConversationStreamStore as t, finalizePendingSettlement as u, unreadySubmissionDeadline as v, discoverSessionContext as w, digestInstructions as x, Session as y };
 diff --git a/dist/dispatch-nU3cIlT-.mjs b/dist/dispatch-nU3cIlT-.mjs
-index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..21a2b9531f229b3d260ae552a8d8968b53d22e88 100644
+index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..b9c3ef44e048f0f59dbb7eac7303a317647b8e1a 100644
 --- a/dist/dispatch-nU3cIlT-.mjs
 +++ b/dist/dispatch-nU3cIlT-.mjs
 @@ -1,7 +1,7 @@
@@ -136,7 +282,77 @@ index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..21a2b9531f229b3d260ae552a8d8968b
  import * as v from "valibot";
  import { Hono } from "hono";
  //#region src/conversation-records.ts
-@@ -1705,7 +1705,30 @@ function findTrailingPartialToolBatch(following) {
+@@ -1398,7 +1398,7 @@ function prepareCompaction(messages, settings, previousCompaction) {
+ * generateSummary and generateTurnPrefixSummary; those two only differ in the
+ * prompt they build, the purpose label, and the error-message prefix.
+ */
+-async function runSummarizationCall(purpose, promptText, maxTokens, model, signal, observer, errorPrefix) {
++async function runSummarizationCall(purpose, promptText, maxTokens, model, signal, observer, errorPrefix, prompts) {
+ 	const summarizationMessages = [{
+ 		role: "user",
+ 		content: [{
+@@ -1411,9 +1411,12 @@ async function runSummarizationCall(purpose, promptText, maxTokens, model, signa
+ 		maxTokens,
+ 		signal
+ 	};
+-	if (model.reasoning) completionOptions.reasoning = "high";
++	// [project-studio patch] The host's reasoning level for the summariser,
++	// when it names one: on some providers the thinking budget shares the
++	// output cap, and "high" can leave the summary itself the smaller share.
++	if (model.reasoning) completionOptions.reasoning = prompts?.reasoning ?? "high";
+ 	const context = {
+-		systemPrompt: SUMMARIZATION_SYSTEM_PROMPT,
++		systemPrompt: prompts?.system ?? SUMMARIZATION_SYSTEM_PROMPT,
+ 		messages: summarizationMessages
+ 	};
+ 	const handle = observer.start(purpose, model, context, completionOptions);
+@@ -1431,19 +1434,20 @@ async function runSummarizationCall(purpose, promptText, maxTokens, model, signa
+ 		usage: response.usage
+ 	};
+ }
+-async function generateSummary(currentMessages, model, reserveTokens, signal, previousSummary, observer) {
++async function generateSummary(currentMessages, model, reserveTokens, signal, previousSummary, observer, prompts) {
+ 	const maxTokens = Math.min(Math.floor(.8 * reserveTokens), 16e3);
+-	const basePrompt = previousSummary ? UPDATE_SUMMARIZATION_PROMPT : SUMMARIZATION_PROMPT;
++	// [project-studio patch] The host's prompts where given, the shipped ones otherwise.
++	const basePrompt = previousSummary ? prompts?.update ?? UPDATE_SUMMARIZATION_PROMPT : prompts?.summary ?? SUMMARIZATION_PROMPT;
+ 	let promptText = `<conversation>\n${serializeConversation(currentMessages)}\n</conversation>\n\n`;
+ 	if (previousSummary) promptText += `<previous-summary>\n${previousSummary}\n</previous-summary>\n\n`;
+ 	promptText += basePrompt;
+-	return runSummarizationCall("compaction", promptText, maxTokens, model, signal, observer, "Summarization failed");
++	return runSummarizationCall("compaction", promptText, maxTokens, model, signal, observer, "Summarization failed", prompts);
+ }
+-async function generateTurnPrefixSummary(messages, model, reserveTokens, signal, observer) {
++async function generateTurnPrefixSummary(messages, model, reserveTokens, signal, observer, prompts) {
+ 	const maxTokens = Math.min(Math.floor(.5 * reserveTokens), 16e3);
+-	return runSummarizationCall("compaction_prefix", `<conversation>\n${serializeConversation(messages)}\n</conversation>\n\n${TURN_PREFIX_SUMMARIZATION_PROMPT}`, maxTokens, model, signal, observer, "Turn prefix summarization failed");
++	return runSummarizationCall("compaction_prefix", `<conversation>\n${serializeConversation(messages)}\n</conversation>\n\n${prompts?.turnPrefix ?? TURN_PREFIX_SUMMARIZATION_PROMPT}`, maxTokens, model, signal, observer, "Turn prefix summarization failed", prompts);
+ }
+-async function compact(preparation, model, signal, observer) {
++async function compact(preparation, model, signal, observer, prompts) {
+ 	const { messagesToSummarize, turnPrefixMessages, isSplitTurn, tokensBefore, previousSummary, fileOps, settings } = preparation;
+ 	let summary;
+ 	let aggregateUsage;
+@@ -1453,15 +1457,15 @@ async function compact(preparation, model, signal, observer) {
+ 		aggregateUsage = aggregateUsage ? addUsage(aggregateUsage, normalized) : normalized;
+ 	};
+ 	if (isSplitTurn && turnPrefixMessages.length > 0) {
+-		const [historyResult, turnPrefixResult] = await Promise.all([messagesToSummarize.length > 0 ? generateSummary(messagesToSummarize, model, settings.reserveTokens, signal, previousSummary, observer) : Promise.resolve({
++		const [historyResult, turnPrefixResult] = await Promise.all([messagesToSummarize.length > 0 ? generateSummary(messagesToSummarize, model, settings.reserveTokens, signal, previousSummary, observer, prompts) : Promise.resolve({
+ 			text: "No prior history.",
+ 			usage: void 0
+-		}), generateTurnPrefixSummary(turnPrefixMessages, model, settings.reserveTokens, signal, observer)]);
++		}), generateTurnPrefixSummary(turnPrefixMessages, model, settings.reserveTokens, signal, observer, prompts)]);
+ 		addCallUsage(historyResult.usage);
+ 		addCallUsage(turnPrefixResult.usage);
+ 		summary = `${historyResult.text}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixResult.text}`;
+ 	} else {
+-		const historyResult = await generateSummary(messagesToSummarize, model, settings.reserveTokens, signal, previousSummary, observer);
++		const historyResult = await generateSummary(messagesToSummarize, model, settings.reserveTokens, signal, previousSummary, observer, prompts);
+ 		addCallUsage(historyResult.usage);
+ 		summary = historyResult.text;
+ 	}
+@@ -1705,7 +1709,30 @@ function findTrailingPartialToolBatch(following) {
  function isRetryableModelError(message) {
  	if (message.stopReason !== "error" || !message.errorMessage) return false;
  	if (message.errorMessage.includes("(retryable_interruption)")) return true;
@@ -168,7 +384,36 @@ index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..21a2b9531f229b3d260ae552a8d8968b
  }
  function isCompletedAssistantResponse(message) {
  	return message.stopReason === "stop" || message.stopReason === "length";
-@@ -1801,15 +1824,43 @@ function projectConversationUi(conversation, streamOffset) {
+@@ -1796,20 +1823,72 @@ function projectConversationUi(conversation, streamOffset) {
+ 	const messages = [];
+ 	const byId = /* @__PURE__ */ new Map();
+ 	const responseBySubmission = /* @__PURE__ */ new Map();
++	// [project-studio patch] The compaction records on the active path, in
++	// the UI's own terms: which projected message each one follows, so a
++	// client can place "conversation compacted" where it happened. Upstream
++	// skips the record here and resets the client with a snapshot that
++	// carries no trace of it, so the one durable fact about a compaction -
++	// that it happened, and what it kept - never reaches a UI. The entries
++	// before the cut stay projected; `firstKeptEntryId` says where the
++	// model's memory now begins. Anchor on `projectConversationUi` and the
++	// `messages` walk, never on a bundle filename or a line number.
++	const compactions = [];
+ 	for (const entry of getActiveConversationPath(conversation)) {
++		if (entry.type === "compaction") {
++			const last = messages[messages.length - 1];
++			compactions.push({
++				id: entry.id,
++				timestamp: entry.timestamp,
++				afterMessageId: last ? last.id : null,
++				firstKeptEntryId: entry.firstKeptEntryId,
++				summary: entry.summary,
++				tokensBefore: entry.tokensBefore,
++				...entry.details ? { details: entry.details } : {},
++				...entry.usage ? { usage: entry.usage } : {}
++			});
++			continue;
++		}
+ 		if (entry.type !== "message") continue;
  		const projected = projectCompletedMessage(entry);
  		if (projected) {
  			if (projected.role === "assistant" && projected.submissionId) {
@@ -216,7 +461,27 @@ index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..21a2b9531f229b3d260ae552a8d8968b
  			}
  			messages.push(projected);
  			byId.set(projected.id, projected);
-@@ -2208,6 +2259,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
+@@ -1856,7 +1935,8 @@ function projectConversationUi(conversation, streamOffset) {
+ 	return {
+ 		conversationId: conversation.conversationId,
+ 		streamOffset,
+-		messages
++		messages,
++		compactions
+ 	};
+ }
+ /**
+@@ -2034,6 +2114,9 @@ function projectAgentConversationSnapshot(state) {
+ 		conversationId: conversation.conversationId,
+ 		offset: ui.streamOffset,
+ 		messages: ui.messages,
++		// [project-studio patch] See projectConversationUi: the compaction
++		// records, so a client can show where the conversation was shortened.
++		compactions: ui.compactions,
+ 		settlements: projectSettlements(state, conversation.conversationId)
+ 	};
+ }
+@@ -2208,6 +2291,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
  			if (assistant?.type !== "message" || assistant.message.role !== "assistant") return [];
  			return assistant.message.content.flatMap((block) => block.type === "toolCall" ? encodeToolResultEntry(conversation, record.assistantMessageId, block.id, conversationId) : []);
  		}
@@ -246,3 +511,80 @@ index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..21a2b9531f229b3d260ae552a8d8968b
  		case "submission_settled": {
  			const answeredBy = typeof record.attemptId === "string" ? assistantSubmissionByAttempt(state).get(record.attemptId) : void 0;
  			return [{
+@@ -2897,10 +3003,25 @@ function assertThinkingLevel(value, label) {
+ function assertCompaction(definition, label) {
+ 	if (definition === void 0 || definition === false) return;
+ 	if (typeof definition !== "object" || definition === null || Array.isArray(definition)) throw new Error(`[flue] ${label} compaction must be a configuration object or \`false\`.`);
+-	for (const key of Object.keys(definition)) if (key !== "reserveTokens" && key !== "keepRecentTokens" && key !== "model") throw new Error(`[flue] ${label} compaction received unknown field "${key}".`);
++	// [project-studio patch] `prompts` is a fourth field: the summariser's
++	// system prompt, first-summary prompt, update prompt and reasoning
++	// level, each a string, each defaulting to the shipped one. The engine's
++	// prompt is a fixed constant upstream, with no hook; a host that wants a
++	// summary shaped for its own product - an overview, a reminders section,
++	// a rule for conversations that are not work - had to fork the engine.
++	// Anchor on `assertCompaction` and `runSummarizationCall`.
++	for (const key of Object.keys(definition)) if (key !== "reserveTokens" && key !== "keepRecentTokens" && key !== "model" && key !== "prompts") throw new Error(`[flue] ${label} compaction received unknown field "${key}".`);
+ 	assertTokenCount(definition.reserveTokens, `${label} compaction.reserveTokens`);
+ 	assertTokenCount(definition.keepRecentTokens, `${label} compaction.keepRecentTokens`);
+ 	if (definition.model !== void 0 && typeof definition.model !== "string") throw new Error(`[flue] ${label} compaction.model must be a string.`);
++	if (definition.prompts !== void 0) {
++		const prompts = definition.prompts;
++		if (typeof prompts !== "object" || prompts === null || Array.isArray(prompts)) throw new Error(`[flue] ${label} compaction.prompts must be an object.`);
++		for (const key of Object.keys(prompts)) {
++			if (key !== "system" && key !== "summary" && key !== "update" && key !== "turnPrefix" && key !== "reasoning") throw new Error(`[flue] ${label} compaction.prompts received unknown field "${key}".`);
++			if (prompts[key] !== void 0 && typeof prompts[key] !== "string") throw new Error(`[flue] ${label} compaction.prompts.${key} must be a string.`);
++		}
++	}
+ }
+ function assertDurability(definition, label) {
+ 	if (definition === void 0) return;
+@@ -3441,6 +3562,25 @@ async function getAgentInstance(agent, id) {
+ 	return readInstanceInfoFromStream(rt.conversationStreamStore, name, id);
+ }
+ /**
++* [project-studio patch] Compact one agent instance's conversation now, on
++* the Node runtime. The same validation as getAgentInstance; the work is the
++* coordinator's compactInstance. Published on globalThis rather than added to
++* this chunk's export map, which is minified: a host reads
++* `globalThis.__projectStudioCompactAgentInstance` and calls it with the
++* agent function and the instance id. Anchor on `getAgentInstance`.
++*/
++async function compactAgentInstance(agent, id) {
++	const rt = runtimeConfig;
++	if (!rt) throw new Error("[flue] compactAgentInstance() called before runtime was configured.");
++	if (!isAgentFunction(agent)) throw new InvalidRequestError({ reason: "compactAgentInstance() requires an agent function as its first argument." });
++	if (typeof id !== "string" || id.trim() === "") throw new Error("[flue] compactAgentInstance() requires a non-empty instance id.");
++	const name = getRegisteredAgentIdentity(agent);
++	if (!name) throw new Error("[flue] compactAgentInstance() target agent is not registered in this built application.");
++	if (rt.target !== "node" || typeof rt.compactAgentInstance !== "function") throw new Error("[flue] compactAgentInstance() is available on the Node runtime only.");
++	return rt.compactAgentInstance(name, id);
++}
++globalThis.__projectStudioCompactAgentInstance = compactAgentInstance;
++/**
+ * Node lookup: the root `conversation_created` record is the first record of
+ * the instance's stream, so existence and uid come from stream meta plus the
+ * first batch.
+diff --git a/dist/types-CVx9SjIx.d.mts b/dist/types-CVx9SjIx.d.mts
+index 0c9ab2477d44e4df8b60c007f5e04c327abb20c3..35c796f4592f6bfb312f1405cdff694e20931b3c 100644
+--- a/dist/types-CVx9SjIx.d.mts
++++ b/dist/types-CVx9SjIx.d.mts
+@@ -520,6 +520,19 @@ interface CompactionConfig {
+    * short-context session). Format: `'provider-id/model-id'`.
+    */
+   model?: string;
++  /**
++   * [project-studio patch] The summariser's prompts, each defaulting to the
++   * shipped one: the system prompt, the first-summary prompt, the update
++   * prompt (given the previous summary), the turn-prefix prompt, and the
++   * reasoning level requested of a model that reasons.
++   */
++  prompts?: {
++    system?: string;
++    summary?: string;
++    update?: string;
++    turnPrefix?: string;
++    reasoning?: string;
++  };
+ }
+ interface DurabilityConfig {
+   /**

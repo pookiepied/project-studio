@@ -210,5 +210,23 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
     )
   }
 
+  // A compaction marker stands after the projected message it followed, or
+  // at the top when it followed none. The messages above it stay: the log
+  // is still the log, and the marker says where the model's memory begins.
+  for (const compaction of snapshot.compactions) {
+    const marker: TranscriptItem = {
+      kind: 'compaction',
+      id: compaction.id,
+      summary: compaction.summary,
+      tokensBefore: compaction.tokensBefore,
+      timestamp: compaction.timestamp,
+    }
+    const anchor =
+      compaction.afterMessageId === null
+        ? -1
+        : items.findIndex((item) => item.id === compaction.afterMessageId)
+    items.splice(anchor + 1, 0, marker)
+  }
+
   return items
 }

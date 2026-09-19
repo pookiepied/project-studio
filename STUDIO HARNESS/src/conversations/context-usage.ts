@@ -49,6 +49,22 @@ import type { StudioDatabase } from "../storage/database.js";
  * would appear to collapse to a few hundred tokens every time it was renamed.
  * That is one turn of an eight-word prompt overwriting the measurement of a
  * hundred-thousand-token one.
+ *
+ * Nor the summariser's own requests. A compaction is one or two model calls
+ * whose prompt is the whole transcript, and they arrive on the same stream as
+ * `turn` observations with `purpose: "compaction"`. Counted, the last thing
+ * measured for a conversation that was just emptied would be the largest
+ * request it ever made.
+ *
+ * ---- After a compaction --------------------------------------------------
+ *
+ * The window is empty and nothing has measured it. The last measured figure
+ * says "full", which is now the wrong answer in the worst way, so the
+ * `compaction` observation writes a provisional row: the summary the
+ * summariser wrote, the recent tail Flue kept verbatim, and a fixed allowance
+ * for the system prompt and tool definitions, which no provider itemises.
+ * The row is marked as an estimate, the meter says so, and the next turn's
+ * measurement replaces it.
  */
 
 /** One provider-reported prompt, as the four parts it is billed in. */
@@ -63,7 +79,20 @@ export interface ConversationUsage {
   readonly output: number;
   /** When this was observed, so a reader can tell a stale answer from a fresh one. */
   readonly observedAt: number;
+  /**
+   * True for the provisional row written after a compaction, before any
+   * request has measured the shortened conversation.
+   */
+  readonly estimated: boolean;
 }
+
+/**
+ * What Flue keeps verbatim after a compaction, and what the prompt carries
+ * that no usage report itemises. Both are round: the row they make is an
+ * estimate by name, replaced by the first measured turn.
+ */
+const KEPT_TAIL_TOKENS = 8_000;
+const FIXED_PROMPT_TOKENS = 12_000;
 
 /** A number that is actually a number, and not a negative one. */
 function count(value: unknown): number {
@@ -80,6 +109,8 @@ function count(value: unknown): number {
  */
 function usageOf(observation: FlueObservation): ConversationUsage | undefined {
   if (observation.type !== "turn") return undefined;
+  // Only the agent's own requests fill the agent's window.
+  if (observation.purpose !== "agent") return undefined;
   const usage = observation.response?.usage;
   if (usage === undefined || usage === null) return undefined;
   const input = count(usage.input);
@@ -87,7 +118,28 @@ function usageOf(observation: FlueObservation): ConversationUsage | undefined {
   const cacheWrite = count(usage.cacheWrite);
   const output = count(usage.output);
   if (input + cacheRead + cacheWrite + output === 0) return undefined;
-  return { input, cacheRead, cacheWrite, output, observedAt: Date.now() };
+  return { input, cacheRead, cacheWrite, output, observedAt: Date.now(), estimated: false };
+}
+
+/**
+ * The provisional figure after a compaction, or undefined for one that
+ * failed or was cancelled - those wrote nothing, and the window is as it was.
+ *
+ * The summary is what the summariser produced, read off the compaction's own
+ * usage; when a provider reports no output for it the tail and the fixed
+ * allowance still stand, which is the honest floor.
+ */
+function usageAfterCompaction(observation: FlueObservation): ConversationUsage | undefined {
+  if (observation.type !== "compaction" || observation.isError) return undefined;
+  const summary = count(observation.usage?.output);
+  return {
+    input: summary + KEPT_TAIL_TOKENS + FIXED_PROMPT_TOKENS,
+    cacheRead: 0,
+    cacheWrite: 0,
+    output: 0,
+    observedAt: Date.now(),
+    estimated: true,
+  };
 }
 
 export interface ContextUsageOptions {
@@ -164,7 +216,7 @@ export class ContextUsageTracker {
     if (this.#db === undefined) return undefined;
     const row = this.#db
       .prepare(
-        `SELECT input, cache_read, cache_write, output, observed_at
+        `SELECT input, cache_read, cache_write, output, observed_at, estimated
            FROM conversation_context_usage WHERE conversation_id = ?`,
       )
       .get(conversationId) as Record<string, unknown> | undefined;
@@ -175,6 +227,7 @@ export class ContextUsageTracker {
       cacheWrite: count(row.cache_write),
       output: count(row.output),
       observedAt: count(row.observed_at),
+      estimated: row.estimated === 1,
     };
   }
 
@@ -182,14 +235,15 @@ export class ContextUsageTracker {
     this.#db
       ?.prepare(
         `INSERT INTO conversation_context_usage
-           (conversation_id, input, cache_read, cache_write, output, observed_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+           (conversation_id, input, cache_read, cache_write, output, observed_at, estimated)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(conversation_id) DO UPDATE SET
            input = excluded.input,
            cache_read = excluded.cache_read,
            cache_write = excluded.cache_write,
            output = excluded.output,
-           observed_at = excluded.observed_at`,
+           observed_at = excluded.observed_at,
+           estimated = excluded.estimated`,
       )
       .run(
         conversationId,
@@ -198,6 +252,7 @@ export class ContextUsageTracker {
         usage.cacheWrite,
         usage.output,
         usage.observedAt,
+        usage.estimated ? 1 : 0,
       );
   }
 
@@ -212,7 +267,7 @@ export class ContextUsageTracker {
     const conversationId = observation.instanceId;
     if (typeof conversationId !== "string" || conversationId === "") return;
     if (observation.agentName !== STUDIO_AGENT_ID) return;
-    const usage = usageOf(observation);
+    const usage = usageOf(observation) ?? usageAfterCompaction(observation);
     if (usage === undefined) return;
     this.#latest.set(conversationId, usage);
     this.#save(conversationId, usage);

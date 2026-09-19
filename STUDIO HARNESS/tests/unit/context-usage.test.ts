@@ -24,17 +24,35 @@ function turn(
   instanceId: string,
   usage: Record<string, number> | undefined,
   agentName = "studio",
+  purpose = "agent",
 ): FlueObservation {
   return {
     type: "turn",
     turnId: "t1",
-    purpose: "agent",
+    purpose,
     durationMs: 10,
     request: { providerId: "p", providerName: "P", requestedModel: "m", api: "a" },
     response: usage === undefined ? {} : { usage },
     isError: false,
     instanceId,
     agentName,
+  } as unknown as FlueObservation;
+}
+
+function compaction(
+  instanceId: string,
+  usage: Record<string, number> | undefined,
+  isError = false,
+): FlueObservation {
+  return {
+    type: "compaction",
+    messagesBefore: 80,
+    messagesAfter: 6,
+    durationMs: 4_000,
+    isError,
+    ...(usage === undefined ? {} : { usage }),
+    instanceId,
+    agentName: "studio",
   } as unknown as FlueObservation;
 }
 
@@ -101,6 +119,45 @@ describe("the measured context", () => {
     expect(usage.get("cnv_1")?.input).toBe(90_000);
   });
 
+  it("ignores the summariser's own requests", () => {
+    // A compaction's model calls carry the whole transcript as their prompt
+    // and arrive as turns with their own purpose. Counted, the last figure
+    // for a conversation that was just emptied would be its largest ever.
+    const usage = tracker();
+    usage.record(turn("cnv_1", { input: 90_000, output: 300 }));
+    usage.record(turn("cnv_1", { input: 150_000, output: 6_000 }, "studio", "compaction"));
+
+    expect(usage.get("cnv_1")?.input).toBe(90_000);
+  });
+
+  it("writes a provisional figure after a compaction, marked as an estimate", () => {
+    // The window was just emptied and nothing has measured it. Left alone
+    // the meter would say "full" about a conversation that is not; the row
+    // written here is the summary, the kept tail and a fixed allowance, and
+    // it says it is an estimate so the meter can too.
+    const usage = tracker();
+    usage.record(turn("cnv_1", { input: 170_000, output: 300 }));
+    usage.record(compaction("cnv_1", { input: 150_000, output: 6_000 }));
+
+    const after = usage.get("cnv_1");
+    expect(after?.estimated).toBe(true);
+    expect(after?.input).toBe(6_000 + 8_000 + 12_000);
+    expect(after?.cacheRead).toBe(0);
+
+    // The next measured turn is the truth again.
+    usage.record(turn("cnv_1", { input: 30_000, output: 400 }));
+    expect(usage.get("cnv_1")).toMatchObject({ input: 30_000, estimated: false });
+  });
+
+  it("leaves the figure alone when a compaction failed or was cancelled", () => {
+    // Nothing was written to the conversation, so the window is as it was.
+    const usage = tracker();
+    usage.record(turn("cnv_1", { input: 170_000, output: 300 }));
+    usage.record(compaction("cnv_1", undefined, true));
+
+    expect(usage.get("cnv_1")).toMatchObject({ input: 170_000, estimated: false });
+  });
+
   it("keeps one conversation's measurement out of another's", () => {
     const usage = tracker();
     usage.record(turn("cnv_1", { input: 90_000, output: 300 }));
@@ -158,6 +215,16 @@ describe("the measured context across a restart", () => {
 
     const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
     expect(after.get("cnv_1")?.input).toBe(52_000);
+  });
+
+  it("keeps the estimate mark across a restart", () => {
+    const db = database();
+    const before = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    before.record(turn("cnv_1", { input: 170_000, output: 100 }));
+    before.record(compaction("cnv_1", { output: 5_000 }));
+
+    const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    expect(after.get("cnv_1")).toMatchObject({ input: 25_000, estimated: true });
   });
 
   it("forgets from the store as well as from memory", () => {

@@ -16,6 +16,12 @@ export interface MeasuredContextUsage {
   readonly cacheWrite: number
   readonly output: number
   readonly observedAt: number
+  /**
+   * The harness's provisional figure after a compaction, before any request
+   * has measured the shortened conversation. Absent on the wire means false:
+   * a row a harness wrote before the flag existed is a measurement.
+   */
+  readonly estimated: boolean
 }
 
 /**
@@ -51,5 +57,26 @@ export function parseMeasuredContextUsage(value: unknown): MeasuredContextUsage 
   ) {
     return null
   }
-  return { input, cacheRead, cacheWrite, output, observedAt }
+  return { input, cacheRead, cacheWrite, output, observedAt, estimated: parts['estimated'] === true }
+}
+
+/**
+ * Whether the conversation may be compacted by hand right now, and if not,
+ * the sentence the control shows. Null when the harness composed no manual
+ * compaction, which the control reads as "not offered".
+ */
+export type CompactionReadiness =
+  | { readonly available: true }
+  | { readonly available: false; readonly reason: string }
+
+export function parseCompactionReadiness(value: unknown): CompactionReadiness | null {
+  if (typeof value !== 'object' || value === null) return null
+  const compact = (value as Record<string, unknown>)['compact']
+  if (typeof compact !== 'object' || compact === null) return null
+  const record = compact as Record<string, unknown>
+  if (record['available'] === true) return { available: true }
+  if (record['available'] === false && typeof record['reason'] === 'string') {
+    return { available: false, reason: record['reason'] }
+  }
+  return null
 }

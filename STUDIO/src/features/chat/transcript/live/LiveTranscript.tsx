@@ -3,6 +3,7 @@ import { AssistantTurn } from '@/features/chat/transcript/live/AssistantTurn'
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
 import { RetryWait } from '@/features/chat/transcript/live/RetryWait'
 import { SubmissionFailed } from '@/features/chat/transcript/live/SubmissionFailed'
+import { CompactionMarker } from '@/features/chat/transcript/live/CompactionMarker'
 import { isTurnRunning, type ConversationPhase } from '@/features/chat/connection/useConversation'
 import {
   isMessageBeingWritten,
@@ -109,6 +110,8 @@ export function LiveTranscript({
           <LiveUserMessage key={item.id} item={item} />
         ) : item.kind === 'submission-failed' ? (
           <SubmissionFailed key={item.id} item={item} />
+        ) : item.kind === 'compaction' ? (
+          <CompactionMarker key={item.id} item={item} />
         ) : (
           <AssistantTurn
             key={item.id}

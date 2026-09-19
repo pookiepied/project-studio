@@ -40,6 +40,7 @@
       "../../STUDIO HARNESS/dist/*": "harness/",
       "../../STUDIO HARNESS/vendor/": "harness/vendor/",
       "../../STUDIO HARNESS/skills/": "harness/skills/",
+      "../../STUDIO HARNESS/commands/": "harness/commands/",
       "../../STUDIO HARNESS/catalog/": "harness/catalog/"
     },
     "icon": [

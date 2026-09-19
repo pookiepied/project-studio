@@ -60,6 +60,7 @@ function snapshotWith(messages: ConversationSnapshotFacts['messages']): Conversa
     offset: '4_0',
     messages,
     settlements: [],
+    compactions: [],
   }
 }
 

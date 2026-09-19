@@ -1,5 +1,6 @@
 import {
   parseLibraryProviders,
+  parseModelFacts,
   parseProbeResult,
   parseProviderConnection,
   parseProviderConnections,
@@ -11,6 +12,7 @@ import {
   type DefaultSelection,
   type LibraryProvider,
   type ModelCapability,
+  type ModelFacts,
   type ProbeResult,
   type ProviderConnection,
   type ProviderConnectionDraft,
@@ -67,6 +69,8 @@ export interface ProviderClient {
     slot: CapabilitySlot,
     ref: { readonly connectionId: string; readonly modelId: string } | undefined,
   ): Promise<HarnessResult<void>>
+  /** What the catalog knows about a slug, for the Add Model form to pre-fill. */
+  lookupModelFacts(modelId: string): Promise<HarnessResult<ModelFacts>>
   /** Adds a model the catalogs have never heard of, under one connection. */
   addManualModel(
     connectionId: string,
@@ -160,6 +164,15 @@ export function providerClient({ json, empty }: Requester): ProviderClient {
       // Clearing is a body of `null`, which the route accepts; an absent body
       // is not JSON and the route refuses it, leaving the slot as it was.
       return empty('PUT', `${PROVIDERS_PATH}/defaults/${encodeURIComponent(slot)}`, ref ?? null)
+    },
+
+    lookupModelFacts(modelId) {
+      return json(
+        'GET',
+        `${PROVIDERS_PATH}/model-facts?modelId=${encodeURIComponent(modelId)}`,
+        undefined,
+        parseModelFacts,
+      )
     },
 
     addManualModel(connectionId, model) {

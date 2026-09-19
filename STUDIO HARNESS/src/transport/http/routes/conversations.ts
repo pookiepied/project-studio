@@ -19,6 +19,7 @@ import {
 } from "../../../conversations/purge.js";
 import type { ConversationStore } from "../../../conversations/store.js";
 import type { ConversationUsage } from "../../../conversations/context-usage.js";
+import type { CompactionReadiness } from "../../../conversations/compaction.js";
 import type { JobStatus } from "../../../process/background.js";
 import type { StudioDatabase } from "../../../storage/database.js";
 import { StorageError } from "../../../storage/errors.js";
@@ -43,6 +44,17 @@ export interface ConversationRoutesOptions {
      * cascade it in SQL and asks here instead.
      */
     forget?(conversationId: string): void;
+  };
+  /**
+   * Compacting a conversation by hand, and whether it may be done now. The
+   * readiness travels with the measurement so the meter's "Compact now" can
+   * be disabled with its reason in the same read; the action is its own
+   * route. Absent means no manual compaction, which a composition without a
+   * runtime wants and production must not be.
+   */
+  readonly compaction?: {
+    readiness(conversationId: string): CompactionReadiness;
+    compact(conversationId: string): Promise<void>;
   };
   /**
    * The background commands, for the panel that shows them.
@@ -167,8 +179,31 @@ export function createConversationRoutes(
    * state: the figure is stored, and comes back with the process.
    */
   routes.get("/:id/context", (context) => {
-    const measured = options.contextUsage?.get(context.req.param("id"));
-    return context.json({ usage: measured ?? null });
+    const id = context.req.param("id");
+    const measured = options.contextUsage?.get(id);
+    const compact = options.compaction?.readiness(id) ?? null;
+    return context.json({ usage: measured ?? null, compact });
+  });
+
+  /**
+   * Compacts one conversation now. 409 with the reason when the cool-down or
+   * a running turn refuses it; 200 once the record is written. The call
+   * lasts as long as the summariser takes, which is the honest shape: the
+   * caller is waiting for exactly that.
+   */
+  routes.post("/:id/compact", async (context) => {
+    if (options.compaction === undefined) {
+      return context.json(
+        failure(new StorageError("unavailable", { message: "Compaction is not available." })),
+        503,
+      );
+    }
+    try {
+      await options.compaction.compact(context.req.param("id"));
+      return context.json({ compacted: true });
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
   });
 
   /**

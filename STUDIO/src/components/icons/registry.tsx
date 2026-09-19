@@ -34,7 +34,7 @@ import {
   SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
-  Cpu, Eye, Hammer, LayoutGrid, Wrench,
+  Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -190,6 +190,10 @@ const REGISTRY = {
   projectNew: { mark: FolderPlus },
   branch: { mark: GitBranch },
   worktree: { mark: GitFork },
+  // Where a conversation was compacted: two arrows closing on a line, the
+  // transcript folding to its summary. Plain enough to sit in a transcript
+  // row at caption size.
+  compaction: { mark: FoldVertical },
 
   // — Message actions -----------------------------------------------------
   copy: { mark: Copy },

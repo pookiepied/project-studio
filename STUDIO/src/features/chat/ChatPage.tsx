@@ -77,7 +77,7 @@ const OPEN_MIN_WAIT_MS = 700
 
 export function ChatPage({ conversation }: { conversation: Conversation }) {
   const { touch, settings, catalog } = useWorkspace()
-  const { markRunning, markContextReport } = useLiveWork()
+  const { markRunning, markContextReport, contextRevisions } = useLiveWork()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
@@ -161,8 +161,13 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // Re-fetched when a turn stops running, because that is when a new figure
   // exists. Not polled while one runs: the number cannot change until a model
   // request completes, and the estimate below covers the gap in the meantime.
+  //
+  // Also re-fetched when the strip's "Compact now" has finished, which the
+  // store announces by bumping the conversation's revision: a compaction
+  // changes the figure without a turn ending.
   const [measuredContext, setMeasuredContext] = useState<MeasuredContextUsage | null>(null)
   const running = isTurnRunning(live.phase)
+  const contextRevision = contextRevisions.get(conversation.id) ?? 0
   useEffect(() => {
     if (gallery) return
     let watching = true
@@ -178,7 +183,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     return () => {
       watching = false
     }
-  }, [gallery, conversation.id, running])
+  }, [gallery, conversation.id, running, contextRevision])
 
   // What the history costs, reported to the store so the top strip can show
   // it. This page is the only witness: the strip has no transcript of its

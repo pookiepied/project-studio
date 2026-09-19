@@ -52,6 +52,7 @@ function measured(fields: {
     cacheWrite: fields.cacheWrite ?? 0,
     output: fields.output ?? 0,
     observedAt: 1_000,
+    estimated: false,
   }
 }
 
@@ -65,7 +66,7 @@ describe('the measured half', () => {
       [],
       measured({ input: 500, cacheRead: 39_000, cacheWrite: 1_000, output: 900 }),
     )
-    expect(report.measured).toEqual({ fresh: 500, cached: 40_000, reply: 900 })
+    expect(report.measured).toEqual({ fresh: 500, cached: 40_000, reply: 900, estimated: false })
     expect(total(report)).toBe(41_400)
   })
 
@@ -147,7 +148,10 @@ describe('the estimated half', () => {
 })
 
 describe('the breakdown against a window', () => {
-  const REPORT = { measured: { fresh: 10_000, cached: 30_000, reply: 2_000 }, pending: 500 }
+  const REPORT = {
+    measured: { fresh: 10_000, cached: 30_000, reply: 2_000, estimated: false },
+    pending: 500,
+  }
 
   it('adds both halves and divides by the model own window', () => {
     const breakdown = contextBreakdown(REPORT, 200_000)
@@ -168,9 +172,29 @@ describe('the breakdown against a window', () => {
   it('clamps at full and never reports negative free space', () => {
     // A catalog window can understate what the provider actually allowed, and
     // a ring drawn past its own circumference is worse than one sitting full.
-    const over = contextBreakdown({ measured: { fresh: 500_000, cached: 0, reply: 0 }, pending: 0 }, 200_000)
+    const over = contextBreakdown(
+      { measured: { fresh: 500_000, cached: 0, reply: 0, estimated: false }, pending: 0 },
+      200_000,
+    )
     expect(over.used).toBe(1)
     expect(over.free).toBe(0)
+  })
+
+  it('says where the harness compacts, by the same rule the harness uses', () => {
+    // 15% held back on a 200k window: compaction at 170k. The floor of 20k
+    // holds on a smaller window, and a model that cannot write the reserve
+    // gets a reserve it can. No window, no line.
+    expect(contextBreakdown(REPORT, 200_000, 64_000).compactsAt).toBe(170_000)
+    expect(contextBreakdown(REPORT, 128_000).compactsAt).toBe(108_000)
+    expect(contextBreakdown(REPORT, 200_000, 8_192).compactsAt).toBe(200_000 - 8_192)
+    expect(contextBreakdown(REPORT, 'unknown').compactsAt).toBeNull()
+  })
+
+  it('carries the estimate mark through from the harness', () => {
+    const provisional = contextReport([], measured({ input: 25_000 }))
+    expect(provisional.measured?.estimated).toBe(false)
+    const after = contextReport([], { ...measured({ input: 25_000 }), estimated: true })
+    expect(after.measured?.estimated).toBe(true)
   })
 })
 
