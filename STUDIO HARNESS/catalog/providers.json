@@ -1,5 +1,5 @@
 {
-  "$comment": "Which vendors the provider library offers. A vendor the catalogs know but this file lists as disabled, or does not list at all, is not offered; a connection that already exists keeps working either way. Edit this file, restart the harness. Curated 2026-09-19.",
+  "$comment": "Which vendors the provider library offers. A vendor the catalogs know but this file lists as disabled, or does not list at all, is not offered; a connection that already exists keeps working either way. Edit this file, restart the harness. Curated 2026-09-19; Vercel AI Gateway dropped the same day, a proxy for other vendors' keys like Cloudflare's.",
   "providers": [
     { "id": "anthropic", "kind": "language", "enabled": true },
     { "id": "openai", "kind": "language", "enabled": true },
@@ -14,7 +14,6 @@
     { "id": "baseten", "kind": "language", "enabled": true },
     { "id": "nvidia", "kind": "language", "enabled": true },
     { "id": "openrouter", "kind": "language", "enabled": true },
-    { "id": "vercel-ai-gateway", "kind": "language", "enabled": true },
     { "id": "cloudflare-workers-ai", "kind": "language", "enabled": true },
     { "id": "github-copilot", "kind": "language", "enabled": true },
     { "id": "opencode", "kind": "language", "enabled": true },
@@ -24,6 +23,7 @@
     { "id": "zai", "kind": "language", "enabled": true },
 
     { "id": "ant-ling", "kind": "language", "enabled": false },
+    { "id": "vercel-ai-gateway", "kind": "language", "enabled": false },
     { "id": "cloudflare-ai-gateway", "kind": "language", "enabled": false },
     { "id": "azure-openai-responses", "kind": "language", "enabled": false },
     { "id": "huggingface", "kind": "language", "enabled": false },

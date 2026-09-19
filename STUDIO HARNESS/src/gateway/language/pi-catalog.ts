@@ -110,10 +110,16 @@ export function reasoningLevelsFromPiModel(model: Model<Api>): readonly Reasonin
   );
 }
 
+/**
+ * Pi's cost bag as a pricing record. A negative figure is not a price:
+ * OpenRouter writes -1 for a model whose price varies by route (its auto
+ * router), and Pi carries that through per million as -1000000. That is the
+ * catalog saying "no fixed price", which is what "unknown" means here.
+ */
 export function pricingFromPiModel(cost: unknown): ModelPricing {
   const bag = isRecord(cost) ? cost : {};
   const at = (value: unknown): number | "unknown" =>
-    typeof value === "number" && Number.isFinite(value) ? value : "unknown";
+    typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : "unknown";
   return {
     input: at(bag.input),
     output: at(bag.output),

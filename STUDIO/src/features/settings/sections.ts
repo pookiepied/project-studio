@@ -78,7 +78,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     sections: [
       { id: 'models', name: 'Models', icon: Icons.providers },
       { id: 'media', name: 'Media', icon: Icons.generate },
-      { id: 'tools', name: 'Tools', icon: Icons.search },
+      { id: 'tools', name: 'Tools', icon: Icons.tools },
     ],
   },
   {

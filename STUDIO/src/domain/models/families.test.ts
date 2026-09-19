@@ -1,18 +1,55 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelCapability, ModelPricing } from '@/platform/harness'
 import type { CatalogModel } from './catalog'
-import { connectionsOf, familyCatalog, familyName } from './families'
+import { authorOf, familyGroups, familyName } from './families'
 
 /**
- * The library's first axis: rows grouped by the vendor whose mark they wear.
- *
- * The grouping is the catalog's own categorization read out - `author` is
- * already on every row - so what is tested here is the reading: that families
- * come out alphabetized by their proper names, that models inside a family
- * sort numerically rather than as strings, that one family served by two
- * connections is still one family, and that a vendor the name table has
- * never heard of still gets a printable name.
+ * Whose model a row is. The author is read from three places in order of
+ * trust - the id's prefix, the model's own name, the connection's vendor -
+ * and the name it prints under is the vendor's own where the table knows
+ * it. What is pinned here is that each source answers the case it exists
+ * for, and that the fallbacks are the honest ones.
  */
+
+describe('authorOf', () => {
+  it('reads the author off a prefixed id, dropping the routing tilde', () => {
+    expect(authorOf('anthropic/claude-sonnet-4', 'openrouter')).toBe('anthropic')
+    // OpenRouter marks a routing variant with a tilde; it is the same author.
+    expect(authorOf('~anthropic/claude-sonnet-4', 'openrouter')).toBe('anthropic')
+    expect(authorOf('Meta-Llama/Llama-3.3-70B', 'together')).toBe('meta-llama')
+  })
+
+  it('recognises a bare id by the name the vendor gave the model', () => {
+    // A host serving someone else's model under a bare id: the row wears the
+    // author's mark, not the host's.
+    expect(authorOf('gpt-oss-120b', 'cerebras')).toBe('openai')
+    expect(authorOf('llama-3.3-70b-versatile', 'groq')).toBe('meta')
+    expect(authorOf('glm-5.3-flash', 'devpass')).toBe('z-ai')
+    expect(authorOf('Qwen3-235B', 'fireworks')).toBe('qwen')
+  })
+
+  it('falls back to the connection vendor for a name it does not know', () => {
+    expect(authorOf('my-finetune-7b', 'devpass')).toBe('devpass')
+    // A direct connection is its own author either way.
+    expect(authorOf('gemini-2.5-pro', 'google')).toBe('google')
+  })
+})
+
+describe('familyName', () => {
+  it('names the vendors the table knows by their own name', () => {
+    expect(familyName('anthropic')).toBe('Anthropic')
+    expect(familyName('mistralai')).toBe('Mistral AI')
+    expect(familyName('x-ai')).toBe('xAI')
+    expect(familyName('z-ai')).toBe('Z.ai')
+    expect(familyName('bytedance-seed')).toBe('ByteDance Seed')
+  })
+
+  it('falls back to the id, title-cased, for a vendor nobody mapped', () => {
+    expect(familyName('the-box-next-door')).toBe('The Box Next Door')
+    // A trailing "ai" is an initialism, not a syllable.
+    expect(familyName('somebody-ai')).toBe('Somebody AI')
+  })
+})
 
 const PRICING: ModelPricing = { input: 3, output: 15, cacheRead: 'unknown', cacheWrite: 'unknown' }
 
@@ -35,15 +72,15 @@ const CAPABILITY: ModelCapability = {
   maxOutputTokens: 'unknown',
 }
 
-function modelFor(author: string, modelId: string, connectionId: string): CatalogModel {
+function modelFor(author: string, modelId: string): CatalogModel {
   return {
-    id: `${author}/${modelId}`,
-    connectionId,
+    id: `openrouter/${modelId}`,
+    connectionId: 'openrouter',
     modelId,
     name: modelId,
     author,
-    connectionVendor: connectionId,
-    connectionName: connectionId,
+    connectionVendor: 'openrouter',
+    connectionName: 'OpenRouter',
     reasoningLevels: [],
     contextWindow: 200_000,
     capability: CAPABILITY,
@@ -51,72 +88,20 @@ function modelFor(author: string, modelId: string, connectionId: string): Catalo
   }
 }
 
-describe('familyCatalog', () => {
-  it('groups rows by the vendor whose mark they wear, across connections', () => {
-    const families = familyCatalog([
-      modelFor('anthropic', 'claude-a', 'work-anthropic'),
-      modelFor('anthropic', 'claude-b', 'openrouter'),
-      modelFor('openai', 'gpt-a', 'openrouter'),
+describe('familyGroups', () => {
+  it("groups one connection's rows by author, families in name order, models numerically", () => {
+    const groups = familyGroups([
+      modelFor('x-ai', 'grok-4'),
+      modelFor('anthropic', 'claude-10'),
+      modelFor('anthropic', 'claude-9'),
+      modelFor('mistralai', 'mistral-large'),
     ])
-    expect(families.map((family) => family.author)).toEqual(['anthropic', 'openai'])
-    expect(families[0]?.models).toHaveLength(2)
+    // "Anthropic" < "Mistral AI" < "xAI" by name, though the ids sort differently.
+    expect(groups.map((group) => group.author)).toEqual(['anthropic', 'mistralai', 'x-ai'])
+    expect(groups[0]?.models.map((model) => model.modelId)).toEqual(['claude-9', 'claude-10'])
   })
 
-  it('orders families by their proper names, not their ids', () => {
-    const families = familyCatalog([
-      modelFor('openai', 'gpt-a', 'c'),
-      modelFor('mistralai', 'mistral-a', 'c'),
-      modelFor('x-ai', 'grok-a', 'c'),
-    ])
-    // "Mistral AI" < "OpenAI" < "xAI" alphabetically, though the ids would
-    // sort differently.
-    expect(families.map((family) => familyName(family.author))).toEqual([
-      'Mistral AI',
-      'OpenAI',
-      'xAI',
-    ])
-  })
-
-  it('sorts models numerically within a family, so 10 follows 9', () => {
-    const families = familyCatalog([
-      modelFor('anthropic', 'model-10', 'c'),
-      modelFor('anthropic', 'model-9', 'c'),
-      modelFor('anthropic', 'model-1', 'c'),
-    ])
-    expect(families[0]?.models.map((model) => model.modelId)).toEqual([
-      'model-1',
-      'model-9',
-      'model-10',
-    ])
-  })
-
-  it('groups an empty catalog into no families', () => {
-    expect(familyCatalog([])).toEqual([])
-  })
-})
-
-describe('familyName', () => {
-  it('names the vendors the table knows by their own name', () => {
-    expect(familyName('anthropic')).toBe('Anthropic')
-    expect(familyName('mistralai')).toBe('Mistral AI')
-    expect(familyName('x-ai')).toBe('xAI')
-  })
-
-  it('falls back to the id, title-cased, for a vendor nobody mapped', () => {
-    expect(familyName('the-box-next-door')).toBe('The Box Next Door')
-    expect(familyName('ai21')).toBe('Ai21')
-  })
-})
-
-describe('connectionsOf', () => {
-  it('names each serving connection once', () => {
-    const families = familyCatalog([
-      modelFor('anthropic', 'claude-a', 'work-anthropic'),
-      modelFor('anthropic', 'claude-b', 'work-anthropic'),
-      modelFor('anthropic', 'claude-c', 'openrouter'),
-    ])
-    const family = families[0]
-    if (family === undefined) throw new Error('expected the rows to group into one family')
-    expect(connectionsOf(family)).toEqual(['work-anthropic', 'openrouter'])
+  it('groups nothing into no families', () => {
+    expect(familyGroups([])).toEqual([])
   })
 })

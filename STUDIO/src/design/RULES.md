@@ -109,7 +109,7 @@ must never play the shell's entrance a second time inside itself: two stacked
 ramps compound into a hop. The shell owns the page-level handover; a page
 animates only the changes it owns, and a crossfade at that. One exception,
 for the same reason: a surface that owns a hierarchy the shell never plays —
-the model library's family → model drill-down — uses the same push / pop /
+the model library's connection → model drill-down — uses the same push / pop /
 sibling vocabulary for its own pages, because nothing is moving underneath
 it and direction is the only thing saying "deeper".
 

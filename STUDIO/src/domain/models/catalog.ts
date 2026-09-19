@@ -6,6 +6,7 @@ import type {
   ProviderModel,
 } from '@/platform/harness'
 import type { ReasoningLevel } from './types'
+import { authorOf, familyName } from './families'
 
 /**
  * The model catalog as the picker sees it: the harness's own list, mapped once
@@ -26,9 +27,10 @@ import type { ReasoningLevel } from './types'
  * Anthropic's mark on the model itself. So each catalog row carries
  * `connectionVendor` - the vendor whose list the connection draws from, which
  * is what a Settings row shows - and `author`, the mark the model itself
- * wears. OpenRouter names the author in its own model ids (`anthropic/...`),
- * so the author is the id's first segment there; a direct vendor connection
- * is its own author; anything else wears the custom mark.
+ * wears. How the author is read off an id is `families`' business: the id's
+ * prefix where the catalog writes one, the model's own name where a host
+ * serves someone else's model under a bare id, the connection's vendor
+ * otherwise.
  *
  * `id` is the runtime reference - `<vendor>/<model>` - the one string the
  * conversation index stores, the submission carries, and the run resolves.
@@ -69,15 +71,29 @@ function connectionVendorOf(connection: ProviderConnection): string {
   return connection.catalogProvider ?? connection.id
 }
 
+/** Letters and digits only, lower-cased: "Aion Labs", "AionLabs" and "aion-labs" are one word. */
+function squash(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
 /**
- * Whose mark a model wears. OpenRouter's ids carry the author (`anthropic/...`);
- * a direct vendor connection is its own author; a self-hosted model id with a
- * slash in it claims the prefix, and unknown authors fall back to the custom
- * mark at the component.
+ * The name a row is printed under, minus the author's own name where the
+ * catalog put it first. OpenRouter titles its rows "Z.ai: GLM 4.5", and under
+ * the Z.ai mark that prefix says the same thing twice. The prefix is the
+ * author's when, spelling aside, it is the author's id or name - "AionLabs"
+ * for `aion-labs` - or ends in it, for the vendors OpenRouter titles more
+ * fully than it ids them ("SpaceXAI" for `x-ai`). A prefix that is not the
+ * author's name is part of the name and stays.
  */
-function authorOf(modelId: string, vendor: string): string {
-  const separator = modelId.indexOf('/')
-  return separator > 0 ? modelId.slice(0, separator) : vendor
+function displayNameOf(displayName: string, author: string): string {
+  const trimmed = displayName.trim()
+  const colon = trimmed.indexOf(':')
+  if (colon <= 0) return trimmed
+  const prefix = squash(trimmed.slice(0, colon))
+  const names = [squash(author), squash(familyName(author))].filter((name) => name.length >= 3)
+  if (!names.some((name) => prefix === name || prefix.endsWith(name))) return trimmed
+  const rest = trimmed.slice(colon + 1).trim()
+  return rest === '' ? trimmed : rest
 }
 
 /** Maps one wire model onto the picker's row, against its connection. */
@@ -86,12 +102,13 @@ function catalogModelOf(
   connection: ProviderConnection | undefined,
 ): CatalogModel {
   const vendor = connection === undefined ? model.connectionId : connectionVendorOf(connection)
+  const author = authorOf(model.modelId, vendor)
   return {
     id: `${vendor}/${model.modelId}`,
     connectionId: model.connectionId,
     modelId: model.modelId,
-    name: model.displayName,
-    author: authorOf(model.modelId, vendor),
+    name: displayNameOf(model.displayName, author),
+    author,
     connectionVendor: vendor,
     connectionName: connection?.displayName ?? model.connectionId,
     reasoningLevels: model.reasoningLevels,

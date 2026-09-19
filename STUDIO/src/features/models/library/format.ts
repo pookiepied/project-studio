@@ -64,13 +64,19 @@ function trimZeros(text: string): string {
   return text.includes('.') ? text.replace(/\.?0+$/, '') : text
 }
 
-/** The capability words a row can vouch for - the ones that differentiate
- * models inside a family and are confirmed rather than undescribed. Tool
- * calling compresses to "tools"; the dial-level details wait for the page. */
-export function rowCapabilities(model: CatalogModel): readonly string[] {
-  const words: string[] = []
-  if (model.capability.toolCalling === 'supported') words.push('tools')
-  if (model.capability.vision === 'supported') words.push('vision')
-  if (model.capability.reasoning === 'supported') words.push('reasoning')
-  return words
+/** One capability a row can show: its key, and the words its mark stands for. */
+export interface RowCapability {
+  readonly id: 'tools' | 'vision' | 'reasoning'
+  readonly label: string
+}
+
+/** The capabilities a row can vouch for - the ones that separate siblings
+ * and are confirmed rather than undescribed. Each is a mark on the row with
+ * its label behind it; the full board waits for the page. */
+export function rowCapabilities(model: CatalogModel): readonly RowCapability[] {
+  const found: RowCapability[] = []
+  if (model.capability.toolCalling === 'supported') found.push({ id: 'tools', label: 'Tool calling' })
+  if (model.capability.vision === 'supported') found.push({ id: 'vision', label: 'Vision' })
+  if (model.capability.reasoning === 'supported') found.push({ id: 'reasoning', label: 'Reasoning' })
+  return found
 }

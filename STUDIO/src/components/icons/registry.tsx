@@ -26,7 +26,7 @@
  * glyph inside it rather than the glyph having its own small hitbox.
  */
 import {
-  Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
+  Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
@@ -34,6 +34,7 @@ import {
   SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
+  Cpu, Eye, Hammer, LayoutGrid, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -161,11 +162,25 @@ const REGISTRY = {
   // which vendors are connected — the exact collision the note at the top of
   // this file forbids.
   reasoning: { mark: Gauge },
-  // Where replies come from: a set of things to draw on, not a thing to plug
-  // in. `Cable` is spoken for by connectors, and MCP now carries its own
-  // published mark, so `Plug` is free again -- but it still describes reach
-  // rather than supply, which is why it is not the answer here either.
-  providers: { mark: Boxes },
+  // Where replies come from: the machine that answers. It was a stack of
+  // boxes - a set of things to draw on - which read as storage or shipping
+  // and never as a model; a brain was tried and is too intricate for the
+  // sizes this app draws marks at. `Cable` is spoken for by connectors, and
+  // MCP carries its own published mark, so `Plug` is free -- but it
+  // describes reach rather than supply, which is why it is not the answer
+  // here either.
+  providers: { mark: Cpu },
+  // The full catalog, one step behind the picker: a grid of tiles, a place
+  // to browse rather than a thing to find. It was the palette's search
+  // glass, which promised a search box and opened a page; a bookshelf was
+  // tried and is too fine a drawing for a menu row.
+  library: { mark: LayoutGrid },
+  // What a model can do, as a row states it. Two of the three are new marks
+  // here: a hammer for tool calling, an eye for vision. Reasoning is the
+  // bulb the transcript already uses for a reasoning run - the same idea at
+  // rest - and not the gauge, which means how hard to reason, a setting.
+  toolCalling: { mark: Hammer },
+  vision: { mark: Eye },
   permissionAsk: { mark: Pause },
   permissionAuto: { mark: FastForward },
 
@@ -252,6 +267,11 @@ const REGISTRY = {
   account: { mark: CircleUser },
   coding: { mark: Code },
   archive: { mark: Archive },
+  // The retrieval vendors a run can call on - web search and page fetch.
+  // A wrench, because the page is named Tools and the mark should agree
+  // with the name; it was the search glass, which said "a search box" about
+  // a page of keys.
+  tools: { mark: Wrench },
 
   // — Appearance ----------------------------------------------------------
   themeSystem: { mark: Monitor },
