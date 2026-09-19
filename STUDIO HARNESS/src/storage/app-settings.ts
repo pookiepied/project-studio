@@ -32,7 +32,7 @@ import type { StudioDatabase } from "./database.js";
  * migration; choosing tidier names would have orphaned every stored setting on
  * upgrade, which is a silent data loss for a cosmetic gain.
  */
-export type SettingNamespace = "local" | "retrieval" | "shell";
+export type SettingNamespace = "local" | "retrieval" | "shell" | "sandbox";
 
 export class AppSettings {
   readonly #db: StudioDatabase;

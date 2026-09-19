@@ -1,5 +1,4 @@
 import { satisfiesIsolation, type IsolationLevel } from "../../contracts/effects.js";
-import { SandboxError } from "../errors.js";
 import type { SandboxPolicy } from "../policy.js";
 
 /**
@@ -87,6 +86,13 @@ export interface ContainmentRequest {
 export interface ContainedCommand {
   readonly executable: string;
   readonly args: readonly string[];
+  /**
+   * One sentence for the person when the command runs without the fence it
+   * was owed - the fence is on, and this machine could not supply it for
+   * this call. Absent when the command is fenced, and absent when no fence
+   * was wanted: silence means nothing is missing.
+   */
+  readonly note?: string;
 }
 
 export interface IsolationBackend {
@@ -140,11 +146,6 @@ export interface IsolationSupport {
   /** Which backend supplies it, or `undefined` for `in-process`. */
   readonly backend: IsolationBackend | undefined;
   /**
-   * True when a required level above {@link IsolationSupport.level} is refused
-   * rather than run anyway.
-   */
-  readonly enforcing: boolean;
-  /**
    * Why the backends this build has could not be used here, if they could not.
    *
    * Empty when containment is available, and empty when there was never a
@@ -183,64 +184,19 @@ export function selectIsolation(backends: readonly IsolationBackend[]): Isolatio
   }
 
   if (best === undefined) {
-    return {
-      level: "in-process",
-      backend: undefined,
-      // A registered backend that this host cannot supply is a real refusal,
-      // not a transitional one: the build has containment for this platform and
-      // this particular machine cannot give it.
-      enforcing: backends.length > 0,
-      shortfall,
-    };
+    // A registered backend this host cannot supply is reported, not refused
+    // (ADR 0057): the gate is the boundary, and the shortfall is what the
+    // note beside a gate-only command and the settings page say.
+    return { level: "in-process", backend: undefined, shortfall };
   }
 
   // Nothing to explain once something works, even if a second backend failed.
-  return { level: best.level, backend: best, enforcing: backends.length > 0, shortfall: [] };
+  return { level: best.level, backend: best, shortfall: [] };
 }
 
-/**
- * Refuses work whose required isolation this host cannot supply.
- *
- * This is where `unsupported_isolation` gets thrown (#32). It was declared in
- * `sandbox/errors.ts` and raised nowhere, left over from ADR 0034 and waiting
- * for a decision that went the other way: the kind is not deleted, it becomes
- * the error a host with no usable backend produces.
- *
- * Returns without complaint when nothing is enforced, so callers that only want
- * to *describe* what they can do — the capability list the model is shown — ask
- * the same function as the caller that runs the work. One rule, asked twice;
- * two rules is what `T-28` was.
- */
-export function assertIsolationAvailable(
-  required: IsolationLevel,
-  support: IsolationSupport,
-): void {
-  if (satisfiesIsolation(support.level, required)) return;
-  if (!support.enforcing) return;
-
-  throw new SandboxError("unsupported_isolation", {
-    message: [
-      "This action needs OS-level isolation, and no sandbox backend on this " +
-        "machine can provide it.",
-      ...support.shortfall,
-    ].join(" "),
-  });
-}
-
-/**
- * Whether the required isolation is available, without the throw.
- *
- * The same question `assertIsolationAvailable` answers, for the places that
- * build a list rather than run a call.
- */
-export function isolationAvailable(
-  required: IsolationLevel,
-  support: IsolationSupport,
-): boolean {
-  try {
-    assertIsolationAvailable(required, support);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/** No fence: what every host runs under until the person turns one on. */
+export const NO_ISOLATION: IsolationSupport = {
+  level: "in-process",
+  backend: undefined,
+  shortfall: [],
+};

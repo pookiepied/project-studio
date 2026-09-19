@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EnvironmentsPane } from './EnvironmentsPane'
 import type { EnvironmentsView } from './useEnvironments'
-import type { FolderTrust, SandboxScopeRow, ShellInfo } from '@/platform/harness'
+import type { FolderTrust, IsolationInfo, SandboxScopeRow, ShellInfo } from '@/platform/harness'
 
 /**
  * The two holes Task 57 left in this pane, and the words around them.
@@ -31,6 +31,7 @@ const environments = vi.hoisted(() => {
     selectProject: vi.fn(async (_id: string | null) => {}),
     setLevel: vi.fn(async () => null),
     setShell: vi.fn(async () => null),
+    setIsolation: vi.fn(async () => null),
     grantCustom: vi.fn(async () => null),
     revoke: vi.fn(async () => null),
     setTrust: vi.fn(async () => null),
@@ -69,11 +70,17 @@ function shellInfo(overrides: Partial<ShellInfo> = {}): ShellInfo {
   return { preferred: null, active: { kind: BASH.kind, path: BASH.path }, available: [BASH, CMD], ...overrides }
 }
 
+/** A Windows build: nothing to turn on. The Linux states override this. */
+function isolationInfo(overrides: Partial<IsolationInfo> = {}): IsolationInfo {
+  return { enabled: false, offered: false, backend: null, shortfall: [], ...overrides }
+}
+
 function ready(scope: {
   readonly project?: readonly SandboxScopeRow[]
   readonly machineWide?: readonly SandboxScopeRow[]
   readonly trust?: readonly FolderTrust[]
   readonly shell?: ShellInfo
+  readonly isolation?: IsolationInfo
 }): void {
   environments.view = {
     status: 'ready',
@@ -95,6 +102,7 @@ function ready(scope: {
       trust: scope.trust ?? [],
     },
     shell: scope.shell ?? shellInfo(),
+    isolation: scope.isolation ?? isolationInfo(),
   }
 }
 
@@ -105,6 +113,7 @@ function noProjects(): void {
     projectId: null,
     scope: { project: [], machineWide: [], level: 'contained', trust: [] },
     shell: shellInfo(),
+    isolation: isolationInfo(),
   }
 }
 
@@ -201,6 +210,47 @@ describe('the shell', () => {
     render(<EnvironmentsPane />)
 
     expect(screen.getByText(/PowerShell 7 was chosen, but this machine does not have it\. Commands run through bash/)).toBeTruthy()
+  })
+})
+
+/**
+ * The sandbox fence is the person's to turn on (ADR 0057), where the build
+ * has one to offer.
+ */
+describe('the sandbox fence', () => {
+  it('offers no switch where the platform has no fence, and says why', () => {
+    ready({})
+    render(<EnvironmentsPane />)
+
+    expect(screen.queryByRole('radiogroup', { name: 'Sandbox fence' })).toBeNull()
+    expect(screen.getByText(/no sandbox fence for this platform/)).toBeTruthy()
+  })
+
+  it('offers the switch where a fence exists, and turns it on', () => {
+    ready({ isolation: isolationInfo({ offered: true }) })
+    render(<EnvironmentsPane />)
+
+    expect(screen.getByText(/^Off\. Commands run under the permission gate alone/)).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Sandbox fence' })).getByRole('radio', { name: 'On' }))
+    expect(environments.setIsolation).toHaveBeenCalledWith(true)
+  })
+
+  it('names the backend when the fence is on and working', () => {
+    ready({ isolation: isolationInfo({ offered: true, enabled: true, backend: 'bwrap' }) })
+    render(<EnvironmentsPane />)
+
+    expect(screen.getByText(/On, through bwrap\./)).toBeTruthy()
+  })
+
+  it("says the machine cannot supply the fence, in the machine's own words", () => {
+    // The state stock Ubuntu lands in: the switch is on and the kernel says
+    // no. The page must not pretend the fence is up.
+    ready({
+      isolation: isolationInfo({ offered: true, enabled: true, shortfall: ['Install bubblewrap.'] }),
+    })
+    render(<EnvironmentsPane />)
+
+    expect(screen.getByText(/this machine cannot supply it.*Install bubblewrap\./)).toBeTruthy()
   })
 })
 

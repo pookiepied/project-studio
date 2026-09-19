@@ -64,6 +64,7 @@ import { ContextUsageTracker } from "./conversations/context-usage.js";
 import { ProjectStore } from "./projects/store.js";
 import { WorkspaceTrustStore } from "./permissions/trust.js";
 import { ShellSettingsStore } from "./process/shell-settings.js";
+import { IsolationSettingsStore } from "./sandbox/isolation-settings.js";
 import { SandboxScopeStore } from "./sandbox/scope-store.js";
 
 interface HarnessApplication {
@@ -191,6 +192,11 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // one shell and run another.
     const shell = new ShellSettingsStore(database);
     shell.apply();
+    // The fence switch, for the same reason and at the same moment: every
+    // sandbox built after this asks `hostIsolation()` and gets the answer
+    // the person stored, and the environment block reads it too.
+    const isolation = new IsolationSettingsStore(database);
+    isolation.apply();
     const mediaAdapters = builtinMediaAdapters();
     const runtime = new StudioRuntime({
       database,
@@ -371,6 +377,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       scopes,
       trust,
       shell,
+      isolation,
       database,
       titling,
       contextUsage,

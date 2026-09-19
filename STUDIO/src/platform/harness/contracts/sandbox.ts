@@ -4,7 +4,7 @@
  */
 
 import { isRecord } from '@/lib/guards'
-import { finiteNumber, listOf, oneOf, text } from './guards'
+import { finiteNumber, flag, listOf, oneOf, text } from './guards'
 
 /*
  * Mirrored from `GET /api/sandbox/scope`: the doors the person opened in the
@@ -182,4 +182,33 @@ export function parseFolderListing(value: unknown): FolderListing | null {
   const directories = listOf(parseBrowsedDirectory, value['directories'])
   if (path === null || parent === null || directories === null) return null
   return { path, parent: parent === '' ? null : parent, directories }
+}
+
+/*
+ * Mirrored from `GET /api/sandbox/isolation` (ADR 0057): the sandbox fence
+ * switch. `offered` is the build's answer for this platform - Linux has a
+ * backend, Windows and macOS do not - and `backend` / `shortfall` are the
+ * machine's, measured only once the fence is on. A page shows the switch
+ * where the fence is offered and says why it is not where it is not.
+ */
+
+export interface IsolationInfo {
+  readonly enabled: boolean
+  readonly offered: boolean
+  readonly backend: string | null
+  readonly shortfall: readonly string[]
+}
+
+export function parseIsolationInfo(value: unknown): IsolationInfo | null {
+  if (!isRecord(value)) return null
+  const enabled = flag(value['enabled'])
+  const offered = flag(value['offered'])
+  let backend: string | null = null
+  if (value['backend'] !== null) {
+    backend = text(value['backend'])
+    if (backend === null) return null
+  }
+  const shortfall = listOf((entry: unknown) => (typeof entry === 'string' ? entry : null), value['shortfall'])
+  if (enabled === null || offered === null || shortfall === null) return null
+  return { enabled, offered, backend, shortfall }
 }

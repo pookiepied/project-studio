@@ -9,6 +9,8 @@ import type { WorkspaceTrustStore } from "../../../permissions/trust.js";
 import type { ProjectStore } from "../../../projects/store.js";
 import { shellChoice, type InterpreterKind } from "../../../process/interpreter.js";
 import type { ShellSettingsStore } from "../../../process/shell-settings.js";
+import type { IsolationSettingsStore } from "../../../sandbox/isolation-settings.js";
+import { ISOLATION_OFFERED, measuredIsolation } from "../../../sandbox/isolation/registry.js";
 import { browseFolders } from "../../../sandbox/browse.js";
 import type { SandboxScopeStore } from "../../../sandbox/scope-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
@@ -35,6 +37,11 @@ export interface SandboxRoutesOptions {
    * shell tool runs whatever the machine orders first.
    */
   readonly shell?: ShellSettingsStore;
+  /**
+   * The sandbox fence switch (ADR 0057). Optional the same way; a
+   * composition without it serves no fence routes and runs gate-only.
+   */
+  readonly isolation?: IsolationSettingsStore;
 }
 
 const shellSchema = v.object({
@@ -42,6 +49,28 @@ const shellSchema = v.object({
 });
 
 /** What the page shows: the preference, what is running lines, and the choices. */
+const isolationSchema = v.object({
+  enabled: v.boolean(),
+});
+
+/**
+ * What the fence switch says and what it gets. `offered` is the build's
+ * answer for this platform; `backend` and `shortfall` are the machine's, and
+ * they are only measured when the person has turned the fence on - the
+ * probe spawns a process, and a page describing an off switch is not a
+ * reason to start one.
+ */
+function isolationReport(store: IsolationSettingsStore) {
+  const enabled = store.read();
+  const measured = enabled && ISOLATION_OFFERED ? measuredIsolation() : undefined;
+  return {
+    enabled,
+    offered: ISOLATION_OFFERED,
+    backend: measured?.backend?.name ?? null,
+    shortfall: measured?.shortfall ?? [],
+  };
+}
+
 function shellReport(store: ShellSettingsStore) {
   const choice = shellChoice();
   return {
@@ -148,6 +177,24 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
         const kind: InterpreterKind | undefined = parsed.output.interpreter ?? undefined;
         shell.select(kind);
         return context.json(shellReport(shell));
+      } catch (error) {
+        return context.json(failure(error), statusOf(error));
+      }
+    });
+  }
+
+  const isolation = options.isolation;
+  if (isolation !== undefined) {
+    routes.get("/isolation", (context) => context.json(isolationReport(isolation)));
+
+    routes.put("/isolation", async (context) => {
+      try {
+        const parsed = v.safeParse(isolationSchema, await body(context));
+        if (!parsed.success) {
+          throw invalidBody("The body must say whether the fence is enabled: true or false.");
+        }
+        isolation.select(parsed.output.enabled);
+        return context.json(isolationReport(isolation));
       } catch (error) {
         return context.json(failure(error), statusOf(error));
       }

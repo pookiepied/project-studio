@@ -171,6 +171,8 @@ export {
   type ShellOption,
   type ShellInfo,
   parseShellInfo,
+  type IsolationInfo,
+  parseIsolationInfo,
 } from './sandbox'
 
 export {

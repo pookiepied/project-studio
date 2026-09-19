@@ -1,9 +1,6 @@
+import { SandboxError } from "../errors.js";
 import type { SandboxPolicy } from "../policy.js";
-import {
-  assertIsolationAvailable,
-  type ContainedCommand,
-  type IsolationSupport,
-} from "./backend.js";
+import type { ContainedCommand, IsolationSupport } from "./backend.js";
 import { isolationForKind, type ChildKind } from "./kinds.js";
 import { hostIsolation } from "./registry.js";
 import { satisfiesIsolation } from "../../contracts/effects.js";
@@ -40,11 +37,6 @@ export async function containCommand(
   support: IsolationSupport = hostIsolation(),
 ): Promise<ContainedCommand> {
   const required = isolationForKind(kind);
-  // Raised before anything is spawned, so a host that cannot contain what this
-  // kind is owed refuses rather than running it uncontained. This is #32's
-  // error, on the path that actually starts code.
-  assertIsolationAvailable(required, support);
-
   const plain: ContainedCommand = { executable: request.executable, args: request.args };
 
   // A kind that needs nothing is not wrapped just because a backend happens to
@@ -53,16 +45,41 @@ export async function containCommand(
   if (required === "in-process") return plain;
 
   const backend = support.backend;
-  if (backend === undefined) return plain;
+  if (backend === undefined) {
+    // Gate-only, and said so only when a fence was asked for (ADR 0057). A
+    // shortfall is only ever recorded by measuring the registry, which only
+    // happens once the fence is wanted; `hostIsolation()` answers with no
+    // shortfall at all until then, so a host that never wanted a fence has
+    // nothing to say here.
+    return support.shortfall.length > 0
+      ? { ...plain, note: gateOnlyNote(support.shortfall.join(" ")) }
+      : plain;
+  }
   if (!satisfiesIsolation(backend.level, required)) return plain;
 
-  return backend.contain({
-    policy: request.policy,
-    executable: request.executable,
-    args: request.args,
-    cwd: request.cwd,
-    network: request.network,
-    ...(request.lineJoin === undefined ? {} : { lineJoin: request.lineJoin }),
-    ...(request.programRoots === undefined ? {} : { programRoots: request.programRoots }),
-  });
+  try {
+    return await backend.contain({
+      policy: request.policy,
+      executable: request.executable,
+      args: request.args,
+      cwd: request.cwd,
+      network: request.network,
+      ...(request.lineJoin === undefined ? {} : { lineJoin: request.lineJoin }),
+      ...(request.programRoots === undefined ? {} : { programRoots: request.programRoots }),
+    });
+  } catch (error) {
+    // The backend refused this one call - the network program missing for a
+    // networked command is the Linux case - after the probe said the fence
+    // works. The backend's own words stay its own (it is untouched by ADR
+    // 0057); what changes is that the call runs under the gate with the
+    // refusal beside its output instead of not running at all.
+    if (error instanceof SandboxError && error.kind === "unsupported_isolation") {
+      return { ...plain, note: gateOnlyNote(error.message) };
+    }
+    throw error;
+  }
+}
+
+function gateOnlyNote(reason: string): string {
+  return `This command ran without the sandbox fence, under the permission gate only. ${reason}`;
 }

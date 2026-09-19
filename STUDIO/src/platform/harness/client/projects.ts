@@ -3,9 +3,11 @@ import {
   parseFolderTrust,
   parseProjectRecord,
   parseProjectRecords,
+  parseIsolationInfo,
   parseSandboxScopeInfo,
   parseShellInfo,
   type FolderListing,
+  type IsolationInfo,
   type FolderTrust,
   type ProjectCreateDraft,
   type ProjectFolderSpec,
@@ -76,6 +78,9 @@ export interface ProjectClient {
   getShell(): Promise<HarnessResult<ShellInfo>>
   /** Records the preferred shell by kind; null lets the machine's order decide. */
   setShell(kind: ShellKind | null): Promise<HarnessResult<ShellInfo>>
+  /** The sandbox fence switch (ADR 0057): off by default, offered on Linux. */
+  getIsolation(): Promise<HarnessResult<IsolationInfo>>
+  setIsolation(enabled: boolean): Promise<HarnessResult<IsolationInfo>>
   /**
    * Records the person's answer about one folder: whether they vouch for what
    * is in it. Addressed by path rather than by project, because that is the
@@ -182,6 +187,14 @@ export function projectClient({ json, empty }: Requester): ProjectClient {
 
     setShell(kind) {
       return json('PUT', `${SANDBOX_PATH}/shell`, { interpreter: kind }, parseShellInfo)
+    },
+
+    getIsolation() {
+      return json('GET', `${SANDBOX_PATH}/isolation`, undefined, parseIsolationInfo)
+    },
+
+    setIsolation(enabled) {
+      return json('PUT', `${SANDBOX_PATH}/isolation`, { enabled }, parseIsolationInfo)
     },
 
     setSandboxLevel(projectId, level) {

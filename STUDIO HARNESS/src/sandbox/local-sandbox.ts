@@ -5,20 +5,14 @@ import type { CapabilityDescriptor } from "../contracts/capabilities.js";
 import { runProcess, type ProcessResult } from "../process/exec.js";
 import { SandboxError } from "./errors.js";
 import {
-  assertIsolationAvailable,
   containCommand,
   hostIsolation,
-  isolationForKind,
   type ChildKind,
   type ContainedCommand,
   type IsolationSupport,
 } from "./isolation/index.js";
 import { resolveContainedPath } from "./paths.js";
-import {
-  requiredIsolation,
-  type IsolationLevel,
-  type SandboxPolicy,
-} from "./policy.js";
+import { type IsolationLevel, type SandboxPolicy } from "./policy.js";
 
 /**
  * A command to run, minus everything the sandbox already knows.
@@ -51,6 +45,14 @@ export interface SandboxRunOptions {
   readonly stdin?: string;
 }
 
+/**
+ * What a run produced, and one sentence the caller owes the person when the
+ * command ran without a fence it was owed. See `ContainedCommand.note`.
+ */
+export interface SandboxRunResult extends ProcessResult {
+  readonly note?: string;
+}
+
 export interface SandboxFileStat {
   readonly isFile: boolean;
   readonly isDirectory: boolean;
@@ -72,10 +74,10 @@ export interface SandboxFileStat {
  *
  * What changed in Stage 4b is that the subprocess is no longer left there.
  * {@link LocalSandbox.run} hands anything the harness did not choose to a real
- * OS container when the host has one, and refuses when the build expects one
- * and the machine cannot supply it. Where it still admits `execute`
- * uncontained, it does so because no backend exists for this platform yet —
- * stated as data in `isolation/registry.ts`, not as a comment.
+ * OS fence when the person has turned one on and the host has it. Since ADR
+ * 0057 the gate is the boundary: a host with no fence, or one that cannot
+ * supply the fence it was asked for, runs the command under the gate alone
+ * and says so beside the output, rather than refusing.
  */
 export class LocalSandbox {
   /**
@@ -89,9 +91,8 @@ export class LocalSandbox {
   /**
    * What this host can actually contain, measured once per sandbox.
    *
-   * Injectable so the enforcing branch is testable today, on a machine where
-   * no backend exists. A refusal that cannot be exercised until the backend
-   * ships is a refusal nobody has ever seen work.
+   * Injectable so the fenced and gate-only branches are both testable on one
+   * machine, whatever that machine can do.
    */
   readonly #isolationSupport: IsolationSupport;
 
@@ -189,22 +190,9 @@ export class LocalSandbox {
         });
       }
 
-      // Trusted removes containment for that project's conversations, so the
-      // isolation question is not asked here. The switches above still apply.
-      if (this.#policy.trusted) continue;
-
-      // The shortfall is decided in one place now, and it is a decision rather
-      // than a fall-through. This branch used to be an `if … continue` followed
-      // by a comment explaining why nothing happened — true, and inert, and
-      // impossible to act on.
-      //
-      // What makes running it anyway acceptable, while it *is* acceptable, is
-      // decided in two other places on purpose: our own code was reviewed
-      // before it shipped, and connected code was installed by hand and asks
-      // again on every single call. What changed is that the harness now says
-      // so by consulting `selectIsolation()`, so the day a backend exists this
-      // starts refusing without anyone having to remember this line.
-      assertIsolationAvailable(requiredIsolation(effect), this.#isolationSupport);
+      // Whether the host can fence the effect is not asked here any more
+      // (ADR 0057): a fence is extra, and a capability is offered on the
+      // strength of the gate. The switches above are the whole answer.
     }
   }
 
@@ -225,18 +213,7 @@ export class LocalSandbox {
    * undo down with it. `architecture.test.ts` is what keeps a *new* execute
    * capability from quietly reaching for `runProcess` instead of this.
    */
-  async run(kind: ChildKind, options: SandboxRunOptions): Promise<ProcessResult> {
-    const required = isolationForKind(kind);
-    // Trusted runs uncontained: the project's own files are no longer the
-    // boundary, so the isolation question is not asked and the command is not
-    // wrapped. The environment is still built from policy alone.
-    if (!this.#policy.trusted) {
-      // The same refusal `assertSupports` raises, asked again at the moment of
-      // truth. A capability list built minutes ago is a description; this is the
-      // spawn, and it is worth re-asking on the path that actually starts code.
-      assertIsolationAvailable(required, this.#isolationSupport);
-    }
-
+  async run(kind: ChildKind, options: SandboxRunOptions): Promise<SandboxRunResult> {
     const command = await this.plan(kind, {
       executable: options.executable,
       args: options.args,
@@ -246,7 +223,7 @@ export class LocalSandbox {
       network: this.#policy.allowNetwork,
     });
 
-    return runProcess({
+    const result = await runProcess({
       executable: command.executable,
       args: command.args,
       cwd: options.cwd,
@@ -259,6 +236,7 @@ export class LocalSandbox {
       ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
     });
+    return command.note === undefined ? result : { ...result, note: command.note };
   }
 
   /**
@@ -279,10 +257,9 @@ export class LocalSandbox {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly env: Readonly<Record<string, string>>;
+    /** See `ContainedCommand.note`. */
+    readonly note?: string;
   }> {
-    if (!this.#policy.trusted) {
-      assertIsolationAvailable(isolationForKind(kind), this.#isolationSupport);
-    }
     const command = await this.plan(kind, {
       executable: options.executable,
       args: options.args,
@@ -296,6 +273,7 @@ export class LocalSandbox {
       args: command.args,
       cwd: options.cwd,
       env: this.environment(),
+      ...(command.note === undefined ? {} : { note: command.note }),
     };
   }
 

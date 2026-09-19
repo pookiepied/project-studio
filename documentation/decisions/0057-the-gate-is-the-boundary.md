@@ -116,8 +116,11 @@ The Linux backend (`isolation/linux/`) is untouched by this decision. It has no
 side effects to own, and the measurements in ADR 0041 stand. Two things change
 about how it is treated:
 
-- It is **opt-in**, not the default. A person on Linux turns it on; a build
-  never claims containment it was not asked for.
+- It is **opt-in**, not the default. A person on Linux turns it on (the
+  "Sandbox fence" switch on the Environments page, stored as a setting and
+  applied process-wide like the shell choice); a build never claims
+  containment it was not asked for. On a platform with no backend the
+  switch is not offered and the stored value means nothing.
 - When it is on and cannot start — `bwrap` missing, user namespaces withheld,
   `passt` absent for a networked command — the command runs **gate-only, with
   a visible note** saying so, instead of refusing. ADR 0041 refused here, and

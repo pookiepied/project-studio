@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { hostIsolation } from "../../src/sandbox/isolation/index.js";
+import { measuredIsolation } from "../../src/sandbox/isolation/index.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 
@@ -29,7 +29,7 @@ import { createSandboxPolicy } from "../../src/sandbox/policy.js";
  * users will hit.
  */
 
-const support = process.platform === "linux" ? hostIsolation() : undefined;
+const support = process.platform === "linux" ? measuredIsolation() : undefined;
 const contained = support?.backend !== undefined;
 
 const linux = contained ? describe : describe.skip;
@@ -401,12 +401,12 @@ refusing("a Linux kernel that will not hand out a namespace", () => {
     expect(support?.shortfall.join(" ")).toMatch(/sandbox program/i);
   });
 
-  it("still declares that it enforces", () => {
-    // The distinction the registry exists to keep: this build *has* a Linux
-    // implementation, so a machine that cannot run it is refused rather than
-    // quietly given `in-process`. A host with no backend registered at all
-    // would report `enforcing: false`, and that is a different sentence.
-    expect(support?.enforcing).toBe(true);
+  it("reports in-process with the reason kept, so the gate-only note can say it", () => {
+    // ADR 0057: this build *has* a Linux implementation and this machine
+    // cannot run it. That is no longer a refusal; it is the sentence beside
+    // every command that runs gate-only while the fence is wanted.
+    expect(support?.backend).toBeUndefined();
     expect(support?.level).toBe("in-process");
+    expect(support?.shortfall.length).toBeGreaterThan(0);
   });
 });

@@ -2,16 +2,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { SandboxError } from "../../src/sandbox/errors.js";
 import {
-  assertIsolationAvailable,
   containCommand,
-  isolationAvailable,
+  hostIsolation,
   isolationForKind,
-  ISOLATION_ENFORCED,
+  ISOLATION_OFFERED,
+  NO_ISOLATION,
   OS_ISOLATION_BACKENDS,
+  preferIsolation,
   programRoots,
   bwrapArgs,
   selectIsolation,
@@ -90,19 +91,20 @@ describe("the kind of a child decides what contains it", () => {
 });
 
 describe("selectIsolation", () => {
-  it("reports in-process with no backend, and enforces nothing", () => {
+  it("reports in-process with no backend", () => {
     const support = selectIsolation([]);
     expect(support.level).toBe("in-process");
     expect(support.backend).toBeUndefined();
-    expect(support.enforcing).toBe(false);
+    expect(support.shortfall).toEqual([]);
   });
 
-  it("enforces once a backend exists, even when this host cannot run it", () => {
-    // The #32 case, stated exactly: the build has containment for this platform
-    // and this machine cannot supply it. That is a refusal, not a fall-through.
+  it("reports in-process when a backend exists and this host cannot run it", () => {
+    // ADR 0057: the build has a fence for this platform and this machine
+    // cannot supply it. That is reported, not refused - the gate is the
+    // boundary, and the shortfall is what the note beside a command says.
     const support = selectIsolation([backend("bwrap", false)]);
     expect(support.level).toBe("in-process");
-    expect(support.enforcing).toBe(true);
+    expect(support.backend).toBeUndefined();
   });
 
   it("uses a backend that probes as available", () => {
@@ -119,43 +121,39 @@ describe("selectIsolation", () => {
   });
 });
 
-describe("assertIsolationAvailable", () => {
-  it("throws unsupported_isolation when a backend exists and cannot deliver", () => {
-    const support = selectIsolation([backend("bwrap", false)]);
-    try {
-      assertIsolationAvailable("os", support);
-      expect.unreachable("should have thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SandboxError);
-      // The kind matters, not just that something threw: `unsupported_isolation`
-      // was declared in `sandbox/errors.ts` and raised nowhere at all until #32.
-      expect((error as SandboxError).kind).toBe("unsupported_isolation");
-    }
+describe("the fence is the person's to turn on", () => {
+  afterEach(() => {
+    preferIsolation(false);
   });
 
-  it("permits the shortfall while nothing is enforced", () => {
-    expect(() => {
-      assertIsolationAvailable("os", selectIsolation([]));
-    }).not.toThrow();
+  it("runs under no isolation until the fence is wanted, and asks the registry nothing", () => {
+    preferIsolation(false);
+    expect(hostIsolation()).toBe(NO_ISOLATION);
   });
 
-  it("permits anything the host already satisfies", () => {
-    expect(isolationAvailable("in-process", selectIsolation([]))).toBe(true);
-    expect(isolationAvailable("os", selectIsolation([backend("x", true)]))).toBe(true);
+  it("measures the registry once the fence is wanted", () => {
+    preferIsolation(true);
+    const support = hostIsolation();
+    // Whatever this machine can do, the answer is the registry's, and a
+    // platform with nothing registered has nothing to measure.
+    if (!ISOLATION_OFFERED) expect(support.backend).toBeUndefined();
+    expect(support.shortfall.every((entry) => typeof entry === "string")).toBe(true);
   });
 });
 
 describe("LocalSandbox consults the measured support", () => {
   const policy = createSandboxPolicy({ workspaceRoot: workspace });
 
-  it("still admits execute while nothing is enforced", () => {
+  it("admits execute with no backend, because the gate is the boundary", () => {
     const sandbox = new LocalSandbox(policy, selectIsolation([]));
     expect(sandbox.supports(capability("shell", ["execute"]))).toBe(true);
   });
 
-  it("refuses execute once a backend exists that this host cannot run", () => {
+  it("still admits execute when a backend exists that this host cannot run", () => {
+    // ADR 0057: a fence the machine cannot supply is a note beside the
+    // command, not a refusal of the capability.
     const sandbox = new LocalSandbox(policy, selectIsolation([backend("bwrap", false)]));
-    expect(sandbox.supports(capability("shell", ["execute"]))).toBe(false);
+    expect(sandbox.supports(capability("shell", ["execute"]))).toBe(true);
   });
 
   it("keeps admitting read, which needs no isolation at all", () => {
@@ -195,17 +193,61 @@ describe("every kind reaches the same verdict", () => {
     expect(server.executable).toBe("fake-launcher");
   });
 
-  it("refuses to start an MCP server a host cannot contain", async () => {
-    // The refusal that matters most: a third party's program on a machine whose
-    // build expects containment and cannot deliver it does not start at all.
-    const support = selectIsolation([backend("bwrap", false)]);
+  it("runs gate-only with a note when the fence is wanted and the host cannot supply it", async () => {
+    // ADR 0057: the fence is on, the probe said no, and the command runs
+    // under the gate with the probe's reason beside it - said only when a
+    // fence was asked for, because a host that never wanted one has nothing
+    // missing.
+    const cannot: IsolationBackend = {
+      ...backend("bwrap", false),
+      diagnose: () => "Install bubblewrap.",
+    };
+    const request = { policy, executable: "node", args: [], cwd: workspace, network: true };
+
+    const wanted = await containCommand("mcp-server", request, selectIsolation([cannot]));
+    expect(wanted.executable).toBe("node");
+    expect(wanted.note).toMatch(/without the sandbox fence.*Install bubblewrap\./);
+
+    // What `hostIsolation()` answers while the fence is off: nothing measured,
+    // nothing missing, nothing said.
+    const unwanted = await containCommand("mcp-server", request, NO_ISOLATION);
+    expect(unwanted.note).toBeUndefined();
+  });
+
+  it("runs gate-only with the backend's own words when it refuses one call", async () => {
+    // The Linux case: the probe passed and the network program is missing for
+    // a networked command. The backend's refusal is untouched (ADR 0057 keeps
+    // that code as it is); the seam turns it into a note instead of a stop.
+    const refusing: IsolationBackend = {
+      ...backend("fence", true),
+      contain: () => {
+        throw new SandboxError("unsupported_isolation", { message: "passt is not installed." });
+      },
+    };
+    const support = selectIsolation([refusing]);
+    const command = await containCommand(
+      "shell",
+      { policy, executable: "node", args: ["-e", "0"], cwd: workspace, network: true },
+      support,
+    );
+    expect(command.executable).toBe("node");
+    expect(command.note).toMatch(/passt is not installed\./);
+  });
+
+  it("lets any other backend failure through", async () => {
+    const broken: IsolationBackend = {
+      ...backend("fence", true),
+      contain: () => {
+        throw new SandboxError("invalid_policy", { message: "broken" });
+      },
+    };
     await expect(
       containCommand(
-        "mcp-server",
-        { policy, executable: "node", args: [], cwd: workspace, network: true },
-        support,
+        "shell",
+        { policy, executable: "node", args: [], cwd: workspace, network: false },
+        selectIsolation([broken]),
       ),
-    ).rejects.toThrow(SandboxError);
+    ).rejects.toThrow(/broken/);
   });
 
   it("asks for the network only when the caller did", async () => {
@@ -610,10 +652,10 @@ describe("what this build knows how to contain, per platform", () => {
     // it does not have.
     if (process.platform === "linux") {
       expect(OS_ISOLATION_BACKENDS.map((entry) => entry.name)).toEqual(["bwrap"]);
-      expect(ISOLATION_ENFORCED).toBe(true);
+      expect(ISOLATION_OFFERED).toBe(true);
     } else {
       expect(OS_ISOLATION_BACKENDS).toHaveLength(0);
-      expect(ISOLATION_ENFORCED).toBe(false);
+      expect(ISOLATION_OFFERED).toBe(false);
     }
   });
 
@@ -629,8 +671,6 @@ describe("what this build knows how to contain, per platform", () => {
     };
 
     expect(selectIsolation([mute, speaking]).shortfall).toEqual(["Install bubblewrap."]);
-    expect(() => assertIsolationAvailable("os", selectIsolation([mute, speaking])))
-      .toThrow(/Install bubblewrap\./);
   });
 
   it("explains nothing once something works", () => {
@@ -643,18 +683,5 @@ describe("what this build knows how to contain, per platform", () => {
     };
 
     expect(selectIsolation([speaking, backend("works", true)]).shortfall).toEqual([]);
-  });
-
-  it("derives enforcement from the registry rather than from a second switch", () => {
-    // Deliberately *not* asserted as `ISOLATION_ENFORCED === length > 0`. That
-    // was the first version of this test and it was a tautology — the constant
-    // is computed from exactly that expression, so nothing could ever make it
-    // fail. Caught by mutating the registry and watching it pass.
-    //
-    // What is worth pinning is the property that made the tautology tempting:
-    // there is no way to register a backend and leave enforcement off, because
-    // there is no independent switch to forget.
-    expect(selectIsolation(OS_ISOLATION_BACKENDS).enforcing).toBe(ISOLATION_ENFORCED);
-    expect(selectIsolation([backend("any", false)]).enforcing).toBe(true);
   });
 });

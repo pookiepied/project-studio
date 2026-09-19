@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { hostIsolation } from "../../src/sandbox/isolation/index.js";
+import { measuredIsolation, preferIsolation } from "../../src/sandbox/isolation/index.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 
@@ -24,8 +24,9 @@ import { createSandboxPolicy } from "../../src/sandbox/policy.js";
  * operations refuse a path outside the roots, is in the unit suite.
  */
 
-const support = hostIsolation();
+const support = measuredIsolation();
 const contained = support.backend !== undefined;
+if (contained) preferIsolation(true);
 const runner = contained ? describe : describe.skip;
 
 const NODE = process.execPath;

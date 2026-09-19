@@ -116,6 +116,8 @@ function stubClient(overrides: {
     browseFolders: () => refuse(),
     setSandboxLevel: () => refuse(),
     getShell: () => refuse(),
+    getIsolation: () => refuse(),
+    setIsolation: () => refuse(),
     setShell: () => refuse(),
     setFolderTrust: () => refuse(),
     getPlan: () => refuse(),

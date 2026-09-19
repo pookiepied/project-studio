@@ -169,7 +169,7 @@ function clip(output: string): string {
  * that was asked - so it is reported rather than thrown.
  */
 function report(
-  result: { exitCode: number; stdout: string; stderr: string },
+  result: { exitCode: number; stdout: string; stderr: string; note?: string },
 ): string {
   const parts: string[] = [];
   const stdout = result.stdout.trim();
@@ -180,10 +180,11 @@ function report(
   if (parts.length === 0) parts.push(`The command produced no output.`);
 
   const clipped = clip(parts.join("\n\n"));
-  if (result.exitCode !== 0) {
-    return `${clipped}\n\n[exit code ${result.exitCode}]`;
-  }
-  return clipped;
+  const exit = result.exitCode === 0 ? clipped : `${clipped}\n\n[exit code ${result.exitCode}]`;
+  // The sandbox's own sentence, after the output and never clipped with it:
+  // the command ran without the fence it was owed (ADR 0057), and the
+  // person reading the transcript is the one who can do something about it.
+  return result.note === undefined ? exit : `${exit}\n\n[sandbox] ${result.note}`;
 }
 
 export interface ShellToolOptions {
@@ -351,6 +352,7 @@ function createShellTool(
               `output with jobs {"id": "${started.id}"}, and stop it with ` +
               `jobs {"id": "${started.id}", "stop": true} when you are done ` +
               "with it.",
+            ...(plan.note === undefined ? [] : ["", `[sandbox] ${plan.note}`]),
           ].join("\n");
         } catch (error) {
           if (error instanceof ToolError) throw error;
