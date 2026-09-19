@@ -408,10 +408,9 @@ function containmentStatement(): readonly string[] {
     "else, and that includes ones in this same project. You cannot read what",
     "another conversation built or the notes it left itself, and it cannot",
     "read yours. If the work genuinely needs something out there, do not go",
-    "looking for a way in and do not pretend you looked. Say plainly that it",
-    "is outside what you can reach, name the exact folder or file, and say",
-    "that the person can give you access to it in Settings, under Coding, in",
-    "Environments - then it is reachable and you can carry on. Granting it is",
+    "looking for a way in and do not pretend you looked. Ask for the exact",
+    "folder with the request_folder tool, and say what for - then, if the",
+    "person says yes, it is reachable and you can carry on. Granting it is",
     "theirs to do; asking clearly is yours.",
     "",
     "What you can run is not narrow. Your commands start with no PATH, and a",
@@ -522,6 +521,32 @@ function conversationFoldersStatement(facts: EnvironmentFacts): readonly string[
   ];
 }
 
+/**
+ * What the file tools reach, and how to ask for more (ADR 0057).
+ *
+ * The gate is the boundary: the folders named above are what a read or a
+ * write may touch, and a path outside them is refused. Said here, before
+ * the model meets the refusal, so the first move on a folder it knows it
+ * needs is the question and not the attempt - and said the same way for a
+ * project conversation and a plain one, because the tool and the rule are
+ * the same for both. Commands are not walled this way on a machine with no
+ * fence; the file tools are, and the sentence is about them.
+ */
+function reachStatement(): readonly string[] {
+  return [
+    "Your file tools reach the folders named above and nothing else: a path",
+    "outside them is refused, and that is the boundary doing its job, not a",
+    "broken machine. If the work needs a folder that is not listed - the",
+    "person's Downloads, another project, a data directory - ask for it with",
+    "the request_folder tool before touching it. Name the folder as an",
+    "absolute path, say whether you need to read or write, and say what for.",
+    "The person decides; a yes makes it reachable at once, and a no is final",
+    "for this conversation. Do not go looking for a way around a refusal and",
+    "do not pretend you looked.",
+    "",
+  ];
+}
+
 function extraRootsStatement(extraRoots: readonly string[] | undefined): readonly string[] {
   if (extraRoots === undefined || extraRoots.length === 0) return [];
   // Paths only, no explanation of how they got there. The block is paid for on
@@ -553,6 +578,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
     ...projectFoldersStatement(facts),
     ...backgroundJobsStatement(facts),
     ...extraRootsStatement(facts.extraRoots),
+    ...reachStatement(),
     ...(shell === undefined
       ? [
           "This machine has no command interpreter, so the shell tool cannot",

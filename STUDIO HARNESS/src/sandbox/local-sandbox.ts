@@ -12,7 +12,7 @@ import {
   type IsolationSupport,
 } from "./isolation/index.js";
 import { resolveContainedPath } from "./paths.js";
-import { type IsolationLevel, type SandboxPolicy } from "./policy.js";
+import { createSandboxPolicy, type IsolationLevel, type SandboxPolicy } from "./policy.js";
 
 /**
  * A command to run, minus everything the sandbox already knows.
@@ -87,7 +87,12 @@ export class LocalSandbox {
    * that `readFile` is OS-isolated, which it is not.
    */
   readonly isolation: IsolationLevel = "in-process";
-  readonly #policy: SandboxPolicy;
+  /**
+   * Not readonly, and only because of {@link LocalSandbox.widen}: a folder
+   * the person grants mid-run has to be reachable in the same run, or the
+   * question they just answered buys nothing until the next message.
+   */
+  #policy: SandboxPolicy;
   /**
    * What this host can actually contain, measured once per sandbox.
    *
@@ -328,6 +333,36 @@ export class LocalSandbox {
    */
   async releaseIsolation(): Promise<void> {
     await this.#isolationSupport.backend?.release(this.#policy);
+  }
+
+  /**
+   * Adds one root to what this sandbox may reach, for the rest of this run.
+   *
+   * What a granted folder question does once the person says yes. The row
+   * the store wrote is what every later run reads at policy-build time; this
+   * is the same grant applied to the run that asked, so "and the work can
+   * carry on" is true in the sentence the person just read. Built through the
+   * policy factory rather than by pushing onto the arrays, so the rule that a
+   * writable root sits inside a readable one holds here as everywhere: a
+   * write grant is a read grant too. A trusted sandbox reaches everything
+   * already and is left as it is.
+   */
+  widen(root: string, mode: "read" | "write"): void {
+    if (this.#policy.trusted) return;
+    const absolute = resolve(root);
+    const readRoots = this.#policy.readRoots.includes(absolute)
+      ? this.#policy.readRoots
+      : [...this.#policy.readRoots, absolute];
+    const writeRoots =
+      mode === "write" && !this.#policy.writeRoots.includes(absolute)
+        ? [...this.#policy.writeRoots, absolute]
+        : this.#policy.writeRoots;
+    this.#policy = createSandboxPolicy({
+      ...this.#policy,
+      // The factory puts the workspace root first itself.
+      readRoots: readRoots.filter((entry) => entry !== this.#policy.workspaceRoot),
+      writeRoots,
+    });
   }
 
   /** Resolves a path the agent may read, or refuses. */

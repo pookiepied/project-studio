@@ -15,9 +15,9 @@ export type SandboxErrorKind =
 
 const MESSAGE_BY_KIND: Record<SandboxErrorKind, string> = {
   path_escape:
-    "That path is outside the workspace this agent may use. If the work really " +
-    "needs it, the person can grant that path in Settings, Coding, Environments, " +
-    "and the command can then be run again.",
+    "That path is outside what this conversation may reach. If the work really " +
+    "needs it, ask for the folder with the request_folder tool - the person " +
+    "decides, and a yes makes it reachable at once.",
   not_permitted: "The sandbox does not permit that operation.",
   unsupported_isolation:
     "That action needs stronger isolation than the local sandbox provides.",

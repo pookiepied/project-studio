@@ -283,7 +283,7 @@ describe("the project's folders", () => {
     });
 
     expect(block).not.toContain("(your working directory)");
-    expect(block).not.toContain("folders");
+    expect(block).not.toContain("opened with these folders");
   });
 
   it("renders no folder list for a project that is only a label", () => {
@@ -294,7 +294,7 @@ describe("the project's folders", () => {
       today: "2026-08-30",
     });
 
-    expect(block).not.toContain("folders");
+    expect(block).not.toContain("opened with these folders");
   });
 
   it("keeps the folder list out of the conversation kind even when the facts carry it", () => {
@@ -538,3 +538,16 @@ describe("the conversation's kept pictures in the block", () => {
     expect(half).not.toContain("Two more folders")
   })
 })
+
+describe("the reach statement", () => {
+  it("names the folder question in both conversation kinds", () => {
+    // ADR 0057: the gate is the boundary, and the model is told how to ask
+    // for more before it meets the refusal - the same way whether or not a
+    // project is open, because the tool and the rule are the same for both.
+    for (const kind of ["conversation", "project"] as const) {
+      const block = environmentBlock({ workspace: "/w", kind, git: false, today: "2026-08-30" });
+      expect(block).toContain("ask for it with");
+      expect(block).toContain("the request_folder tool before touching it");
+    }
+  });
+});

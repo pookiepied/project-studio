@@ -185,6 +185,21 @@ This is the mechanism behind the next thing the product needs: a conversation
 that says "download that model into Downloads" should get a one-line question
 naming the folder, not a refusal. The rework is what makes that a small change.
 
+*Done 2026-09-19, after the eight steps.* The question is the model's to ask,
+through one native tool, `request_folder` (`tools/ask/folder.ts`): an absolute
+path, `read` or `write`, and one sentence saying what for. The person sees
+exactly that and answers; a yes writes the same `question`-sourced row the
+Settings page would and widens the running sandbox too (`LocalSandbox.widen`),
+so the work carries on in the same run; a no is remembered for the rest of the
+conversation. A conversation with no project is offered one yes (machine-wide)
+rather than two that would write the same row. The tool declares `read` only,
+like `ask_user_question`, so asking never itself needs approval and Auto mode
+does not answer it - Auto resolves the gate's default asks, and a question to
+the person is not one. The environment block now tells the model about the
+tool before it meets the refusal, and the refusal names the tool. Nothing
+was wired to raise the question automatically on a refused path, on purpose:
+a model that reached without asking is told how to ask, and asks.
+
 ### A project-less conversation gets one tree and no identity
 
 A conversation with no project stands in its own `workspace/` under the

@@ -335,6 +335,20 @@ describe('the question and its answer', () => {
       ...overrides,
     })
 
+  it('names the folder the model asked for on a folder question', () => {
+    render(
+      <ToolGroups
+        conversationId="conv"
+        groups={groupsOf({
+          toolName: 'request_folder',
+          calls: [call({ toolName: 'request_folder', input: present({ path: 'C:/Users/me/Downloads', mode: 'write', reason: 'x' }) })],
+        })}
+      />,
+    )
+    expect(screen.getByText('C:/Users/me/Downloads')).toBeTruthy()
+    expect(screen.getByText('Asking for')).toBeTruthy()
+  })
+
   it('names the first question on the chip, with the count beside it', () => {
     render(
       <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'ask_user_question', calls: [askCall()] })} />,
