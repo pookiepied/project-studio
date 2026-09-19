@@ -109,6 +109,13 @@ function pathTarget(resource: string, folderPattern: string | null): string {
   return relative === '' ? name : relative
 }
 
+/** Whether a resource sits under a `root/**` folder pattern, separators unified. */
+function insidePattern(resource: string, pattern: string): boolean {
+  const unified = resource.replaceAll('\\', '/')
+  const root = pattern.replaceAll('\\', '/').replace(/\/?\*+$/, '')
+  return root !== '' && (unified === root || unified.startsWith(`${root}/`))
+}
+
 /**
  * Which kind of thing the question touches, read from the scope ladder the
  * kernel itself offered: `this-command` means a command line, `this-file`
@@ -130,6 +137,24 @@ function sentenceFor(record: PendingApprovalRecord): readonly QuestionTextPart[]
   if (kind === 'path' && resource !== null) {
     const verb = PATH_VERBS[record.capabilityName] ?? record.capabilityTitle
     const folder = record.scopes.find((scope) => scope.id === 'this-folder')?.pattern ?? null
+    // The project rung is the workspace root, and the kernel offers it
+    // whether or not the path is inside it. A path it does not cover is one
+    // the person granted beyond the workspace - the Downloads folder the
+    // model asked for - and saying "in this conversation's workspace" about
+    // it would be the prompt misnaming what it asks consent for. Named by
+    // its folder instead.
+    const project = record.scopes.find((scope) => scope.id === 'this-project')?.pattern ?? null
+    if (project !== null && !insidePattern(resource, project)) {
+      const unified = resource.replaceAll('\\', '/')
+      const cut = unified.lastIndexOf('/')
+      return [
+        { kind: 'text', text: `${verb} ` },
+        { kind: 'code', text: unified.slice(cut + 1) || unified },
+        { kind: 'text', text: ' in ' },
+        { kind: 'code', text: cut <= 0 ? unified : resource.slice(0, cut) },
+        { kind: 'text', text: '.' },
+      ]
+    }
     return [
       { kind: 'text', text: `${verb} ` },
       { kind: 'code', text: pathTarget(resource, folder) },
