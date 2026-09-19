@@ -7,6 +7,8 @@ import {
   type ProjectRecord,
   type SandboxLevel,
   type SandboxScopeInfo,
+  type ShellInfo,
+  type ShellKind,
 } from '@/platform/harness'
 
 export type EnvironmentsView =
@@ -17,6 +19,7 @@ export type EnvironmentsView =
       readonly projects: readonly ProjectRecord[]
       readonly projectId: string | null
       readonly scope: SandboxScopeInfo
+      readonly shell: ShellInfo
     }
   | { readonly status: 'failed'; readonly error: HarnessFailure }
 
@@ -28,6 +31,8 @@ export interface Environments {
   refresh: () => Promise<void>
   selectProject: (projectId: string | null) => Promise<void>
   setLevel: (projectId: string, level: SandboxLevel) => Promise<HarnessFailure | null>
+  /** The shell commands run through; null hands the choice back to the machine's order. */
+  setShell: (kind: ShellKind | null) => Promise<HarnessFailure | null>
   /**
    * The person's answer about one folder, by path. Not by project: the
    * harness decides trust per folder, so two projects attaching the same
@@ -75,9 +80,10 @@ export function useEnvironments(): Environments {
     if (!background) setView({ status: 'loading' })
     else setRefreshing(true)
 
-    const [projectsResult, scopeResult] = await Promise.all([
+    const [projectsResult, scopeResult, shellResult] = await Promise.all([
       handle.listProjects(),
       handle.getScope(selected ?? undefined),
+      handle.getShell(),
     ])
     if (!live.current) return
     setRefreshing(false)
@@ -90,6 +96,10 @@ export function useEnvironments(): Environments {
       setView({ status: 'failed', error: scopeResult.error })
       return
     }
+    if (!shellResult.ok) {
+      setView({ status: 'failed', error: shellResult.error })
+      return
+    }
     const projects = projectsResult.value
     const next = selected ?? projects[0]?.id ?? null
     projectId.current = next
@@ -100,10 +110,10 @@ export function useEnvironments(): Environments {
         setView({ status: 'failed', error: rescoped.error })
         return
       }
-      setView({ status: 'ready', projects, projectId: next, scope: rescoped.value })
+      setView({ status: 'ready', projects, projectId: next, scope: rescoped.value, shell: shellResult.value })
       return
     }
-    setView({ status: 'ready', projects, projectId: next, scope: scopeResult.value })
+    setView({ status: 'ready', projects, projectId: next, scope: scopeResult.value, shell: shellResult.value })
   }, [connect])
 
   useEffect(() => {
@@ -144,6 +154,7 @@ export function useEnvironments(): Environments {
     refresh,
     selectProject,
     setLevel: (id, level) => mutate((handle) => handle.setSandboxLevel(id, level)),
+    setShell: (kind) => mutate((handle) => handle.setShell(kind)),
     setTrust: (root, trusted) => mutate((handle) => handle.setFolderTrust(root, trusted)),
     grantCustom: (id, path, mode) =>
       mutate((handle) => handle.grantScope({ projectId: id, path, mode, source: 'custom' })),

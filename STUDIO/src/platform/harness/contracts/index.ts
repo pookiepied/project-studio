@@ -167,6 +167,10 @@ export {
   parseSandboxScopeInfo,
   type FolderListing,
   parseFolderListing,
+  type ShellKind,
+  type ShellOption,
+  type ShellInfo,
+  parseShellInfo,
 } from './sandbox'
 
 export {

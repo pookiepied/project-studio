@@ -4,6 +4,7 @@ import {
   parseProjectRecord,
   parseProjectRecords,
   parseSandboxScopeInfo,
+  parseShellInfo,
   type FolderListing,
   type FolderTrust,
   type ProjectCreateDraft,
@@ -12,6 +13,8 @@ import {
   type ProjectRecord,
   type SandboxLevel,
   type SandboxScopeInfo,
+  type ShellInfo,
+  type ShellKind,
   type SandboxScopeMode,
   type SandboxScopeSource,
 } from '../contracts'
@@ -69,6 +72,10 @@ export interface ProjectClient {
   browseFolders(path?: string): Promise<HarnessResult<FolderListing>>
   /** Sets whether one project is contained at all. */
   setSandboxLevel(projectId: string, level: SandboxLevel): Promise<HarnessResult<void>>
+  /** The shells this machine has, which runs lines, and the preference (ADR 0057). */
+  getShell(): Promise<HarnessResult<ShellInfo>>
+  /** Records the preferred shell by kind; null lets the machine's order decide. */
+  setShell(kind: ShellKind | null): Promise<HarnessResult<ShellInfo>>
   /**
    * Records the person's answer about one folder: whether they vouch for what
    * is in it. Addressed by path rather than by project, because that is the
@@ -167,6 +174,14 @@ export function projectClient({ json, empty }: Requester): ProjectClient {
       // person's home, so this side never has to know where home is.
       const search = path === undefined || path === '' ? '' : `?path=${encodeURIComponent(path)}`
       return json('GET', `${SANDBOX_PATH}/browse${search}`, undefined, parseFolderListing)
+    },
+
+    getShell() {
+      return json('GET', `${SANDBOX_PATH}/shell`, undefined, parseShellInfo)
+    },
+
+    setShell(kind) {
+      return json('PUT', `${SANDBOX_PATH}/shell`, { interpreter: kind }, parseShellInfo)
     },
 
     setSandboxLevel(projectId, level) {

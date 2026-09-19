@@ -7,9 +7,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ExecutionScope } from "../../../src/contracts/capabilities.js";
 import { requiresUndoPoint } from "../../../src/contracts/effects.js";
 import {
-  interpreterStarted,
-  markInterpreterStarted,
+  listInterpreters,
+  preferInterpreter,
   resolveInterpreter,
+  shellChoice,
   type CommandSeparator,
   type Interpreter,
   type InterpreterKind,
@@ -27,12 +28,11 @@ import { BackgroundJobs } from "../../../src/process/background.js";
 import { MediaJobs, type MediaJobStatus } from "../../../src/gateway/media/jobs.js";
 import { readCommandPrograms } from "../../../src/tools/shell/command.js";
 import {
-  interpreterCanStart,
   registerShellTools,
   shellResource,
   SHELL_DESCRIPTOR,
 } from "../../../src/tools/shell/index.js";
-import { CAN_CONTAIN, itContained } from "../../helpers/contained.js";
+import { CAN_RUN, itRuns } from "../../helpers/contained.js";
 
 const SCOPE: ExecutionScope = {
   conversationId: "conv-1",
@@ -61,8 +61,8 @@ function npmOnPath(): boolean {
   return false;
 }
 
-/** Runs only where containment works and npm is installed: the shim proof. */
-const itRunsNpm = CAN_CONTAIN && npmOnPath() ? itContained : it.skip;
+/** Runs only where a program can run and npm is installed: the shim proof. */
+const itRunsNpm = CAN_RUN && npmOnPath() ? itRuns : it.skip;
 
 let db: StudioDatabase;
 let workspace: string;
@@ -174,7 +174,7 @@ describe("running a command line", () => {
   // integration suites. What is *not* gated is everything decided before the
   // spawn: an unparsable line, a working directory outside the project, a
   // policy that never opted in. Those hold on every machine.
-  itContained("runs it and returns its output", async () => {
+  itRuns("runs it and returns its output", async () => {
     const output = await run(gate(), {
       command: `${NODEQ} -e "console.log('hello')"`,
     });
@@ -182,7 +182,7 @@ describe("running a command line", () => {
     expect(output).toContain("hello");
   });
 
-  itContained("reports a non-zero exit as a result rather than a failure", async () => {
+  itRuns("reports a non-zero exit as a result rather than a failure", async () => {
     // A failing test suite is the answer to the question that was asked.
     const output = await run(gate(), {
       command: `${NODEQ} -e "process.exit(3)"`,
@@ -191,7 +191,7 @@ describe("running a command line", () => {
     expect(output).toContain("exit code 3");
   });
 
-  itContained("labels stderr so the model can tell the streams apart", async () => {
+  itRuns("labels stderr so the model can tell the streams apart", async () => {
     const output = await run(gate(), {
       command: `${NODEQ} -e "console.error('bad')"`,
     });
@@ -200,7 +200,7 @@ describe("running a command line", () => {
     expect(output).toContain("bad");
   });
 
-  itContained("runs in the project, and in a subdirectory when asked", async () => {
+  itRuns("runs in the project, and in a subdirectory when asked", async () => {
     mkdirSync(join(workspace, "sub"), { recursive: true });
 
     const output = await run(gate(), {
@@ -230,7 +230,7 @@ describe("running a command line", () => {
     ).rejects.toThrow(/msite/);
   });
 
-  itContained("stops a command that outlives its time limit", async () => {
+  itRuns("stops a command that outlives its time limit", async () => {
     const output = await run(gate(), {
       command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
       timeoutMs: 1_000,
@@ -244,7 +244,7 @@ describe("the interpreter runs the line", () => {
   // The properties pipes and chaining rest on. Where the chosen interpreter
   // is PowerShell 5.1, `&&` is unavailable to the *shell*, not to the reader -
   // the environment block says so, and the model writes `;` instead.
-  itContained("interprets redirection", async () => {
+  itRuns("interprets redirection", async () => {
     const output = await run(gate(), {
       command: `${NODEQ} -e "console.log('into the file')" > out.txt`,
     });
@@ -253,7 +253,7 @@ describe("the interpreter runs the line", () => {
     expect(statSync(join(workspace, "out.txt")).size).toBeGreaterThan(0);
   });
 
-  itContained("interprets a pipe between two programs", async () => {
+  itRuns("interprets a pipe between two programs", async () => {
     // Both sides are node, so the test does not depend on which other tools
     // the machine ships - only on the interpreter `resolveInterpreter` picked.
     const output = await run(gate(), {
@@ -294,73 +294,43 @@ describe("the interpreter is chosen once, by the machine", () => {
     const interpreter = resolveInterpreter();
     expect(interpreter?.takes).toBe(interpreter?.kind === "cmd" ? "command-line" : "argv");
   });
-});
 
-describe("whose loader failed", () => {
-  it("does not demote an interpreter that has already started something", () => {
-    // The bug this replaces. `STATUS_DLL_INIT_FAILED` arrives as the
-    // interpreter's exit code, but an interpreter reports its child's exit
-    // code as its own - and on this machine `tar --version` under cmd exits
-    // with exactly it. Read as a broken cmd, that demoted the whole process,
-    // permanently, to Windows PowerShell 5.1, where npm, npx and pnpm are all
-    // refused by the execution policy. One `tar` cost every later command in
-    // the harness its package manager.
-    // A shell this process has never run, so the answer cannot depend on what
-    // an earlier test in this file happened to execute.
-    const unproven: Interpreter = { ...POWERSHELL_LIKE, path: "/nowhere/unproven" };
+  it("lets the person prefer one of the shells the machine has, and falls back otherwise", () => {
+    // ADR 0057: the shell is the person's shell. A preference picks by kind
+    // from what was measured; one this machine lacks - a setting written on
+    // another machine, or before an uninstall - leaves the order in charge,
+    // and the choice reports both so a settings page can say so.
+    const available = listInterpreters();
+    const first = available[0];
+    if (first === undefined) return;
+    const last = available[available.length - 1] as Interpreter;
+    try {
+      preferInterpreter(last.kind);
+      expect(resolveInterpreter()).toBe(last);
+      expect(shellChoice()).toEqual({ preferred: last.kind, active: last, available });
 
-    expect(interpreterStarted(unproven)).toBe(false);
-    markInterpreterStarted(unproven);
-    expect(interpreterStarted(unproven)).toBe(true);
+      const missing = (["pwsh", "bash", "powershell", "cmd", "sh"] as const).find(
+        (kind) => !available.some((entry) => entry.kind === kind),
+      );
+      if (missing !== undefined) {
+        preferInterpreter(missing);
+        expect(resolveInterpreter()).toBe(first);
+        expect(shellChoice().preferred).toBe(missing);
+      }
+    } finally {
+      preferInterpreter(undefined);
+    }
+    expect(resolveInterpreter()).toBe(first);
   });
 
-  it("treats a command that ran and failed as the shell having started", () => {
-    // A shell that runs a program and reports exit 3 started perfectly well,
-    // so what is recorded is "it ran", not "it worked". Asserted on the
-    // vocabulary rather than through the gate, because the flag is module
-    // state shared with every other test in this file and an assertion about
-    // its value after a call would pass for the wrong reason.
-    const ran: Interpreter = { ...POWERSHELL_LIKE, path: "/nowhere/ran-and-failed" };
-    markInterpreterStarted(ran);
-    expect(interpreterStarted(ran)).toBe(true);
-  });
-
-  itContained("asks the shell itself, and gets a straight answer", async () => {
-    // The probe that decides a demotion when the interpreter has never run
-    // anything. `exit 0` reaches no program in any of these shells, so the
-    // only thing that can fail it is the shell's own loader - which is the
-    // question being asked. Without this the probe is unreachable in this
-    // suite, because an earlier test has already proved the interpreter and
-    // the fast path skips it.
-    const interpreter = resolveInterpreter();
-    if (interpreter === undefined) return;
-    const sandbox = new LocalSandbox(
-      createSandboxPolicy({
-        workspaceRoot: workspace,
-        environment: {
-          PATH: process.env.PATH ?? "",
-          ...(process.env.PATHEXT === undefined ? {} : { PATHEXT: process.env.PATHEXT }),
-        },
-      }),
-    );
-
-    expect(await interpreterCanStart(sandbox, interpreter, workspace)).toBe(true);
-  });
-
-  it("keeps the interpreter when a child exits with the loader status", async () => {
-    // The regression, end to end through the tool. 0xC0000142 is written as
-    // its signed form because that is what `process.exit` takes; Windows
-    // reports it back unsigned, which is the value the tool compares.
-    //
-    // Before the fix this demoted the process permanently. `resolveInterpreter`
-    // is module state shared by every conversation in the harness, so the
-    // assertion is simply that it is the same interpreter afterwards.
-    const before = resolveInterpreter();
-    expect(before).toBeDefined();
-
-    await run(gate(), { command: `${NODEQ} -e "process.exit(-1073741502)"` });
-
-    expect(resolveInterpreter()).toBe(before);
+  it("prefers bash on Windows when Git for Windows supplies one", () => {
+    // Bash leads the Windows order since ADR 0057: nothing contains it any
+    // more, and it is the syntax models write. Asserted only where a bash
+    // was found, because a machine without Git has nothing to lead with.
+    if (process.platform !== "win32") return;
+    const available = listInterpreters();
+    if (!available.some((entry) => entry.kind === "bash")) return;
+    expect(available[0]?.kind).toBe("bash");
   });
 });
 
@@ -708,7 +678,7 @@ describe("containment", () => {
     ).rejects.toBeInstanceOf(SandboxError);
   });
 
-  itContained("does not hand the host environment to the command", async () => {
+  itRuns("does not hand the host environment to the command", async () => {
     // Inheriting process.env would give every program on the machine every
     // token on the machine. PATH is granted by the policy, by name; the rest
     // of the host environment is not there.
@@ -722,7 +692,7 @@ describe("containment", () => {
     expect(output).toContain("undefined");
   });
 
-  itContained("receives the policy's PATH, because a shell must find programs", async () => {
+  itRuns("receives the policy's PATH, because a shell must find programs", async () => {
     // `node` named bare, resolved by the interpreter through the PATH the
     // policy granted - the same grant a real `npm test` relies on.
     const output = await run(gate(), {
@@ -760,7 +730,7 @@ describe("bad input", () => {
  * is not. Flue documents the same limit for its own `bash`.
  */
 describe("command lines running together", () => {
-  itContained("runs two command lines at once rather than one after the other", async () => {
+  itRuns("runs two command lines at once rather than one after the other", async () => {
     const instance = gate();
     const sleeper = (label: string) => ({
       command: `${NODEQ} -e "setTimeout(() => console.log('${label}'), 600)"`,
@@ -796,7 +766,7 @@ describe("command lines running together", () => {
     expect(both).toBeLessThan(alone * 1.7);
   });
 
-  itContained("keeps each command line's output to itself", async () => {
+  itRuns("keeps each command line's output to itself", async () => {
     const instance = gate();
 
     const [first, second] = await Promise.all([
@@ -812,7 +782,7 @@ describe("command lines running together", () => {
     expect(String(second)).not.toContain("alpha");
   });
 
-  itContained("reports one command line's failure without touching the other", async () => {
+  itRuns("reports one command line's failure without touching the other", async () => {
     const instance = gate();
 
     const [failing, fine] = await Promise.all([

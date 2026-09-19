@@ -24,7 +24,7 @@ import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { ToolError } from "../../src/tools/errors.js";
-import { itContained } from "../helpers/contained.js";
+import { itRuns } from "../helpers/contained.js";
 import { CallGate } from "../../src/tools/gate.js";
 import type { SnapshotHook } from "../../src/snapshots/turn.js";
 import { defineStudioTool, type ToolDefinition } from "../../src/tools/types.js";
@@ -509,11 +509,11 @@ describe("the model is shown only what can actually run", () => {
     expect(locked.list().map((tool) => tool.id.name)).toEqual(["read"]);
   });
 
-  // `itContained`: `list()` shows only what could actually run, and an
+  // `itRuns`: `list()` shows only what could actually run, and an
   // execute-capable tool cannot on a host with no working sandbox. The
   // switched-off case above needs no such gate — it is hidden for a policy
   // reason on every machine.
-  itContained("shows it when the policy allows it", () => {
+  itRuns("shows it when the policy allows it", () => {
     const open = gateWith(true);
     open.register(executeTool([]));
 
@@ -545,7 +545,7 @@ describe("the model is shown only what can actually run", () => {
     expect(locked.listAll().map((tool) => tool.id.name)).toEqual(["run"]);
   });
 
-  itContained("does not hide a tool merely because it has not been approved", () => {
+  itRuns("does not hide a tool merely because it has not been approved", () => {
     // "You have not approved this yet" is a question with an answer. Hiding the
     // tool would take away the user's chance to give it.
     const instance = gate();
@@ -569,7 +569,7 @@ describe("a restore point is taken from the effect table, not from a list of nam
   // T-14. `shell` declares execute and writes anyway, and the gate used to
   // test `effects.includes("write")` — so the tool that can do the most damage
   // was the one with nothing to return to.
-  itContained("takes one before a program runs", async () => {
+  itRuns("takes one before a program runs", async () => {
     const snapshots = recordingSnapshots();
     // A policy that permits running programs, which is the only state in which
     // this question arises at all.

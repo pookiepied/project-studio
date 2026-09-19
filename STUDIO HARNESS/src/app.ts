@@ -63,6 +63,7 @@ import { TextImprover } from "./application/text-improver.js";
 import { ContextUsageTracker } from "./conversations/context-usage.js";
 import { ProjectStore } from "./projects/store.js";
 import { WorkspaceTrustStore } from "./permissions/trust.js";
+import { ShellSettingsStore } from "./process/shell-settings.js";
 import { SandboxScopeStore } from "./sandbox/scope-store.js";
 
 interface HarnessApplication {
@@ -184,6 +185,12 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // Studio has closed, so the registry is stopped with the runtime below.
     // Built before the runtime because the tools and the HTTP surface share it.
     const mediaJobs = new MediaJobs({ artifactsDirectory: conversationArtifactsDirectory });
+    // The shell the person picked, applied before anything resolves an
+    // interpreter: the choice is process-wide, and a tool registered under
+    // the machine's first shell before the preference landed would describe
+    // one shell and run another.
+    const shell = new ShellSettingsStore(database);
+    shell.apply();
     const mediaAdapters = builtinMediaAdapters();
     const runtime = new StudioRuntime({
       database,
@@ -363,6 +370,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       projects,
       scopes,
       trust,
+      shell,
       database,
       titling,
       contextUsage,

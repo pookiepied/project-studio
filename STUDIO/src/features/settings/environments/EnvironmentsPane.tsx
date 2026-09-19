@@ -4,24 +4,40 @@ import { Button, IconButton, Segmented } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
 import { useEnvironments } from '@/features/settings/environments/useEnvironments'
-import type { FolderTrust, SandboxLevel } from '@/platform/harness'
+import type { FolderTrust, SandboxLevel, ShellInfo, ShellKind } from '@/platform/harness'
 
 // A JSX string attribute is not escaped, so the two backslashes written
 // here would both reach the input. Held as a value instead.
 const CUSTOM_PATH_PLACEHOLDER = 'C:\\Tools\\data'
 
+/** What each interpreter kind is called on the page. */
+const SHELL_NAMES: Record<ShellKind, string> = {
+  bash: 'bash',
+  pwsh: 'PowerShell 7',
+  powershell: 'PowerShell 5.1',
+  cmd: 'cmd',
+  sh: 'sh',
+}
+
 /**
  * Environments.
  *
- * Where commands actually run. Four parts, in this order: whether the
- * project's folders are vouched for at all, this project's level, the scope
- * the next grant will take, and everything granted with where it came from.
- * The detected-toolchain presets that used to sit between the last two went
- * with the Windows container (ADR 0057): they named the folders a container
- * had to be let into, and with no container the machine's own PATH answers. Scope and level are kept apart here the same way
- * they are kept apart everywhere else: granting a path never changes a level.
+ * Where commands actually run. Five parts, in this order: the shell that
+ * runs them, whether the project's folders are vouched for at all, this
+ * project's level, the scope the next grant will take, and everything
+ * granted with where it came from. The detected-toolchain presets that used
+ * to sit between the last two went with the Windows container (ADR 0057):
+ * they named the folders a container had to be let into, and with no
+ * container the machine's own PATH answers. Scope and level are kept apart
+ * here the same way they are kept apart everywhere else: granting a path
+ * never changes a level.
  *
- * Trust comes first because it is the precondition the other three sit
+ * The shell comes first because it is machine-wide and every command on the
+ * page below runs through it. The choice is the person's (ADR 0057): the
+ * harness orders what the machine has, and this is where that order is
+ * overruled.
+ *
+ * Trust comes next because it is the precondition the other three sit
  * behind. An unvouched folder refuses every write and every command in every
  * permission mode, so a person reading this pane top to bottom meets the
  * answer that explains the refusal before they meet the controls that cannot
@@ -51,11 +67,13 @@ export function EnvironmentsPane() {
           projects={view.projects}
           projectId={view.projectId}
           scope={view.scope}
+          shell={view.shell}
           lastError={environments.lastError}
           refreshing={environments.refreshing}
           onRefresh={() => void environments.refresh()}
           onSelectProject={(id) => void environments.selectProject(id)}
           onSetLevel={(id, level) => void environments.setLevel(id, level)}
+          onSetShell={(kind) => void environments.setShell(kind)}
           onSetTrust={(root, trusted) => void environments.setTrust(root, trusted)}
           onRevoke={(id, path) => void environments.revoke(id, path)}
           onGrantCustom={(id, path, mode) => void environments.grantCustom(id, path, mode)}
@@ -69,11 +87,13 @@ function Body({
   projects,
   projectId,
   scope,
+  shell,
   lastError,
   refreshing,
   onRefresh,
   onSelectProject,
   onSetLevel,
+  onSetShell,
   onSetTrust,
   onRevoke,
   onGrantCustom,
@@ -81,11 +101,13 @@ function Body({
   projects: readonly { readonly id: string; readonly name: string }[]
   projectId: string | null
   scope: { readonly project: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly machineWide: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly level: SandboxLevel; readonly trust: readonly FolderTrust[] }
+  shell: ShellInfo
   lastError: string | null
   refreshing: boolean
   onRefresh: () => void
   onSelectProject: (id: string | null) => void
   onSetLevel: (id: string, level: SandboxLevel) => void
+  onSetShell: (kind: ShellKind | null) => void
   onSetTrust: (root: string, trusted: boolean) => void
   onRevoke: (id: string, path: string) => void
   onGrantCustom: (id: string, path: string, mode: 'read' | 'write') => void
@@ -101,8 +123,34 @@ function Body({
   const [grantScope, setGrantScope] = useState<'project' | 'everywhere'>('project')
   const grantEverywhere = projectId === null || grantScope === 'everywhere'
 
+  // What the shell row says under its control. The preference and the shell
+  // in effect are the same thing until the preference names a shell this
+  // machine does not have, and then the row says which one answers instead.
+  const shellHint = (): string => {
+    if (shell.active === null) return 'This machine has no command interpreter the shell tool can run.'
+    const active = `Commands run through ${SHELL_NAMES[shell.active.kind]} at ${shell.active.path}.`
+    if (shell.preferred !== null && shell.preferred !== shell.active.kind) {
+      return `${SHELL_NAMES[shell.preferred]} was chosen, but this machine does not have it. ${active}`
+    }
+    if (shell.preferred === null) return `${active} Automatic picks the first shell found, in the order shown.`
+    return active
+  }
+
   return (
     <div>
+      <Row label="Shell" hint={shellHint()}>
+        <Segmented
+          layoutId="settings-shell"
+          ariaLabel="Shell"
+          value={shell.preferred ?? 'auto'}
+          onChange={(value) => onSetShell(value === 'auto' ? null : value)}
+          options={[
+            { id: 'auto' as const, label: 'Automatic' },
+            ...shell.available.map((entry) => ({ id: entry.kind, label: SHELL_NAMES[entry.kind] })),
+          ]}
+        />
+      </Row>
+
       <div className="flex items-center justify-between py-3.5">
         <p className="text-ui text-muted-foreground">
           {projects.length === 0 ? 'No projects yet' : 'One project at a time'}

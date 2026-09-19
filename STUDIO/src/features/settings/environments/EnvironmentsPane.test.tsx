@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EnvironmentsPane } from './EnvironmentsPane'
 import type { EnvironmentsView } from './useEnvironments'
-import type { FolderTrust, SandboxScopeRow } from '@/platform/harness'
+import type { FolderTrust, SandboxScopeRow, ShellInfo } from '@/platform/harness'
 
 /**
  * The two holes Task 57 left in this pane, and the words around them.
@@ -30,6 +30,7 @@ const environments = vi.hoisted(() => {
     refresh: vi.fn(async () => {}),
     selectProject: vi.fn(async (_id: string | null) => {}),
     setLevel: vi.fn(async () => null),
+    setShell: vi.fn(async () => null),
     grantCustom: vi.fn(async () => null),
     revoke: vi.fn(async () => null),
     setTrust: vi.fn(async () => null),
@@ -62,10 +63,18 @@ function scopeRow(path: string, projectId: string): SandboxScopeRow {
   }
 }
 
+const BASH = { kind: 'bash', label: 'bash', path: 'C:\\Program Files\\Git\\bin\\bash.exe' } as const
+const CMD = { kind: 'cmd', label: 'cmd', path: 'C:\\Windows\\System32\\cmd.exe' } as const
+
+function shellInfo(overrides: Partial<ShellInfo> = {}): ShellInfo {
+  return { preferred: null, active: { kind: BASH.kind, path: BASH.path }, available: [BASH, CMD], ...overrides }
+}
+
 function ready(scope: {
   readonly project?: readonly SandboxScopeRow[]
   readonly machineWide?: readonly SandboxScopeRow[]
   readonly trust?: readonly FolderTrust[]
+  readonly shell?: ShellInfo
 }): void {
   environments.view = {
     status: 'ready',
@@ -86,6 +95,7 @@ function ready(scope: {
       level: 'contained',
       trust: scope.trust ?? [],
     },
+    shell: scope.shell ?? shellInfo(),
   }
 }
 
@@ -95,6 +105,7 @@ function noProjects(): void {
     projects: [],
     projectId: null,
     scope: { project: [], machineWide: [], level: 'contained', trust: [] },
+    shell: shellInfo(),
   }
 }
 
@@ -152,6 +163,45 @@ describe('EnvironmentsPane', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(environments.revoke).toHaveBeenCalledWith('prj_a', GIT)
+  })
+})
+
+/**
+ * The shell is the person's shell (ADR 0057).
+ */
+describe('the shell', () => {
+  it('offers the shells the machine has behind Automatic, and names the one in effect', () => {
+    ready({})
+    render(<EnvironmentsPane />)
+
+    const group = screen.getByRole('radiogroup', { name: 'Shell' })
+    expect(within(group).getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
+      'Automatic',
+      'bash',
+      'cmd',
+    ])
+    expect(screen.getByText(/Commands run through bash at C:\\Program Files/)).toBeTruthy()
+    expect(screen.getByText(/Automatic picks the first shell found/)).toBeTruthy()
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'cmd' }))
+    expect(environments.setShell).toHaveBeenCalledWith('cmd')
+  })
+
+  it('hands the choice back to the machine through Automatic', () => {
+    ready({ shell: shellInfo({ preferred: 'cmd', active: { kind: 'cmd', path: CMD.path } }) })
+    render(<EnvironmentsPane />)
+
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Shell' })).getByRole('radio', { name: 'Automatic' }))
+    expect(environments.setShell).toHaveBeenCalledWith(null)
+  })
+
+  it('says when the chosen shell is not on this machine, and which one answers instead', () => {
+    // A preference kept from another machine, or from before an uninstall:
+    // the page must not pretend it is in effect, and must not throw it away.
+    ready({ shell: shellInfo({ preferred: 'pwsh' }) })
+    render(<EnvironmentsPane />)
+
+    expect(screen.getByText(/PowerShell 7 was chosen, but this machine does not have it\. Commands run through bash/)).toBeTruthy()
   })
 })
 

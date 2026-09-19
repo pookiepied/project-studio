@@ -2,15 +2,8 @@ import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
 } from "../../contracts/capabilities.js";
-import {
-  demoteInterpreter,
-  interpreterStarted,
-  markInterpreterStarted,
-  resolveInterpreter,
-  type Interpreter,
-} from "../../process/interpreter.js";
+import { resolveInterpreter, type Interpreter } from "../../process/interpreter.js";
 import { ProcessError } from "../../process/errors.js";
-import type { LocalSandbox } from "../../sandbox/local-sandbox.js";
 import { SandboxError } from "../../sandbox/errors.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
@@ -52,17 +45,7 @@ const MAX_OUTPUT_LINES = 400;
 /** Ten minutes. A build or a test run is the reason this tool exists. */
 const MAX_TIMEOUT_MS = 600_000;
 
-/**
- * `STATUS_DLL_INIT_FAILED` (0xC0000142), as Windows reports it through an exit
- * code. The process was created and then died initialising its libraries, so
- * it never read the command line - which is what makes retrying it with
- * another interpreter safe rather than a second attempt at whatever the line
- * asked for.
- */
-const STATUS_DLL_INIT_FAILED = 3_221_225_794;
 const DEFAULT_TIMEOUT_MS = 120_000;
-/** Long enough for a shell to start and exit, short enough not to stall a turn. */
-const PROBE_TIMEOUT_MS = 15_000;
 
 interface ShellInput {
   /** A full command line, for the machine's interpreter. */
@@ -167,129 +150,6 @@ function shellDescriptor(interpreter: Interpreter | undefined): CapabilityDescri
  * want the sentence a model reads build it with {@link shellDescriptor}.
  */
 export const SHELL_DESCRIPTOR: CapabilityDescriptor = shellDescriptor(undefined);
-
-/**
- * Whether a demotion invalidates the approval that was already given.
- *
- * The retry after `STATUS_DLL_INIT_FAILED` reuses the authorization from the
- * first attempt, which is right only while the second interpreter would start
- * the same programs as the first. It does not always. The line was read with
- * bash's separators, bash could not be contained, and the fallback is
- * `cmd.exe` - which does not honour `;`. So `git status; git push` was read as
- * two commands, approved as two, and then handed to a shell that runs one of
- * them with a stray argument. The user approved a push that never happened,
- * which is the quieter half of the same bug: an approval that does not
- * describe what ran is not an approval of it.
- *
- * Returns the sentence to refuse with, or undefined when the retry is safe -
- * which it is whenever the separators the line actually uses are honoured by
- * both. Re-reading rather than comparing separator lists, because the only
- * question that matters is what this line does, and most lines use none.
- */
-function demotionRefusal(
-  input: ShellInput,
-  from: Interpreter,
-  to: Interpreter,
-): string | undefined {
-  let programs: readonly string[];
-  try {
-    programs = readCommandPrograms(input.command, to);
-  } catch {
-    return (
-      `The command could not be started in ${from.label}, and this machine's ` +
-      `next shell is ${to.label}, which reads this line differently. It was ` +
-      `not retried. Rewrite the command for ${to.label} and call again.`
-    );
-  }
-
-  const same =
-    programs.length === input.programs.length &&
-    programs.every((program, index) => program === input.programs[index]);
-  if (same) return undefined;
-
-  return (
-    `The command could not be started in ${from.label}, and in ${to.label} the ` +
-    `same line runs ${programs.join(", ")} rather than ${input.programs.join(", ")}. ` +
-    `Only the first was approved, so nothing was run. Rewrite the command for ` +
-    `${to.label} and call again.`
-  );
-}
-
-/** The first non-empty line of a stream, or undefined when it carried nothing. */
-function firstLine(text: string): string | undefined {
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed !== "") return trimmed;
-  }
-  return undefined;
-}
-
-/**
- * What the model is told when the shell it was promised dies unstarted.
- *
- * The tool is registered under the interpreter the machine resolved first, so
- * the description the model has already read names that shell, and from here
- * on it runs under the next one. A description that says bash while the line
- * is read by cmd is how `a ; b` becomes one command with a stray argument,
- * so the note says which shell died - the first line it printed, which is
- * the diagnostic, rather than the whole stream - and which one the rest of
- * the session uses, with that shell's own statement of what it can and
- * cannot do. The same lines the environment block carries, so the two cannot
- * disagree about it.
- */
-export function demotionNote(
-  from: Interpreter,
-  to: Interpreter,
-  stderr: string | undefined,
-): string {
-  const fatal = stderr === undefined ? undefined : firstLine(stderr);
-  const death =
-    fatal === undefined
-      ? `${from.label} could not be contained on this machine: the child died in its own library loader (exit ${String(STATUS_DLL_INIT_FAILED)}), before reading the line.`
-      : `${from.label} could not be contained on this machine: the child died in its own library loader (exit ${String(STATUS_DLL_INIT_FAILED)}), before reading the line: "${fatal}".`;
-  return [
-    death,
-    "",
-    `The rest of this session runs through ${to.label} instead.`,
-    ...to.statement,
-  ].join("\n");
-}
-
-/**
- * Whether the interpreter itself can start under containment.
- *
- * `exit 0` reaches no program in any of the shells this harness uses, so the
- * only thing that can fail it is the shell's own loader - which is exactly
- * the question. No program roots are granted, for the same reason: anything
- * granted would widen what the probe proves.
- *
- * A success is recorded, so this runs at most once per interpreter per
- * process. Any error is read as "it started" rather than "it did not": the
- * probe exists to *withhold* a permanent, process-wide demotion, and a
- * demotion taken because a probe timed out would be the original bug with an
- * extra step.
- */
-export async function interpreterCanStart(
-  sandbox: LocalSandbox,
-  interpreter: Interpreter,
-  cwd: string,
-): Promise<boolean> {
-  try {
-    const probe = await sandbox.run("shell", {
-      executable: interpreter.path,
-      args: [...interpreter.args, "exit 0"],
-      cwd,
-      lineJoin: interpreter.takes,
-      programRoots: [],
-      timeoutMs: PROBE_TIMEOUT_MS,
-    });
-    const ok = probe.exitCode !== STATUS_DLL_INIT_FAILED;
-    if (ok) markInterpreterStarted(interpreter);
-    return ok;
-  } catch {
-    return true;
-  }
-}
 
 function clip(output: string): string {
   const lines = output.split("\n");
@@ -422,7 +282,7 @@ function createShellTool(
     resources: (input) => input.programs.map((program) => shellResource(program)),
 
     execute: async (input, context) => {
-      let interpreter = input.interpreter;
+      const interpreter = input.interpreter;
 
       // Through the sandbox, so a cwd escaping the project is refused here
       // rather than becoming the working directory of a real process.
@@ -471,29 +331,6 @@ function createShellTool(
               "foreground with a timeout instead.",
           });
         }
-        // The interpreter is proven before the job exists: a background bash
-        // that cannot be contained dies in its loader inside the registry,
-        // where there is no retry point and the death reads as the job having
-        // failed. The probe runs at most once per interpreter per process, so
-        // this costs one spawn only when nobody has proved this interpreter
-        // yet. The approval was given for what this line runs; reusing it
-        // under the next shell is only honest while it runs the same
-        // programs, which is the same refusal the foreground path asks.
-        let backgroundNote: string | undefined;
-        if (
-          !interpreterStarted(interpreter) &&
-          !(await interpreterCanStart(context.sandbox, interpreter, cwd))
-        ) {
-          if (demoteInterpreter(interpreter)) {
-            const next = resolveInterpreter();
-            if (next !== undefined && next !== interpreter) {
-              const refusal = demotionRefusal(input, interpreter, next);
-              if (refusal !== undefined) return refusal;
-              backgroundNote = demotionNote(interpreter, next, undefined);
-              interpreter = next;
-            }
-          }
-        }
         try {
           const plan = await context.sandbox.spawnPlan("shell", {
             executable: interpreter.path,
@@ -514,7 +351,6 @@ function createShellTool(
               `output with jobs {"id": "${started.id}"}, and stop it with ` +
               `jobs {"id": "${started.id}", "stop": true} when you are done ` +
               "with it.",
-            ...(backgroundNote === undefined ? [] : ["", backgroundNote]),
           ].join("\n");
         } catch (error) {
           if (error instanceof ToolError) throw error;
@@ -539,80 +375,21 @@ function createShellTool(
         // The sandbox builds the environment from policy too, so there is no
         // remaining way for this call site to hand the interpreter the
         // machine's tokens by forgetting a field.
-        const spawn = async (): Promise<{
-          exitCode: number;
-          stdout: string;
-          stderr: string;
-        }> =>
-          context.sandbox.run("shell", {
-            executable: interpreter.path,
-            args: [...interpreter.args, input.command],
-            cwd,
-            // The line the interpreter reads is handed over the way that
-            // interpreter reads lines, declared where the interpreter is
-            // described. A `cmd.exe` takes the raw remainder after `/c` and
-            // takes its quotes itself; escaping them for it is what turned a
-            // fully-qualified path into `'\"C:\Program Files\nodejs\node.exe\"'
-            // is not recognized` on every machine this tool was broken on.
-            lineJoin: interpreter.takes,
-            programRoots: granted.directories,
-            timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-            ...(context.signal ? { signal: context.signal } : {}),
-          });
-
-        let result = await spawn();
-
-        // The interpreter could not start. Retried, once, with the next
-        // interpreter this machine has - and safe to retry precisely because
-        // this status means the child died in its own loader, before it read
-        // the command line, so nothing the line asks for has happened.
-        //
-        // The case is real and was costing every command on this machine: on
-        // Windows without PowerShell 7 the choice is Git's `bash.exe`, which
-        // cannot run inside a container, and the answer is to use an
-        // interpreter that does not need what it cannot read.
-        if (result.exitCode !== STATUS_DLL_INIT_FAILED) {
-          // It ran. Exit code 1 is still a shell that started, and that is the
-          // fact worth keeping: it makes every later failure with the loader
-          // status attributable to the child instead of to the shell.
-          markInterpreterStarted(interpreter);
-        }
-
-        // Whose loader actually failed. An interpreter reports its child's
-        // exit code as its own, so this status alone cannot tell "the shell
-        // could not start" from "the shell started and the program it ran
-        // could not". On this machine `tar --version` under cmd exits with
-        // exactly it - and demotion is permanent and process-wide, so reading
-        // that as a broken cmd moved every later command to PowerShell 5.1,
-        // where npm, npx and pnpm are all refused by the execution policy.
-        //
-        // Measured rather than inferred: if the interpreter is known to have
-        // started, the child owns the failure and nothing is demoted. If it
-        // has never started, it is asked to run a line that reaches no
-        // program at all, which only its own loader can fail.
-        const shellItself =
-          result.exitCode === STATUS_DLL_INIT_FAILED && !interpreterStarted(interpreter)
-            ? !(await interpreterCanStart(context.sandbox, interpreter, cwd))
-            : false;
-
-        if (shellItself && demoteInterpreter(interpreter)) {
-          const next = resolveInterpreter();
-          if (next !== undefined && next !== interpreter) {
-            // The approval was given for what this line runs under the first
-            // interpreter. Reusing it under the second is only honest while
-            // the second starts the same programs.
-            const refusal = demotionRefusal(input, interpreter, next);
-            if (refusal !== undefined) return refusal;
-            // The dead attempt's own stream is the diagnostic, and the
-            // retry's answer would throw it away: the note carries both, so
-            // the model learns which shell died and which one the rest of the
-            // session uses, in the same breath as the command's answer.
-            const note = demotionNote(interpreter, next, result.stderr);
-            interpreter = next;
-            result = await spawn();
-            return [report(result), "", note].join("\n");
-          }
-        }
+        const result = await context.sandbox.run("shell", {
+          executable: interpreter.path,
+          args: [...interpreter.args, input.command],
+          cwd,
+          // The line the interpreter reads is handed over the way that
+          // interpreter reads lines, declared where the interpreter is
+          // described. A `cmd.exe` takes the raw remainder after `/c` and
+          // takes its quotes itself; escaping them for it is what turned a
+          // fully-qualified path into a program that is not recognized, on
+          // every machine this tool was broken on.
+          lineJoin: interpreter.takes,
+          programRoots: granted.directories,
+          timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+          ...(context.signal ? { signal: context.signal } : {}),
+        });
 
         return report(result);
       } catch (error) {

@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { itContained } from "../helpers/contained.js";
+import { itContained, itRuns } from "../helpers/contained.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { McpConnection } from "../../src/extend/mcp/connection.js";
 import { createMcpLauncher } from "../../src/extend/mcp/launcher.js";
@@ -183,13 +183,14 @@ afterEach(async () => {
 });
 
 describe("createMcpLauncher", () => {
-  // Every case that actually starts a local server is `itContained`. An
-  // `mcp-server` is owed `os` isolation, so on a host that cannot supply it the
-  // launch is refused before a process exists — correctly, and asserted as a
-  // refusal in the sandbox integration suites. The remote-server cases below
-  // start nothing and run everywhere.
+  // Every case that actually starts a local server is `itRuns`: on a host
+  // with a backend that will not run, the launch is refused before a process
+  // exists - correctly, and asserted as a refusal in the sandbox integration
+  // suites. The one case about the network fence is `itContained`, because
+  // without a fence there is nothing to measure. The remote-server cases
+  // below start nothing and run everywhere.
   describe("a local server", () => {
-    itContained("starts it in the project's root, not ours", async () => {
+    itRuns("starts it in the project's root, not ours", async () => {
       const project = await workspace();
       const script = await stdioServerScript(project);
       const launch = createMcpLauncher({
@@ -244,7 +245,7 @@ describe("createMcpLauncher", () => {
       expect(await ask(true)).toBe(true);
     }, 60_000);
 
-    itContained("reads the root at the moment of the launch, not when it was built", async () => {
+    itRuns("reads the root at the moment of the launch, not when it was built", async () => {
       const first = await workspace();
       const second = await workspace();
       const script = await stdioServerScript(first);
@@ -265,7 +266,7 @@ describe("createMcpLauncher", () => {
       expect(answer.cwd.endsWith(second.split(/[\\/]/).pop() ?? "")).toBe(true);
     });
 
-    itContained("puts the secret in the named variable and nowhere else", async () => {
+    itRuns("puts the secret in the named variable and nowhere else", async () => {
       const project = await workspace();
       const script = await stdioServerScript(project);
       const credentials = new InMemoryCredentialStore();
@@ -301,7 +302,7 @@ describe("createMcpLauncher", () => {
       expect(JSON.stringify(stored)).not.toContain(SECRET);
     });
 
-    itContained("does not inherit our own environment", async () => {
+    itRuns("does not inherit our own environment", async () => {
       const project = await workspace();
       const script = await stdioServerScript(project);
       process.env.STUDIO_LAUNCHER_PROBE = "should-not-travel";
@@ -440,7 +441,7 @@ describe("createMcpLauncher", () => {
    * will start it, and the class of bug it can find is the one no fake can:
    * two pieces that each work and do not fit.
    */
-  itContained("starts a server that was saved the way settings will save it", async () => {
+  itRuns("starts a server that was saved the way settings will save it", async () => {
     const project = await workspace();
     const script = await stdioServerScript(project);
     const db = openDatabase({ path: ":memory:" });
@@ -482,7 +483,7 @@ describe("createMcpLauncher", () => {
    * shape of that failure nobody notices.
    */
   describe("what makes two launches the same launch", () => {
-    itContained("gives two projects two processes for one local server", async () => {
+    itRuns("gives two projects two processes for one local server", async () => {
       const first = await workspace();
       const second = await workspace();
       const script = await stdioServerScript(first);
@@ -509,7 +510,7 @@ describe("createMcpLauncher", () => {
       expect(firstRoot).not.toBe(secondRoot);
     });
 
-    itContained("shares one process when nothing about the launch differs", async () => {
+    itRuns("shares one process when nothing about the launch differs", async () => {
       const project = await workspace();
       const script = await stdioServerScript(project);
       const supervisor = new McpSupervisor({
@@ -547,7 +548,7 @@ describe("createMcpLauncher", () => {
       expect(supervisor.statuses()).toHaveLength(1);
     });
 
-    itContained("stops every process of a server, not the one that matched first", async () => {
+    itRuns("stops every process of a server, not the one that matched first", async () => {
       const first = await workspace();
       const second = await workspace();
       const script = await stdioServerScript(first);
