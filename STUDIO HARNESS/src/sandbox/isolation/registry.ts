@@ -1,5 +1,5 @@
 import type { IsolationBackend, IsolationSupport } from "./backend.js";
-import { selectIsolation } from "./backend.js";
+import { NO_ISOLATION, selectIsolation } from "./backend.js";
 import { linuxBwrap } from "./linux/bwrap.js";
 
 /**
@@ -22,14 +22,18 @@ import { linuxBwrap } from "./linux/bwrap.js";
  * a backend for it. Those are different sentences and they deserve different
  * behaviour.
  *
- * ## Linux is registered; Windows and macOS are not, by decision
+ * ## A third question since ADR 0057: does the person want it
  *
- * Linux *enforces*: a machine whose `bwrap` cannot get a user namespace is
- * refused rather than run open, which is the measured state of stock Ubuntu
- * 24.04, where `bwrap` is installed and the kernel still says no.
- * Registration says the implementation exists; only `available()` says it
- * works. (ADR 0057 makes this backend opt-in with a gate-only fallback; that
- * is a later step and this file still enforces until it lands.)
+ * The gate is the boundary. A backend is an extra fence under it, never a
+ * requirement, so the person turns it on (`preferIsolation`) and until they
+ * do the harness behaves as if this build had no backend at all - no probe,
+ * no fence, no sentence about containment in the prompt. Once it is on, the
+ * registry is measured, and a machine that cannot supply the fence runs
+ * gate-only with a note saying so, rather than refusing: a Linux host whose
+ * kernel withholds a user namespace is in the same position as every Windows
+ * host, which is a position the design accepts.
+ *
+ * ## Linux is registered; Windows and macOS are not, by decision
  *
  * Windows had an AppContainer backend from ADR 0041 until ADR 0057 removed
  * it. Containing a developer's shell in an AppContainer meant writing
@@ -48,17 +52,42 @@ export const OS_ISOLATION_BACKENDS: readonly IsolationBackend[] =
   BACKENDS_BY_PLATFORM[process.platform] ?? [];
 
 /**
- * Whether a shortfall in isolation refuses the work.
+ * Whether this build has a backend for this platform at all.
  *
- * **Derived** from the registry rather than set beside it, so there is no
- * second switch to forget: registering a backend for a platform turns
- * enforcement on there by construction, and removing the last one turns it off
- * again. It is not a comment or a TODO, because those do not fail.
+ * What a settings page asks before it offers the switch: on a platform with
+ * nothing registered there is nothing to turn on, and the page says so
+ * instead of showing a control that does nothing.
  */
-export const ISOLATION_ENFORCED: boolean = OS_ISOLATION_BACKENDS.length > 0;
+export const ISOLATION_OFFERED: boolean = OS_ISOLATION_BACKENDS.length > 0;
 
 /** @internal Cleared only by tests that need the probe to run again. */
 let measured: IsolationSupport | undefined;
+
+/** Whether the person has turned the fence on. Off until a setting says so. */
+let wanted = false;
+
+/**
+ * Turns the fence on or off for this process.
+ *
+ * Process-wide, like `preferInterpreter`: the setting is the person's, read
+ * from the store at startup and written back through the route, and every
+ * sandbox built afterwards asks `hostIsolation()` and gets the answer that
+ * matches. A sandbox built before the change keeps the support it was given.
+ */
+export function preferIsolation(on: boolean): void {
+  wanted = on;
+}
+
+/**
+ * Whether the fence is turned on, on a platform that has one to turn on.
+ *
+ * The switch is stored on every platform (a person's data directory may
+ * travel), but on a platform with nothing registered it means nothing here:
+ * no probe, no note, no sentence in the prompt.
+ */
+export function isolationWanted(): boolean {
+  return wanted && ISOLATION_OFFERED;
+}
 
 /**
  * What this host can contain, measured once and then remembered.
@@ -67,9 +96,21 @@ let measured: IsolationSupport | undefined;
  * `bwrap` to ask the kernel for a namespace; doing that as a side effect of
  * *importing* a module would mean every test file, every CLI invocation and
  * every `tsx` script spawned a process on load. It is measured the first
- * time something actually asks.
+ * time something actually asks. Measured regardless of the switch, so a
+ * settings page can say what turning the fence on would get.
  */
-export function hostIsolation(): IsolationSupport {
+export function measuredIsolation(): IsolationSupport {
   measured ??= selectIsolation(OS_ISOLATION_BACKENDS);
   return measured;
+}
+
+/**
+ * The isolation the harness runs commands under right now.
+ *
+ * The measured support when the fence is on, and none when it is off - and
+ * "off" asks the registry nothing, so a machine that never wanted the fence
+ * never spawns the probe.
+ */
+export function hostIsolation(): IsolationSupport {
+  return isolationWanted() ? measuredIsolation() : NO_ISOLATION;
 }

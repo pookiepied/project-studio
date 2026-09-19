@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   environmentBlock,
@@ -7,7 +7,14 @@ import {
   localDate,
 } from "../../src/context/environment.js";
 import { resolveInterpreter } from "../../src/process/interpreter.js";
-import { ISOLATION_ENFORCED } from "../../src/sandbox/isolation/registry.js";
+import {
+  ISOLATION_OFFERED,
+  measuredIsolation,
+  preferIsolation,
+} from "../../src/sandbox/isolation/registry.js";
+
+/** Whether turning the fence on here gets one: a backend the probe accepts. */
+const FENCED: boolean = ISOLATION_OFFERED && measuredIsolation().backend !== undefined;
 
 /**
  * The block the model is actually given.
@@ -184,14 +191,40 @@ describe("the environment block", () => {
     expect(environmentFacts("/w", new Date(2026, 7, 30, 12, 0, 0)).kind).toBe("conversation");
   });
 
-  it("says commands are contained, where containment is enforced", () => {
+  afterEach(() => {
+    preferIsolation(false);
+  });
+
+  it("says nothing about containment while the fence is off, on every host", () => {
+    // ADR 0057: the gate is the boundary, its refusals arrive as questions,
+    // and a block that claimed a fence nobody turned on would send the model
+    // explaining access errors that never happen.
+    preferIsolation(false);
+    const block = environmentBlock({ workspace: "/w", kind: "conversation", git: false, today: "2026-08-30" });
+    expect(block).not.toContain("Commands you run are contained.");
+    expect(block).not.toContain("sandbox fence is turned on");
+  });
+
+  it("says the fence is on and missing, when it is, rather than claiming it", () => {
+    // Linux with the switch on and a kernel that refuses the namespace: the
+    // model is told in one sentence, so it neither diagnoses the machine nor
+    // treats the settings page as a promise.
+    if (!ISOLATION_OFFERED || FENCED) return;
+    preferIsolation(true);
+    const block = environmentBlock({ workspace: "/w", kind: "conversation", git: false, today: "2026-08-30" });
+    expect(block).toContain("The sandbox fence is turned on in Settings, and this machine cannot");
+    expect(block).not.toContain("Commands you run are contained.");
+  });
+
+  it("says commands are contained, where the fence is on and works", () => {
     // An evaluation run read the boundary as a broken machine: `tasklist` was
     // refused, and with nothing saying there was a container the only
     // available explanation was a defect. The block has to state it, or every
     // run pays to rediscover it.
+    preferIsolation(true);
     const block = environmentBlock({ workspace: "/w", kind: "conversation", git: false, today: "2026-08-30" });
 
-    if (ISOLATION_ENFORCED) {
+    if (FENCED) {
       expect(block).toContain("Commands you run are contained.");
       // The two refusals that were misread, both named.
       expect(block).toContain("listing");
@@ -216,7 +249,7 @@ describe("the environment block", () => {
       // Network is a stated decision, not a gap something slipped through.
       expect(block).toMatch(/Outbound network is on/);
     } else {
-      // A host with no backend must not claim a boundary it does not have.
+      // A host that cannot fence must not claim a boundary it does not have.
       expect(block).not.toContain("Commands you run are contained.");
     }
   });
@@ -397,15 +430,21 @@ describe("what the block says about commands that do not finish", () => {
   const block = () =>
     environmentBlock(environmentFacts("/w", new Date("2026-09-07T10:00:00"), "conversation"))
 
+  afterEach(() => {
+    preferIsolation(false)
+  })
+
   it("names the background option rather than leaving it to be found", () => {
-    if (!ISOLATION_ENFORCED) return
+    if (!FENCED) return
+    preferIsolation(true)
     expect(block()).toContain("background option")
   })
 
   it("says that detaching by hand does not avoid the wait", () => {
     // Without this the model reaches for `start` or `&`, waits out the
     // timeout anyway, and reports the tool as broken.
-    if (!ISOLATION_ENFORCED) return
+    if (!FENCED) return
+    preferIsolation(true)
     expect(block()).toContain("Do not try to detach a command by hand")
   })
 })

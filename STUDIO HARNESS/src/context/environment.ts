@@ -3,7 +3,7 @@ import { platform, release } from "node:os";
 import { join } from "node:path";
 
 import { interpreterStatement } from "../process/interpreter.js";
-import { ISOLATION_ENFORCED } from "../sandbox/isolation/registry.js";
+import { hostIsolation, isolationWanted } from "../sandbox/isolation/registry.js";
 
 /**
  * The environment block.
@@ -236,12 +236,16 @@ export function environmentFacts(
  * standing on, and the report that comes back proposes weakening the boundary.
  * Naming it costs four lines.
  *
- * Derived from `ISOLATION_ENFORCED` rather than the platform, so this cannot
- * claim containment on a host that has none - the constant is itself derived
- * from the backend registry, so registering a backend turns this sentence on
- * by construction. Deliberately NOT `hostIsolation()`: that probe spawns
- * `bwrap` to ask the kernel a question, and building a prose block is not a
- * reason to start a process.
+ * Asked of `hostIsolation()`, which since ADR 0057 answers three ways. The
+ * fence is off - the default, and every Windows host - and nothing is said:
+ * the gate is the boundary and its refusals arrive as questions, not as
+ * access errors a model has to explain. The fence is on and this machine
+ * supplies it, and the paragraph below tells the model what a refusal from
+ * it means. The fence is on and this machine cannot supply it, and the model
+ * is told that too, in one sentence, so it does not read the person's
+ * settings page as a promise the machine is breaking. `hostIsolation()`
+ * spawns the probe only when the fence is on, which is when there is a
+ * question to ask.
  *
  * It says what a model can act on - which failures are the boundary and not a
  * bug - and not how containment is implemented, which is ours to change.
@@ -375,7 +379,18 @@ function workspaceStatement(facts: EnvironmentFacts): readonly string[] {
 }
 
 function containmentStatement(): readonly string[] {
-  if (!ISOLATION_ENFORCED) return [];
+  if (!isolationWanted()) return [];
+  const support = hostIsolation();
+  if (support.backend === undefined) {
+    return [
+      "The sandbox fence is turned on in Settings, and this machine cannot",
+      "supply it, so your commands run under the permission gate alone. This",
+      `is what the machine said: ${support.shortfall.join(" ") || "no detail was recorded."}`,
+      "It is the person's to fix or to leave; say so once if it matters to the",
+      "work, and do not try to fix it yourself.",
+      "",
+    ];
+  }
   return [
     "Commands you run are contained. They can read and write your working",
     "directory and read the programs they need, and nothing else: another",

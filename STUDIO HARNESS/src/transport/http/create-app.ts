@@ -142,6 +142,8 @@ export interface CreateHttpAppOptions {
   readonly browseHome?: string;
   /** The shell preference store (ADR 0057), served under the sandbox routes. */
   readonly shell?: import("../../process/shell-settings.js").ShellSettingsStore;
+  /** The sandbox fence switch (ADR 0057), served beside it. */
+  readonly isolation?: import("../../sandbox/isolation-settings.js").IsolationSettingsStore;
   readonly admission: AdmissionVerifier;
   /**
    * Answers whether the catalog currently serves a model reference. Settling a
@@ -203,6 +205,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
         ...(options.trust === undefined ? {} : { trust: options.trust }),
         ...(options.browseHome === undefined ? {} : { browseHome: options.browseHome }),
         ...(options.shell === undefined ? {} : { shell: options.shell }),
+        ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
       }),
     );
   }

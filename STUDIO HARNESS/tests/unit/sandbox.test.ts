@@ -9,9 +9,7 @@ import type {
   CapabilityDescriptor,
   CapabilityEffect,
 } from "../../src/contracts/capabilities.js";
-import { CAN_CONTAIN } from "../helpers/contained.js";
 import { SandboxError } from "../../src/sandbox/errors.js";
-import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { isInsideRoot } from "../../src/sandbox/paths.js";
 import {
@@ -318,27 +316,16 @@ describe("isolation is claimed honestly", () => {
     // This used to be called "runs a native program … uncontained and said so",
     // citing ADR 0019: running a program the user chose, in a folder they
     // trusted, with their approval is doing as asked rather than containment.
-    // ADR 0041 overrode it. `execute` is contained now, and a host that cannot
-    // contain refuses instead of running open — that is the whole of #15.
+    // ADR 0041 overrode it with a refusal on a host that could not contain;
+    // ADR 0057 overrode that in turn.
     //
-    // So `allowExec` clears the operator's switch and then hands the question
-    // to the machine, and the honest assertion is both halves: past the switch,
-    // and decided by measured support. Written this way rather than gated with
-    // `itContained`, because "what happens when the host cannot contain" is
-    // precisely what this test is about.
-    //
-    // Three states, not two, since ADR 0057. A host with a backend that
-    // works admits; a host with a backend that does not work refuses, because
-    // a registered backend enforces; a host with no backend at all - Windows
-    // and macOS - admits, because there the gate is the boundary and nothing
-    // was promised that the machine cannot keep.
+    // One state since ADR 0057: past the switch, execute is admitted on
+    // every host, because the gate is the boundary and a fence the machine
+    // cannot supply is a note beside the command rather than a refusal.
     const permissive = new LocalSandbox(
       createSandboxPolicy({ workspaceRoot: workspace, allowExec: true }),
     );
-    const attempt = () => permissive.assertSupports(descriptor(["execute"]));
-
-    if (CAN_CONTAIN || !hostIsolation().enforcing) expect(attempt).not.toThrow();
-    else expect(attempt).toThrow(SandboxError);
+    expect(() => permissive.assertSupports(descriptor(["execute"]))).not.toThrow();
   });
 
   it("does not ask who wrote the code, because that is not a containment fact", () => {

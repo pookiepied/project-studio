@@ -32,8 +32,7 @@ export {
   PRIVATE_V6,
 } from "./linux/network.js";
 export {
-  assertIsolationAvailable,
-  isolationAvailable,
+  NO_ISOLATION,
   selectIsolation,
   type ContainedCommand,
   type IsolationBackend,
@@ -41,6 +40,9 @@ export {
 } from "./backend.js";
 export {
   hostIsolation,
-  ISOLATION_ENFORCED,
+  ISOLATION_OFFERED,
+  isolationWanted,
+  measuredIsolation,
   OS_ISOLATION_BACKENDS,
+  preferIsolation,
 } from "./registry.js";

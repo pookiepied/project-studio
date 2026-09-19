@@ -97,6 +97,7 @@ export {
   type ShellInfo,
   type ShellKind,
   type ShellOption,
+  type IsolationInfo,
   type WireStreamEvent,
   type MeasuredContextUsage,
   type BackgroundJob,

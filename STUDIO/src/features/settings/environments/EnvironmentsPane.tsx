@@ -4,7 +4,7 @@ import { Button, IconButton, Segmented } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
 import { useEnvironments } from '@/features/settings/environments/useEnvironments'
-import type { FolderTrust, SandboxLevel, SandboxScopeRow, ShellInfo, ShellKind } from '@/platform/harness'
+import type { FolderTrust, IsolationInfo, SandboxLevel, SandboxScopeRow, ShellInfo, ShellKind } from '@/platform/harness'
 
 // A JSX string attribute is not escaped, so the two backslashes written
 // here would both reach the input. Held as a value instead.
@@ -22,10 +22,10 @@ const SHELL_NAMES: Record<ShellKind, string> = {
 /**
  * Environments.
  *
- * Where commands actually run. Five parts, in this order: the shell that
- * runs them, whether the project's folders are vouched for at all, this
- * project's reach, the scope the next grant will take, and everything
- * granted with where it came from. The detected-toolchain presets that used
+ * Where commands actually run. Six parts, in this order: the shell that
+ * runs them, the sandbox fence under the permission gate, whether the
+ * project's folders are vouched for at all, this project's reach, the scope
+ * the next grant will take, and everything granted with where it came from. The detected-toolchain presets that used
  * to sit between the last two went with the Windows container (ADR 0057):
  * they named the folders a container had to be let into, and with no
  * container the machine's own PATH answers. Scope and reach are kept apart
@@ -43,7 +43,10 @@ const SHELL_NAMES: Record<ShellKind, string> = {
  * The shell comes first because it is machine-wide and every command on the
  * page below runs through it. The choice is the person's (ADR 0057): the
  * harness orders what the machine has, and this is where that order is
- * overruled.
+ * overruled. The fence is beside it for the same reason: machine-wide, off
+ * until turned on, and only offered where this build has one - Linux. On
+ * Windows the row says so and offers nothing, because a switch that does
+ * nothing is worse than a sentence that says why.
  *
  * Trust comes next because it is the precondition the other three sit
  * behind. An unvouched folder refuses every write and every command in every
@@ -76,12 +79,14 @@ export function EnvironmentsPane() {
           projectId={view.projectId}
           scope={view.scope}
           shell={view.shell}
+          isolation={view.isolation}
           lastError={environments.lastError}
           refreshing={environments.refreshing}
           onRefresh={() => void environments.refresh()}
           onSelectProject={(id) => void environments.selectProject(id)}
           onSetLevel={(id, level) => void environments.setLevel(id, level)}
           onSetShell={(kind) => void environments.setShell(kind)}
+          onSetIsolation={(enabled) => void environments.setIsolation(enabled)}
           onSetTrust={(root, trusted) => void environments.setTrust(root, trusted)}
           onRevoke={(id, path) => void environments.revoke(id, path)}
           onGrantCustom={(id, path, mode) => void environments.grantCustom(id, path, mode)}
@@ -96,12 +101,14 @@ function Body({
   projectId,
   scope,
   shell,
+  isolation,
   lastError,
   refreshing,
   onRefresh,
   onSelectProject,
   onSetLevel,
   onSetShell,
+  onSetIsolation,
   onSetTrust,
   onRevoke,
   onGrantCustom,
@@ -115,12 +122,14 @@ function Body({
     readonly trust: readonly FolderTrust[]
   }
   shell: ShellInfo
+  isolation: IsolationInfo
   lastError: string | null
   refreshing: boolean
   onRefresh: () => void
   onSelectProject: (id: string | null) => void
   onSetLevel: (id: string, level: SandboxLevel) => void
   onSetShell: (kind: ShellKind | null) => void
+  onSetIsolation: (enabled: boolean) => void
   onSetTrust: (root: string, trusted: boolean) => void
   onRevoke: (id: string, path: string) => void
   onGrantCustom: (id: string, path: string, mode: 'read' | 'write') => void
@@ -149,6 +158,23 @@ function Body({
     return active
   }
 
+  // What the fence row says. Three states the harness reports, and the
+  // page must not blur them: not offered on this platform (nothing to turn
+  // on), on and working (the backend named), on and not working (the
+  // machine's own reason, so the person can fix it or leave it).
+  const fenceHint = (): string => {
+    if (!isolation.offered) {
+      return 'This build has no sandbox fence for this platform. Commands run under the permission gate, which asks before anything runs; that is the boundary here.'
+    }
+    if (!isolation.enabled) {
+      return 'Off. Commands run under the permission gate alone. Turn the fence on to also wall each command into the project and what is granted below.'
+    }
+    if (isolation.backend !== null) {
+      return `On, through ${isolation.backend}. Each command is walled into the project and what is granted below.`
+    }
+    return `On, and this machine cannot supply it, so commands run under the permission gate alone. ${isolation.shortfall.join(' ')}`
+  }
+
   return (
     <div>
       <Row label="Shell" hint={shellHint()}>
@@ -162,6 +188,21 @@ function Body({
             ...shell.available.map((entry) => ({ id: entry.kind, label: SHELL_NAMES[entry.kind] })),
           ]}
         />
+      </Row>
+
+      <Row label="Sandbox fence" hint={fenceHint()}>
+        {isolation.offered ? (
+          <Segmented
+            layoutId="settings-sandbox-fence"
+            ariaLabel="Sandbox fence"
+            value={isolation.enabled ? 'on' : 'off'}
+            onChange={(value) => onSetIsolation(value === 'on')}
+            options={[
+              { id: 'off', label: 'Off' },
+              { id: 'on', label: 'On' },
+            ]}
+          />
+        ) : null}
       </Row>
 
       <div className="flex items-center justify-between py-3.5">
