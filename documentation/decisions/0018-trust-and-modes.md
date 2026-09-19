@@ -1,6 +1,8 @@
 # ADR 0018 — Workspace Trust And Execution Modes
 
-**Status:** accepted
+**Status:** accepted · amended by [ADR 0057](0057-the-gate-is-the-boundary.md)
+on 2026-09-19: the three modes below become two, Ask and Auto. Decision one
+(trust) and the invariant in decision two are unchanged.
 **Closes:** `T-03`, `T-09`. **Unblocks:** `shell`.
 **Builds on:** ADR 0012 (permission kernel), ADR 0016 (undo).
 **Amended by:** ADR 0025 — the rule below is unchanged, its key is now
