@@ -191,7 +191,10 @@ path, `read` or `write`, and one sentence saying what for. The person sees
 exactly that and answers; a yes writes the same `question`-sourced row the
 Settings page would and widens the running sandbox too (`LocalSandbox.widen`),
 so the work carries on in the same run; a no is remembered for the rest of the
-conversation. The first yes is *for this conversation*, and it is the
+turn - long enough that the model cannot ask the same thing in a loop, and no
+longer, so "try again" in the person's next message asks again (the harness
+cannot tell a change of mind from a nag by reading the message, and does not
+try; the next message is the line). The first yes is *for this conversation*, and it is the
 recommended one (migration 26 adds the conversation scope to `sandbox_scope`):
 it is the cheapest answer, it ends with the conversation, and it is what the
 person most often means. *This project* follows when there is a project, and
