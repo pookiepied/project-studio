@@ -6,6 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Markdown } from '@/features/chat/markdown/Markdown'
 import { CodeBlock } from './CodeBlock'
+// Pulled in eagerly, on purpose. `CodeBlock` imports this module lazily, and
+// under the whole suite's load that one import - the highlighter and twenty
+// grammars - took longer than any wait a test could honestly give it, so the
+// colour test failed once every few runs. With the module already in the
+// graph the lazy import resolves at once, and what the test waits for is the
+// render, which is the claim.
+import './HighlightedCode'
 import { PlainCode } from './PlainCode'
 import { TextBlock } from './TextBlock'
 
@@ -69,13 +76,8 @@ describe('CodeBlock', () => {
     // got a block wearing the Java mark and no color. This pins one of the
     // nine and one fence spelling that resolves through the alias table.
     // The highlighter is a chunk that arrives on demand, so the colour lands
-    // a moment after the block does.
-    // A generous wait: under the whole suite's load the chunk can take
-    // longer than the library's one-second default to import. And the
-    // generosity has to reach the test itself: this test schedules two of
-    // those eight-second waits, and vitest's default five would cut it dead
-    // before either could take its time - which is what it did, once every
-    // few runs, on a loaded machine.
+    // a moment after the block does. The chunk itself is preloaded at the top
+    // of this file; the waits below are for the render, not the import.
     const { container } = render(<CodeBlock code={'public class A {}'} fence="java" />)
     await waitFor(() => expect(container.querySelector('.hljs-keyword')).not.toBeNull(), CHUNK)
 
