@@ -6,10 +6,16 @@ import type { SandboxScopeStore } from "./scope-store.js";
 /**
  * The refusal that becomes a question.
  *
- * When a command is refused because it needed a path outside its roots, the
- * run can put the real question to the person through `native/ask_user_question`
- * - the tool Task 55 shipped. This module builds that question and applies its
- * answer. It builds no second asking mechanism; the broker stays the channel.
+ * When the work needs a path outside the roots a conversation may reach, the
+ * run puts the real question to the person through the question broker - the
+ * channel `native/ask_user_question` uses. This module builds that question
+ * and applies its answer. It builds no second asking mechanism.
+ *
+ * Since ADR 0057 the asking is the model's to do, through
+ * `native/request_folder`: the gate is the boundary, a grant is a cheap
+ * stored rule, and a model that needs the person's Downloads folder asks for
+ * it in so many words rather than reaching, being refused, and reporting the
+ * refusal. The question is the same one either way.
  *
  * The path in the question is the resolved, normalized absolute path the
  * sandbox computed - never the raw string the model wrote. If those two
@@ -38,42 +44,68 @@ export interface ScopeQuestion {
 }
 
 /**
- * Builds the question for a refused path.
+ * Builds the question for a path outside the roots.
  *
  * `resolvedPath` is what the sandbox computed; `rawPath` is what the model
  * wrote and is never shown. `program` names the command that needed the path,
  * when it is known - `cargo` in the brief's example - so the sentence reads
- * as something that happened rather than as a path on its own.
+ * as something that happened rather than as a path on its own. `reason` is
+ * the model's own sentence about why, when it asked up front through
+ * `request_folder`; it is shown after the question so the person decides on
+ * the stated purpose and not on a bare path.
+ *
+ * `hasProject` decides the options. With a project there are two ways to say
+ * yes - this project, or everywhere - and they write different rows. With no
+ * project both would write the machine-wide row, so a conversation with no
+ * project is offered one yes and told what it means.
  */
 export function buildScopeQuestion(options: {
   readonly resolvedPath: string;
   readonly rawPath?: string | undefined;
   readonly program?: string | undefined;
+  readonly reason?: string | undefined;
   readonly mode?: SandboxScopeMode | undefined;
+  readonly hasProject?: boolean | undefined;
 }): ScopeQuestion {
   const resolvedPath = normalizeScopePath(options.resolvedPath);
   const mode = options.mode ?? "write";
-  const actor = options.program === undefined ? "A command" : options.program;
+  const hasProject = options.hasProject ?? true;
+  const actor = options.program === undefined ? "The model" : options.program;
+  const verb = mode === "write" ? "write" : "read";
+  const boundary = hasProject ? "outside this project" : "outside this conversation's folders";
+  const reason =
+    options.reason === undefined || options.reason.trim() === "" ? "" : ` ${options.reason.trim()}`;
+  const retry = "and the work can carry on";
   return {
     resolvedPath,
     mode,
     payload: {
-      question:
-        `${actor} needs to ${mode === "write" ? "write" : "read"} ${resolvedPath}, ` +
-        `which is outside this project.`,
-      header: "Sandbox",
+      question: `${actor} needs to ${verb} ${resolvedPath}, which is ${boundary}.${reason}`,
+      header: "Folder",
       multiSelect: false,
       options: [
-        {
-          id: SCOPE_QUESTION_OPTIONS.project,
-          label: "Allow it for this project",
-          description: `Grants ${mode} on ${resolvedPath} for this project, and the command can be retried.`,
-        },
-        {
-          id: SCOPE_QUESTION_OPTIONS.everywhere,
-          label: "Allow it for every project",
-          description: `Grants ${mode} on ${resolvedPath} everywhere, and the command can be retried.`,
-        },
+        ...(hasProject
+          ? [
+              {
+                id: SCOPE_QUESTION_OPTIONS.project,
+                label: "Allow it for this project",
+                description: `Grants ${mode} on ${resolvedPath} for this project, ${retry}.`,
+              },
+              {
+                id: SCOPE_QUESTION_OPTIONS.everywhere,
+                label: "Allow it for every project",
+                description: `Grants ${mode} on ${resolvedPath} everywhere, ${retry}.`,
+              },
+            ]
+          : [
+              {
+                id: SCOPE_QUESTION_OPTIONS.everywhere,
+                label: "Allow it",
+                description:
+                  `Grants ${mode} on ${resolvedPath} machine-wide - every project and every ` +
+                  `conversation with no project - ${retry}.`,
+              },
+            ]),
         {
           id: SCOPE_QUESTION_OPTIONS.deny,
           label: "Don't allow it",

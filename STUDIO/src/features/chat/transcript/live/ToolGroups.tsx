@@ -184,6 +184,9 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   grep: { mark: Icons.search, running: 'Searching', done: 'Searched' },
   plan: { mark: Icons.plan, running: 'Planning', done: 'Planned' },
   ask_user_question: { mark: Icons.ask, running: 'Asking', done: 'Asked' },
+  // The folder question wears the same mark: it is a question to the
+  // person, and the row's subject is the folder the model asked for.
+  request_folder: { mark: Icons.ask, running: 'Asking for', done: 'Asked for' },
   // Discovery wears MCP's own mark rather than a magnifying glass: what it
   // searches is the extensions, and the mark the settings pane already uses
   // for them is the one a reader has been taught. Its verbs say what the

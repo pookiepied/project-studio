@@ -1656,6 +1656,14 @@ export class StudioRuntime implements AgentHost {
               ask: (conversationId, payloads, timeoutMs, signal) =>
                 questionBroker.ask(conversationId, payloads, timeoutMs, signal),
               closing,
+              // The folder question writes the same rows the Settings page
+              // does and remembers a no beside the access logs, so both are
+              // the runtime's and not the run's.
+              folders: {
+                scopes: this.#scopes,
+                declines: this.#declines,
+                projectOf: (conversationId) => this.#conversationProject(conversationId),
+              },
             },
           }),
       ...(planStore === undefined
