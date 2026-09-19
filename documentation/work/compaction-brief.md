@@ -169,6 +169,25 @@ limit — the point of compacting is to keep answers good, not to use every
 token. Not 80%: on a 1M model that is 200k tokens of headroom thrown away
 per cycle, and each cycle re-reads everything.
 
+**Does the summariser request fit?** Yes, by construction, and the
+arithmetic is worth writing down once for a 200k model at 85% (170k
+used). The request carries the transcript as text with every tool result
+cut to 2,000 characters and images dropped, without the system prompt or
+the tool definitions (10–20k that are not sent), and without the 8k tail
+that is kept verbatim: at most ~150k, usually far less. Its output is
+capped at `min(0.8 × reserve, 16,000)` tokens — 16k with a 30k reserve.
+Worst case ~167k in a 200k window. Both the reserve and the cap scale
+with the window, so the margin holds at every size. After the compaction
+the context is roughly system prompt + summary + tail ≈ 40k, a fifth of
+the window.
+
+One quality risk to measure rather than assume: Flue requests reasoning
+at "high" for the summariser when the model supports it, and on
+Anthropic the thinking budget lives inside that same 16k output cap. A
+summariser that thinks for 12k tokens has 4k left for the summary. It
+cannot overflow the window; it can produce a short summary. If C-01's
+fixture shows it, the fix is one line (summariser at low reasoning).
+
 ### 4.3 What happens in the middle of an edit?
 
 Flue never cuts inside a tool call and its result, and it runs between
