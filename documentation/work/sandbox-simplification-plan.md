@@ -1,6 +1,6 @@
 # Sandbox simplification — the plan
 
-**Status:** In progress — steps 1 to 5 done (ADR, seam, deletion, shell, modes); next is step 6, the project-less conversation folder. Step 1 is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
+**Status:** In progress — steps 1 to 6 done (ADR, seam, deletion, shell, modes, conversation identity); next is step 7, the Linux opt-in and gate-only fallback. Step 1 is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
 **Decision:** ADR 0057, which supersedes the Windows half of
 [ADR 0041](../decisions/0041-containment-is-the-kernel-s-job.md) and
 [ADR 0047](../decisions/0047-a-contained-command-can-find-the-programs-it-may-run.md),
