@@ -203,6 +203,56 @@ describe("the scope store", () => {
     scopes.clearProject("prj_gone");
     expect(scopes.listProject("prj_gone")).toHaveLength(0);
   });
+
+  it("keeps a conversation grant to its conversation (migration 26)", () => {
+    // The third scope. Read by the conversation that was granted it and by
+    // no other, whichever project either is filed under; carried in neither
+    // the project list nor the machine-wide list, so the settings pane
+    // cannot mistake it for a durable one.
+    const scopes = new SandboxScopeStore(db);
+    const directory = workspace("downloads");
+    const row = scopes.grant({
+      projectId: "prj_a",
+      conversationId: "cnv_1",
+      path: directory,
+      mode: "write",
+      source: "question",
+    });
+    expect(row.projectId).toBe("");
+    expect(row.conversationId).toBe("cnv_1");
+
+    expect(scopes.resolveRoots("prj_a", "cnv_1").writeRoots).toContain(resolve(directory));
+    expect(scopes.resolveRoots(undefined, "cnv_1").writeRoots).toContain(resolve(directory));
+    expect(scopes.resolveRoots("prj_a", "cnv_2").readRoots).not.toContain(resolve(directory));
+    expect(scopes.resolveRoots("prj_a").readRoots).not.toContain(resolve(directory));
+    expect(scopes.listProject("prj_a")).toHaveLength(0);
+    expect(scopes.listMachineWide()).toHaveLength(0);
+    expect(scopes.listConversations().map((entry) => entry.conversationId)).toEqual(["cnv_1"]);
+  });
+
+  it("removes a conversation grant on its own, and all of them with the conversation", () => {
+    const scopes = new SandboxScopeStore(db);
+    const first = workspace("first");
+    const second = workspace("second");
+    scopes.grant({ projectId: "", conversationId: "cnv_1", path: first, mode: "read", source: "question" });
+    scopes.grant({ projectId: "", conversationId: "cnv_1", path: second, mode: "read", source: "question" });
+    // The same path machine-wide is a different row and survives both.
+    scopes.grant({ projectId: "", path: first, mode: "read", source: "custom" });
+
+    expect(scopes.revokeConversation("cnv_1", first)).toBe(true);
+    expect(scopes.revoke("", second)).toBe(false);
+    expect(scopes.listConversations().map((entry) => entry.path)).toEqual([resolve(second)]);
+    expect(scopes.clearConversation("cnv_1")).toBe(1);
+    expect(scopes.listConversations()).toHaveLength(0);
+    expect(scopes.listMachineWide().map((entry) => entry.path)).toEqual([resolve(first)]);
+  });
+
+  it("refuses a blank conversation id", () => {
+    const scopes = new SandboxScopeStore(db);
+    expect(() =>
+      scopes.grant({ projectId: "", conversationId: " ", path: workspace("x"), mode: "read", source: "question" }),
+    ).toThrow(StorageError);
+  });
 });
 
 describe("the policy build", () => {
@@ -268,8 +318,10 @@ describe("the refusal that becomes a question", () => {
     expect(built.resolvedPath).toBe(resolve(resolved));
     expect(built.payload.question).toContain(resolve(resolved));
     expect(built.payload.question).not.toContain("..");
-    expect(built.payload.options).toHaveLength(3);
-    expect(built.payload.recommendedOptionId).toBeUndefined();
+    // Four answers with a project: this conversation (recommended), this
+    // project, everywhere, and no.
+    expect(built.payload.options).toHaveLength(4);
+    expect(built.payload.recommendedOptionId).toBe(SCOPE_QUESTION_OPTIONS.conversation);
   });
 
   it("writes the grant for this project, and the command can be retried", () => {

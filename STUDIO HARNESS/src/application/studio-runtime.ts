@@ -914,7 +914,7 @@ export class StudioRuntime implements AgentHost {
 
   conversationExtraRoots(conversationId: string): readonly string[] {
     const projectId = this.#conversationProject(conversationId);
-    const roots = this.#scopes.resolveRoots(projectId);
+    const roots = this.#scopes.resolveRoots(projectId, conversationId);
     // The standing roots are plumbing, not choices: the block names what the
     // person granted, so the git config files the policy owes every workspace
     // stay out of this list rather than reading as an invitation.
@@ -1437,7 +1437,7 @@ export class StudioRuntime implements AgentHost {
     // on the project: trusted removes containment for that project's
     // conversations, and contained is what an untouched project still gets.
     const scopeProject = conversationProject ?? (options.projectId === undefined ? undefined : projectId);
-    const roots = this.#scopes.resolveRoots(scopeProject);
+    const roots = this.#scopes.resolveRoots(scopeProject, options.conversationId);
     const trusted = this.#conversationTrusted(conversationProject ?? options.projectId);
     // The roots one project conversation stands to work with: the person's
     // other folders join the scope rows, and the workspace root leads the

@@ -208,6 +208,7 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
         return context.json({
           project: [],
           machineWide: scopes.listMachineWide(),
+          conversations: scopes.listConversations(),
           level: "contained",
           trust: [],
         });
@@ -215,6 +216,7 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
       return context.json({
         project: scopes.listProject(projectId),
         machineWide: scopes.listMachineWide(),
+        conversations: scopes.listConversations(),
         level: projects.sandboxLevelOf(projectId),
         trust: folderTrust(projectId),
       });
@@ -272,11 +274,17 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
   routes.delete("/scope", async (context) => {
     try {
       const projectId = context.req.query("projectId") ?? "";
+      const conversationId = context.req.query("conversationId") ?? "";
       const path = context.req.query("path");
       if (path === undefined || path === "") {
         throw invalidBody("Removing a scope names its path.");
       }
-      const removed = scopes.revoke(projectId, path);
+      // A conversation row is addressed by its conversation, a project or
+      // machine-wide row by its project; the two never share a key.
+      const removed =
+        conversationId === ""
+          ? scopes.revoke(projectId, path)
+          : scopes.revokeConversation(conversationId, path);
       if (!removed) return context.json({ error: "No such scope." }, 404);
       return context.body(null, 204);
     } catch (error) {

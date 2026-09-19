@@ -6,6 +6,7 @@ import { PermissionGrantStore } from "../permissions/grant-store.js";
 import { ExtensionSelectionStore } from "../extend/selection.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
 import type { PendingQuestionStore } from "../questions/pending-questions.js";
+import type { SandboxScopeStore } from "../sandbox/scope-store.js";
 import {
   conversationDirectory,
   conversationsDirectory,
@@ -81,6 +82,8 @@ export interface PurgeDependencies {
   readonly plans: PlanItemStore;
   /** The one owner of `pending_question`. */
   readonly questions: PendingQuestionStore;
+  /** The one owner of `sandbox_scope`, for the folders granted to this conversation alone. */
+  readonly folders: SandboxScopeStore;
   /**
    * The journal file to delete from. Resolved per call from the same rule
    * Flue itself follows when unset, so tests point it at a fixture.
@@ -156,7 +159,7 @@ export async function purgeConversations(
   dependencies: PurgeDependencies,
   ids: readonly string[],
 ): Promise<PurgeOutcome> {
-  const { conversations, grants, selection, plans, questions, flueJournalPath } =
+  const { conversations, grants, selection, plans, questions, folders, flueJournalPath } =
     dependencies;
   const removed: string[] = [];
   const cleanupFailures: Record<string, string> = {};
@@ -206,6 +209,9 @@ export async function purgeConversations(
         // asked it is gone.
         plans.clearConversation(id);
         questions.clearConversation(id);
+        // A folder granted "for this conversation" was granted for exactly as
+        // long as the conversation exists.
+        folders.clearConversation(id);
         scoped = true;
       } catch (unknown) {
         const failure = failureOf(unknown);

@@ -191,8 +191,13 @@ path, `read` or `write`, and one sentence saying what for. The person sees
 exactly that and answers; a yes writes the same `question`-sourced row the
 Settings page would and widens the running sandbox too (`LocalSandbox.widen`),
 so the work carries on in the same run; a no is remembered for the rest of the
-conversation. A conversation with no project is offered one yes (machine-wide)
-rather than two that would write the same row. The tool declares `read` only,
+conversation. The first yes is *for this conversation*, and it is the
+recommended one (migration 26 adds the conversation scope to `sandbox_scope`):
+it is the cheapest answer, it ends with the conversation, and it is what the
+person most often means. *This project* follows when there is a project, and
+*everywhere* is last, on purpose - always should be chosen, not landed on
+because it was the only yes. All three list in Settings > Environments and
+can be removed there. The tool declares `read` only,
 like `ask_user_question`, so asking never itself needs approval and Auto mode
 does not answer it - Auto resolves the gate's default asks, and a question to
 the person is not one. The environment block now tells the model about the

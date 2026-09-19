@@ -49,6 +49,7 @@ export interface Environments {
     mode: 'read' | 'write',
   ) => Promise<HarnessFailure | null>
   revoke: (projectId: string, path: string) => Promise<HarnessFailure | null>
+  revokeConversation: (conversationId: string, path: string) => Promise<HarnessFailure | null>
 }
 
 export function useEnvironments(): Environments {
@@ -170,5 +171,6 @@ export function useEnvironments(): Environments {
     grantCustom: (id, path, mode) =>
       mutate((handle) => handle.grantScope({ projectId: id, path, mode, source: 'custom' })),
     revoke: (id, path) => mutate((handle) => handle.revokeScope(id, path)),
+    revokeConversation: (id, path) => mutate((handle) => handle.revokeConversationScope(id, path)),
   }
 }

@@ -113,6 +113,7 @@ function stubClient(overrides: {
     getScope: () => refuse(),
     grantScope: () => refuse(),
     revokeScope: () => refuse(),
+    revokeConversationScope: () => refuse(),
     browseFolders: () => refuse(),
     setSandboxLevel: () => refuse(),
     getShell: () => refuse(),

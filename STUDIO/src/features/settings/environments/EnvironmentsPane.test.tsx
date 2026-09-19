@@ -34,6 +34,7 @@ const environments = vi.hoisted(() => {
     setIsolation: vi.fn(async () => null),
     grantCustom: vi.fn(async () => null),
     revoke: vi.fn(async () => null),
+    revokeConversation: vi.fn(async () => null),
     setTrust: vi.fn(async () => null),
   }
 })
@@ -53,9 +54,10 @@ beforeEach(() => {
 
 const GIT = 'C:\\Program Files\\Git'
 
-function scopeRow(path: string, projectId: string): SandboxScopeRow {
+function scopeRow(path: string, projectId: string, conversationId = ''): SandboxScopeRow {
   return {
     projectId,
+    conversationId,
     path,
     mode: 'read',
     source: 'custom',
@@ -78,6 +80,7 @@ function isolationInfo(overrides: Partial<IsolationInfo> = {}): IsolationInfo {
 function ready(scope: {
   readonly project?: readonly SandboxScopeRow[]
   readonly machineWide?: readonly SandboxScopeRow[]
+  readonly conversations?: readonly SandboxScopeRow[]
   readonly trust?: readonly FolderTrust[]
   readonly shell?: ShellInfo
   readonly isolation?: IsolationInfo
@@ -98,6 +101,7 @@ function ready(scope: {
     scope: {
       project: scope.project ?? [],
       machineWide: scope.machineWide ?? [],
+      conversations: scope.conversations ?? [],
       level: 'contained',
       trust: scope.trust ?? [],
     },
@@ -111,7 +115,7 @@ function noProjects(): void {
     status: 'ready',
     projects: [],
     projectId: null,
-    scope: { project: [], machineWide: [], level: 'contained', trust: [] },
+    scope: { project: [], machineWide: [], conversations: [], level: 'contained', trust: [] },
     shell: shellInfo(),
     isolation: isolationInfo(),
   }
@@ -163,6 +167,19 @@ describe('EnvironmentsPane', () => {
     expect(screen.getByText('read · custom · everywhere')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(environments.revoke).toHaveBeenCalledWith('', GIT)
+  })
+
+  it("lists a conversation's own grant and removes it by conversation", () => {
+    // Migration 26: the answer the folder question recommends. It belongs to
+    // one conversation, is named as such, and is removed by that id rather
+    // than by a project - it never had one.
+    ready({ conversations: [scopeRow(GIT, '', 'cnv_9')] })
+    render(<EnvironmentsPane />)
+
+    expect(screen.getByText('read · custom · one conversation (cnv_9)')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(environments.revokeConversation).toHaveBeenCalledWith('cnv_9', GIT)
+    expect(environments.revoke).not.toHaveBeenCalled()
   })
 
   it('removes a project grant for the project, not machine-wide', () => {

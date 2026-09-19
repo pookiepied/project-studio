@@ -33,10 +33,11 @@ import { defineStudioTool, type ToolDefinition } from "../types.js";
  *
  * So this is a question, not a grant. The model names the folder, what it
  * wants to do there, and why; the person sees exactly that and answers; a
- * yes is the same stored rule Settings would write, applied to this run as
- * well, and a no is remembered for the rest of the conversation so the
- * same folder is not asked about twice. Nothing here can widen reach
- * without a person choosing to.
+ * yes is a stored rule - for this conversation, which is the recommended
+ * answer and ends with the conversation; for the project; or everywhere -
+ * applied to this run as well, and a no is remembered for the rest of the
+ * conversation so the same folder is not asked about twice. Nothing here
+ * can widen reach without a person choosing to.
  *
  * Like `ask_user_question` it declares `read` and nothing else: asking
  * observes a person's intent and changes no state until they answer, and a
@@ -59,7 +60,7 @@ export const REQUEST_FOLDER_DESCRIPTOR: CapabilityDescriptor = {
     "the roots you were given - their Downloads folder, another project, a data directory. " +
     "Name the folder as an absolute path, say whether you need to read or write in it, and " +
     "give one plain sentence saying what for; the person sees exactly that. If they say " +
-    "yes the folder is reachable at once and stays reachable in later conversations. If " +
+    "yes the folder is reachable at once, for this conversation or more widely as they choose. If " +
     "they say no, do the work another way or say what you cannot do; do not ask for the " +
     "same folder again. A volume root or the system directory cannot be asked for.",
   inputSchema: {
@@ -266,9 +267,11 @@ export function createRequestFolderTool(
         // The row is written; this run reads it too.
         context.sandbox.widen(path, input.mode);
         const where =
-          applied.choice === SCOPE_QUESTION_OPTIONS.everywhere || projectId === undefined
-            ? "machine-wide"
-            : "for this project";
+          applied.choice === SCOPE_QUESTION_OPTIONS.conversation
+            ? "for this conversation"
+            : applied.choice === SCOPE_QUESTION_OPTIONS.project
+              ? "for this project"
+              : "machine-wide";
         return {
           path,
           outcome: "granted",

@@ -81,17 +81,20 @@ function harness(options: {
 }
 
 describe("the folder question", () => {
-  it("offers two ways to say yes with a project, and one without", () => {
+  it("recommends this conversation first, offers the project only when there is one, and everywhere last", () => {
     const withProject = buildScopeQuestion({ resolvedPath: base, reason: "To read the export.", hasProject: true });
     expect(withProject.payload.options.map((option) => option.id)).toEqual([
+      SCOPE_QUESTION_OPTIONS.conversation,
       SCOPE_QUESTION_OPTIONS.project,
       SCOPE_QUESTION_OPTIONS.everywhere,
       SCOPE_QUESTION_OPTIONS.deny,
     ]);
+    expect(withProject.payload.recommendedOptionId).toBe(SCOPE_QUESTION_OPTIONS.conversation);
     expect(withProject.payload.question).toContain("To read the export.");
 
     const without = buildScopeQuestion({ resolvedPath: base, hasProject: false });
     expect(without.payload.options.map((option) => option.id)).toEqual([
+      SCOPE_QUESTION_OPTIONS.conversation,
       SCOPE_QUESTION_OPTIONS.everywhere,
       SCOPE_QUESTION_OPTIONS.deny,
     ]);
@@ -134,6 +137,27 @@ describe("request_folder", () => {
     expect(scopes.resolveRoots("prj_a").writeRoots).toContain(resolve(downloads));
     // And this run reaches it already.
     expect(sandbox.resolveWrite(join(downloads, "model.bin"))).toBe(resolve(downloads, "model.bin"));
+  });
+
+  it("writes a conversation row when the person allows it for this conversation", async () => {
+    const downloads = folder("Downloads");
+    const { tool, context, sandbox, scopes } = harness({
+      answer: { optionIds: [SCOPE_QUESTION_OPTIONS.conversation] },
+      projectId: "prj_a",
+    });
+
+    const report = await tool.execute(
+      tool.parse({ path: downloads, mode: "write", reason: "To save the file." }),
+      context,
+    );
+
+    expect(report.outcome).toBe("granted");
+    expect(report.message).toContain("for this conversation");
+    expect(scopes.resolveRoots("prj_a", CONVERSATION).writeRoots).toContain(resolve(downloads));
+    // Not the project's, and not another conversation's.
+    expect(scopes.listProject("prj_a")).toHaveLength(0);
+    expect(scopes.resolveRoots("prj_a", "cnv_other").readRoots).not.toContain(resolve(downloads));
+    expect(sandbox.resolveWrite(join(downloads, "a.bin"))).toBe(resolve(downloads, "a.bin"));
   });
 
   it("writes the machine-wide row for a conversation with no project", async () => {
