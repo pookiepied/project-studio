@@ -65,10 +65,10 @@ Established, not proposed. See `STUDIO HARNESS/src/`.
 
 Two directories sit beside `src/` rather than inside it, because neither is
 TypeScript the build compiles: `vendor/` holds the programs we ship, laid out
-`<platform>-<arch>/`, and `native/` holds the source of the one program in
-`vendor/` that is ours — the Windows AppContainer launcher. `native/` has no
-Linux directory and that is the design, not a gap: there, the launcher is
-`bwrap` and the OS supplies it.
+`<platform>-<arch>/`, and `native/` is where a containment launcher of our
+own would live. It is empty by design: on Linux the launcher is `bwrap` and
+the OS supplies it, and the Windows AppContainer launcher that used to be
+there went with ADR 0057.
 
 ```
 agents/          agent definitions (defineAgent)
@@ -93,7 +93,7 @@ process/         exec.ts — the only place a child process starts, and it does
 retrieval/       web search and page reading providers - two slots, never a pool
 sandbox/         path containment, and what contains a child process
                  isolation/       who needs containing, and what this host has
-                 isolation/windows/  the AppContainer launcher (ADR 0041)
+                 isolation/linux/    the bwrap backend (ADR 0041); the only one (ADR 0057)
 snapshots/       shadow git per project — the undo history
 storage/         SQLite, versioned migrations
 tools/           filesystem, search, git, shell, web — all behind one CallGate

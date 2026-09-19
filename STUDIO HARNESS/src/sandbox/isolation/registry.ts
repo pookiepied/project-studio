@@ -1,7 +1,6 @@
 import type { IsolationBackend, IsolationSupport } from "./backend.js";
 import { selectIsolation } from "./backend.js";
 import { linuxBwrap } from "./linux/bwrap.js";
-import { windowsAppContainer } from "./windows/appcontainer.js";
 
 /**
  * Which containment backends **this build has an implementation for**, per
@@ -18,27 +17,30 @@ import { windowsAppContainer } from "./windows/appcontainer.js";
  * Conflating them in either direction is a bug with a history. Deciding
  * availability by platform name claims `bwrap` on a Linux box that never
  * installed it. Deciding build knowledge by probing means a Linux machine sees
- * a registry containing only a Windows backend, finds it unavailable, and
- * concludes that containment exists and this host is broken — when the truth is
- * that nobody has written the Linux half yet. Those are different sentences and
- * they deserve different behaviour.
+ * an empty registry, finds nothing available, and concludes that containment
+ * exists and this host is broken - when the truth is that nobody registered
+ * a backend for it. Those are different sentences and they deserve different
+ * behaviour.
  *
- * ## Both platforms are registered, and neither is thereby claimed
+ * ## Linux is registered; Windows and macOS are not, by decision
  *
- * Linux was absent here until Stage 4b step 3, so `ISOLATION_ENFORCED` was false
- * there and `execute` ran uncontained. It is present now, which means Linux
- * *enforces*: a machine whose `bwrap` cannot get a user namespace is refused
- * rather than run open. That distinction is not theoretical — it is the measured
- * state of stock Ubuntu 24.04, where `bwrap` is installed and the kernel still
- * says no. Registration says the implementation exists; only `available()` says
- * it works.
+ * Linux *enforces*: a machine whose `bwrap` cannot get a user namespace is
+ * refused rather than run open, which is the measured state of stock Ubuntu
+ * 24.04, where `bwrap` is installed and the kernel still says no.
+ * Registration says the implementation exists; only `available()` says it
+ * works. (ADR 0057 makes this backend opt-in with a gate-only fallback; that
+ * is a later step and this file still enforces until it lands.)
  *
- * macOS stays absent, and that is a decision rather than a gap: Stage 4b put it
- * explicitly out of scope, so a Mac gets `in-process` and no enforcement, the
- * same honest transitional state Linux had until now.
+ * Windows had an AppContainer backend from ADR 0041 until ADR 0057 removed
+ * it. Containing a developer's shell in an AppContainer meant writing
+ * permission entries onto the real filesystem for every workspace and every
+ * ancestor down from the volume root, and those entries accumulated until
+ * the ACLs they lived on could hold no more. So Windows has no backend, and
+ * on Windows the permission gate is the boundary - the position every other
+ * harness on the platform is in. A Windows or macOS fence, if one worth
+ * having appears, is a new registration here and a new ADR.
  */
 const BACKENDS_BY_PLATFORM: Partial<Record<NodeJS.Platform, readonly IsolationBackend[]>> = {
-  win32: [windowsAppContainer],
   linux: [linuxBwrap],
 };
 
@@ -61,11 +63,11 @@ let measured: IsolationSupport | undefined;
 /**
  * What this host can contain, measured once and then remembered.
  *
- * A function rather than a constant, deliberately. The Windows probe creates
- * and deletes a real AppContainer profile; doing that as a side effect of
+ * A function rather than a constant, deliberately. The Linux probe runs
+ * `bwrap` to ask the kernel for a namespace; doing that as a side effect of
  * *importing* a module would mean every test file, every CLI invocation and
- * every `tsx` script touched the machine's security state on load. It is
- * measured the first time something actually asks.
+ * every `tsx` script spawned a process on load. It is measured the first
+ * time something actually asks.
  */
 export function hostIsolation(): IsolationSupport {
   measured ??= selectIsolation(OS_ISOLATION_BACKENDS);

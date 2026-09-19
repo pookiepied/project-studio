@@ -3,7 +3,6 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  parseDetectedPresets,
   parseSandboxScopeInfo,
   parseSandboxScopeRow,
 } from '@/platform/harness'
@@ -72,26 +71,6 @@ describe('parseSandboxScopeInfo', () => {
         level: 'contained',
         trust: [{ root: 'C:\\Work\\alpha', name: 'alpha', decision: 'maybe' }],
       }),
-    ).toBeNull()
-  })
-})
-
-describe('parseDetectedPresets', () => {
-  it('accepts a detected Git preset with the path found', () => {
-    const parsed = parseDetectedPresets([
-      {
-        id: 'git',
-        title: 'Git',
-        description: 'The Git installation.',
-        paths: [{ path: 'C:\\Program Files\\Git', mode: 'read' }],
-      },
-    ])
-    expect(parsed?.[0]?.id).toBe('git')
-  })
-
-  it('refuses a preset with no paths field', () => {
-    expect(
-      parseDetectedPresets([{ id: 'git', title: 'Git', description: 'x' }]),
     ).toBeNull()
   })
 })

@@ -239,9 +239,9 @@ export function environmentFacts(
  * Derived from `ISOLATION_ENFORCED` rather than the platform, so this cannot
  * claim containment on a host that has none - the constant is itself derived
  * from the backend registry, so registering a backend turns this sentence on
- * by construction. Deliberately NOT `hostIsolation()`: that probe creates and
- * deletes a real AppContainer profile, and building a prose block is not a
- * reason to touch the machine's security state.
+ * by construction. Deliberately NOT `hostIsolation()`: that probe spawns
+ * `bwrap` to ask the kernel a question, and building a prose block is not a
+ * reason to start a process.
  *
  * It says what a model can act on - which failures are the boundary and not a
  * bug - and not how containment is implemented, which is ours to change.

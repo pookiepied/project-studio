@@ -1,15 +1,14 @@
 # `native/` — the parts of the sandbox Node cannot do
 
-One folder, and it should stay small. Everything in here exists because a
-containment primitive is a system call that JavaScript has no way to make.
+Deliberately empty, and kept so the absence is a statement rather than an
+oversight.
 
-| Directory | Platform | Why it exists |
-|---|---|---|
-| `windows-appcontainer/` | Windows | `CreateAppContainerProfile`, `UpdateProcThreadAttribute` and `CreateProcessW` are Win32 calls. Node has no binding for them, and a native addon would tie the harness's test suite to a compiled module on every platform. A standalone launcher is the smallest thing that works. |
-| *(none)* | Linux | Deliberately empty. `bwrap` is the launcher and the OS supplies it, so there is nothing for us to build — the absence of a directory here is the design, not an omission. |
+| Platform | Why nothing is here |
+|---|---|
+| Linux | `bwrap` is the launcher and the OS supplies it. There is nothing for us to build. |
+| Windows | There was a launcher here - `windows-appcontainer/`, a Rust binary that applied an AppContainer to a child process - from ADR 0041 until ADR 0057 removed it. Containing a developer's shell that way meant writing permission entries onto the real filesystem for every workspace and every ancestor down from the volume root, and the entries accumulated until the ACLs could hold no more. On Windows the permission gate is the boundary now, and no binary is needed to apply it. |
+| macOS | No backend, by decision. |
 
-Built binaries are copied into `vendor/<platform>-<arch>/`, which is where
-`src/vendor/resolver.ts` already looks for shipped programs. Nothing in the
-harness locates a binary by walking `native/`.
-
-See ADR 0041 and `documentation/work/stage-4b-plan.md`.
+If a fence worth having appears for a platform, its launcher goes here, its
+built binary goes into `vendor/<platform>-<arch>/` where `src/vendor/resolver.ts`
+already looks, and the decision gets an ADR.

@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, parse, resolve } from "node:path";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -13,7 +13,6 @@ import {
   ISOLATION_ENFORCED,
   OS_ISOLATION_BACKENDS,
   programRoots,
-  ancestorsOf,
   bwrapArgs,
   selectIsolation,
   unprivilegedIdentity,
@@ -30,15 +29,6 @@ import {
   profileText,
   PROFILE_PATH,
 } from "../../src/sandbox/isolation/linux/apparmor.js";
-import { containArgs, invokeLauncherAsync } from "../../src/sandbox/isolation/windows/launcher.js";
-import {
-  grantsFor,
-  grantShortfall,
-  prepareAdvice,
-  profileKey,
-  profileName,
-} from "../../src/sandbox/isolation/windows/appcontainer.js";
-import { isFullPermissionList } from "../../src/sandbox/isolation/windows/traversal.js";
 import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
@@ -50,23 +40,13 @@ import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 /**
  * The seam meta-task #15 is built on, and the rules that keep it honest.
  *
- * Everything here runs on every platform, including the Windows-specific
- * argument and naming rules — those are pure functions on purpose, so the parts
- * of the Windows backend that can be checked anywhere are checked anywhere.
- * What genuinely needs Windows is in
- * `tests/integration/sandbox-appcontainer.test.ts`, which measures the kernel
- * rather than describing it.
+ * Everything here runs on every platform, including the Linux backend's
+ * argument rules - those are pure functions on purpose, so the parts of the
+ * backend that can be checked anywhere are checked anywhere. What genuinely
+ * needs a Linux kernel is in `tests/integration/sandbox-bwrap.test.ts`, which
+ * measures the kernel rather than describing it. The Windows backend's rules
+ * were here too, until ADR 0057 removed the backend.
  */
-
-/**
- * The running platform's filesystem root — `D:\` here, `/` there.
- *
- * Path *shape* is the one thing in this file that cannot be written as a
- * Windows literal and still mean something everywhere: `node:path` on Linux
- * does not consider `C:/Users` rooted, so an assertion built from `C:` there
- * tests the test rather than the code.
- */
-const ROOT = parse(process.cwd()).root;
 
 const workspace = process.cwd();
 
@@ -572,240 +552,6 @@ describe("the Linux machine setup, and the fix it refuses to suggest", () => {
   });
 });
 
-describe("the Windows launcher's argument rules", () => {
-  it("asks for internetClient only when the network was requested", () => {
-    // The capability is the whole network policy in one flag, so its presence
-    // and absence are both worth pinning. Measured behaviour behind it:
-    // `internetClient` reaches the internet and is refused loopback and the
-    // LAN, so this flag is "may call an API", not "may reach the machine".
-    const base = { sid: "S-1-15-2-1", cwd: "C:\\p", executable: "n.exe", args: [] };
-    expect(containArgs({ ...base, capabilities: ["internetClient"] }))
-      .toContain("internetClient");
-    expect(containArgs(base)).not.toContain("--capability");
-  });
-
-  it("puts the program after `--`, so its flags are never ours", () => {
-    // `studio-contain` and the program it runs can both be given `--cwd`. The
-    // separator is what decides whose it is, and getting the order wrong would
-    // silently hand the launcher an argument the model wrote.
-    const args = containArgs({
-      sid: "S-1-15-2-1",
-      cwd: "C:\\project",
-      executable: "C:\\Windows\\System32\\where.exe",
-      args: ["--cwd", "anything"],
-    });
-    expect(args.slice(0, 5)).toEqual(["run", "--sid", "S-1-15-2-1", "--cwd", "C:\\project"]);
-    expect(args.indexOf("--")).toBe(5);
-    expect(args.slice(6)).toEqual([
-      "C:\\Windows\\System32\\where.exe",
-      "--cwd",
-      "anything",
-    ]);
-  });
-
-  it("asks for a join only when the interpreter needs the other one", () => {
-    // The launcher's default is `argv`, and the programs the harness chose
-    // (git, rg) are correct only under it - so the flag's absence is as much
-    // of the contract as its presence, and a threading mistake that sent
-    // `--join command-line` for everything would escape nothing for them.
-    const base = { sid: "S-1-15-2-1", cwd: "C:\\p", executable: "n.exe", args: [] };
-    expect(containArgs(base)).not.toContain("--join");
-    expect(containArgs({ ...base, join: "argv" })).not.toContain("--join");
-
-    // `cmd.exe` reads the raw remainder after `/c`, and the flag has to reach
-    // the launcher ahead of `--` or it becomes an argument the model wrote.
-    const args = containArgs({
-      sid: "S-1-15-2-1",
-      cwd: "C:\\project",
-      executable: "C:\\Windows\\System32\\cmd.exe",
-      args: ["/d", "/s", "/c", "node -v"],
-      join: "command-line",
-    });
-    const flag = args.indexOf("--join");
-    expect(flag).toBeGreaterThan(-1);
-    expect(args[flag + 1]).toBe("command-line");
-    expect(flag).toBeLessThan(args.indexOf("--"));
-  });
-
-  it("grants each root once, at the strongest mode it is owed", () => {
-    // The bug this pins shipped for one test run: the roots were applied as a
-    // write pass and then a read pass, and `SetEntriesInAcl` replaces a
-    // trustee's entry rather than adding to it. The workspace root is on both
-    // lists, so read won, and the agent could read its own project and not
-    // write to it. One entry per path with the mode already decided is what
-    // makes the order stop mattering.
-    const modes = grantsFor({
-      readRoots: ["C:\\project", "C:\\reference"],
-      writeRoots: ["C:\\project"],
-    });
-    expect(modes.get("C:\\project")).toBe("write");
-    expect(modes.get("C:\\reference")).toBe("read");
-    expect(modes.size).toBe(2);
-  });
-
-  it("gives every workspace its own container name, and the same one each time", () => {
-    const first = profileName("D:\\projects\\alpha");
-    expect(profileName("D:\\projects\\alpha")).toBe(first);
-    expect(profileName("D:\\other\\alpha")).not.toBe(first);
-    // AppContainer names are limited to 64 characters and reject most
-    // punctuation, which is why this is a hash and not the path.
-    expect(first.length).toBeLessThanOrEqual(64);
-    expect(first).toMatch(/^studio-[0-9a-f]{32}$/);
-  });
-
-  describe("the anchor a profile is named from", () => {
-    it("names the anchor when the policy carries one, and the workspace root when it does not", () => {
-      const anchor = ROOT + join("studio", "anchors", "shared");
-      const anchored = createSandboxPolicy({ workspaceRoot: workspace, profileAnchor: anchor });
-      // Resolved by the policy, so the hash is of one shape of the path.
-      expect(profileKey(anchored)).toBe(resolve(anchor));
-      expect(profileKey(createSandboxPolicy({ workspaceRoot: workspace }))).toBe(
-        resolve(workspace),
-      );
-    });
-
-    it("gives every conversation on one anchor the same identity", () => {
-      // The property the anchors exist for: two workspaces standing in
-      // different conversation directories, under the same anchor, mint the
-      // same profile — which is what lets the second one skip the entire
-      // grant walk the first one paid for.
-      const anchor = ROOT + join("studio", "anchors", "shared");
-      const first = profileName(
-        profileKey(createSandboxPolicy({ workspaceRoot: ROOT + join("a"), profileAnchor: anchor })),
-      );
-      const second = profileName(
-        profileKey(createSandboxPolicy({ workspaceRoot: ROOT + join("b"), profileAnchor: anchor })),
-      );
-      expect(first).toBe(second);
-      // And a project standing outside the anchor stays its own identity.
-      expect(
-        profileName(profileKey(createSandboxPolicy({ workspaceRoot: ROOT + join("p") }))),
-      ).not.toBe(first);
-    });
-  });
-});
-
-describe("the async launcher's failure shape", () => {
-  it("raises the classified error, with the launcher's own answer, on failure", async () => {
-    // The async wrapper exists so a slow grant keeps the harness streaming;
-    // its error contract has to be the same one every sync caller already
-    // relies on — a `SandboxError("unavailable")` carrying the launcher's
-    // stderr, because that message is what the shortfall text quotes. A
-    // vendor root that holds no launcher fails the spawn, which is the one
-    // failure this can exercise on any machine.
-    await expect(
-      invokeLauncherAsync(["profile-ensure", "--name", "studio-test-probe"], {
-        vendorRoot: join(tmpdir(), "studio-no-vendor-here"),
-      }),
-    ).rejects.toThrow(SandboxError);
-  });
-});
-
-describe("the advice given while containment is still working", () => {
-  // Task 50: a per-workspace traverse entry on a user-owned ancestor is legal,
-  // unelevated, and unbounded across workspaces. The machine-wide entry that
-  // ends the accumulation needs no refusal to install it — only a message the
-  // user sees on the *first* containment, not after a few hundred. So the
-  // message is a pure function with rules of its own.
-
-  it("names the directories and the exact command", () => {
-    const advice = prepareAdvice(["C:\\Users\\pooki", "C:\\Users\\pooki\\AppData"]);
-    expect(advice).toContain("C:\\Users\\pooki");
-    expect(advice).toContain("C:\\Users\\pooki\\AppData");
-    expect(advice).toContain('pnpm sandbox:prepare "C:\\Users\\pooki"');
-  });
-
-  it("never claims the setup command needs elevation", () => {
-    // The accumulation happens on directories the user owns — their home
-    // folder above all — and those need no elevation at all. Saying "run this
-    // as administrator" makes the fix look heavier than it is, and is the same
-    // wrong advice the elevation failure once gave for every error.
-    const advice = prepareAdvice(["C:\\Users\\pooki"]);
-    expect(advice.toLowerCase()).not.toContain("administrator");
-  });
-});
-
-describe("the answer a grant shortfall gives", () => {
-  // The measured case: the git preset's row lives in `C:\Program Files\Git`,
-  // which the machine covers with its own ALL APPLICATION PACKAGES read and
-  // guards against an unelevated WRITE_DAC. The grant died, every conversation
-  //'s first contained command died with it, and the difference between that
-  // and a one-time setup step is this message.
-
-  const denied = (path: string): Error =>
-    new Error(
-      "The Windows sandbox launcher failed: " +
-        `could not set the permissions of ${path} (error 5)`,
-    );
-
-  it("names every failed root, its mode, and what the launcher answered", () => {
-    const text = grantShortfall([
-      { path: "C:\\Program Files\\Git", mode: "read", error: denied("C:\\Program Files\\Git") },
-      { path: "C:\\Program Files\\Java", mode: "write", error: denied("C:\\Program Files\\Java") },
-    ]);
-    expect(text).toContain("(read)  C:\\Program Files\\Git");
-    expect(text).toContain("(write)  C:\\Program Files\\Java");
-    // The launcher's own answer, not a paraphrase: the Win32 status is the
-    // thing a search or a finding doc is written from.
-    expect(text).toContain("error 5");
-  });
-
-  it("gives the one elevated command, covering every failed read at once", () => {
-    const text = grantShortfall([
-      { path: "C:\\Program Files\\Git", mode: "read", error: denied("C:\\Program Files\\Git") },
-      { path: "C:\\Program Files\\Dive", mode: "read", error: denied("C:\\Program Files\\Dive") },
-    ]);
-    expect(text).toContain(
-      'pnpm sandbox:prepare --read "C:\\Program Files\\Git" "C:\\Program Files\\Dive"',
-    );
-    expect(text.toLowerCase()).toContain("administrator");
-  });
-
-  it("leaves the elevated read command out when only a write failed", () => {
-    // There would be nothing for `--read` to do, and a command that touches
-    // nothing is one more thing to run without knowing why.
-    const text = grantShortfall([
-      { path: "C:\\Program Files\\Java", mode: "write", error: denied("C:\\Program Files\\Java") },
-    ]);
-    expect(text).not.toContain("pnpm sandbox:prepare --read");
-    // The write counsel, named by a phrase that survives its own wrapping.
-    expect(text).toContain("elevated hand");
-  });
-});
-
-describe("what a failed traverse grant means", () => {
-  // The launcher's message carries the Win32 status, and the two statuses that
-  // reach this code need opposite advice. Error 5 means "not yours": one setup
-  // command fixes it. Error 87 means the directory's permission list is
-  // physically full: that same setup command fails the same way, and the list
-  // has to shrink first. Sending a user with a full list to run prepare is how
-  // this defect survived its first cleanups.
-  const FULL = "The Windows sandbox launcher failed: could not build the new " +
-    "permissions for C:\\Users\\pooki (error 87)";
-
-  it("reads status 87 as a full permission list", () => {
-    expect(isFullPermissionList(new SandboxError("unavailable", { message: FULL }))).toBe(true);
-    expect(isFullPermissionList(FULL)).toBe(true);
-  });
-
-  it("reads any other status as a directory we cannot write", () => {
-    const denied = FULL.replace("error 87", "error 5");
-    expect(isFullPermissionList(new SandboxError("unavailable", { message: denied }))).toBe(false);
-    expect(isFullPermissionList(new Error("something else entirely"))).toBe(false);
-  });
-
-  it("does not read a longer status that starts with 87 as a full list", () => {
-    // "error 870" and "error 8712" are their own Win32 statuses, and a
-    // substring test for "error 87" answered yes to both - which would send a
-    // user whose problem is something else entirely to the one piece of advice
-    // that cannot help them.
-    for (const status of ["error 870", "error 8712"]) {
-      const other = FULL.replace("error 87", status);
-      expect(isFullPermissionList(new SandboxError("unavailable", { message: other }))).toBe(false);
-    }
-  });
-});
-
 describe("the two grants a contained program needs beyond its workspace", () => {
   it("grants the program's own tree, and the node_modules that holds its dependencies", () => {
     // Built on disk rather than as strings, because the function deliberately
@@ -844,32 +590,6 @@ describe("the two grants a contained program needs beyond its workspace", () => 
     // folder while looking correct.
     expect(programRoots(["--flag", "relative/path.js", "10"])).toEqual([]);
   });
-
-  it("lists every ancestor of a path, root first", () => {
-    // Root first because that is the order the kernel checks them, and because
-    // a diagnostic built from this list should name the *first* wall a program
-    // will hit rather than the last.
-    //
-    // Built from the running platform's own root rather than a `C:\` literal.
-    // The first version of this test hardcoded a Windows path, which meant it
-    // asserted nothing on Linux except that `node:path` there does not consider
-    // `C:/Users` rooted — a true statement about the wrong subject, and a
-    // failure that says the code is broken when the test is.
-    const chain = ancestorsOf(join(ROOT, "one", "two", "three", "file.js"));
-    expect(chain).toEqual([
-      ROOT,
-      join(ROOT, "one"),
-      join(ROOT, "one", "two"),
-      join(ROOT, "one", "two", "three"),
-    ]);
-  });
-
-  it("does not spin on a path that is already a root", () => {
-    // `dirname` is its own fixed point at the root. Without the guard this
-    // loops forever instead of failing, which is the worst way to be wrong.
-    expect(ancestorsOf(ROOT)).toEqual([ROOT]);
-  });
-
 });
 
 describe("what this build knows how to contain, per platform", () => {
@@ -883,13 +603,12 @@ describe("what this build knows how to contain, per platform", () => {
     // `bwrap` failed the test and forced this file, the ADR and the README to
     // be brought along with it. It did exactly that.
     //
-    // macOS is the remaining `else`, and it is out of scope by decision rather
-    // than by omission — so it still asserts an empty registry and no
-    // enforcement, which is the state Linux has just left.
-    if (process.platform === "win32") {
-      expect(OS_ISOLATION_BACKENDS.map((entry) => entry.name)).toEqual(["appcontainer"]);
-      expect(ISOLATION_ENFORCED).toBe(true);
-    } else if (process.platform === "linux") {
+    // Windows and macOS are the `else`: Windows had an AppContainer backend
+    // until ADR 0057 removed it, macOS never had one by decision. Both assert
+    // an empty registry and no enforcement, because on both the gate is the
+    // boundary and a build that claimed otherwise would be claiming a fence
+    // it does not have.
+    if (process.platform === "linux") {
       expect(OS_ISOLATION_BACKENDS.map((entry) => entry.name)).toEqual(["bwrap"]);
       expect(ISOLATION_ENFORCED).toBe(true);
     } else {
