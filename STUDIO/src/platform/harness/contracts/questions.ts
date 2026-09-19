@@ -30,7 +30,7 @@ export interface PendingQuestionOption {
 
 export interface PendingQuestionPayload {
   readonly question: string
-  /** A short label, at most twelve characters, for the compact display. */
+  /** A short label - a word or two, at most twenty-four characters - for the compact display. */
   readonly header: string
   readonly options: readonly PendingQuestionOption[]
   /** Whether several options may be chosen at once. */
