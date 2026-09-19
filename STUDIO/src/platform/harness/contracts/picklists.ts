@@ -77,28 +77,26 @@ export type ReasoningLevel = (typeof REASONING_LEVELS)[number]
 /**
  * `executionModeSchema`, mirrored from `STUDIO HARNESS/src/permissions/mode.ts`.
  *
- * These are the harness's own names for the three execution modes, and the
+ * These are the harness's own names for the two execution modes, and the
  * only spelling every wire value is validated against: the submission body,
  * the conversation create and patch bodies, the stored column, and the record
- * the index returns. The frontend's picker vocabulary (`manual` / `edits` /
- * `auto`, in `domain/permissions/modes.ts`) is deliberately a different set -
- * the mode is a consent, and the harness refuses to translate one name into
- * another on the user's behalf, so the translation happens here, on this side
- * of the boundary, and nowhere else.
+ * the index returns. Since ADR 0057 the picker (`domain/permissions/modes.ts`)
+ * speaks the same two words, so the two maps below are identities - kept,
+ * because they are the one place the picker's word is turned into a wire
+ * value and back, and a mode is a consent: the day the two vocabularies part
+ * again, the translation is already where it has to be and nowhere else.
  */
-export const EXECUTION_MODES = ['manual', 'auto-edit', 'full-auto'] as const
+export const EXECUTION_MODES = ['ask', 'auto'] as const
 export type ExecutionModeWire = (typeof EXECUTION_MODES)[number]
 
 export const MODE_TO_WIRE: Record<PermissionMode, ExecutionModeWire> = {
-  manual: 'manual',
-  edits: 'auto-edit',
-  auto: 'full-auto',
+  ask: 'ask',
+  auto: 'auto',
 }
 
 export const WIRE_TO_MODE: Record<ExecutionModeWire, PermissionMode> = {
-  manual: 'manual',
-  'auto-edit': 'edits',
-  'full-auto': 'auto',
+  ask: 'ask',
+  auto: 'auto',
 }
 
 /** The picker's word for a mode becomes the word the harness validates. */

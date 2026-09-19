@@ -36,7 +36,7 @@ export interface TurnSnapshotsOptions {
    *
    * A function, not a boolean, because the answer changes with the execution
    * mode and the mode changes mid-session. It is read at the moment of the
-   * write rather than captured at construction, so switching into Full Auto
+   * write rather than captured at construction, so switching into Auto
    * takes effect on the next write instead of the next session.
    *
    * While a person approves each write, a snapshot failure is reported and the
@@ -44,7 +44,7 @@ export interface TurnSnapshotsOptions {
    * refusing to work because the net is unavailable turns a degraded feature
    * into an outage.
    *
-   * Under Full Auto nobody is approving anything, "you can undo it" *is* the
+   * Under Auto nobody is approving anything, "you can undo it" *is* the
    * safety story, and a write with no snapshot behind it is exactly what that
    * argument rules out. `requiresUndo(mode)` supplies this.
    */
@@ -101,7 +101,7 @@ export class TurnSnapshots implements SnapshotHook {
     // It is force-added from the following snapshot onward, which is the first
     // one where it exists.
     //
-    // If the capture rejects (Full Auto, `required` true), the rejected promise
+    // If the capture rejects (Auto, `required` true), the rejected promise
     // is cleared so the next write in the same turn can retry. Otherwise the
     // first transient failure (lock, disk full) would poison the whole turn
     // (T-18). When `required` is false the capture resolves to undefined, so

@@ -42,7 +42,7 @@ const AUTH: AuthContext = {
   scopes: ["approval"],
 };
 
-type Mode = "manual" | "auto-edit" | "full-auto";
+type Mode = "ask" | "auto";
 
 const temporaryDirectories: string[] = [];
 let previousHome: string | undefined;
@@ -135,11 +135,11 @@ function refusalOf(value: unknown): PermissionError | undefined {
 
 describe("the permission mode follows the conversation", () => {
   it(
-    "in Manual a write parks on a real pending approval, and denying answers it as a refusal",
+    "in Ask a write parks on a real pending approval, and denying answers it as a refusal",
     async () => {
-      const harness = await harnessWith([{ id: "cnv_manual", permissionMode: "manual" }]);
+      const harness = await harnessWith([{ id: "cnv_ask", permissionMode: "ask" }]);
       try {
-        const write = await toolOf(harness, "cnv_manual", "write");
+        const write = await toolOf(harness, "cnv_ask", "write");
         // Starting the call is synchronous up to the parking: the durable
         // row exists by the time this line returns.
         const settled = write.execute("call-1", { path: "note.txt", content: "a note" });
@@ -157,7 +157,7 @@ describe("the permission mode follows the conversation", () => {
           name: "write",
         });
         expect(question?.request.resource).toBe(join(harness.projectRoot, "note.txt"));
-        expect(question?.request.scope.conversationId).toBe("cnv_manual");
+        expect(question?.request.scope.conversationId).toBe("cnv_ask");
 
         // Denying settles the run's own promise, the queue empties, and the
         // write did not happen.
@@ -186,9 +186,9 @@ describe("the permission mode follows the conversation", () => {
   );
 
   it(
-    "in Manual an allow lets the write complete",
+    "in Ask an allow lets the write complete",
     async () => {
-      const harness = await harnessWith([{ id: "cnv_allow", permissionMode: "manual" }]);
+      const harness = await harnessWith([{ id: "cnv_allow", permissionMode: "ask" }]);
       try {
         const write = await toolOf(harness, "cnv_allow", "write");
         const settled = write.execute("call-1", { path: "note.txt", content: "a note" });
@@ -223,8 +223,8 @@ describe("the permission mode follows the conversation", () => {
       // questions under two different scopes. A collapsed scope would let a
       // grant made in one conversation answer the other's asks.
       const harness = await harnessWith([
-        { id: "cnv_scope_a", permissionMode: "manual" },
-        { id: "cnv_scope_b", permissionMode: "manual" },
+        { id: "cnv_scope_a", permissionMode: "ask" },
+        { id: "cnv_scope_b", permissionMode: "ask" },
       ]);
       try {
         const scopes: string[] = [];
@@ -259,38 +259,16 @@ describe("the permission mode follows the conversation", () => {
   );
 
   it(
-    "in Auto Edit a write proceeds without a question, and a shell line still stops",
+    "in Auto a write proceeds without a question",
     async () => {
-      const harness = await harnessWith([{ id: "cnv_edit", permissionMode: "auto-edit" }]);
+      const harness = await harnessWith([{ id: "cnv_auto", permissionMode: "auto" }]);
       try {
-        const write = await toolOf(harness, "cnv_edit", "write");
+        const write = await toolOf(harness, "cnv_auto", "write");
         const outcome = await write.execute("call-1", { path: "note.txt", content: "a note" });
         expect(outcome).toBeDefined();
         expect(existsSync(join(harness.projectRoot, "note.txt"))).toBe(true);
         // Not asked: the write's default ask was resolved by the mode.
         expect(harness.broker.list(AUTH)).toEqual([]);
-
-        // Shell declares `execute`, which the effect table marks elevated, so
-        // the mode does not resolve its ask: still a question, even here.
-        const shell = await toolOf(harness, "cnv_edit", "shell");
-        const shellRun = shell.execute("call-2", { command: "node --version" });
-        const asked = harness.broker.list(AUTH);
-        expect(asked).toHaveLength(1);
-        expect(asked[0]?.request.capability.id).toEqual({
-          namespace: "native",
-          name: "shell",
-        });
-        expect(asked[0]?.request.resource).toBe("shell:node");
-
-        // Nobody answers a shell question in this scenario, so the call is
-        // cancelled - the same path an aborted run takes - and refuses.
-        expect(harness.broker.cancel(asked[0]?.id ?? "", AUTH)).toBe(true);
-        const shellOutcome = await shellRun.then(
-          () => "completed",
-          (error: unknown) => error,
-        );
-        const shellRefusal = refusalOf(shellOutcome);
-        expect(shellRefusal?.kind).toBe("denied");
       } finally {
         await harness.runtime.stop();
         harness.database.close();
@@ -314,7 +292,7 @@ describe("the permission mode follows the conversation", () => {
       new ConversationStore(database).record({
         id: "cnv_restart",
         firstMessage: "First",
-        permissionMode: "manual",
+        permissionMode: "ask",
       });
       const projectRoot = join(directory, "project");
       await mkdir(projectRoot, { recursive: true });

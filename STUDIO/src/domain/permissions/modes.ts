@@ -1,25 +1,28 @@
 /**
  * Execution modes.
  *
- * Three, and they escalate. The wording is the design here: each one is written
- * as the consequence to the user's machine, not as the mechanism. "Auto-approve
- * tool calls" describes our implementation; "writes files without asking"
- * describes what happens to their work, and that is what someone is choosing
- * between.
+ * Two, since ADR 0057. The wording is the design here: each one is written
+ * as the consequence to the user's machine, not as the mechanism. "Auto-
+ * approve tool calls" describes our implementation; "proceeds without
+ * asking" describes what happens to their work, and that is what someone is
+ * choosing between.
  *
- * These ids are this webview's own vocabulary. The harness names the same
- * three modes `manual` / `auto-edit` / `full-auto` - the one spelling every
- * wire value is validated against, and it refuses `edits` and `auto` on
- * purpose, because a mode is a consent and the harness will not translate one
- * name into another on the user's behalf. The translation lives exactly once,
- * at the wire boundary (`platform/harness/contracts/`), so a change here
- * touches no component and no wire value.
+ * There used to be a third between them, "Accept edits": write files
+ * freely, ask to run. It drew its line where the OS container drew one, and
+ * with the container gone (ADR 0057) that consent is one lasting answer to
+ * the first write question - this project, always - under Ask, rather than
+ * a mode of its own. A rule the person writes that way holds in both modes;
+ * the mode only says what happens to a call no rule covers.
+ *
+ * These ids are the harness's own names (`ask` / `auto`) as well: one
+ * vocabulary, validated on the wire at `platform/harness/contracts/`, so a
+ * value this file cannot describe is refused there rather than translated.
  *
  * The glyph each mode wears lives with the components that draw it
  * (`features/chat/permissions/modeIcon.ts`); this file is data only.
  */
 
-export type PermissionMode = 'manual' | 'edits' | 'auto'
+export type PermissionMode = 'ask' | 'auto'
 
 export interface PermissionModeSpec {
   readonly id: PermissionMode
@@ -32,29 +35,22 @@ export interface PermissionModeSpec {
 
 export const PERMISSION_MODES: readonly PermissionModeSpec[] = [
   {
-    id: 'manual',
-    name: 'Manual',
-    note: 'Ask before everything.',
+    id: 'ask',
+    name: 'Ask',
+    note: 'Ask before anything, unless you said always.',
     detail:
-      'Nothing runs without your approval. Every file write, command, and network request stops and asks first.',
-  },
-  {
-    id: 'edits',
-    name: 'Accept edits',
-    note: 'Write files freely. Ask to run.',
-    detail:
-      'Reading and editing files inside the project happens without asking. Running commands and reaching the network still stop for approval.',
+      'Every file write, command, and network request stops and asks first. An answer you gave as "always" holds, so a project you have let Studio edit is edited without asking and still stops before running anything.',
   },
   {
     id: 'auto',
-    name: 'Full auto',
+    name: 'Auto',
     note: 'Proceed unless a rule says ask.',
     detail:
       'Anything left at its default proceeds. Only the things a rule explicitly marks as ask will stop. Undo history still records every change.',
   },
 ]
 
-export const DEFAULT_PERMISSION_MODE: PermissionMode = 'manual'
+export const DEFAULT_PERMISSION_MODE: PermissionMode = 'ask'
 
 export function findPermissionMode(id: PermissionMode): PermissionModeSpec {
   const mode = PERMISSION_MODES.find((candidate) => candidate.id === id)

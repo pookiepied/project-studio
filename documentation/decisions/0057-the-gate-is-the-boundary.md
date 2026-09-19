@@ -145,13 +145,17 @@ ADR 0018's three modes become two:
 
 | Mode | What it does |
 |---|---|
-| **Ask** | Every effectful call asks. Reads do not. |
-| **Auto** | Allow rules the person wrote resolve the default `ask`; everything else asks. |
+| **Ask** | Every effectful call asks, unless a rule the person wrote allows it. Reads do not. |
+| **Auto** | Every default `ask` proceeds. Policy `ask` still asks. |
 
 Auto Edit existed to draw a line between editing and running, and the line
 was drawn there because running was the thing the container was for. Without
 the container, "edit without asking, ask before running" is one allow rule
-under Auto, not a third mode. ADR 0018's invariant is unchanged and load-
+under Ask - the first write question answered "this project, always" - not a
+third mode. The rules the person wrote apply in both modes; the mode says
+only what happens to the `ask` no rule covers. Stored rows are rewritten
+once, in the safe direction: Manual and Auto Edit read as Ask, Full Auto as
+Auto (migration 25). ADR 0018's invariant is unchanged and load-
 bearing: **a mode may only resolve an `ask` that came from the default.** A
 policy `ask` — a connected server about to run code — is never touched by any
 mode. Auto still requires a working undo, for ADR 0018's reason.
@@ -165,10 +169,14 @@ propagated down a tree the user's tools were watching; that cost is why the
 question was asked reluctantly. Now a grant is a row the gate consults: the
 model may use `~/Downloads` for this conversation, or for this project, or
 always, and the answer is stored where every other user decision is stored
-(ADR 0036) and withdrawn the same way. The scope store's `level` column
-(`contained` / `trusted`) and its preset source lose their meaning with the
-container and are retired; `read`/`write` mode and the `question`/`custom`
-sources stay.
+(ADR 0036) and withdrawn the same way. The scope store's preset source loses
+its meaning with the container and is retired; `read`/`write` mode and the
+`question`/`custom` sources stay. The project's `level` (`contained` /
+`trusted`) **stays**, corrected here from an earlier draft that retired it:
+without a container it still decides something real, namely whether the
+project folder plus its grants are the boundary the file tools stop at and
+ask beyond, or whether the whole machine is in reach with no question. Only
+its words on the page change; the stored values do not.
 
 This is the mechanism behind the next thing the product needs: a conversation
 that says "download that model into Downloads" should get a one-line question

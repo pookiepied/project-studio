@@ -58,7 +58,6 @@ function scopeRow(path: string, projectId: string): SandboxScopeRow {
     path,
     mode: 'read',
     source: 'custom',
-    presetId: null,
     grantedAt: 1_000,
   }
 }
@@ -119,8 +118,8 @@ describe('EnvironmentsPane', () => {
     expect(screen.getByRole('button', { name: 'Grant everywhere' })).not.toBeNull()
     expect(screen.getByLabelText('Absolute path')).not.toBeNull()
     expect(screen.getByText('No project selected')).not.toBeNull()
-    // No project means no level to choose.
-    expect(screen.queryByRole('radiogroup', { name: "This project's level" })).toBeNull()
+    // No project means no reach to choose.
+    expect(screen.queryByRole('radiogroup', { name: 'What this project can reach' })).toBeNull()
     // And no scope chooser, because there is nothing to choose between.
     expect(screen.queryByRole('radiogroup', { name: 'Grants below apply to' })).toBeNull()
   })
@@ -220,8 +219,8 @@ describe('folder trust', () => {
     render(<EnvironmentsPane />)
 
     expect(screen.getByText('This project can only read')).toBeTruthy()
-    // Scoped to the folder's own group: the level control below offers a
-    // `Trusted` of its own, and the two answers are not the same question.
+    // Scoped to the folder's own group: the reach control below is another
+    // question with its own answers, and the two must not be confused.
     const group = screen.getByRole('radiogroup', { name: 'Trust alpha' })
     fireEvent.click(within(group).getByRole('radio', { name: 'Trusted' }))
 

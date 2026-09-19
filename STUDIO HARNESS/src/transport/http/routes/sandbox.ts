@@ -59,8 +59,7 @@ const grantSchema = v.object({
   projectId: v.optional(v.string()),
   path: v.pipe(v.string(), v.minLength(1)),
   mode: v.picklist(["read", "write"]),
-  source: v.optional(v.picklist(["preset", "custom", "question"])),
-  presetId: v.optional(v.string()),
+  source: v.optional(v.picklist(["custom", "question"])),
 });
 
 const levelSchema = v.object({
@@ -216,7 +215,6 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
         path: parsed.output.path,
         mode: parsed.output.mode,
         source: parsed.output.source ?? "custom",
-        ...(parsed.output.presetId === undefined ? {} : { presetId: parsed.output.presetId }),
       });
       return context.json(row, 201);
     } catch (error) {

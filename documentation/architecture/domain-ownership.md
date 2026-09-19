@@ -222,7 +222,7 @@ Domain modules that need `StudioDatabase` or `SecureCredentialStore` receive the
 | **Tables** | **none** — deliberately no table (`src/snapshots/store.ts:17`). |
 | **Credential scopes** | none. |
 | **Filesystem** | `~/.studio/data/snapshots/<projectKey>/.git` + object store. Operations on `workspaceRoot` via git worktree; guarded by `relative` + `isAbsolute` check on `rm` (`src/snapshots/store.ts:212`). |
-| **Lifecycle** | **Created:** `new SnapshotStore({workspaceRoot, root=snapshotsDirectory()})` per `createAgentSandbox` (`src/application/studio-runtime.ts:247`); wrapped in `TurnSnapshots({store, required: mode==='full-auto', reporter})` (`src/application/studio-runtime.ts:246`). Hook `beginTurn()` registered in `#turns` (`src/application/studio-runtime.ts:251`). **Captured:** `beforeWrite` per mutating tool (`src/tools/gate.ts:309`). **Listed/restored:** via snapshot API routes (typed contracts, no UI). **Pruned:** policy deferred to `008.10` decision. |
+| **Lifecycle** | **Created:** `new SnapshotStore({workspaceRoot, root=snapshotsDirectory()})` per `createAgentSandbox` (`src/application/studio-runtime.ts:247`); wrapped in `TurnSnapshots({store, required: requiresUndo(mode), reporter})` (`src/application/studio-runtime.ts:246`). Hook `beginTurn()` registered in `#turns` (`src/application/studio-runtime.ts:251`). **Captured:** `beforeWrite` per mutating tool (`src/tools/gate.ts:309`). **Listed/restored:** via snapshot API routes (typed contracts, no UI). **Pruned:** policy deferred to `008.10` decision. |
 | **Refs** | `src/snapshots/store.ts:9`, `src/snapshots/shadow-repo.ts`, `src/snapshots/turn.ts` |
 
 ## 16 — storage

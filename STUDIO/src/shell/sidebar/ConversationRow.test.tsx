@@ -38,7 +38,7 @@ const CONVERSATION: Conversation = {
   archived: false,
   modelId: null,
   reasoningLevel: null,
-  permissionMode: 'manual',
+  permissionMode: 'ask',
 }
 
 const TITLE = CONVERSATION.title ?? ''

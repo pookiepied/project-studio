@@ -26,7 +26,7 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
  * as write roots, and a child process - the kind of thing a model actually
  * starts - can write into the second one. This is `sandbox-scope.test.ts`'s
  * shape, taken one level up: through the project conversation's own tool
- * surface, gate, kernel, and sandbox, with Full Auto resolving the ask the
+ * surface, gate, kernel, and sandbox, with Auto resolving the ask the
  * way a run does.
  *
  * The second half - the same command refused a directory that is nobody's
@@ -128,7 +128,7 @@ describe("a project conversation and its folders", () => {
         id: "cnv_build",
         firstMessage: "Build it",
         projectId: project.id,
-        permissionMode: "full-auto",
+        permissionMode: "auto",
       });
       // Opening a project is trusting its folder - the same decision the
       // conversation-mode harness records for its project root. The kernel
@@ -171,7 +171,7 @@ describe("a project conversation and its folders", () => {
       state.conversations.record({
         id: "cnv_pics",
         firstMessage: "Reimagine this one",
-        permissionMode: "full-auto",
+        permissionMode: "auto",
       });
 
       // What the render does when a delivery carries pictures - before the

@@ -8,16 +8,21 @@ import { StorageError } from "../storage/errors.js";
  *
  * Scope is which paths a project may read and write beyond its own folder -
  * additive, per path, each one a decision the person made and can unmake.
- * Level is whether the project is contained at all - `contained` (the
- * default) or `trusted`, the escape hatch for the walk-up class and for
- * Docker. Docker belongs under level, not under scope: a contained process
- * that can reach the Docker daemon can mount any path on the machine, so a
- * Docker path preset would be a containment bypass wearing a preset's
- * clothes.
+ * Level is whether the project's folder is the boundary at all - `contained`
+ * (the default: the file tools reach the project and the scope rows, and a
+ * path outside them becomes a question) or `trusted`, where the project's
+ * own files are no longer the boundary and any path resolves. Since ADR 0057
+ * the boundary is the gate's, not an OS container's, and the level is the
+ * one answer that widens it for a whole project rather than one path.
+ *
+ * A scope row has two sources, both the person's own words: `custom` is a
+ * path typed in settings and `question` is a yes to a path the model asked
+ * for. The `preset` source - a toolchain ticked in settings - went with the
+ * Windows container (ADR 0057, migration 25).
  */
 
 export type SandboxScopeMode = "read" | "write";
-export type SandboxScopeSource = "preset" | "custom" | "question";
+export type SandboxScopeSource = "custom" | "question";
 export type SandboxLevel = "contained" | "trusted";
 
 export interface SandboxScopeRow {
@@ -25,12 +30,11 @@ export interface SandboxScopeRow {
   readonly path: string;
   readonly mode: SandboxScopeMode;
   readonly source: SandboxScopeSource;
-  readonly presetId: string | null;
   readonly grantedAt: number;
 }
 
 const MODES: readonly SandboxScopeMode[] = ["read", "write"];
-const SOURCES: readonly SandboxScopeSource[] = ["preset", "custom", "question"];
+const SOURCES: readonly SandboxScopeSource[] = ["custom", "question"];
 const LEVELS: readonly SandboxLevel[] = ["contained", "trusted"];
 
 /**
@@ -211,7 +215,7 @@ export function readScopeSource(value: unknown): SandboxScopeSource {
   for (const source of SOURCES) {
     if (value === source) return source;
   }
-  throw new StorageError("invalid", { message: "A scope source is preset, custom, or question." });
+  throw new StorageError("invalid", { message: "A scope source is custom or question." });
 }
 
 export function readSandboxLevel(value: unknown): SandboxLevel {

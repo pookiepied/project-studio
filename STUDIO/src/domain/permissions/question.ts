@@ -27,7 +27,7 @@ export interface PermissionQuestion {
   /**
    * The kernel's own reason for asking, verbatim, and only when it says
    * something the sentence cannot: a policy ask (third-party code, git
-   * reaching the network) survives every mode, so in Full Auto it is the one
+   * reaching the network) survives every mode, so in Auto it is the one
    * explanation on screen. A default ask's reason - the capability "has not
    * been approved yet" - is the question restated, and is left off.
    */

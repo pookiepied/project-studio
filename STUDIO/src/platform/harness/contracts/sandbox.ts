@@ -19,7 +19,7 @@ export type SandboxLevel = (typeof SANDBOX_LEVELS)[number]
 export const SANDBOX_SCOPE_MODES = ['read', 'write'] as const
 export type SandboxScopeMode = (typeof SANDBOX_SCOPE_MODES)[number]
 
-export const SANDBOX_SCOPE_SOURCES = ['preset', 'custom', 'question'] as const
+export const SANDBOX_SCOPE_SOURCES = ['custom', 'question'] as const
 export type SandboxScopeSource = (typeof SANDBOX_SCOPE_SOURCES)[number]
 
 export interface SandboxScopeRow {
@@ -27,7 +27,6 @@ export interface SandboxScopeRow {
   readonly path: string
   readonly mode: SandboxScopeMode
   readonly source: SandboxScopeSource
-  readonly presetId: string | null
   readonly grantedAt: number
 }
 
@@ -37,9 +36,9 @@ export interface SandboxScopeRow {
  * A different question from the two above, and a precondition rather than a
  * wall - an undecided folder refuses every write and every command whatever
  * the permission mode says. The vocabulary collides with `SandboxLevel`, whose
- * `trusted` means uncontained: these two never derive from each other, and a
- * folder can be vouched for while its project stays contained, which is the
- * ordinary case.
+ * `trusted` means the project's folder is no longer the boundary: these two
+ * never derive from each other, and a folder can be vouched for while its
+ * project stays contained, which is the ordinary case.
  */
 
 export const TRUST_DECISIONS = ['trusted', 'untrusted', 'undecided'] as const
@@ -59,24 +58,17 @@ export interface SandboxScopeInfo {
   readonly trust: readonly FolderTrust[]
 }
 
-export function nullablePresetId(value: unknown): { ok: true; value: string | null } | { ok: false } {
-  if (value === null) return { ok: true, value: null }
-  const parsed = text(value)
-  return parsed === null ? { ok: false } : { ok: true, value: parsed }
-}
-
 export function parseSandboxScopeRow(value: unknown): SandboxScopeRow | null {
   if (!isRecord(value)) return null
   const projectId = typeof value['projectId'] === 'string' ? value['projectId'] : null
   const path = text(value['path'])
   const mode = oneOf(SANDBOX_SCOPE_MODES, value['mode'])
   const source = oneOf(SANDBOX_SCOPE_SOURCES, value['source'])
-  const presetId = nullablePresetId(value['presetId'])
   const grantedAt = finiteNumber(value['grantedAt'])
-  if (projectId === null || path === null || mode === null || source === null || !presetId.ok || grantedAt === null) {
+  if (projectId === null || path === null || mode === null || source === null || grantedAt === null) {
     return null
   }
-  return { projectId, path, mode, source, presetId: presetId.value, grantedAt }
+  return { projectId, path, mode, source, grantedAt }
 }
 
 export function parseFolderTrust(value: unknown): FolderTrust | null {

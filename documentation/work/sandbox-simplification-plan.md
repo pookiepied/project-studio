@@ -1,6 +1,6 @@
 # Sandbox simplification — the plan
 
-**Status:** In progress — steps 1 to 4 done (ADR, seam, deletion, shell); next is step 5, the modes. Step 1 is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
+**Status:** In progress — steps 1 to 5 done (ADR, seam, deletion, shell, modes); next is step 6, the project-less conversation folder. Step 1 is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
 **Decision:** ADR 0057, which supersedes the Windows half of
 [ADR 0041](../decisions/0041-containment-is-the-kernel-s-job.md) and
 [ADR 0047](../decisions/0047-a-contained-command-can-find-the-programs-it-may-run.md),
@@ -93,7 +93,7 @@ protection every other Windows harness lives without.
 | `pnpm sandbox:prepare`, `sandbox:release`, the ledger file | required maintenance | deleted |
 | Linux `bwrap` backend | default when present | kept, opt-in, behind the same `hostIsolation` seam |
 | `hostIsolation` on Windows/macOS | AppContainer / (none) | answers "no isolation"; the gate continues |
-| Execution modes (ADR 0018) | three plus scope questions | two: **ask** (every effectful call asks) and **auto** (path-scoped allow rules the user wrote; everything else asks) |
+| Execution modes (ADR 0018) | three plus scope questions | two: **ask** (every effectful call asks unless a rule the user wrote allows it) and **auto** (every default ask proceeds; policy asks still ask) |
 | Scope questions / grants (ADR 0015, 0021, 0038) | per-project rows, presets, elevation | allow rules only; no ACL side effects |
 | Shell tool | `cmd.exe` because the container permits it | the user's shell: bash if Git for Windows is present, else PowerShell, else cmd; a setting to choose; the system prompt names it |
 | Toolchain access | policy `PATH` rebuilt from the disk | inherited `PATH` |

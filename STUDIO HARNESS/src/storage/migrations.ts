@@ -1107,6 +1107,37 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 25,
+    name: "two_modes_and_no_presets",
+    up(db) {
+      // ADR 0057. Three execution modes become two, and the stored answer is
+      // rewritten in the safe direction only: Manual and Auto Edit both read
+      // as Ask, because an Auto Edit consent was "edit without asking, ask
+      // before running" and the only mode wider than that is one nobody
+      // chose. Full Auto reads as Auto, which is the same consent under its
+      // new name. Rows that hold nothing stay null - an unset row is still
+      // Ask, and writing it would make it indistinguishable from a choice.
+      db.exec(`
+        UPDATE conversation SET permission_mode = 'ask'
+         WHERE permission_mode IN ('manual', 'auto-edit');
+        UPDATE conversation SET permission_mode = 'auto'
+         WHERE permission_mode = 'full-auto';
+      `);
+
+      // The toolchain presets went with the Windows container: they named the
+      // directories a contained program had to be let into, and with no
+      // container the machine's PATH answers. A preset row was written by a
+      // tick in settings, never typed by hand, so it goes with the control
+      // that wrote it; `custom` and `question` rows are the person's own
+      // words and stay. The column goes too, so a reader cannot find a source
+      // that no longer exists.
+      db.exec(`
+        DELETE FROM sandbox_scope WHERE source = 'preset';
+        ALTER TABLE sandbox_scope DROP COLUMN preset_id;
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

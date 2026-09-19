@@ -28,7 +28,7 @@ const CONVERSATION = {
   archived: false,
   modelId: null,
   reasoningLevel: null,
-  permissionMode: 'manual',
+  permissionMode: 'ask',
   createdAt: 1_000,
   lastTurnAt: 2_000,
 } as const
@@ -88,12 +88,13 @@ describe('parseConversationRecord', () => {
   })
 
   it('carries the mode in the harness vocabulary only', () => {
-    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'auto-edit' })?.permissionMode).toBe('auto-edit')
-    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'full-auto' })?.permissionMode).toBe('full-auto')
-    // The picker's own spellings are a different vocabulary on purpose; a
-    // value the submission boundary would refuse cannot arrive on a record.
-    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'edits' })).toBeNull()
-    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'auto' })).toBeNull()
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'ask' })?.permissionMode).toBe('ask')
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'auto' })?.permissionMode).toBe('auto')
+    // The three retired names are refused, not translated: a value the
+    // submission boundary would refuse cannot arrive on a record.
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'manual' })).toBeNull()
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'auto-edit' })).toBeNull()
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'full-auto' })).toBeNull()
     expect(parseConversationRecord({ ...CONVERSATION, permissionMode: null })).toBeNull()
   })
 

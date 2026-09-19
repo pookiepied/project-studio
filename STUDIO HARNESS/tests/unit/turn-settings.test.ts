@@ -210,29 +210,30 @@ describe("the turn settings a submission carries", () => {
   it("settles the permission mode before the run is admitted", async () => {
     const response = await submit("cnv_mode", {
       kind: "user", body: "Rearrange these files",
-      permissionMode: "auto-edit",
+      permissionMode: "auto",
     });
 
     expect(response.status).toBe(202);
-    expect(store.get("cnv_mode")?.permissionMode).toBe("auto-edit");
+    expect(store.get("cnv_mode")?.permissionMode).toBe("auto");
   });
 
   it("keeps a conversation's stored mode when the submission carries none", async () => {
-    store.record({ id: "cnv_held", firstMessage: "Earlier", permissionMode: "full-auto" });
+    store.record({ id: "cnv_held", firstMessage: "Earlier", permissionMode: "ask" });
 
     const response = await submit("cnv_held", { kind: "user", body: "Plain turn" });
 
     expect(response.status).toBe(202);
-    expect(store.get("cnv_held")?.permissionMode).toBe("full-auto");
+    expect(store.get("cnv_held")?.permissionMode).toBe("ask");
   });
 
-  it("refuses a mode outside the harness's three names instead of translating it", async () => {
-    // The frontend's own picker names are deliberately not accepted here: a
-    // value this boundary cannot describe is a consent it cannot have been
-    // given, and silently mapping it onto a mode would be a grant.
+  it("refuses a mode outside the harness's two names instead of translating it", async () => {
+    // A retired name is deliberately not accepted here: a value this boundary
+    // cannot describe is a consent it cannot have been given, and silently
+    // mapping it onto a mode would be a grant. The stored rows were rewritten
+    // once, by migration 25; the wire never is.
     const response = await submit("cnv_bad_mode", {
       kind: "user", body: "Hello",
-      permissionMode: "edits",
+      permissionMode: "full-auto",
     });
 
     expect(response.status).toBe(400);
