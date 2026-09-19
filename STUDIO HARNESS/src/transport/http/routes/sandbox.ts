@@ -7,6 +7,8 @@ import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
 import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
 import type { WorkspaceTrustStore } from "../../../permissions/trust.js";
 import type { ProjectStore } from "../../../projects/store.js";
+import { shellChoice, type InterpreterKind } from "../../../process/interpreter.js";
+import type { ShellSettingsStore } from "../../../process/shell-settings.js";
 import { browseFolders } from "../../../sandbox/browse.js";
 import type { SandboxScopeStore } from "../../../sandbox/scope-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
@@ -27,6 +29,30 @@ export interface SandboxRoutesOptions {
    * browse with the harness process's own working directory.
    */
   readonly browseHome?: string;
+  /**
+   * The person's shell preference (ADR 0057). Optional the way the trust
+   * store is: a composition without it serves no shell routes, and the
+   * shell tool runs whatever the machine orders first.
+   */
+  readonly shell?: ShellSettingsStore;
+}
+
+const shellSchema = v.object({
+  interpreter: v.nullable(v.picklist(["pwsh", "bash", "powershell", "cmd", "sh"])),
+});
+
+/** What the page shows: the preference, what is running lines, and the choices. */
+function shellReport(store: ShellSettingsStore) {
+  const choice = shellChoice();
+  return {
+    preferred: store.read() ?? null,
+    active: choice.active === undefined ? null : { kind: choice.active.kind, path: choice.active.path },
+    available: choice.available.map((entry) => ({
+      kind: entry.kind,
+      label: entry.label,
+      path: entry.path,
+    })),
+  };
 }
 
 const grantSchema = v.object({
@@ -98,6 +124,35 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
       name: folder.name,
       decision: store.decision(folder.path),
     }));
+  }
+
+  /**
+   * The shell: which interpreters this machine has, which one runs lines,
+   * and the one the person prefers. Lives beside scope and level because it
+   * is the same question - where and how commands actually run - and the
+   * same page. `preferred` is what was asked for; `active` is what is in
+   * effect, and the two differ when the preference names a shell this
+   * machine lacks.
+   */
+  const shell = options.shell;
+  if (shell !== undefined) {
+    routes.get("/shell", (context) => context.json(shellReport(shell)));
+
+    routes.put("/shell", async (context) => {
+      try {
+        const parsed = v.safeParse(shellSchema, await body(context));
+        if (!parsed.success) {
+          throw invalidBody(
+            "The body must name an interpreter kind - pwsh, bash, powershell, cmd, sh - or null.",
+          );
+        }
+        const kind: InterpreterKind | undefined = parsed.output.interpreter ?? undefined;
+        shell.select(kind);
+        return context.json(shellReport(shell));
+      } catch (error) {
+        return context.json(failure(error), statusOf(error));
+      }
+    });
   }
 
   routes.get("/scope", (context) => {

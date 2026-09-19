@@ -140,6 +140,8 @@ export interface CreateHttpAppOptions {
    * optional-for-tests shape as `titling` and `questions`.
    */
   readonly browseHome?: string;
+  /** The shell preference store (ADR 0057), served under the sandbox routes. */
+  readonly shell?: import("../../process/shell-settings.js").ShellSettingsStore;
   readonly admission: AdmissionVerifier;
   /**
    * Answers whether the catalog currently serves a model reference. Settling a
@@ -200,6 +202,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
         projects: options.projects,
         ...(options.trust === undefined ? {} : { trust: options.trust }),
         ...(options.browseHome === undefined ? {} : { browseHome: options.browseHome }),
+        ...(options.shell === undefined ? {} : { shell: options.shell }),
       }),
     );
   }

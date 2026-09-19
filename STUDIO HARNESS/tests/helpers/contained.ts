@@ -36,6 +36,17 @@ import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 /** True when this host has a backend that its own probe says works. */
 export const CAN_CONTAIN: boolean = hostIsolation().backend !== undefined;
 
-/** `describe`, unless containment is unavailable here. */
-/** `it`, unless containment is unavailable here. */
+/**
+ * True when this host can run a model-chosen program at all: contained where
+ * a backend works, or plainly where no backend was ever registered (Windows
+ * and macOS since ADR 0057, where the gate is the boundary). False only on
+ * the one state that refuses - a registered backend this kernel will not
+ * let run, which is stock Ubuntu 24.04 before `sandbox:prepare`.
+ */
+export const CAN_RUN: boolean = CAN_CONTAIN || !hostIsolation().enforcing;
+
+/** `it`, unless containment is unavailable here - for tests about the fence. */
 export const itContained = CAN_CONTAIN ? it : it.skip;
+
+/** `it`, unless nothing can run here - for tests that start a program. */
+export const itRuns = CAN_RUN ? it : it.skip;

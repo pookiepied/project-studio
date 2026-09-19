@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect } from "vitest";
 
-import { itContained } from "../helpers/contained.js";
+import { itRuns } from "../helpers/contained.js";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { conversationScope, projectScope } from "../../src/extend/selection.js";
@@ -210,7 +210,7 @@ describe("MCP application runtime", () => {
     return { runtime, database };
   }
 
-  itContained("discovers a real stdio tool through the gate and retains it when disabled", async () => {
+  itRuns("discovers a real stdio tool through the gate and retains it when disabled", async () => {
     const { runtime, database } = await startedRuntime("user");
     try {
       const sandbox = runtime.createAgentSandbox({
@@ -389,7 +389,7 @@ describe("MCP application runtime", () => {
   // is built from its own chain, and the discovery names the scope that
   // decided, which until the conversation route existed was a sentence the
   // harness wrote without ever sending.
-  itContained("lets a conversation override its project, and tells each conversation its own truth", async () => {
+  itRuns("lets a conversation override its project, and tells each conversation its own truth", async () => {
     const { runtime, database } = await startedRuntime("user");
     try {
       const sandbox = runtime.createAgentSandbox({ agentId: "agent", conversationId: "agent" });
@@ -482,7 +482,7 @@ describe("MCP application runtime", () => {
     }
   }, 30_000);
 
-  itContained("withholds a system extension's schemas until they are discovered", async () => {
+  itRuns("withholds a system extension's schemas until they are discovered", async () => {
     // **This test asserted the opposite until 2026-09-09, and the rule it
     // asserted was wrong.** ADR 0048 §3 said system-provenance servers load
     // eagerly; ADR 0049 §5 corrected that, because it conflated two
@@ -547,7 +547,7 @@ describe("MCP application runtime", () => {
    * This case installs and enables after the startup pass has settled, which
    * is the arrangement a person actually produces from the settings screen.
    */
-  itContained("names a switched-on server's tools on a conversation's first settled note", async () => {
+  itRuns("names a switched-on server's tools on a conversation's first settled note", async () => {
     const directory = await mkdtemp(join(tmpdir(), "studio-mcp-first-note-"));
     temporaryDirectories.push(directory);
     const projectRoot = join(directory, "project");

@@ -15,19 +15,27 @@ import { resolveBinary } from "../vendor/resolver.js";
  *
  * **The order prefers syntax models write, measured where it differs.** Models
  * reach for POSIX syntax first (`&&`, pipes, `$VARS`), and every fallback
- * below it is stated rather than silent. On Windows that means: PowerShell 7
- * if installed, then the bash that ships with Git for Windows (found beside
- * the git binary this harness already resolves), then a `bash.exe` on PATH,
- * then `cmd.exe`, then Windows PowerShell 5.1 - the last two in that order
- * because of what each can run, measured on the machine this was built on:
- * 5.1 refuses a quoted absolute path without a call operator and has no `&&`,
+ * below it is stated rather than silent. On Windows that means: the bash that
+ * ships with Git for Windows (found beside the git binary this harness
+ * already resolves) or a `bash.exe` on PATH, then PowerShell 7, then
+ * `cmd.exe`, then Windows PowerShell 5.1 - the last two in that order because
+ * of what each can run, measured on the machine this was built on: 5.1
+ * refuses a quoted absolute path without a call operator and has no `&&`,
  * while cmd runs both. The 5.1 fallback is picked only when nothing better
  * exists, and its gaps are stated facts in the environment block rather than
  * surprises.
  *
- * **Which interpreter survives containment is a separate question**, and it is
- * answered by measurement rather than by this order - see
- * {@link demoteInterpreter}.
+ * Bash led PowerShell 7 from ADR 0057 on. While the shell ran inside an
+ * AppContainer, Git's bash died in its own loader there, so the order put
+ * the interpreter that could be contained first and fell back by
+ * measurement. There is no container on Windows now, bash starts, and it is
+ * the syntax models write with nothing to translate - `&&`, `$VAR`, a quoted
+ * path with no call operator in front of it.
+ *
+ * **The person can overrule the order.** A preference, stored by the shell
+ * settings and applied through {@link preferInterpreter}, picks one of the
+ * interpreters this machine has by kind; a preference the machine cannot
+ * honour falls back to the order, and says so through {@link shellChoice}.
  *
  * Lives in `src/process/` rather than beside the shell tool because the
  * environment block needs the same answer, and a second copy of "which shell
@@ -189,104 +197,71 @@ const CMD_ARGS = ["/d", "/s", "/c"] as const;
 /**
  * Every interpreter this machine has, best first, measured once.
  *
- * A list rather than a single answer because the best one is not always the
- * one that works: an interpreter that cannot be contained on this machine has
- * to be given up on, and the next one tried. `chosen` only ever moves forward,
- * and only through `demoteInterpreter`.
+ * A list rather than a single answer because the person may prefer one that
+ * is not first: the list is what the settings page offers, and `preferred`
+ * is which of them was chosen. A preference that names a kind this machine
+ * lacks is kept - it may be a setting written on another machine, or before
+ * an uninstall - and the order answers instead, which {@link shellChoice}
+ * reports so the page can say the preference is not in effect.
  *
  * The Windows order is measured, not only preferred. On the machine this
- * harness is built on - Windows 11 Home, no PowerShell 7 - the preferred
- * bash cannot be contained, and the demotion lands on whichever fallback
- * follows it. With Windows PowerShell 5.1 next, that chain could not run a
- * single line the shell's own tests write: 5.1 refuses a quoted absolute
- * path without a call operator in front of it (measured as a ParserError on
- * every such line, seven test failures' worth) and has no `&&` at all, while
- * `cmd.exe` runs quoted paths, `&&`, pipes and redirection alike. So cmd
- * outranks 5.1, and 5.1 stays last - reachable only where cmd is somehow
- * absent, which is nowhere Windows ships. The statement each entry carries
- * says what its syntax can and cannot do, so the model writes for the shell
- * it actually got.
+ * harness is built on - Windows 11 Home, no PowerShell 7 - the chain after
+ * bash could not run a single line the shell's own tests write if Windows
+ * PowerShell 5.1 came before cmd: 5.1 refuses a quoted absolute path without
+ * a call operator in front of it (measured as a ParserError on every such
+ * line, seven test failures' worth) and has no `&&` at all, while `cmd.exe`
+ * runs quoted paths, `&&`, pipes and redirection alike. So cmd outranks 5.1,
+ * and 5.1 stays last - reachable only where cmd is somehow absent, which is
+ * nowhere Windows ships. The statement each entry carries says what its
+ * syntax can and cannot do, so the model writes for the shell it actually
+ * got.
  *
  * An empty list is a real state, not an error: a machine with no shell at all
  * gets a shell tool that refuses with that sentence, rather than a crash at
  * registration time.
  */
 let candidates: readonly Interpreter[] | undefined;
-let chosen = 0;
+let preferred: InterpreterKind | undefined;
+
+/** Every interpreter this machine has, in the order the harness would pick them. */
+export function listInterpreters(): readonly Interpreter[] {
+  candidates ??= measure();
+  return candidates;
+}
 
 /**
- * Interpreters measured to start under containment on this machine.
+ * Names the interpreter the person wants, by kind, or clears the preference.
  *
- * `STATUS_DLL_INIT_FAILED` arrives as the *interpreter's* exit code, but an
- * interpreter reports its child's exit code as its own - so a child that dies
- * in its own loader is indistinguishable, from the code alone, from the shell
- * failing to start. `tar` is the case that proved it: under `cmd` on this
- * machine `tar --version` exits with exactly that status, cmd passes it up,
- * and the shell tool concluded cmd could not run.
- *
- * That conclusion is permanent and process-wide, so one `tar` demoted every
- * later command in the harness to Windows PowerShell 5.1 - where npm, npx and
- * pnpm are all refused by the execution policy. An evaluation session lost
- * most of its run to exactly that, reporting a wall of "AuthorizationManager
- * check failed" for tooling that works fine one interpreter up.
- *
- * So the answer is measured rather than inferred: once an interpreter has
- * started anything at all, it can start, and every later failure with that
- * status belongs to the child. One success is proof for the life of the
- * process, because whether a shell's own libraries are readable does not
- * change while it runs.
+ * Process-wide, like the choice it overrides: the shell tool and the
+ * environment block ask the same question and must get the same answer. The
+ * settings store is what remembers it across runs; this is how the running
+ * process learns it.
  */
-const started = new Set<string>();
+export function preferInterpreter(kind: InterpreterKind | undefined): void {
+  preferred = kind;
+}
+
+/** What the person asked for, and which interpreter is actually running lines. */
+export interface ShellChoice {
+  /** The stored preference, whether or not this machine can honour it. */
+  readonly preferred: InterpreterKind | undefined;
+  /** The interpreter in use, or undefined on a machine with none. */
+  readonly active: Interpreter | undefined;
+  /** Everything this machine has, best first. */
+  readonly available: readonly Interpreter[];
+}
+
+export function shellChoice(): ShellChoice {
+  return { preferred, active: resolveInterpreter(), available: listInterpreters() };
+}
 
 export function resolveInterpreter(): Interpreter | undefined {
-  candidates ??= measure();
-  return candidates[chosen];
-}
-
-/**
- * Records that this interpreter ran something.
- *
- * Called for every result that is not `STATUS_DLL_INIT_FAILED` - including
- * failures, because a command that ran and exited 1 is a shell that started.
- */
-export function markInterpreterStarted(interpreter: Interpreter): void {
-  started.add(interpreter.path);
-}
-
-/** Whether this interpreter is already known to start on this machine. */
-export function interpreterStarted(interpreter: Interpreter): boolean {
-  return started.has(interpreter.path);
-}
-
-/**
- * Gives up on the current interpreter and moves to the next one this machine
- * has, for the rest of the process.
- *
- * There is exactly one caller and one reason: a contained child that dies at
- * `STATUS_DLL_INIT_FAILED`, which is what happens when the interpreter cannot
- * read the libraries beside its own executable. Git for Windows' `bash.exe`
- * loads `msys-2.0.dll` from its own installation, an AppContainer cannot read
- * `C:\Program Files`, and granting it there would need elevation this feature
- * must never want - so on a machine with Git and no PowerShell 7, the shell
- * tool could not run a single line. That was nine failing tests and the reason
- * a Full Auto build could not include a command.
- *
- * Demotion rather than a reordered preference list, because the preference is
- * still right where it works: `bash` interprets what models write, and on a
- * machine where it can be contained it should keep being chosen. Which
- * interpreters survive containment is a property of the machine, not of the
- * ordering, so it is measured once, on the first line that fails, instead of
- * predicted. Returns false when there is nothing left to fall back to.
- */
-export function demoteInterpreter(failed: Interpreter): boolean {
-  if (candidates === undefined) return false;
-  // Compared by identity against the current choice: two calls racing on the
-  // same failure must demote once, not twice, or a machine with three
-  // interpreters would skip the middle one on a single failure.
-  if (candidates[chosen] !== failed) return true;
-  if (chosen + 1 >= candidates.length) return false;
-  chosen += 1;
-  return true;
+  const found = listInterpreters();
+  if (preferred !== undefined) {
+    const match = found.find((entry) => entry.kind === preferred);
+    if (match !== undefined) return match;
+  }
+  return found[0];
 }
 
 /**
@@ -301,6 +276,22 @@ function measure(): readonly Interpreter[] {
   const found: Interpreter[] = [];
 
   if (process.platform === "win32") {
+    const bash = bashFromGit() ?? bashFromPath();
+    if (bash !== undefined) {
+      found.push({
+        path: bash,
+        label: "bash",
+        kind: "bash",
+        args: BASH_ARGS,
+        takes: "argv",
+        separators: [";", "&", "&&", "||"],
+        statement: [
+          "Commands run through bash. Pipes, &&, quotes, and redirection are",
+          "interpreted by the shell.",
+        ],
+      });
+    }
+
     const pwsh = scanPath("pwsh.exe");
     if (pwsh !== undefined) {
       found.push({
@@ -314,22 +305,6 @@ function measure(): readonly Interpreter[] {
           "Commands run through PowerShell 7 (pwsh). Pipes, &&, quotes, and",
           "redirection are interpreted by the shell. A quoted absolute path",
           'needs the call operator in front of it: & "C:\\path\\tool.exe" args.',
-        ],
-      });
-    }
-
-    const bash = bashFromGit() ?? bashFromPath();
-    if (bash !== undefined) {
-      found.push({
-        path: bash,
-        label: "bash",
-        kind: "bash",
-        args: BASH_ARGS,
-        takes: "argv",
-        separators: [";", "&", "&&", "||"],
-        statement: [
-          "Commands run through bash. Pipes, &&, quotes, and redirection are",
-          "interpreted by the shell.",
         ],
       });
     }

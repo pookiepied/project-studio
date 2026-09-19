@@ -1,6 +1,6 @@
 /**
- * The sandbox's scope: levels, rows, folder trust, and the
- * folder listing the picker browses.
+ * The sandbox's scope: levels, rows, folder trust, the shell, and the folder
+ * listing the picker browses.
  */
 
 import { isRecord } from '@/lib/guards'
@@ -96,6 +96,57 @@ export function parseSandboxScopeInfo(value: unknown): SandboxScopeInfo | null {
   const trust = listOf(parseFolderTrust, value['trust'])
   if (project === null || machineWide === null || level === null || trust === null) return null
   return { project, machineWide, level, trust }
+}
+
+/*
+ * Mirrored from `GET /api/sandbox/shell` (ADR 0057): the interpreters this
+ * machine has, the one running lines, and the one the person prefers. The
+ * last two differ when the preference names a shell the machine lacks, and
+ * the page says so rather than hiding the preference.
+ */
+
+export const SHELL_KINDS = ['pwsh', 'bash', 'powershell', 'cmd', 'sh'] as const
+export type ShellKind = (typeof SHELL_KINDS)[number]
+
+export interface ShellOption {
+  readonly kind: ShellKind
+  readonly label: string
+  readonly path: string
+}
+
+export interface ShellInfo {
+  readonly preferred: ShellKind | null
+  readonly active: { readonly kind: ShellKind; readonly path: string } | null
+  readonly available: readonly ShellOption[]
+}
+
+export function parseShellInfo(value: unknown): ShellInfo | null {
+  if (!isRecord(value)) return null
+  // Null is an answer here (nothing preferred, no shell at all), so the
+  // guards' null-means-invalid cannot carry it; each is checked first.
+  let preferred: ShellKind | null = null
+  if (value['preferred'] !== null) {
+    preferred = oneOf(SHELL_KINDS, value['preferred'])
+    if (preferred === null) return null
+  }
+  let active: ShellInfo['active'] = null
+  if (value['active'] !== null) {
+    if (!isRecord(value['active'])) return null
+    const kind = oneOf(SHELL_KINDS, value['active']['kind'])
+    const path = text(value['active']['path'])
+    if (kind === null || path === null) return null
+    active = { kind, path }
+  }
+  const available = listOf((entry: unknown) => {
+    if (!isRecord(entry)) return null
+    const kind = oneOf(SHELL_KINDS, entry['kind'])
+    const label = text(entry['label'])
+    const path = text(entry['path'])
+    if (kind === null || label === null || path === null) return null
+    return { kind, label, path }
+  }, value['available'])
+  if (available === null) return null
+  return { preferred, active, available }
 }
 
 /*
