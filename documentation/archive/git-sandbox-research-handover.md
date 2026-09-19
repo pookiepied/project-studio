@@ -1,8 +1,13 @@
 # Research task: why git cannot read its working directory inside our sandbox
 
+> **Archived 2026-09-19.** The task it set was answered in
+> `git-sandbox-findings.md` beside it, and both concern the Windows
+> AppContainer backend that [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md)
+> removed. Kept for provenance.
+
 **This is a research task. Change no source file, write no fix, open no
 branch.** Another agent is editing the harness right now. Your entire output is
-one new document, `documentation/work/git-sandbox-findings.md`. If you finish
+one new document, `documentation/work/git-sandbox-findings.md` (now beside this one in `archive/`). If you finish
 early, measure more; do not start implementing.
 
 ## What is already known, so you do not re-measure it

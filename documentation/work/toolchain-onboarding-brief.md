@@ -5,6 +5,14 @@
 here: a contradiction inside our own sandbox code, which is a bug, and the
 absence of an onboarding, which is a product gap.
 
+> **2026-09-19.** The sandbox half is closed by
+> [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md): the Windows
+> container it describes no longer ships, so its `error 5`, its corridor
+> fix and the installer's ACL duties in §7 are gone with it. The onboarding
+> half - a first-run setup so a missing toolchain is met before a
+> conversation meets it - is still open and is what this brief is now
+> about.
+
 ## 1. What actually happened
 
 The `shell` tool resolves every program a command line names, the way the
@@ -143,7 +151,7 @@ other than the author runs Studio.
 ## 7. The installer's job, written down while it is fresh (2026-09-08)
 
 The corridor fix landed (ADR 0041's amendment,
-[the findings](git-sandbox-findings.md)), and landing it produced the concrete
+[the findings](../archive/git-sandbox-findings.md)), and landing it produced the concrete
 list this brief was missing. **The installer must do this**, because in a
 packaged `.exe` there is no pnpm, no `package.json` and no checkout, so the
 remedy the runtime currently names does not exist on the machine at all.

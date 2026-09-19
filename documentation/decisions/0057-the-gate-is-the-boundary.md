@@ -14,7 +14,7 @@ two. Trust is unchanged.
 **Builds on:** [ADR 0012](0012-permission-and-containment.md) — the kernel
 decides, never executes, never prompts. Everything here is subtraction under
 that rule; nothing new is decided about permission.
-**Evidence:** `documentation/work/sandbox-simplification-plan.md`, the
+**Evidence:** `documentation/archive/sandbox-simplification-plan.md`, the
 measurements of 2026-09-19.
 
 ## Context

@@ -1,6 +1,6 @@
 # Sandbox simplification — the plan
 
-**Status:** In progress — steps 1 to 7 done (ADR, seam, deletion, shell, modes, conversation identity, Linux opt-in with gate-only fallback); next is step 8, archiving the research docs. Step 1 is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md) · **Opened:** 2026-09-19 · **Last worked:** 2026-09-19
+**Status:** Closed 2026-09-19 — all eight steps done (ADR, seam, deletion, shell, modes, conversation identity, Linux opt-in with gate-only fallback, docs). The durable residue is [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md); this plan is kept for the reasoning and the measurements. · **Opened:** 2026-09-19 · **Closed:** 2026-09-19
 **Decision:** ADR 0057, which supersedes the Windows half of
 [ADR 0041](../decisions/0041-containment-is-the-kernel-s-job.md) and
 [ADR 0047](../decisions/0047-a-contained-command-can-find-the-programs-it-may-run.md),

@@ -1,5 +1,10 @@
 # Why git cannot read its working directory inside our sandbox
 
+> **Archived 2026-09-19.** Correct about what it measured, and it measured a
+> sandbox that no longer ships: the Windows AppContainer backend was removed
+> by [ADR 0057](../decisions/0057-the-gate-is-the-boundary.md). Kept for
+> provenance.
+
 **2026-09-08 · the research round this document answers** [the handover note](git-sandbox-research-handover.md) and continues [the toolchain onboarding brief](toolchain-onboarding-brief.md). Machine: the author's Windows 11, unelevated throughout (measured: `net session` → not elevated; nothing below required elevation). Harness untouched: no edits under `STUDIO HARNESS/src` or `STUDIO/src`, no test-suite runs, no `sandbox:prepare`. Section 9 lists everything this investigation *did* change, and the state it left behind.
 
 **The one-paragraph answer.** Inside the container, git's `getcwd` (`compat/mingw.c` at the installed build's own commit, quoted in §2) resolves the working directory it got from `GetCurrentDirectoryW` through `CreateFileW(cwd, 0, …, FILE_FLAG_BACKUP_SEMANTICS)` and then `GetFinalPathNameByHandleW`, falling back to `GetLongPathNameW`. Whatever the first resolving step asks beyond *traverse* is missing on the ancestor chain, and the `GetLongPathNameW` fallback needs `FILE_LIST_DIRECTORY` (the same 0x1 bit as `FILE_READ_DATA`) on the parent of *every* component — including `C:\` and `C:\Users`, which on this machine carry only the machine-prepared traverse ACE and cannot be extended by an unelevated process. Granting traverse+LIST on the whole chain, drive root included, fixes it: proven by compressing the chain to a single grantable component with `subst`, after which the identical binary, grants and policy answered `fatal: not a git repository` — the good error — instead of dying. The read-extended-attributes bit is *not* needed (measured). `C:\Users\pooki` and below need no elevation (measured); exactly two directories do (measured).
