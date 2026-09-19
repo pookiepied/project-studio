@@ -75,6 +75,8 @@ export {
   parseLibraryProviders,
   type ProviderIcon,
   parseProviderIcon,
+  type ModelFacts,
+  parseModelFacts,
 } from './models'
 
 export {

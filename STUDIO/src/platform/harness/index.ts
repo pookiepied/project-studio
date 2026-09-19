@@ -76,6 +76,7 @@ export {
   type LanguageProtocol,
   type LibraryProvider,
   type ModelCapability,
+  type ModelFacts,
   type ModelPricing,
   type ModelReferenceSlot,
   type PendingApprovalRecord,

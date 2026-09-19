@@ -333,6 +333,10 @@ function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind:
         open={addingModel !== null}
         onClose={() => setAddingModel(null)}
         connectionName={addingModel?.displayName ?? ''}
+        onLookup={async (modelId) => {
+          const result = await providers.lookupModelFacts(modelId)
+          return result.ok ? result.value : null
+        }}
         onAdd={async (model) => {
           if (addingModel === null) return null
           const result = await providers.addManualModel(addingModel.id, model)

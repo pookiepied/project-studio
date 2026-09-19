@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, TextField } from '@/components/primitives'
 import {
   REASONING_LEVELS,
   type CapabilityState,
   type HarnessFailure,
   type ModelCapability,
+  type ModelFacts,
   type ReasoningLevel,
 } from '@/platform/harness'
 import { SLOT_LABELS } from '@/domain/models/slots'
@@ -28,7 +29,20 @@ import type { ManualModelInput } from '@/platform/harness/client'
  *     only at low and medium says exactly that, and the composer's control
  *     follows;
  *   - the context window and output cap are optional numbers; left empty they
- *     stay unknown and the meter says so.
+ *     stay unknown, the meter says so, and the form says what else that
+ *     costs: a model with no window is only compacted when its provider
+ *     refuses a request.
+ *
+ * ---- The catalog fills in first --------------------------------------------
+ *
+ * A slug typed here is very often a model the catalog serves under other
+ * hosts - GLM 5.3 Flash on a private gateway is the same model Z.ai and
+ * OpenRouter list - and the window, the output cap, whether it reasons and
+ * whether it reads images are the model's facts, not the host's. So the form
+ * asks the harness about the slug as it is typed and fills what it learns
+ * into fields the person has not touched. It is a pre-fill and not a claim:
+ * every value stays editable, the caption says how many entries it rests on,
+ * and a slug nobody lists leaves the form as it was.
  *
  * Chat is deliberately not a checkbox. A hand-entered model under a provider
  * exists to answer turns, so `textGeneration` is stated supported for the
@@ -66,16 +80,33 @@ type CapabilityStateKey = {
 
 type CapabilityDraft = { -readonly [K in CapabilityStateKey]?: ModelCapability[K] }
 
+/** How long the slug rests before the catalog is asked about it. */
+const LOOKUP_DELAY_MS = 350
+
+/** What the catalog said about the slug in the field, and for which slug. */
+type Lookup =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'asking'; readonly slug: string }
+  | { readonly kind: 'answered'; readonly slug: string; readonly facts: ModelFacts }
+
+type FilledField = 'capabilities' | 'levels' | 'contextWindow' | 'maxOutputTokens'
+
 export function AddModelDialog({
   open,
   onClose,
   connectionName,
+  onLookup,
   onAdd,
 }: {
   open: boolean
   onClose: () => void
   /** The connection the model will be filed under, named in the copy. */
   connectionName: string
+  /**
+   * What the catalog knows about a slug, or null when it could not be asked.
+   * Optional so a caller with no harness still has a working form.
+   */
+  onLookup?: (modelId: string) => Promise<ModelFacts | null>
   /** Resolves to the failure to show, or null when the model was added. */
   onAdd: (model: ManualModelInput) => Promise<HarnessFailure | null>
 }) {
@@ -87,6 +118,11 @@ export function AddModelDialog({
   const [maxOutputTokens, setMaxOutputTokens] = useState('')
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<HarnessFailure | null>(null)
+  const [lookup, setLookup] = useState<Lookup>({ kind: 'idle' })
+  // Which fields the person has typed in or ticked themselves. The catalog
+  // fills only the others, so a corrected number is never overwritten by a
+  // later answer for a different slug.
+  const touched = useRef<Set<FilledField>>(new Set())
 
   const close = () => {
     setModelId('')
@@ -97,10 +133,58 @@ export function AddModelDialog({
     setMaxOutputTokens('')
     setFailure(null)
     setBusy(false)
+    setLookup({ kind: 'idle' })
+    touched.current.clear()
     onClose()
   }
 
+  const slug = modelId.trim()
+
+  // Ask the catalog once the slug has rested. The answer is applied only if
+  // the slug is still the one asked about - a person typing through several
+  // ids must not have the first answer land on the last id.
+  useEffect(() => {
+    if (!open || onLookup === undefined) return
+    if (slug === '') {
+      setLookup({ kind: 'idle' })
+      return
+    }
+    let current = true
+    const timer = window.setTimeout(() => {
+      setLookup({ kind: 'asking', slug })
+      void onLookup(slug).then((facts) => {
+        if (!current) return
+        if (facts === null) {
+          setLookup({ kind: 'idle' })
+          return
+        }
+        setLookup({ kind: 'answered', slug, facts })
+        if (!facts.found) return
+        const untouched = (field: FilledField) => !touched.current.has(field)
+        if (untouched('contextWindow') && facts.contextWindow !== null) {
+          setContextWindow(String(facts.contextWindow))
+        }
+        if (untouched('maxOutputTokens') && facts.maxOutputTokens !== null) {
+          setMaxOutputTokens(String(facts.maxOutputTokens))
+        }
+        if (untouched('capabilities')) {
+          setCapabilities({
+            streaming: 'supported',
+            ...(facts.reasoning ? { reasoning: 'supported' } : {}),
+            ...(facts.vision ? { vision: 'supported' } : {}),
+          })
+        }
+        if (untouched('levels') && facts.reasoning) setLevels(facts.reasoningLevels)
+      })
+    }, LOOKUP_DELAY_MS)
+    return () => {
+      current = false
+      window.clearTimeout(timer)
+    }
+  }, [open, slug, onLookup])
+
   const toggleCapability = (key: CapabilityStateKey): void => {
+    touched.current.add('capabilities')
     setCapabilities((current) => {
       const next: CapabilityDraft = { ...current }
       if (next[key] === 'supported') {
@@ -113,8 +197,9 @@ export function AddModelDialog({
   }
 
   const reasons = capabilities.reasoning === 'supported'
-  const slug = modelId.trim()
   const valid = slug.length > 0 && displayName.trim().length > 0
+  const windowEmpty = contextWindow.trim() === ''
+  const answered = lookup.kind === 'answered' && lookup.slug === slug ? lookup.facts : null
 
   const submit = async (): Promise<boolean> => {
     if (!valid || busy) return false
@@ -175,6 +260,15 @@ export function AddModelDialog({
         <label className="flex flex-col gap-1.5">
           <span className="text-caption text-muted-foreground">Model id (slug)</span>
           <TextField value={modelId} onChange={setModelId} placeholder="my-org/my-fine-tune" autoFocus />
+          {answered === null ? null : (
+            <span className="text-caption text-muted-foreground/80" aria-live="polite">
+              {answered.found
+                ? `Filled from ${
+                    answered.entries === 1 ? 'the catalog entry' : `${answered.entries} catalog entries`
+                  } for this model. Change anything that is wrong.`
+                : 'Not in the catalog. Say what you know about it below.'}
+            </span>
+          )}
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -213,11 +307,12 @@ export function AddModelDialog({
                     key={level}
                     type="button"
                     aria-pressed={selected}
-                    onClick={() =>
+                    onClick={() => {
+                      touched.current.add('levels')
                       setLevels((current) =>
                         selected ? current.filter((entry) => entry !== level) : [...current, level],
                       )
-                    }
+                    }}
                     className={`rounded-full border px-2.5 py-0.5 text-caption transition-colors duration-fast ${
                       selected
                         ? 'border-foreground/40 bg-selected text-foreground'
@@ -235,23 +330,40 @@ export function AddModelDialog({
           </fieldset>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-caption text-muted-foreground">Context window</span>
-            <TextField
-              value={contextWindow}
-              onChange={setContextWindow}
-              placeholder="unknown"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-caption text-muted-foreground">Max output tokens</span>
-            <TextField
-              value={maxOutputTokens}
-              onChange={setMaxOutputTokens}
-              placeholder="unknown"
-            />
-          </label>
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-caption text-muted-foreground">Context window</span>
+              <TextField
+                value={contextWindow}
+                onChange={(value) => {
+                  touched.current.add('contextWindow')
+                  setContextWindow(value)
+                }}
+                placeholder="unknown"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-caption text-muted-foreground">Max output tokens</span>
+              <TextField
+                value={maxOutputTokens}
+                onChange={(value) => {
+                  touched.current.add('maxOutputTokens')
+                  setMaxOutputTokens(value)
+                }}
+                placeholder="unknown"
+              />
+            </label>
+          </div>
+          {/* The consequence, stated where the choice is made. Compaction
+              stands on the window: without one the meter has no percentage,
+              and Studio can only compact once the provider has refused. */}
+          {windowEmpty ? (
+            <p className="text-caption text-muted-foreground/80">
+              Without a context window the meter shows no percentage, and a long conversation is
+              compacted only once the provider refuses a request.
+            </p>
+          ) : null}
         </div>
 
         {failure ? (

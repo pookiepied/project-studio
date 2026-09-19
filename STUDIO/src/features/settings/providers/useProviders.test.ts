@@ -65,6 +65,7 @@ function stubClient(overrides: {
     deleteConnection: () => Promise.resolve(ok(undefined)),
     probeConnection: () => Promise.resolve(ok(overrides.probe ?? PROBE)),
     setDefault: () => Promise.resolve(ok(undefined)),
+    lookupModelFacts: () => Promise.resolve(ok({ found: false as const })),
     addManualModel: () => refuse(),
     setModelOverride: () => refuse(),
     removeModel: () => refuse(),
