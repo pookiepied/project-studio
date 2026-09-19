@@ -74,6 +74,8 @@ export function usePendingApprovals(
     readonly enabled?: boolean
     /** Whether a run is under way - the fast cadence's other trigger. */
     readonly active?: boolean
+    /** Whether the conversation belongs to a project; decides how the sentence names the workspace. */
+    readonly hasProject?: boolean
   } = {},
 ): {
   /** The conversation's questions, oldest first. Empty means nothing is asked. */
@@ -91,7 +93,7 @@ export function usePendingApprovals(
   /** Withdraws every question this conversation has pending. Safe when empty. */
   cancelAll: () => void
 } {
-  const { enabled = true, active = false } = options
+  const { enabled = true, active = false, hasProject = false } = options
   const { approvals } = useWorkspace()
 
   // The raw rows, unfiltered: the store answers for every conversation. The
@@ -200,8 +202,8 @@ export function usePendingApprovals(
     // resource in the order the call names them, so the queue's order is the
     // command line's order.
     own.sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
-    return own.map(questionFromRecord)
-  }, [records, conversationId])
+    return own.map((record) => questionFromRecord(record, { hasProject }))
+  }, [records, conversationId, hasProject])
 
   return { questions, answeringId, answeredElsewhere, answer, cancelAll }
 }

@@ -92,6 +92,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const approvals = usePendingApprovals(conversation.id, {
     enabled: !gallery,
     active: isTurnRunning(live.phase),
+    hasProject: conversation.projectId !== null,
   })
 
   // The questions a run raises to get a decision - the other kind of stop,
