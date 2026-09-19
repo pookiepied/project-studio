@@ -125,7 +125,7 @@ could look at a repository, on every workspace, while node ran fine beside it:
 node's own path resolution walks by `lstat`, which needs only traverse and
 read-attributes. The measurement, the source at the installed build's commit,
 and the elimination that identifies the two resolvers are in
-`documentation/work/git-sandbox-findings.md`; the decisive experiment
+`documentation/archive/git-sandbox-findings.md`; the decisive experiment
 compressed the ancestor chain to one grantable component with `subst`, and the
 identical binary answered `fatal: not a git repository` - the good failure.
 
