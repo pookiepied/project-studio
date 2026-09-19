@@ -130,7 +130,19 @@ function kindOf(record: PendingApprovalRecord): 'command' | 'path' | 'capability
   return 'capability'
 }
 
-function sentenceFor(record: PendingApprovalRecord): readonly QuestionTextPart[] {
+/**
+ * Where a path inside the workspace is said to be.
+ *
+ * The working directory of a project conversation is the person's own
+ * folder, and calling that "this conversation's workspace" paints it as
+ * Studio's scratch space when it is their code. With no project the phrase
+ * is exactly right: the directory is one Studio made for the conversation.
+ */
+function insideWorkspace(hasProject: boolean): string {
+  return hasProject ? ' in this project.' : " in this conversation's workspace."
+}
+
+function sentenceFor(record: PendingApprovalRecord, hasProject: boolean): readonly QuestionTextPart[] {
   const kind = kindOf(record)
   const resource = record.resource
 
@@ -158,7 +170,7 @@ function sentenceFor(record: PendingApprovalRecord): readonly QuestionTextPart[]
     return [
       { kind: 'text', text: `${verb} ` },
       { kind: 'code', text: pathTarget(resource, folder) },
-      { kind: 'text', text: " in this conversation's workspace." },
+      { kind: 'text', text: insideWorkspace(hasProject) },
     ]
   }
 
@@ -192,11 +204,14 @@ function sentenceFor(record: PendingApprovalRecord): readonly QuestionTextPart[]
 }
 
 /** The wire row becomes the question the prompt renders. */
-export function questionFromRecord(record: PendingApprovalRecord): PermissionQuestion {
+export function questionFromRecord(
+  record: PendingApprovalRecord,
+  options: { readonly hasProject?: boolean } = {},
+): PermissionQuestion {
   return {
     id: record.id,
     createdAt: record.createdAt,
-    sentence: sentenceFor(record),
+    sentence: sentenceFor(record, options.hasProject ?? false),
     reason: record.source === 'policy' ? record.reason : null,
     lastingScopeId:
       record.scopes.find((scope) => scope.id === 'this-folder')?.id ?? null,

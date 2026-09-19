@@ -48,6 +48,14 @@ describe('the question sentence', () => {
     )
   })
 
+  it("says in this project for a project conversation, not the conversation's workspace", () => {
+    // The working directory of a project conversation is the person's own
+    // folder; naming it as the conversation's paints it as scratch space.
+    expect(flat(questionFromRecord(record(), { hasProject: true }))).toBe(
+      'Write [index.html] in this project.',
+    )
+  })
+
   it('says where in the workspace the file is, not only its name', () => {
     // Two files called index.html in one project produce two questions that
     // read identically if only the name is shown, and a consent prompt that
