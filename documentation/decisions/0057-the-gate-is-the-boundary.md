@@ -182,12 +182,20 @@ This is the mechanism behind the next thing the product needs: a conversation
 that says "download that model into Downloads" should get a one-line question
 naming the folder, not a refusal. The rework is what makes that a small change.
 
-### A project-less conversation gets one folder
+### A project-less conversation gets one tree and no identity
 
-A conversation with no project runs in one scratch folder under the
-conversations directory. No per-conversation identity, no grants, no sharing
-rules between "workspace" and "conversation". A project conversation runs in
-the project folder. Writing anywhere else is the scope question above.
+A conversation with no project stands in its own `workspace/` under the
+conversations directory, with the `scratch/`, `attachments/` and `artifacts/`
+siblings every conversation gets, and nothing else: no container identity
+minted or shared for it (the `profileAnchor` that anchored one to the
+conversations directory goes with the container), and no grants written on
+its behalf beyond the machine-wide scope rows it reads. A project
+conversation stands in the project folder with the same three siblings.
+Writing anywhere else is the scope question above. An earlier draft of this
+section said "one folder"; the pair of `workspace/` and `scratch/` is kept
+because it is what lets the model be told the same rule in both kinds of
+conversation - the work goes in the workspace, everything else beside it -
+and it never depended on the container.
 
 ### The seam stays
 

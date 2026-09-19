@@ -56,7 +56,6 @@ import {
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
-  conversationsDirectory,
   conversationScratchDirectory,
   conversationWorkspaceDirectory,
   ensureDirectory,
@@ -64,7 +63,6 @@ import {
 import { SandboxError } from "../sandbox/errors.js";
 import { LocalSandbox } from "../sandbox/local-sandbox.js";
 import { createSandboxPolicy, gitConfigRoots } from "../sandbox/policy.js";
-import { isInsideRoot } from "../sandbox/paths.js";
 import { projectKey } from "../snapshots/shadow-repo.js";
 import { SnapshotStore } from "../snapshots/store.js";
 import { TurnSnapshots } from "../snapshots/turn.js";
@@ -1467,21 +1465,6 @@ export class StudioRuntime implements AgentHost {
     // explain, which is why neither joins the write roots below.
     const attachmentsRoot = conversationAttachmentsDirectory(options.conversationId);
     const artifactsRoot = conversationArtifactsDirectory(options.conversationId);
-    // The container identity for a conversation whose own root is not stable.
-    // A conversation standing in the app's conversations tree used to mint its
-    // profile from that tree, and the tree is the conversation: every fresh
-    // conversation meant a fresh SID, and a fresh SID meant re-granting every
-    // scope root the person had opened — the full inheritance walk, again,
-    // measured at about a hundred seconds of the harness unable to stream a
-    // byte, paid on the first command of every new conversation. Anchoring the
-    // profile to the conversations directory makes the walk once per install,
-    // and the anchor is only taken when the workspace is actually one of
-    // these — a project conversation keeps its own per-project identity, so
-    // its project-scoped grants never ride a SID a project-less conversation
-    // could hold.
-    const profileAnchor = isInsideRoot(conversationsDirectory(), projectRoot)
-      ? conversationsDirectory()
-      : undefined;
     const policy = createSandboxPolicy({
       workspaceRoot: projectRoot,
       // The scratch root is readable as well as writable, and not only for
@@ -1502,7 +1485,6 @@ export class StudioRuntime implements AgentHost {
         ...roots.writeRoots,
       ]),
       ...(trusted ? { trusted: true } : {}),
-      ...(profileAnchor === undefined ? {} : { profileAnchor }),
       // PATH is the one grant a command line needs beyond the workspace: a
       // shell's job is finding programs, and with the policy environment
       // empty its children inherited nothing and could resolve no tool at
