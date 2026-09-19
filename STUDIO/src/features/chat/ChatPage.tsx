@@ -569,6 +569,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                   questions={approvals.questions}
                   answeringId={approvals.answeringId}
                   onAnswer={approvals.answer}
+                  hasProject={conversation.projectId !== null}
                 />
               </div>
             ) : null}
