@@ -37,7 +37,15 @@ const MAX_TIMEOUT_MS = 3_600_000;
 const MAX_QUESTIONS = 4;
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 4;
-const MAX_HEADER_LENGTH = 12;
+/**
+ * Where a long header is cut. A header is the chip's label and the card's
+ * title - one or two words - and the transcript truncates it with an
+ * ellipsis anyway. It used to be refused past twelve characters, and a
+ * refusal cost the run two round trips to learn that "File or folder?" is
+ * three too many. Now it is shortened here instead, at a word boundary when
+ * one is near, and the run carries on.
+ */
+const MAX_HEADER_LENGTH = 24;
 
 export const ASK_USER_QUESTION_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "ask_user_question" },
@@ -229,6 +237,19 @@ export function createAskUserQuestionTool(
   });
 }
 
+/**
+ * A header cut to fit, at the last space before the limit when there is one
+ * past the halfway mark, and mid-word with an ellipsis otherwise. Never
+ * refuses: a header is a label, and a label too long is a label to shorten.
+ */
+export function shortenHeader(header: string): string {
+  if (header.length <= MAX_HEADER_LENGTH) return header;
+  const room = MAX_HEADER_LENGTH - 1;
+  const cut = header.lastIndexOf(" ", room);
+  const kept = cut > room / 2 ? header.slice(0, cut) : header.slice(0, room);
+  return `${kept.replace(/[\s,;:.!?-]+$/, "")}…`;
+}
+
 function parseQuestion(raw: unknown): {
   readonly question: string;
   readonly header: string;
@@ -250,17 +271,13 @@ function parseQuestion(raw: unknown): {
     });
   }
 
-  const header = value["header"];
-  if (typeof header !== "string" || header.trim() === "") {
+  const rawHeader = value["header"];
+  if (typeof rawHeader !== "string" || rawHeader.trim() === "") {
     throw new ToolError("invalid_input", {
-      message: "Each question needs a short header, at most twelve characters.",
+      message: "Each question needs a short header: one or two words.",
     });
   }
-  if (header.length > MAX_HEADER_LENGTH) {
-    throw new ToolError("invalid_input", {
-      message: `The header "${header}" is longer than ${MAX_HEADER_LENGTH} characters.`,
-    });
-  }
+  const header = shortenHeader(rawHeader.trim());
 
   const rawOptions = value["options"];
   if (!Array.isArray(rawOptions) || rawOptions.length < MIN_OPTIONS) {

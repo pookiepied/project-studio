@@ -16,6 +16,7 @@ import {
   ASK_USER_QUESTION_DESCRIPTOR,
   clampTimeout,
   createAskUserQuestionTool,
+  shortenHeader,
 } from "../../src/tools/ask/questions.js";
 import { CallGate } from "../../src/tools/gate.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -443,18 +444,32 @@ describe("the ask tool's inputs", () => {
     ).toThrow(/between 2 and 4 options/);
   });
 
-  it("refuses a header longer than twelve characters", () => {
-    expect(() =>
-      definition.parse({
-        questions: [
-          {
-            question: "Which?",
-            header: "A thirteen char",
-            options: VALID_INPUT.questions[0]?.options,
-          },
-        ],
-      }),
-    ).toThrow(/longer than 12 characters/);
+  it("keeps a header of a few words as written", () => {
+    // "File or folder?" used to be refused at twelve characters, and the
+    // refusal cost two round trips. A short header is one the chip can show.
+    const parsed = definition.parse({
+      questions: [
+        { question: "Which?", header: "File or folder?", options: VALID_INPUT.questions[0]?.options },
+      ],
+    });
+    expect(parsed.questions[0]?.header).toBe("File or folder?");
+  });
+
+  it("shortens a long header instead of refusing it", () => {
+    const parsed = definition.parse({
+      questions: [
+        {
+          question: "Which?",
+          header: "Which database engine should the service use",
+          options: VALID_INPUT.questions[0]?.options,
+        },
+      ],
+    });
+    const header = parsed.questions[0]?.header ?? "";
+    expect(header.length).toBeLessThanOrEqual(24);
+    expect(header).toBe("Which database engine…");
+    // One long word is cut inside the word rather than dropped whole.
+    expect(shortenHeader("Supercalifragilisticexpialidocious")).toBe("Supercalifragilisticexp…");
   });
 
   it("refuses a recommendation that names no offered option", () => {
