@@ -579,21 +579,23 @@ function ModelPanel({
           <MenuItem
             icon={<Icons.compaction />}
             disabled={compaction.compacting || running || !compaction.readiness.available}
-            hint={
-              compaction.compacting
-                ? undefined
-                : running
-                  ? 'Finish or stop the run first'
-                  : compaction.readiness.available
-                    ? undefined
-                    : compaction.readiness.reason
-            }
             onSelect={compaction.onCompact}
           >
             {compaction.compacting ? 'Compacting…' : 'Compact now'}
           </MenuItem>
+          {/* The reason under the row, not as its hint: a sentence beside
+              the label pushed the label out of a menu this narrow. */}
+          {compaction.compacting ? null : running ? (
+            <p className="px-2 pb-1 pl-8 text-micro text-muted-foreground/80">
+              Finish or stop the run first.
+            </p>
+          ) : compaction.readiness.available ? null : (
+            <p className="px-2 pb-1 pl-8 text-micro text-muted-foreground/80">
+              {compaction.readiness.reason}
+            </p>
+          )}
           {compaction.error !== null ? (
-            <p role="alert" className="px-2 pb-1 text-micro text-danger">
+            <p role="alert" className="px-2 pb-1 pl-8 text-micro text-danger">
               {compaction.error}
             </p>
           ) : null}
