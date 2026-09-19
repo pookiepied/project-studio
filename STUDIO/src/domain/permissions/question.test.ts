@@ -61,6 +61,31 @@ describe('the question sentence', () => {
     ).toBe("Write [src/index.html] in this conversation's workspace.")
   })
 
+  it('names the folder when the path is outside the workspace', () => {
+    // A folder the model asked for and the person granted (ADR 0057). The
+    // kernel offers the project rung anyway, so the workspace root is known,
+    // and the path is not under it: the sentence must not call it the
+    // conversation's workspace.
+    expect(
+      flat(
+        questionFromRecord(
+          record({
+            resource: 'C:\\Users\\me\\Downloads\\model.bin',
+            scopes: [
+              { id: 'this-file', label: 'Just this file', detail: 'model.bin', pattern: null },
+              {
+                id: 'this-project',
+                label: 'This project',
+                detail: 'Everything in workspace',
+                pattern: 'C:/home/conversations/cnv_1/workspace/**',
+              },
+            ],
+          }),
+        ),
+      ),
+    ).toBe('Write [model.bin] in [C:\\Users\\me\\Downloads].')
+  })
+
   it('falls back to the file name when the kernel offered no folder rule', () => {
     expect(
       flat(
