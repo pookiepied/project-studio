@@ -50,6 +50,14 @@ export const TITLE_AGENT_ID = "title";
 export const IMPROVE_AGENT_ID = "improve";
 
 /**
+ * The image-describing agent of the library, kept off the HTTP surface the
+ * same way. Its module is `agents/describe.ts`; its only caller is
+ * `library/describer.ts`, in process, through `dispatch()`. Its stream
+ * prefix is `agents/describe/<take id>`.
+ */
+export const DESCRIBE_AGENT_ID = "describe";
+
+/**
  * The turn settings a submission may carry beside its message.
  *
  * A submission body cannot carry these through to the run: Flue parses every

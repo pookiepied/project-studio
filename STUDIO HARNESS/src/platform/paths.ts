@@ -194,6 +194,20 @@ export function userCommandsDirectory(): string {
   return studioPath("commands");
 }
 
+/**
+ * The library: files the person chose to keep beyond one conversation.
+ *
+ * Under `data/` beside `conversations/`, so the backup enumerates it with
+ * the rest of what the person owns. Flat, one file per record id: a
+ * re-tagged item never moves, two uploads called `photo.png` never collide,
+ * and a new kind of file needs no new folder rule. Read by every
+ * conversation's sandbox, written only by the harness - the same doctrine
+ * as a conversation's `attachments/`.
+ */
+export function libraryDirectory(): string {
+  return studioPath("data", "library");
+}
+
 /** Per-project state the application owns, keyed by project id. */
 export function projectsDirectory(): string {
   return studioPath("data", "projects");

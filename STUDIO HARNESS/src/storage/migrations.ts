@@ -1189,6 +1189,37 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 28,
+    name: "library_items",
+    up(db) {
+      // The library: files the person chose to keep beyond one conversation
+      // (`documentation/work/library-brief.md`). The bytes live under
+      // `data/library/<id>.<ext>`; this row is what says what the file is.
+      // `subject` is the person's own answer to "who or what is this" and
+      // is never written by a model; `tags` is a JSON array of words.
+      // `source_conversation_id` is where the file came from, kept as a
+      // plain column rather than a foreign key so purging the conversation
+      // does not take the item with it - keeping it was the point.
+      db.exec(`
+        CREATE TABLE library_item (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          mime_type TEXT NOT NULL,
+          byte_length INTEGER NOT NULL,
+          title TEXT NOT NULL DEFAULT '',
+          description TEXT NOT NULL DEFAULT '',
+          subject TEXT NOT NULL DEFAULT '',
+          tags TEXT NOT NULL DEFAULT '[]',
+          source_conversation_id TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX library_item_created ON library_item(created_at DESC);
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

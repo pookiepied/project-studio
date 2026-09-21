@@ -45,6 +45,8 @@ import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
 import { Studio } from "./agents/studio.js";
 import { compactConversation, compactionReadiness } from "./conversations/compaction.js";
 import { CommandRegistry } from "./extend/commands/registry.js";
+import { ImageDescriber } from "./library/describer.js";
+import { LibraryStore } from "./library/store.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
 import { ConnectionStore } from "./gateway/connections/connection-store.js";
@@ -200,6 +202,11 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     const isolation = new IsolationSettingsStore(database);
     isolation.apply();
     const mediaAdapters = builtinMediaAdapters();
+    // The library: one store, shared by the HTTP surface (the Settings page
+    // and the composer's "Keep") and by the runtime (the search tool and
+    // the read root every conversation gets). Built here because the
+    // runtime needs it before the routes do.
+    const library = new LibraryStore(database);
     const runtime = new StudioRuntime({
       database,
       logger: observability.logger,
@@ -210,6 +217,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       sessionId: admission.context.sessionId,
       mediaJobs,
       mediaAdapters,
+      library,
       // The finished-job ping's one Flue seam: when a background job ends, its
       // news is dispatched to the conversation's own agent instance as a
       // signal - a delivery, not a turn-settings-carrying prompt, so it needs
@@ -321,6 +329,8 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // The dictation improver: one request, one reply, on the same bus. It
     // subscribes on its first request and is stopped in the drain below.
     const improver = new TextImprover();
+    // The library's describer: the same one-request-one-reply shape.
+    const describer = new ImageDescriber();
     // The measured context, from the same process-global bus and for the same
     // reason it is subscribed here rather than deeper: a run's own usage is
     // reported to the observer, not to the transcript, and the webview cannot
@@ -336,6 +346,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         try {
           titling.stop();
           improver.stop();
+          describer.stop();
           contextUsage.stop();
           // Nothing of ours keeps polling a vendor once Studio has closed;
           // a job with a cancel endpoint is told.
@@ -356,6 +367,8 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       servers: runtime.servers,
       skills: runtime.skills,
       commands: new CommandRegistry(),
+      library,
+      describer,
       // Awaited before the run renders. `start()` memoises, so this costs one
       // wait on the first submission after a harness starts and nothing at
       // all afterwards - and it is what lets a capability Studio ships be

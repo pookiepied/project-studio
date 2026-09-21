@@ -34,7 +34,7 @@ import {
   SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
-  Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical,
+  Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -194,6 +194,9 @@ const REGISTRY = {
   // transcript folding to its summary. Plain enough to sit in a transcript
   // row at caption size.
   compaction: { mark: FoldVertical },
+  // "Keep in the library": a bookmark with a plus, on a thumbnail and on
+  // a generated picture, for the one act the library begins with.
+  keep: { mark: BookmarkPlus },
 
   // — Message actions -----------------------------------------------------
   copy: { mark: Copy },

@@ -40,6 +40,8 @@ const MAX_LINE_LENGTH = 2_000;
 
 /** 1 MiB. A larger file is a data file, and belongs to a search, not a read. */
 const MAX_TEXT_BYTES = 1024 * 1024;
+/** The largest PDF read as text; past this the pages are the person's to pick. */
+const MAX_PDF_BYTES = 40 * 1024 * 1024;
 
 /** Every limit a picture is held to lives in `image-budget.ts`. */
 
@@ -148,7 +150,8 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
     "larger than 1 MB is refused - search it instead. " +
     `Images (PNG, JPEG, GIF, WebP) come back as attachments when the model ` +
     `accepts image input, up to ${Math.round(MAX_IMAGE_BYTES / 1_000_000)} MB each and ` +
-    `${MAX_IMAGES_PER_CONVERSATION} per conversation.`,
+    `${MAX_IMAGES_PER_CONVERSATION} per conversation. A PDF comes back as its text, ` +
+    "page after page, numbered and paged like any text file.",
   inputSchema: {
     type: "object",
     properties: {
@@ -489,19 +492,36 @@ export function createReadTool(
       const extension = extensionOf(input.path);
 
       if (extension === ".pdf") {
-        // Ahead of the size check, and for the same reason the size check is
-        // now behind the kind: a PDF is refused whatever it weighs, so a large
-        // one should hear why rather than be told to search a file nothing
-        // here can search. Nothing downstream can carry one - the agent loop
-        // forwards text and image blocks and nothing else, and Pi's catalog
-        // marks image input only, so there is no honest answer to "can this
-        // model read a PDF". A refusal that says so beats base64 dressed up as
-        // an image.
-        throw new ToolError("invalid_input", {
-          message:
-            "This file is a PDF, and PDFs cannot be shown to the model yet. " +
-            "Extract the text you need with a command instead.",
+        // A PDF is read as its text. Nothing downstream can carry the file
+        // itself - the agent loop forwards text and image blocks and nothing
+        // else - so the honest reading is the words the pages hold, numbered
+        // like any text file and paged the same way. A scanned PDF has no
+        // words to give and says so, rather than returning an empty page
+        // that reads as "the document is blank". Ahead of the size check,
+        // because the text limit was written for source files and a PDF's
+        // bytes are mostly not its text.
+        if (stat.size > MAX_PDF_BYTES) {
+          throw new ToolError("invalid_input", {
+            message:
+              `This PDF is ${Math.round(stat.size / (1024 * 1024))} MB, which is larger than ` +
+              "can be read here. Extract the pages you need with a command instead.",
+          });
+        }
+        const bytes = await readFile(absolute);
+        const text = await pdfText(bytes);
+        log.record(context.scope, absolute, {
+          modifiedAt: stat.modifiedAt,
+          size: stat.size,
+          contentHash: hashContent(bytes),
         });
+        if (text.trim() === "") {
+          throw new ToolError("invalid_input", {
+            message:
+              "This PDF holds no extractable text - it is probably scanned pages. " +
+              "Nothing here can read it as an image yet.",
+          });
+        }
+        return formatNumbered(text, input.offset, input.limit);
       }
 
       // The kind is decided from the bytes first and the name second. Reading
@@ -643,4 +663,22 @@ function extensionOf(path: string): string {
   const base = path.replace(/\\/g, "/").split("/").at(-1) ?? "";
   const dot = base.lastIndexOf(".");
   return dot <= 0 ? "" : base.slice(dot).toLowerCase();
+}
+
+/**
+ * The text of a PDF, page after page, each page ending in a blank line.
+ *
+ * `unpdf` is loaded on the first PDF and not before: it brings pdf.js with
+ * it, and a harness that never meets a PDF should not pay for one at boot.
+ * An unreadable file - encrypted, truncated, not a PDF despite its name -
+ * reads as empty, and the caller's "no extractable text" sentence covers it.
+ */
+async function pdfText(bytes: Uint8Array): Promise<string> {
+  try {
+    const { extractText } = await import("unpdf");
+    const { text } = await extractText(new Uint8Array(bytes), { mergePages: false });
+    return (Array.isArray(text) ? text : [text]).map((page) => page.trim()).join("\n\n");
+  } catch {
+    return "";
+  }
 }

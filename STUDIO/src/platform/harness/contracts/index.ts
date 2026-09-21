@@ -172,6 +172,19 @@ export {
 } from './commands'
 
 export {
+  LIBRARY_KINDS,
+  type LibraryKind,
+  type LibraryItem,
+  type LibraryListing,
+  type LibraryFacts,
+  type LibraryDescription,
+  parseLibraryItem,
+  parseLibraryListing,
+  parseLibraryItemEnvelope,
+  parseLibraryDescription,
+} from './library'
+
+export {
   type SandboxLevel,
   type SandboxScopeMode,
   type SandboxScopeSource,

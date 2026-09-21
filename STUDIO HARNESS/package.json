@@ -38,6 +38,7 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "hono": "^4.12.31",
     "playwright-core": "^1.63.0",
+    "unpdf": "^1.8.1",
     "valibot": "^1.1.0"
   },
   "devDependencies": {

@@ -18,9 +18,16 @@ import type { TurnImageWire } from '@/platform/harness'
 export function PendingImages({
   images,
   onRemove,
+  onKeep,
 }: {
   images: readonly TurnImageWire[]
   onRemove: (index: number) => void
+  /**
+   * "Keep in the library": the offer the brief asks for on every upload -
+   * a control on the thumbnail, not a question in the way of sending. The
+   * picture rides on the message whether or not it is kept.
+   */
+  onKeep?: (index: number) => void
 }) {
   if (images.length === 0) return null
   return (
@@ -36,6 +43,17 @@ export function PendingImages({
             className="size-16 rounded-md object-cover ring-1 ring-border"
             draggable={false}
           />
+          {onKeep !== undefined ? (
+            <button
+              type="button"
+              aria-label={`Keep ${image.filename ?? 'image'} in the library`}
+              title="Keep in the library"
+              onClick={() => onKeep(index)}
+              className="absolute -left-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border bg-surface-raised text-muted-foreground shadow-raised transition-colors duration-fast hover:bg-tint hover:text-foreground"
+            >
+              <Icons.keep size="sm" />
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label={`Remove ${image.filename ?? 'image'}`}
