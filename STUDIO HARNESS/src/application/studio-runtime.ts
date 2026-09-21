@@ -82,6 +82,7 @@ import { CapabilityResolver } from "../gateway/connections/capability-defaults.j
 import { ConnectionStore } from "../gateway/connections/connection-store.js";
 import { ModelCatalog } from "../gateway/connections/model-catalog.js";
 import { mediaFinishedNotice, mediaJobLines } from "../tools/media/index.js";
+import type { LibraryStore } from "../library/store.js";
 import { ConversationStore } from "../conversations/store.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
 
@@ -125,6 +126,12 @@ export interface StudioRuntimeOptions {
    */
   readonly mediaJobs?: MediaJobs;
   readonly mediaAdapters?: MediaAdapters;
+  /**
+   * The library, when this harness has one. Its folder joins every
+   * conversation's read roots and its tools join the native set, so a
+   * kept file can be found and then read or edited in any conversation.
+   */
+  readonly library?: LibraryStore;
   /**
    * Where a finished job's news goes: one conversation, one message.
    *
@@ -447,6 +454,14 @@ export interface AgentHost {
    */
   conversationExtraRoots?(conversationId: string): readonly string[];
   /**
+   * Where the library keeps its files, when this harness has one. Named in
+   * the environment block beside the conversation's own folders, because
+   * a root granted but never named is a call spent discovering it.
+   * Optional so a test double that predates the library still satisfies
+   * the host.
+   */
+  libraryDirectory?(): string | undefined;
+  /**
    * The folders of the project one conversation is filed under, in the order
    * the person arranged them, and empty when the conversation has no project
    * or the project has none.
@@ -659,6 +674,7 @@ export class StudioRuntime implements AgentHost {
    * exactly when `#media` is - the one option decides both.
    */
   readonly #mediaJobs: MediaJobs | undefined;
+  readonly #library: LibraryStore | undefined;
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -674,6 +690,7 @@ export class StudioRuntime implements AgentHost {
 
     this.#db = options.database;
     this.#mediaJobs = options.mediaJobs;
+    this.#library = options.library;
     this.#media =
       options.mediaJobs === undefined
         ? undefined
@@ -929,6 +946,10 @@ export class StudioRuntime implements AgentHost {
   #conversationProject(conversationId: string): string | undefined {
     const record = this.#conversations.get(conversationId);
     return record?.projectId ?? undefined;
+  }
+
+  libraryDirectory(): string | undefined {
+    return this.#library?.directory;
   }
 
   conversationExtraRoots(conversationId: string): readonly string[] {
@@ -1503,6 +1524,10 @@ export class StudioRuntime implements AgentHost {
         scratchRoot,
         attachmentsRoot,
         artifactsRoot,
+        // The library, readable by every conversation and written by none:
+        // a kept file is found by its tool and then read or edited by its
+        // path, and the harness alone files anything there.
+        ...(this.#library === undefined ? [] : [this.#library.directory]),
         ...otherFolders,
         ...roots.readRoots,
       ]),
@@ -1639,6 +1664,7 @@ export class StudioRuntime implements AgentHost {
       // conversation's background work, one tool. Present exactly when the
       // generation tools are, since both come from the one mediaJobs option.
       ...(this.#mediaJobs === undefined ? {} : { mediaJobs: this.#mediaJobs }),
+      ...(this.#library === undefined ? {} : { library: this.#library }),
       ...(this.#media === undefined
         ? {}
         : {

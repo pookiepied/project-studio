@@ -217,6 +217,9 @@ export function Studio({ id }: AgentProps) {
       // would ever turn up in a glob of its own.
       conversationAttachmentsDirectory(id),
       conversationArtifactsDirectory(id),
+      // The library, when this harness has one: the folder that outlives
+      // conversations, named so the model asks its tool instead of globbing.
+      runtime.libraryDirectory?.(),
     ),
   )}${capabilities}`;
 }

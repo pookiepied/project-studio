@@ -12,6 +12,8 @@ import {
 } from '@/domain/attachments/images'
 import { AddMenu } from '@/features/chat/composer/AddMenu'
 import { PendingImages } from '@/features/chat/composer/PendingImages'
+import { KeepDialog } from '@/features/library/KeepDialog'
+import type { KeepCandidate } from '@/features/library/client'
 import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
@@ -173,6 +175,9 @@ export function Composer({
    * during the round trip belong to the next message.
    */
   const [images, setImages] = useState<readonly TurnImageWire[]>([])
+  // The picture being offered to the library, while its dialog is open.
+  // Keeping does not touch the message: the strip still carries the image.
+  const [keeping, setKeeping] = useState<KeepCandidate | null>(null)
   const imagesRef = useRef<readonly TurnImageWire[]>([])
   imagesRef.current = images
   /** Pick-time rejections, held until the next pick or a successful send. */
@@ -511,7 +516,26 @@ export function Composer({
           message, in the message's frame. The rejections under them are the
           pick's honest remainder — a file the rules refused, named where the
           person can still do something about it. */}
-      <PendingImages images={images} onRemove={removeImage} />
+      <PendingImages
+        images={images}
+        onRemove={removeImage}
+        onKeep={(index) => {
+          const image = images[index]
+          if (image === undefined) return
+          setKeeping({
+            fileName: image.filename ?? 'image.png',
+            mimeType: image.mimeType,
+            data: image.data,
+            sourceConversationId: conversationId,
+          })
+        }}
+      />
+      <KeepDialog
+        open={keeping !== null}
+        candidate={keeping}
+        editing={null}
+        onClose={() => setKeeping(null)}
+      />
       {/* The slash picker, while a name is being typed. */}
       {slash.suggestions !== null ? (
         <SlashSuggestions

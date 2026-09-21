@@ -4,7 +4,7 @@ import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
 import { MediaLightbox } from '@/features/artifacts/media/MediaLightbox'
 import { MediaGrid } from '@/features/artifacts/media/MediaGrid'
 import { Timeline } from '@/features/artifacts/sections'
-import { mediaOf } from '@/domain/artifacts/media'
+import { mediaOf, type MediaOutput } from '@/domain/artifacts/media'
 import { isWorking, type Artifact } from '@/domain/artifacts/types'
 import { cn } from '@/lib/cn'
 
@@ -32,7 +32,19 @@ import { cn } from '@/lib/cn'
  * failed register — the frames stay out of it, because a box saying
  * "failed" under a line saying why is the same fact drawn twice.
  */
-export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: boolean }) {
+export function MediaArtifact({
+  artifact,
+  video,
+  onKeep,
+}: {
+  artifact: Artifact
+  video: boolean
+  /**
+   * "Keep in the library", offered under a finished picture when the
+   * caller can file it: the transcript's card can, a gallery cannot.
+   */
+  onKeep?: (output: MediaOutput, index: number) => void
+}) {
   const media = mediaOf(artifact.data)
   const working = isWorking(artifact.status)
   const failed = artifact.status === 'failed'
@@ -88,6 +100,22 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
         caption={media.prompt}
         video={video}
       />
+
+      {onKeep !== undefined && !video && !working && media.outputs.length > 0 ? (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {media.outputs.map((output, index) => (
+            <button
+              key={output.path ?? output.url ?? String(index)}
+              type="button"
+              onClick={() => onKeep(output, index)}
+              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-caption text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
+            >
+              <Icons.keep size="sm" />
+              {media.outputs.length > 1 ? `Keep ${String(index + 1)} in the library` : 'Keep in the library'}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {media.prompt ? <Prompt text={media.prompt} /> : null}
 

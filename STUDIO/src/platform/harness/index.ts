@@ -10,6 +10,9 @@
 
 export {
   createHarnessClient,
+  libraryBytesPath,
+  type LibraryQuery,
+  type LibraryAddition,
   type HarnessClient,
   type HarnessFailure,
   type HarnessResult,
@@ -71,6 +74,12 @@ export {
   type CommandDetail,
   type CommandProvenance,
   type CommandKind,
+  LIBRARY_KINDS,
+  type LibraryKind,
+  type LibraryItem,
+  type LibraryListing,
+  type LibraryFacts,
+  type LibraryDescription,
   parseSandboxScopeInfo,
   parseSandboxScopeRow,
   type ApprovalAnswer,

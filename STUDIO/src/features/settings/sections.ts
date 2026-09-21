@@ -65,6 +65,9 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     name: 'Account',
     sections: [
       { id: 'account', name: 'Account', icon: Icons.account },
+      // The library sits with the person, not the agent: it is what they
+      // keep, and every conversation reads it.
+      { id: 'library', name: 'Library', icon: Icons.library },
       { id: 'personalization', name: 'Personalization', icon: Icons.personalization },
     ],
   },

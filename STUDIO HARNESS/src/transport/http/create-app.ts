@@ -10,6 +10,9 @@ import type { McpAdministration } from "../../application/mcp-management.js";
 import type { SkillAdministration } from "../../application/skill-management.js";
 import { createSkillRoutes } from "./routes/skills.js";
 import { createCommandRoutes } from "./routes/commands.js";
+import { createLibraryRoutes } from "./routes/library.js";
+import type { LibraryStore } from "../../library/store.js";
+import type { ImageDescriberPort } from "../../library/describer.js";
 import type { CommandRegistry } from "../../extend/commands/registry.js";
 import type { ProviderAdministration } from "../../gateway/connections/management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
@@ -50,6 +53,13 @@ export interface CreateHttpAppOptions {
    * it, because a composition without it has a slash that knows nothing.
    */
   readonly commands?: CommandRegistry;
+  /**
+   * The library - the files the person keeps beyond one conversation - and
+   * the describer that proposes a picture's label. Optional for tests; a
+   * composition without them has no library page.
+   */
+  readonly library?: LibraryStore;
+  readonly describer?: ImageDescriberPort;
   /**
    * Re-asks a conversation's capability note, called by the turn-settings
    * middleware between submissions. A port of the same shape as `servers`:
@@ -196,6 +206,12 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/skills", createSkillRoutes(options.skills));
   if (options.commands !== undefined) {
     app.route("/api/commands", createCommandRoutes(options.commands));
+  }
+  if (options.library !== undefined) {
+    app.route(
+      "/api/library",
+      createLibraryRoutes(options.library, options.describer === undefined ? {} : { describer: options.describer }),
+    );
   }
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));

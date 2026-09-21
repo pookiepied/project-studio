@@ -18,6 +18,8 @@ import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
 import { registerWebTools } from "../web/index.js";
 import { registerMediaTools, type MediaToolRegistration } from "../media/index.js";
+import { registerLibraryTools } from "../library/index.js";
+import type { LibraryStore } from "../../library/store.js";
 
 export interface NativeToolRegistrationOptions {
   readonly database: StudioDatabase;
@@ -64,6 +66,12 @@ export interface NativeToolRegistrationOptions {
   readonly mediaJobs?: MediaJobs;
   /** The generation tools; absent in a harness built without media. */
   readonly media?: MediaToolRegistration;
+  /**
+   * The library, for the search and keep tools. Optional because a harness
+   * built without one (a test composition) has nothing to search; the
+   * environment block names the tool only when the store is composed.
+   */
+  readonly library?: LibraryStore;
   /**
    * The read history the filesystem family enforces read-before-modify with.
    *
@@ -135,6 +143,9 @@ export function registerNativeTools(
   }
   if (options.plan !== undefined) {
     registerPlanTools(gate, options.plan);
+  }
+  if (options.library !== undefined) {
+    registerLibraryTools(gate, options.library);
   }
   if (options.media !== undefined) {
     registerMediaTools(gate, options.media);

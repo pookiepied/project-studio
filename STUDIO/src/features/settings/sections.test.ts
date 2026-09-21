@@ -17,7 +17,7 @@ describe('the settings taxonomy', () => {
     )
 
     expect(members.get('application')).toEqual(['general', 'appearance', 'devices', 'shortcuts'])
-    expect(members.get('account')).toEqual(['account', 'personalization'])
+    expect(members.get('account')).toEqual(['account', 'library', 'personalization'])
     expect(members.get('providers')).toEqual(['models', 'media', 'tools'])
     expect(members.get('extensions')).toEqual(['mcp', 'connectors', 'browser-use'])
     expect(members.get('agent')).toEqual(['skills', 'commands', 'hooks'])

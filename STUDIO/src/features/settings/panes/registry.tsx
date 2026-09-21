@@ -20,6 +20,7 @@ const CommandsPane = lazyNamed(
   () => import('@/features/settings/commands/CommandsPane'),
   'CommandsPane',
 )
+const LibraryPane = lazyNamed(() => import('@/features/settings/library/LibraryPane'), 'LibraryPane')
 const EnvironmentsPane = lazyNamed(
   () => import('@/features/settings/environments/EnvironmentsPane'),
   'EnvironmentsPane',
@@ -51,6 +52,7 @@ const BUILT: Readonly<Record<string, () => ReactNode>> = {
   mcp: deferred('MCP servers', <McpPane />),
   skills: deferred('Skills', <SkillsPane />),
   commands: deferred('Commands', <CommandsPane />),
+  library: deferred('Library', <LibraryPane />),
   environments: deferred('Environments', <EnvironmentsPane />),
   devices: deferred('Other devices', <DevicesPane />),
 }

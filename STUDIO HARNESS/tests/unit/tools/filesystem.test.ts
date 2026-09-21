@@ -177,12 +177,12 @@ describe("read", () => {
     await expect(read({ path: "huge.png" })).rejects.not.toThrow(/search it instead/i);
   });
 
-  it("tells a large PDF what is actually wrong with it", async () => {
-    // A PDF is refused whatever it weighs, so the size rule answering first
-    // only replaced the real reason with an irrelevant one.
-    writeFileSync(join(workspace, "big.pdf"), Buffer.alloc(2 * 1024 * 1024));
+  it("reads a PDF as its text, and says when there is none", async () => {
+    // A file that is a PDF by name only has no pages to give: the answer is
+    // the scanned-pages sentence, not a blank numbered page.
+    writeFileSync(join(workspace, "blank.pdf"), Buffer.alloc(2 * 1024 * 1024));
 
-    await expect(read({ path: "big.pdf" })).rejects.toThrow(/PDFs cannot be shown/i);
+    await expect(read({ path: "blank.pdf" })).rejects.toThrow(/no extractable text/i);
   });
 
   it("refuses a path outside the workspace", async () => {

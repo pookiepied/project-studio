@@ -123,6 +123,12 @@ export interface EnvironmentFacts {
   readonly attachmentsDirectory?: string;
   readonly artifactsDirectory?: string;
   /**
+   * Where the library keeps the files the person chose to keep beyond one
+   * conversation, when this harness has one. A read root of every
+   * conversation; the note says how to find things in it.
+   */
+  readonly libraryDirectory?: string;
+  /**
    * The background commands this conversation has, as lines to render.
    *
    * Present only when there are any, and that condition is the whole design.
@@ -181,6 +187,7 @@ export function environmentFacts(
   backgroundJobs?: readonly string[],
   attachmentsDirectory?: string,
   artifactsDirectory?: string,
+  libraryDirectory?: string,
 ): EnvironmentFacts {
   return {
     workspace,
@@ -199,6 +206,7 @@ export function environmentFacts(
     ...(scratch === undefined || scratch === workspace ? {} : { scratch }),
     ...(attachmentsDirectory === undefined ? {} : { attachmentsDirectory }),
     ...(artifactsDirectory === undefined ? {} : { artifactsDirectory }),
+    ...(libraryDirectory === undefined ? {} : { libraryDirectory }),
     ...(backgroundJobs === undefined || backgroundJobs.length === 0
       ? {}
       : { backgroundJobs }),
@@ -522,6 +530,34 @@ function conversationFoldersStatement(facts: EnvironmentFacts): readonly string[
 }
 
 /**
+ * The library: the one folder that outlives conversations (ADR-less; see
+ * `documentation/work/library-brief.md`).
+ *
+ * Named after the conversation's own folders because it is the same kind of
+ * fact - a read root the tools reach - with one difference the model needs
+ * told: it is not this conversation's, so its contents are not found by a
+ * glob of the workspace but by the search tool, and what is found is a
+ * reference to work with, not only a picture to regenerate. The lines are
+ * conversation-stable and land in the cached prefix.
+ */
+function libraryStatement(facts: EnvironmentFacts): readonly string[] {
+  if (facts.libraryDirectory === undefined) return [];
+  return [
+    "The user also keeps a library: files they chose to keep beyond any one",
+    "conversation - their own photos, logos, documents, references - each",
+    "with a title, a subject in their own words (who or what it is), and",
+    "tags. It lives in",
+    `${facts.libraryDirectory},`,
+    "readable here and written only by Studio. Do not glob it; ask",
+    "library_search when the user refers to something of theirs, and read",
+    "what it returns: look at a picture and discuss it, work from a document,",
+    "or hand the path to studio_image when they want it edited. To keep a",
+    "file the user asks to keep, use library_keep.",
+    "",
+  ];
+}
+
+/**
  * What the file tools reach, and how to ask for more (ADR 0057).
  *
  * The gate is the boundary: the folders named above are what a read or a
@@ -576,6 +612,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
     "",
     ...workspaceStatement(facts),
     ...conversationFoldersStatement(facts),
+    ...libraryStatement(facts),
     ...projectFoldersStatement(facts),
     ...backgroundJobsStatement(facts),
     ...extraRootsStatement(facts.extraRoots),

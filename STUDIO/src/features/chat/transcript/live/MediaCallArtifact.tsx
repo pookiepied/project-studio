@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { KeepDialog } from '@/features/library/KeepDialog'
+import { base64OfDataUrl, type KeepCandidate } from '@/features/library/client'
+import { harnessBytesDataUrl } from '@/platform/harness'
 
 import { MediaArtifact } from '@/features/artifacts/kinds/MediaArtifact'
 import { useWorkspace } from '@/stores/workspace'
@@ -29,7 +32,34 @@ export function MediaCallArtifact({
   const job = useFollowedJob(conversationId, jobId)
   const recovered = useRecoveredOutputs(conversationId, jobId, job === 'unknown')
   const artifact = mediaCallArtifact(call, view, job, conversationId, recovered)
-  return <MediaArtifact artifact={artifact} video={view.kind === 'video'} />
+  const [keeping, setKeeping] = useState<KeepCandidate | null>(null)
+
+  // A generated picture is a harness path; the library takes bytes, so the
+  // same fetch the frame drew it with hands them over.
+  const keep = async (path: string, mimeType: string) => {
+    const url = await harnessBytesDataUrl(path, mimeType)
+    if (url === null) return
+    setKeeping({
+      fileName: path.slice(path.lastIndexOf('/') + 1),
+      mimeType,
+      data: base64OfDataUrl(url),
+      sourceConversationId: conversationId,
+    })
+  }
+
+  return (
+    <>
+      <MediaArtifact
+        artifact={artifact}
+        video={view.kind === 'video'}
+        onKeep={(output) => {
+          if (output.path === undefined) return
+          void keep(output.path, output.mimeType ?? 'image/png')
+        }}
+      />
+      <KeepDialog open={keeping !== null} candidate={keeping} editing={null} onClose={() => setKeeping(null)} />
+    </>
+  )
 }
 
 /** How often a running video job is asked after. */
