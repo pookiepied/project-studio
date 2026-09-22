@@ -103,6 +103,18 @@ describe('parseProviderConnection', () => {
     expect(several?.serves).toEqual({ language: 'openai-responses', media: 'openai' })
   })
 
+  it('accepts the Mistral media protocol the OCR slot added', () => {
+    // The harness gained this protocol with document reading. A provider list
+    // holding one Mistral connection is refused whole when the mirror lacks
+    // it, which took the providers page and the chat down together.
+    const ocr = parseProviderConnection({
+      ...LANGUAGE,
+      id: 'mistral',
+      serves: { language: 'mistral-conversations', media: 'mistral' },
+    })
+    expect(ocr?.serves).toEqual({ language: 'mistral-conversations', media: 'mistral' })
+  })
+
   it('refuses a protocol from the wrong kind, and a connection that serves nothing', () => {
     expect(parseProviderConnection({ ...LANGUAGE, serves: { language: 'brave' } })).toBeNull()
     expect(

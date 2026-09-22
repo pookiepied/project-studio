@@ -38,6 +38,7 @@ export const MEDIA_PROTOCOLS = [
   'deepgram',
   'fish-audio',
   'minimax',
+  'mistral',
 ] as const
 export type MediaProtocol = (typeof MEDIA_PROTOCOLS)[number]
 
