@@ -43,6 +43,11 @@ class ResizeObserverStub {
 }
 vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 
+// jsdom has no scrollIntoView either; the picker keeps its picked row in
+// view with one. A thrown one of these unmounts the whole tree under React
+// 19, which is why the composer renders empty without it.
+Element.prototype.scrollIntoView = () => undefined
+
 function renderComposer(
   onSend: (text: string, images: readonly TurnImageWire[]) => Promise<Receipt>,
   busy?: boolean,
@@ -345,5 +350,107 @@ describe('voice on an insecure origin', () => {
     expect(screen.getByRole('button', { name: 'Dictate' })).toBeTruthy()
     const voice = screen.getByRole('button', { name: 'Voice mode' })
     expect(voice.hasAttribute('disabled')).toBe(false)
+  })
+})
+
+/**
+ * The slash, end to end but for the socket. Nothing here mocks a module of
+ * ours: the address resolves through the same env vars the production read
+ * uses, the harness's own answer is served by a stubbed `fetch`, and
+ * everything between - the client, the requester, the contract, the picker
+ * and the send path - is the code the window runs. What is pinned is the
+ * experience: a slash offers the commands the moment it is typed, Enter
+ * completes the picked name, and what goes out is the harness's expansion,
+ * not the words. The listing below is what the harness answers, built-in
+ * first, its record carrying the hint as the empty string - which is what
+ * took the record, the listing, the picker and the settings pane down
+ * together before the contract learned to read it.
+ */
+describe('the slash, from the field', () => {
+  const LISTING = {
+    commands: [
+      {
+        id: 'compact',
+        description: 'Compact the conversation: fold the earlier turns into a summary',
+        argumentHint: '',
+        provenance: 'builtin',
+        kind: 'action',
+        path: null,
+      },
+      {
+        id: 'explain',
+        description: 'Explain a file, a function or a concept in plain words',
+        argumentHint: '<what to explain>',
+        provenance: 'system',
+        kind: 'prompt',
+        path: 'C:/studio/commands/explain.md',
+      },
+      {
+        id: 'review',
+        description: 'Review the changes on the current branch and report what needs fixing',
+        argumentHint: '[focus]',
+        provenance: 'system',
+        kind: 'prompt',
+        path: 'C:/studio/commands/review.md',
+      },
+    ],
+    problems: [],
+    userDirectory: 'C:/studio/commands',
+  }
+
+  afterEach(() => {
+    vi.stubEnv('VITE_HARNESS_BASE_URL', undefined)
+    vi.stubEnv('VITE_HARNESS_TOKEN', undefined)
+  })
+
+  it('offers the commands while the name is typed, completes the picked one, and sends its expansion', async () => {
+    vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
+    vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url =
+          input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
+        if (url.includes('/api/pairing/state')) return new Response(null, { status: 404 })
+        if (url.endsWith('/api/commands')) {
+          return new Response(JSON.stringify(LISTING), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+        if (/\/api\/commands\/[a-z0-9-]+\/expand$/.test(url)) {
+          return new Response(JSON.stringify({ text: 'Explain the projection layer in plain words, please.' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+        return new Response(null, { status: 404 })
+      }),
+    )
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    // One slash, the whole list: built-ins first, then the files by name.
+    type('/')
+    await waitFor(() => expect(screen.getByRole('listbox', { name: 'Commands' })).toBeTruthy())
+    expect(screen.getAllByRole('option')).toHaveLength(3)
+
+    // The name still being typed narrows the list to the one that matches.
+    type('/exp')
+    expect(screen.getByRole('option', { name: /explain/ })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: /compact/ })).toBeNull()
+
+    // Enter takes the picked row: the name completes, the hint's argument
+    // comes next, and the picker steps aside for the words. This command
+    // takes an argument, so the second Enter is the send - here the click.
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    expect(field()).toBe('/explain ')
+    expect(screen.queryByRole('listbox')).toBeNull()
+
+    type('/explain the projection layer')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() =>
+      expect(onSend).toHaveBeenCalledWith('Explain the projection layer in plain words, please.', [], []),
+    )
   })
 })
