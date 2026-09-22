@@ -82,6 +82,7 @@ const SLOTS: readonly CapabilitySlot[] = [
   "videoGeneration",
   "speechGeneration",
   "transcription",
+  "documentReading",
   "embeddings",
   "webSearch",
   "webFetch",

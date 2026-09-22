@@ -99,6 +99,22 @@ describe("the library under the curation", () => {
     expect(fal?.serves.language).toBeUndefined();
     expect(fal?.serves.media).toBe("fal");
   });
+
+  it("advertises document reading for every vendor with a model that reads one", async () => {
+    // The library summarises a vendor's models into slots so a settings page
+    // can offer it under Documents. Mistral earns the slot from its declared
+    // OCR model, OpenAI and Google from vision models on a wire that carries
+    // a file, OpenRouter from its live listing; a slot the summary forgets
+    // leaves the vendor unlisted under Documents even though the picker
+    // would accept its models.
+    const entries = await listLibraryProviders();
+    for (const id of ["mistral", "openai", "google", "openrouter"]) {
+      const vendor = entries.find((entry) => entry.id === id);
+      expect(vendor?.capabilities, id).toContain("documentReading");
+    }
+    const elevenlabs = entries.find((entry) => entry.id === "elevenlabs");
+    expect(elevenlabs?.capabilities).not.toContain("documentReading");
+  });
 });
 
 describe("a curation file that cannot be trusted", () => {
