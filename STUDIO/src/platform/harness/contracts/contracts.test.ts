@@ -637,6 +637,7 @@ describe('readConversationSnapshot', () => {
           timestamp: '2026-08-24T00:00:00Z',
           model: null,
           usage: null,
+          signal: null,
         },
         {
           id: 'a1',
@@ -665,6 +666,7 @@ describe('readConversationSnapshot', () => {
             reasoning: null,
             totalTokens: 14,
           },
+          signal: null,
         },
       ],
       settlements: [

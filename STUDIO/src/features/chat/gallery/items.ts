@@ -28,6 +28,7 @@ export function galleryItems(): readonly TranscriptItem[] {
       submissionId: null,
       text: 'Show me every kind of artifact you can render, and let me watch them resolve.',
       attachments: [],
+      documents: [],
       timestamp: null,
     },
     {

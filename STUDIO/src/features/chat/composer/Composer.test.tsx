@@ -80,7 +80,7 @@ describe('the field holds its words until the harness takes them', () => {
     type('please answer this')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    await waitFor(() => expect(onSend).toHaveBeenCalledWith('please answer this', []))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('please answer this', [], []))
     expect(field()).toBe('please answer this')
   })
 
@@ -177,12 +177,12 @@ describe('the images a turn carries', () => {
     pickImages()
     changeFiles(pickerInput(), [
       new File([pngBytes], 'photo.png', { type: 'image/png' }),
-      new File([new Uint8Array([0, 1, 2])], 'notes.txt', { type: 'text/plain' }),
+      new File([new Uint8Array([0, 1, 2])], 'notes.zip', { type: 'application/zip' }),
     ])
 
     await waitFor(() => expect(screen.getByAltText('photo.png')).toBeTruthy())
     // The picker's honest remainder: a file the rules refused, named.
-    expect(screen.getByText(/notes\.txt — Images only/)).toBeTruthy()
+    expect(screen.getByText(/notes\.zip — Images only/)).toBeTruthy()
 
     type('look at this')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -194,10 +194,41 @@ describe('the images a turn carries', () => {
           mimeType: 'image/png',
           filename: 'photo.png',
         },
-      ]),
+      ], []),
     )
     await waitFor(() => expect(screen.queryByAltText('photo.png')).toBeNull())
-    expect(screen.queryByText(/notes\.txt/)).toBeNull()
+    expect(screen.queryByText(/notes\.zip/)).toBeNull()
+  })
+
+  it('carries a picked document as the file it is, beside the words, and strips it once taken', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    pickImages()
+    const report = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], 'report.pdf', { type: 'application/pdf' })
+    changeFiles(pickerInput(), [report])
+
+    // A chip, not a thumbnail: the name and the size are what a person checks.
+    await waitFor(() => expect(screen.getByText('report.pdf')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Remove report.pdf' })).toBeTruthy()
+
+    type('summarise this')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('summarise this', [], [report]))
+    await waitFor(() => expect(screen.queryByText('report.pdf')).toBeNull())
+  })
+
+  it('sends with a document and no words at all', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    pickImages()
+    const notes = new File(['hello'], 'notes.txt', { type: 'text/plain' })
+    changeFiles(pickerInput(), [notes])
+    await waitFor(() => expect(screen.getByText('notes.txt')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('', [], [notes]))
   })
 
   it('keeps the strip when the harness refuses, exactly as it keeps the words', async () => {
@@ -251,13 +282,13 @@ describe('paste and drop', () => {
       dataTransfer: {
         files: [
           new File([pngBytes], 'dropped.png', { type: 'image/png' }),
-          new File([new Uint8Array([9])], 'table.csv', { type: 'text/csv' }),
+          new File([new Uint8Array([9])], 'table.bin', { type: 'application/octet-stream' }),
         ],
       },
     })
 
     await waitFor(() => expect(screen.getByAltText('dropped.png')).toBeTruthy())
-    expect(screen.getByText(/table\.csv — Images only/)).toBeTruthy()
+    expect(screen.getByText(/table\.bin — Images only/)).toBeTruthy()
   })
 
   it('leaves a text-only paste to the field', () => {

@@ -1220,6 +1220,38 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 29,
+    name: "conversation_documents",
+    up(db) {
+      // The documents a person attaches to a conversation
+      // (`conversations/documents.ts`): the engine carries pictures on the
+      // message and nothing else, so a PDF is saved under the conversation's
+      // `attachments/` folder and announced to the model by a signal. The
+      // row is what the announcement says - pages, the pages with no text
+      // layer, the whole text when short - and `announced_at` is when it
+      // was said, null until the next user message starts a response. The
+      // purge clears the rows with the conversation.
+      db.exec(`
+        CREATE TABLE conversation_document (
+          id TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          path TEXT NOT NULL,
+          mime_type TEXT NOT NULL,
+          byte_length INTEGER NOT NULL,
+          page_count INTEGER NOT NULL,
+          unit TEXT NOT NULL,
+          empty_pages TEXT NOT NULL DEFAULT '[]',
+          inline_text TEXT,
+          created_at INTEGER NOT NULL,
+          announced_at INTEGER
+        );
+        CREATE INDEX conversation_document_conversation
+          ON conversation_document (conversation_id, created_at);
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

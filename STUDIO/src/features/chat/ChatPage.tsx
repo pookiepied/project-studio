@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
+import { uploadDocuments } from '@/features/chat/connection/documents'
 import { Composer } from '@/features/chat/composer'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
 import { useForkConversation } from '@/features/chat/connection/fork'
@@ -274,7 +275,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
    * picker displays, so what is on screen is what is sent.
    */
   const sendTurn = useCallback(
-    async (text: string, images: readonly TurnImageWire[]) => {
+    async (text: string, images: readonly TurnImageWire[], documents: readonly File[]) => {
       const effective = effectiveTurnSettings(conversation, settings)
       const refused = visionRefusal(effective.modelId, images.length, catalog.models)
       if (refused !== null) {
@@ -287,7 +288,15 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       // what the picker shows is what the turn is admitted under.
       setSending(true)
       try {
+        // Documents go up ahead of the words, and come back down if the
+        // words do not go: `connection/documents.ts` says why.
+        const uploaded = await uploadDocuments(conversation.id, documents)
+        if (!uploaded.ok) {
+          setAttachRefusal(uploaded.error)
+          return { ok: false }
+        }
         const sent = await live.submit(text, turnSettingsToWire(effective), images)
+        if (!sent.ok) await uploaded.takeBack()
         if (sent.ok) {
           touch(conversation.id)
           // Sending is a return to the end. A message written from halfway

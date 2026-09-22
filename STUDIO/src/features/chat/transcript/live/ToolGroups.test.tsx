@@ -753,6 +753,7 @@ describe('every native tool', () => {
     'request_folder',
     'library_search',
     'library_keep',
+    'ocr',
     'studio_image',
     'studio_video',
     'web_search',

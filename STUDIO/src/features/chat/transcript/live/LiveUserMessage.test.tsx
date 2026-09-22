@@ -27,6 +27,7 @@ function message(
     submissionId: 'sub_1',
     text: 'look at these',
     attachments,
+    documents: [],
     timestamp: null,
   }
 }

@@ -133,6 +133,7 @@ describe('words that have been sent and not yet echoed', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: WORDS, state: 'done' }],
         },
       ]),

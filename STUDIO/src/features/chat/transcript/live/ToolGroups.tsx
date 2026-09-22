@@ -203,10 +203,13 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   // to recognise by that grid of tiles.
   library_search: { mark: Icons.library, running: 'Searching', done: 'Searched' },
   library_keep: { mark: Icons.keep, running: 'Keeping', done: 'Kept' },
+  // OCR reads a page through a provider; the row's subject is the file,
+  // and the verb is the reading it is, not the network trip it takes.
+  ocr: { mark: Icons.fileRead, running: 'Reading pages of', done: 'Read pages of' },
 }
 
 /** The tools whose subject is a file path, and so earns the file's own mark. */
-const FILE_TOOLS: ReadonlySet<string> = new Set(['read', 'write', 'edit'])
+const FILE_TOOLS: ReadonlySet<string> = new Set(['read', 'write', 'edit', 'ocr'])
 
 function answeredOf(call: ToolCallView): boolean {
   return call.output !== null && call.output.present

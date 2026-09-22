@@ -107,6 +107,12 @@ export type StudioErrorDomain =
    * result over MCP.
    */
   | "computer"
+  /**
+   * Reading a document as text on the harness side - a PDF's pages, an
+   * Office file's parts - before or instead of the model seeing it. A file
+   * that is not what its name claims, or that cannot be opened, fails here.
+   */
+  | "documents"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

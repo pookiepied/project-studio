@@ -177,12 +177,14 @@ describe("read", () => {
     await expect(read({ path: "huge.png" })).rejects.not.toThrow(/search it instead/i);
   });
 
-  it("reads a PDF as its text, and says when there is none", async () => {
-    // A file that is a PDF by name only has no pages to give: the answer is
-    // the scanned-pages sentence, not a blank numbered page.
+  it("refuses a PDF by name only with the reader's own sentence, not a blank page", async () => {
+    // A file that is a PDF by name only cannot be opened: the answer says
+    // so, rather than a blank numbered page or a guess about scans. What a
+    // real PDF reads as, page by page with its coverage, is the documents
+    // suite's subject.
     writeFileSync(join(workspace, "blank.pdf"), Buffer.alloc(2 * 1024 * 1024));
 
-    await expect(read({ path: "blank.pdf" })).rejects.toThrow(/no extractable text/i);
+    await expect(read({ path: "blank.pdf" })).rejects.toThrow(/could not be opened/i);
   });
 
   it("refuses a path outside the workspace", async () => {

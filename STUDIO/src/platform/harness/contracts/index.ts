@@ -185,6 +185,14 @@ export {
 } from './library'
 
 export {
+  PAGE_UNITS,
+  type PageUnit,
+  type ConversationDocument,
+  parseConversationDocument,
+  parseConversationDocumentEnvelope,
+} from './documents'
+
+export {
   type SandboxLevel,
   type SandboxScopeMode,
   type SandboxScopeSource,

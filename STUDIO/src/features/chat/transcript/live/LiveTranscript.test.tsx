@@ -40,7 +40,7 @@ vi.stubGlobal('matchMedia', () => ({
 }))
 
 function user(id: string, text: string): TranscriptItem {
-  return { kind: 'user', id, submissionId: 'sub_1', text, attachments: [], timestamp: null }
+  return { kind: 'user', id, submissionId: 'sub_1', text, attachments: [], documents: [], timestamp: null }
 }
 
 function assistant(id: string, text: string): TranscriptItem {

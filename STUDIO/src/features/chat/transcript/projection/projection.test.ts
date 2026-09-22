@@ -61,6 +61,7 @@ describe('seeding from history', () => {
           timestamp: '2026-08-24T00:00:00Z',
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'read the config', state: 'done' }],
         },
         {
@@ -70,6 +71,7 @@ describe('seeding from history', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [
             { kind: 'reasoning', text: 'I should look.', state: 'done' },
             { kind: 'text', text: 'On it.', state: 'done' },
@@ -129,6 +131,7 @@ describe('seeding from history', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'half a senten', state: 'streaming' }],
         },
       ],
@@ -153,6 +156,7 @@ describe('seeding from history', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [
             {
               kind: 'tool',
@@ -187,6 +191,7 @@ describe('a compaction in the history', () => {
       timestamp: null,
       model: null,
       usage: null,
+      signal: null,
       parts: [{ kind: 'text', text, state: 'done' }],
     }) as const
 
@@ -599,6 +604,7 @@ describe('seeded turns honour what their submission settled as', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'half a senten', state: 'streaming' }],
         },
       ],
@@ -625,6 +631,7 @@ describe('seeded turns honour what their submission settled as', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'done writing', state: 'done' }],
         },
       ],
@@ -687,6 +694,7 @@ describe('which message is being written right now', () => {
           submissionId: null,
           text: 'hi',
           attachments: [],
+          documents: [],
           timestamp: null,
         },
         { newest: true, turnRunning: true },
@@ -899,6 +907,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: '[fail] please answer.', state: 'done' }],
         },
         // History's own shape for the attempts: assistant messages with NO
@@ -911,6 +920,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [],
         })),
       ],
@@ -968,6 +978,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'too slow', state: 'done' }],
         },
         {
@@ -977,6 +988,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [],
         },
         {
@@ -986,6 +998,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'Submission was aborted.', state: 'done' }],
         },
       ],
@@ -1028,6 +1041,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text' as const, text: 'next question', state: 'done' as const }],
         },
         {
@@ -1037,6 +1051,7 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text' as const, text: 'a good answer', state: 'done' as const }],
         },
       ],
@@ -1140,6 +1155,7 @@ describe('the span a reasoning run is measured over', () => {
           model: null,
           timestamp: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'reasoning', text: 'thought about it', state: 'done' }],
         },
       ],
@@ -1296,6 +1312,7 @@ describe('the file run', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [{ kind: 'text', text: 'go', state: 'done' }],
         },
         {
@@ -1305,6 +1322,7 @@ describe('the file run', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [
             {
               kind: 'tool',
@@ -1483,6 +1501,7 @@ describe('the file run', () => {
           timestamp: null,
           model: null,
           usage: null,
+          signal: null,
           parts: [part('e1'), part('e2')],
         },
       ],
@@ -1503,5 +1522,93 @@ describe('the file run', () => {
     // Identity to the character: a replay's rows are the ones the live turn
     // grew, so keys hold and nothing remounts.
     expect(seededTools.groups).toEqual(liveTools.groups)
+  })
+})
+
+/**
+ * A document is not an attachment: the harness announces the files a user
+ * message brought with a signal it appends when that message's response
+ * starts, and the signal's attributes are what the chips draw. The signal
+ * is a `system` message on the wire, the one system message with a place
+ * to go.
+ */
+describe('the documents a message brought', () => {
+  const DOCUMENTS = [
+    { id: 'doc_1', fileName: 'report.pdf', mimeType: 'application/pdf', byteLength: 2048, pageCount: 12, unit: 'page' },
+    { id: 'doc_2', fileName: 'deck.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', byteLength: 900, pageCount: 3, unit: 'slide' },
+  ]
+
+  function signalMessage(documents: unknown, tagName = 'attached_documents'): unknown {
+    return {
+      id: 'sig_1',
+      role: 'system',
+      purpose: 'dispatch',
+      display: 'hidden',
+      signal: { tagName, attributes: { documents: JSON.stringify(documents) } },
+      parts: [{ type: 'text', text: 'The user attached "report.pdf"...', state: 'done' }],
+    }
+  }
+
+  it('hangs a seeded signal on the last user message before it, and stays out of the items', () => {
+    const chunk = chunksOf({
+      type: 'conversation-reset',
+      conversationId: CONVERSATION,
+      snapshot: {
+        v: 1,
+        conversationId: CONVERSATION,
+        offset: '3_0',
+        messages: [
+          { id: 'u1', role: 'user', submissionId: SUBMISSION, parts: [{ type: 'text', text: 'read these', state: 'done' }] },
+          signalMessage(DOCUMENTS),
+          { id: 'a1', role: 'assistant', submissionId: SUBMISSION, parts: [{ type: 'text', text: 'Read.', state: 'done' }] },
+        ],
+        settlements: [],
+      },
+      position: at(0),
+    })
+    const projection = applyChunks(emptyProjection(), chunk)
+    expect(projection.items.map((item) => item.kind)).toEqual(['user', 'assistant'])
+    const user = projection.items[0]
+    if (user?.kind !== 'user') throw new Error('expected the user item')
+    expect(user.documents).toEqual(DOCUMENTS)
+  })
+
+  it('hangs a signal appended live on the message the turn is answering', () => {
+    let projection = applyChunks(emptyProjection(), chunksOf(resetChunk()))
+    projection = applyChunks(
+      projection,
+      chunksOf(
+        {
+          type: 'message-appended',
+          message: { id: 'u1', role: 'user', submissionId: SUBMISSION, parts: [{ type: 'text', text: 'read this', state: 'done' }] },
+          position: at(1),
+        },
+        { type: 'message-appended', message: signalMessage(DOCUMENTS.slice(0, 1)), position: at(2) },
+      ),
+    )
+    expect(projection.items).toHaveLength(1)
+    const user = projection.items[0]
+    if (user?.kind !== 'user') throw new Error('expected the user item')
+    expect(user.documents.map((document) => document.fileName)).toEqual(['report.pdf'])
+  })
+
+  it('draws nothing for a signal of another kind, or one whose attribute is not the shape', () => {
+    const projection = applyChunks(
+      emptyProjection(),
+      chunksOf(
+        resetChunk(),
+        {
+          type: 'message-appended',
+          message: { id: 'u1', role: 'user', submissionId: SUBMISSION, parts: [{ type: 'text', text: 'hi', state: 'done' }] },
+          position: at(1),
+        },
+        { type: 'message-appended', message: signalMessage(DOCUMENTS, 'other_signal'), position: at(2) },
+        { type: 'message-appended', message: signalMessage('not a list'), position: at(3) },
+        { type: 'message-appended', message: signalMessage([{ id: 'x' }]), position: at(4) },
+      ),
+    )
+    const user = projection.items[0]
+    if (user?.kind !== 'user') throw new Error('expected the user item')
+    expect(user.documents).toEqual([])
   })
 })

@@ -54,6 +54,7 @@ import {
   copyDeliveredAttachments,
   type DeliveredAttachmentImage,
 } from "../conversations/attachments.js";
+import { ConversationDocumentStore, type DocumentAnnouncement } from "../conversations/documents.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
@@ -462,6 +463,16 @@ export interface AgentHost {
    */
   libraryDirectory?(): string | undefined;
   /**
+   * The documents attached since the conversation's last announcement, as
+   * the signal that tells the model of them, and marked announced in the
+   * same call. Undefined when nothing was attached. Called from the
+   * render's start hook, once per delivered user message, because that is
+   * the one seam where the harness may put words in front of the model
+   * between the person's message and the model's first turn. Optional for
+   * the same reason as every member here.
+   */
+  announceDocuments?(conversationId: string): DocumentAnnouncement | undefined;
+  /**
    * The folders of the project one conversation is filed under, in the order
    * the person arranged them, and empty when the conversation has no project
    * or the project has none.
@@ -675,6 +686,7 @@ export class StudioRuntime implements AgentHost {
    */
   readonly #mediaJobs: MediaJobs | undefined;
   readonly #library: LibraryStore | undefined;
+  readonly #documents: ConversationDocumentStore;
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -691,6 +703,7 @@ export class StudioRuntime implements AgentHost {
     this.#db = options.database;
     this.#mediaJobs = options.mediaJobs;
     this.#library = options.library;
+    this.#documents = new ConversationDocumentStore(this.#db);
     this.#media =
       options.mediaJobs === undefined
         ? undefined
@@ -950,6 +963,10 @@ export class StudioRuntime implements AgentHost {
 
   libraryDirectory(): string | undefined {
     return this.#library?.directory;
+  }
+
+  announceDocuments(conversationId: string): DocumentAnnouncement | undefined {
+    return this.#documents.announce(conversationId);
   }
 
   conversationExtraRoots(conversationId: string): readonly string[] {

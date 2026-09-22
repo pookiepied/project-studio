@@ -13,6 +13,7 @@ import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { PlanItemStore } from "../../src/plan/plan-items.js";
 import { PendingQuestionStore } from "../../src/questions/pending-questions.js";
 import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
+import { ConversationDocumentStore } from "../../src/conversations/documents.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import {
   conversationWorkspaceDirectory,
@@ -343,6 +344,7 @@ describe("emptying the archive", () => {
     plans: PlanItemStore;
     questions: PendingQuestionStore;
     folders: SandboxScopeStore;
+    documents: ConversationDocumentStore;
     flueJournalPath: string;
   } {
     // A journal with the required tables and no rows: the purge's journal
@@ -368,6 +370,7 @@ describe("emptying the archive", () => {
       plans: new PlanItemStore(db),
       questions: new PendingQuestionStore(db),
       folders: new SandboxScopeStore(db),
+      documents: new ConversationDocumentStore(db),
       flueJournalPath,
     };
   }

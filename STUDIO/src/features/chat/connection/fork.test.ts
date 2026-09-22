@@ -17,6 +17,7 @@ function user(id: string, text: string): TranscriptItem {
     submissionId: null,
     text,
     attachments: [],
+    documents: [],
     timestamp: null,
   }
 }

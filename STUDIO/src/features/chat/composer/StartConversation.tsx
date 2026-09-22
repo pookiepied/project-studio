@@ -68,7 +68,7 @@ export function StartConversation({
   const [attachRefusal, setAttachRefusal] = useState<SeamFailure | null>(null)
 
   const onSend = useCallback(
-    async (text: string, images: readonly TurnImageWire[]) => {
+    async (text: string, images: readonly TurnImageWire[], documents: readonly File[]) => {
       const refusal = visionRefusal(
         effectiveTurnSettings(null, settings).modelId,
         images.length,
@@ -79,7 +79,7 @@ export function StartConversation({
         return { ok: false }
       }
       setAttachRefusal(null)
-      return firstTurn.start(text, images)
+      return firstTurn.start(text, images, documents)
     },
     // The method, not the object: only `start` is called, and `firstTurn`
     // is new each render.

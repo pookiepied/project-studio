@@ -12,6 +12,9 @@ import {
 } from '@/domain/attachments/images'
 import { AddMenu } from '@/features/chat/composer/AddMenu'
 import { PendingImages } from '@/features/chat/composer/PendingImages'
+import { PendingDocuments } from '@/features/chat/composer/PendingDocuments'
+import { DOCUMENT_ACCEPT, documentMimeOf, pickDocumentFiles } from '@/domain/attachments/documents'
+import { base64OfBytes } from '@/lib/base64'
 import { KeepDialog } from '@/features/library/KeepDialog'
 import type { KeepCandidate } from '@/features/library/client'
 import { PermissionControl } from '@/features/chat/composer/PermissionControl'
@@ -130,9 +133,15 @@ export function Composer({
    * field clears only when `ok` says the harness took the message. The
    * images beside the words clear with the same rule — they belong to this
    * message, and stay when the field still holds words the receipt did not
-   * take.
+   * take. The documents ride the same call as the files they still are:
+   * the page uploads them ahead of the words, because the engine carries
+   * pictures on the message and nothing else.
    */
-  onSend: (text: string, images: readonly TurnImageWire[]) => Promise<{ readonly ok: boolean }>
+  onSend: (
+    text: string,
+    images: readonly TurnImageWire[],
+    documents: readonly File[],
+  ) => Promise<{ readonly ok: boolean }>
   /** The harness has a turn of ours: admitted, not yet settled. */
   busy?: boolean
   /** Aborts the harness run. */
@@ -180,6 +189,14 @@ export function Composer({
   const [keeping, setKeeping] = useState<KeepCandidate | null>(null)
   const imagesRef = useRef<readonly TurnImageWire[]>([])
   imagesRef.current = images
+  /**
+   * The documents riding on this message, still as the files the picker
+   * gave: nothing is read until the send, when each is uploaded ahead of
+   * the words. The ref is the receipt check's twin, as for the images.
+   */
+  const [documents, setDocuments] = useState<readonly File[]>([])
+  const documentsRef = useRef<readonly File[]>([])
+  documentsRef.current = documents
   /** Pick-time rejections, held until the next pick or a successful send. */
   const [refusals, setRefusals] = useState<readonly ImageRejection[]>([])
   const picker = useRef<HTMLInputElement>(null)
@@ -327,7 +344,7 @@ export function Composer({
   // `turnRunning` alone would leave the field open for the length of the
   // round trip, and the in-flight lock is what closes it.
   const busy = turnRunning || sending
-  const canSend = (text.trim().length > 0 || images.length > 0) && !busy
+  const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) && !busy
   const dictating = dictation.stage !== 'idle'
 
   /**
@@ -354,31 +371,52 @@ export function Composer({
     setImages((current) => current.filter((_, at) => at !== index))
   }, [])
 
+  /** Judges a haul of documents by name and size; the harness judges the bytes at the send. */
+  const addDocuments = useCallback((picked: readonly File[]) => {
+    const { accepted, rejections: judged } = pickDocumentFiles(picked, documentsRef.current.length)
+    setRefusals((current) => [...current, ...judged])
+    if (accepted.length === 0) return
+    setDocuments((current) => [...current, ...accepted])
+  }, [])
+
+  const removeDocument = useCallback((index: number) => {
+    setDocuments((current) => current.filter((_, at) => at !== index))
+  }, [])
+
   /**
-   * Whatever the clipboard or a drag carries lands in the strip through the
-   * same rules the picker uses -- judged, read, refused by name. Text pastes
-   * never reach here -- a clipboard with files in it is an attachment event;
-   * a clipboard of words is the field doing its job.
+   * Whatever the clipboard or a drag carries lands in a strip through the
+   * same rules the picker uses -- judged, read, refused by name. A file is
+   * a picture when the picker says so and a document when its name is one
+   * the harness reads; anything else is refused by the picture rules, whose
+   * sentence names the formats. Text pastes never reach here -- a clipboard
+   * with files in it is an attachment event; a clipboard of words is the
+   * field doing its job.
    */
   const ingestFiles = useCallback(
     (files: readonly File[]) => {
       if (files.length === 0) return
-      addImages(files)
+      const pictures = files.filter((file) => file.type.startsWith('image/'))
+      const papers = files.filter((file) => !file.type.startsWith('image/') && documentMimeOf(file.name) !== null)
+      const neither = files.filter((file) => !pictures.includes(file) && !papers.includes(file))
+      setRefusals([])
+      if (pictures.length > 0 || neither.length > 0) addImages([...pictures, ...neither])
+      if (papers.length > 0) addDocuments(papers)
     },
-    [addImages],
+    [addImages, addDocuments],
   )
 
   const submit = () => {
     if (!canSend) return
     const outgoing = text
     const carried = images
+    const papers = documents
     setSending(true)
     setCommandNote(null)
     // Words go straight out. A command is resolved first: an action runs
     // here and the field clears; a prompt command sends its expansion in
     // place of the words.
     const dispatched = !slash.isCommand(outgoing)
-      ? onSend(outgoing, carried)
+      ? onSend(outgoing, carried, papers)
       : slash.resolve(outgoing).then((outcome) => {
           if (outcome.kind === 'done') {
             setSending(false)
@@ -390,7 +428,7 @@ export function Composer({
             }
             return null
           }
-          return onSend(outcome.kind === 'prompt' ? outcome.text : outgoing, carried)
+          return onSend(outcome.kind === 'prompt' ? outcome.text : outgoing, carried, papers)
         })
     void dispatched.then(
       (receipt) => {
@@ -400,7 +438,12 @@ export function Composer({
         // field still holds exactly that — words typed during the round
         // trip belong to the next message, not this receipt. Same for the
         // strip: a different array is a different message being built.
-        if (!receipt.ok || textRef.current !== outgoing || imagesRef.current !== carried) {
+        if (
+          !receipt.ok ||
+          textRef.current !== outgoing ||
+          imagesRef.current !== carried ||
+          documentsRef.current !== papers
+        ) {
           return
         }
         setText('')
@@ -410,6 +453,7 @@ export function Composer({
         clearDraft(conversationId)
         setMultiline(false)
         setImages([])
+        setDocuments([])
         setRefusals([])
       },
       () => {
@@ -527,6 +571,25 @@ export function Composer({
             mimeType: image.mimeType,
             data: image.data,
             sourceConversationId: conversationId,
+          })
+        }}
+      />
+      <PendingDocuments
+        documents={documents}
+        onRemove={removeDocument}
+        onKeep={(index) => {
+          const document = documents[index]
+          if (document === undefined) return
+          // Read now, for the dialog's copy alone; the send reads it again
+          // for the upload. A document is kept as its bytes, which the
+          // library takes for any file it is handed.
+          void document.arrayBuffer().then((bytes) => {
+            setKeeping({
+              fileName: document.name,
+              mimeType: documentMimeOf(document.name) ?? 'application/octet-stream',
+              data: base64OfBytes(new Uint8Array(bytes)),
+              sourceConversationId: conversationId,
+            })
           })
         }}
       />
@@ -861,19 +924,20 @@ export function Composer({
       </div>
 
       {/* Off-flow and invisible: only its click handler matters, opened by
-          the plus menu. `accept` narrows the dialog to the four formats the
-          rules admit, and `multiple` matches the strip's count; the value is
-          reset after each read so picking the same file twice still fires. */}
+          the plus menu. `accept` narrows the dialog to the four picture
+          formats and the document kinds the harness reads, and `multiple`
+          matches the strips' counts; the value is reset after each read so
+          picking the same file twice still fires. */}
       <input
         ref={picker}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept={`image/png,image/jpeg,image/webp,image/gif,${DOCUMENT_ACCEPT}`}
         multiple
         className="hidden"
         onChange={(event) => {
           const picked = Array.from(event.target.files ?? [])
           event.target.value = ''
-          if (picked.length > 0) addImages(picked)
+          ingestFiles(picked)
         }}
       />
     </div>

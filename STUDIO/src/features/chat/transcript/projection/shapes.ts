@@ -90,6 +90,22 @@ export interface UserAttachmentView {
   readonly size: number | null
 }
 
+/**
+ * A document the message brought. Not an attachment: the engine carries
+ * pictures on the message and nothing else, so a document is uploaded ahead
+ * of the words and announced to the model by a signal, and the signal's
+ * attributes are where these facts come from. Drawn under the message it
+ * belongs to, which is the last user message before the signal.
+ */
+export interface UserDocumentView {
+  readonly id: string
+  readonly fileName: string
+  readonly mimeType: string
+  readonly byteLength: number
+  readonly pageCount: number
+  readonly unit: 'page' | 'slide' | 'sheet'
+}
+
 export type TranscriptItem =
   | {
       readonly kind: 'user'
@@ -98,6 +114,7 @@ export type TranscriptItem =
       readonly submissionId: string | null
       readonly text: string
       readonly attachments: readonly UserAttachmentView[]
+      readonly documents: readonly UserDocumentView[]
       readonly timestamp: string | null
     }
   | {

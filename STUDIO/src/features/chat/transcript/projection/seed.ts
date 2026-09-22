@@ -4,12 +4,14 @@
  * the live turn grew.
  */
 
-import type { ConversationSnapshotFacts } from '@/platform/harness'
+import { isRecord } from '@/lib/guards'
+import type { ConversationMessageFacts, ConversationSnapshotFacts } from '@/platform/harness'
 import type {
   AssistantSegment,
   ToolGroupView,
   TranscriptItem,
   UserAttachmentView,
+  UserDocumentView,
 } from './shapes'
 import { emptyAssistant } from './segments'
 import { fileOf, pushCall, readPathOf } from './rows'
@@ -35,8 +37,14 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
     // failure a person needs is already carried by the settlement below,
     // which renders as the `submission-failed` card. The reader accepts the
     // role only so a stop control press does not make the whole snapshot
-    // unparseable; nothing system-shaped becomes a transcript item.
-    if (message.role === 'system') continue
+    // unparseable; nothing system-shaped becomes a transcript item - with
+    // one exception that is not an item either: the documents signal, which
+    // the harness appends right after the user message that brought the
+    // files, becomes that message's chips.
+    if (message.role === 'system') {
+      attachDocuments(items, message)
+      continue
+    }
     if (message.role === 'user') {
       const texts: string[] = []
       const attachments: UserAttachmentView[] = []
@@ -51,6 +59,7 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
         submissionId: message.submissionId,
         text: texts.join('\n\n'),
         attachments,
+        documents: [],
         timestamp: message.timestamp,
       })
       continue
@@ -229,4 +238,62 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
   }
 
   return items
+}
+
+/** The tag the harness gives the signal that names a message's documents. */
+const DOCUMENTS_SIGNAL = 'attached_documents'
+
+/**
+ * The documents a signal names, read from its `documents` attribute - a
+ * JSON list the harness wrote for exactly this reader. Anything that is not
+ * that shape reads as no documents: the model still got its note, and a
+ * chip nobody can trust is worse than none.
+ */
+export function documentsOfSignal(message: ConversationMessageFacts): readonly UserDocumentView[] {
+  if (message.role !== 'system' || message.signal?.tagName !== DOCUMENTS_SIGNAL) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(message.signal.attributes['documents'] ?? '')
+  } catch {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+  const documents: UserDocumentView[] = []
+  for (const entry of parsed) {
+    if (!isRecord(entry)) continue
+    const id = entry['id']
+    const fileName = entry['fileName']
+    const mimeType = entry['mimeType']
+    const byteLength = entry['byteLength']
+    const pageCount = entry['pageCount']
+    const unit = entry['unit']
+    if (typeof id !== 'string' || typeof fileName !== 'string' || typeof mimeType !== 'string') continue
+    if (typeof byteLength !== 'number' || typeof pageCount !== 'number') continue
+    documents.push({
+      id,
+      fileName,
+      mimeType,
+      byteLength,
+      pageCount,
+      unit: unit === 'slide' || unit === 'sheet' ? unit : 'page',
+    })
+  }
+  return documents
+}
+
+/**
+ * Puts a documents signal's files on the last user message before it, in
+ * place. The signal follows the message it belongs to - the harness appends
+ * it when that message's response starts - so the last user item is the
+ * right one; with no user item yet there is nothing to hang them on.
+ */
+export function attachDocuments(items: TranscriptItem[], message: ConversationMessageFacts): void {
+  const documents = documentsOfSignal(message)
+  if (documents.length === 0) return
+  for (let at = items.length - 1; at >= 0; at -= 1) {
+    const item = items[at]
+    if (item?.kind !== 'user') continue
+    items[at] = { ...item, documents: [...item.documents, ...documents] }
+    return
+  }
 }

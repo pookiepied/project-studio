@@ -1,6 +1,6 @@
 'use agent';
 
-import { useDelivery, useModel, useSandbox, useSkill, type AgentProps } from "@flue/runtime";
+import { useAgentStart, useDelivery, useModel, useSandbox, useSkill, type AgentProps } from "@flue/runtime";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
@@ -174,6 +174,41 @@ export function Studio({ id }: AgentProps) {
   if (delivery.kind === "user" && delivery.attachments !== undefined) {
     runtime.persistDeliveredAttachments?.(id, delivery.attachments);
   }
+  // The documents the person attached with this message. They cannot ride
+  // the message - the engine carries pictures and nothing else - so the
+  // composer uploaded them ahead of the words, and this is where the model
+  // hears of them: a signal appended before its first turn, naming each
+  // file, its pages, the pages with no text layer, and the text itself when
+  // it is short. The hook runs once per delivered message; a message with
+  // nothing new attached appends nothing. `append` rather than a dispatch,
+  // because a delivery would be a second message and this is a footnote
+  // to the one the person sent. The attributes carry what the transcript
+  // draws; the body carries what the model reads.
+  useAgentStart(({ append }) => {
+    // A finished job's own signal wakes the same seam; a document waits for
+    // the person's words, not for a background job's.
+    if (delivery.kind !== "user") return;
+    const announcement = runtime.announceDocuments?.(id);
+    if (announcement === undefined) return;
+    append({
+      kind: "signal",
+      type: "documents",
+      tagName: "attached_documents",
+      attributes: {
+        documents: JSON.stringify(
+          announcement.documents.map((document) => ({
+            id: document.id,
+            fileName: document.fileName,
+            mimeType: document.mimeType,
+            byteLength: document.byteLength,
+            pageCount: document.pageCount,
+            unit: document.unit,
+          })),
+        ),
+      },
+      body: announcement.body,
+    });
+  });
   // Derived by comparing the two, not assumed from which branch built the
   // path. They are equal for a conversation with no project, and for a
   // project with no folders, and that reports "conversation", which is the

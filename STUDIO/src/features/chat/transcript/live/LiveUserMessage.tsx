@@ -1,5 +1,6 @@
 import { memo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { Icons } from '@/components/icons'
 import { ENTER } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
@@ -52,9 +53,37 @@ export const LiveUserMessage = memo(function LiveUserMessage({
             ))}
           </div>
         ) : null}
+        {item.documents.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap justify-end gap-1">
+            {/* A document is not an attachment: it was uploaded ahead of the
+                words and named to the model by a signal, and these are that
+                signal's facts. Keyed by the id the harness gave the upload. */}
+            {item.documents.map((document) => (
+              <span
+                key={document.id}
+                title={`${document.fileName} - ${formatPages(document)}, ${formatBytes(document.byteLength)}`}
+                className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-caption text-muted-foreground"
+              >
+                <Icons.file size="sm" />
+                <span className="max-w-48 truncate">{document.fileName}</span>
+                <span className="text-muted-foreground/70">{formatPages(document)}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <MessageActions visible={hovered} align="end" copyPayload={item.text} actions={[]} />
     </motion.div>
   )
 })
+
+/** "12 pages", "1 slide", "3 sheets": what the document gave the model. */
+function formatPages(document: { readonly pageCount: number; readonly unit: string }): string {
+  return `${document.pageCount} ${document.unit}${document.pageCount === 1 ? '' : 's'}`
+}
+
+function formatBytes(byteLength: number): string {
+  if (byteLength < 1024 * 1024) return `${Math.max(1, Math.round(byteLength / 1024))} KB`
+  return `${(byteLength / (1024 * 1024)).toFixed(1)} MB`
+}

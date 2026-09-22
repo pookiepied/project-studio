@@ -135,6 +135,17 @@ export interface ModelRefFacts {
   readonly id: string
 }
 
+/**
+ * What a `system` message projected from a signal delivery carries beside
+ * its body: the tag the harness chose and its string attributes. The one
+ * signal the transcript reads is `attached_documents`, whose attributes
+ * name the files a user message brought; every other signal is plumbing.
+ */
+export interface SignalFacts {
+  readonly tagName: string | null
+  readonly attributes: Readonly<Record<string, string>>
+}
+
 export interface ConversationMessageFacts {
   readonly id: string
   readonly role: MessageRole
@@ -144,6 +155,8 @@ export interface ConversationMessageFacts {
   readonly timestamp: string | null
   readonly model: ModelRefFacts | null
   readonly usage: UsageFacts | null
+  /** Present on a system message that came from a signal; null everywhere else. */
+  readonly signal: SignalFacts | null
 }
 
 /** How one submission ended, per the settlement records. */
@@ -397,10 +410,23 @@ function readConversationMessage(value: unknown): ConversationMessageFacts | nul
     role,
     submissionId: text(value['submissionId']),
     parts,
+    signal: readSignal(value['signal']),
     timestamp: text(metadata['timestamp']),
     model: readModelRef(metadata['model']),
     usage: readUsage(metadata['usage']),
   }
+}
+
+function readSignal(value: unknown): SignalFacts | null {
+  if (!isRecord(value)) return null
+  const attributes: Record<string, string> = {}
+  const raw = value['attributes']
+  if (isRecord(raw)) {
+    for (const [key, entry] of Object.entries(raw)) {
+      if (typeof entry === 'string') attributes[key] = entry
+    }
+  }
+  return { tagName: text(value['tagName']), attributes }
 }
 
 function readSettlement(value: unknown): SettlementFacts | null {

@@ -17,6 +17,7 @@ import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { PlanItemStore } from "../../src/plan/plan-items.js";
 import { PendingQuestionStore } from "../../src/questions/pending-questions.js";
 import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
+import { ConversationDocumentStore } from "../../src/conversations/documents.js";
 import {
   conversationWorkspaceDirectory,
   conversationsDirectory,
@@ -78,6 +79,7 @@ function dependencies(
     plans: new PlanItemStore(db),
     questions: new PendingQuestionStore(db),
     folders: new SandboxScopeStore(db),
+    documents: new ConversationDocumentStore(db),
     flueJournalPath,
   };
 }

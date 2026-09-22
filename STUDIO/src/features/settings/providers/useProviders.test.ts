@@ -62,6 +62,8 @@ function stubClient(overrides: {
     addLibraryItem: () => refuse(),
     updateLibraryItem: () => refuse(),
     removeLibraryItem: () => refuse(),
+    uploadDocument: () => refuse(),
+    removeDocument: () => refuse(),
     describeImage: () => refuse(),
     expandCommand: () => refuse(),
     compactConversation: () => Promise.resolve(ok(undefined)),

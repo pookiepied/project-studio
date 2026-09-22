@@ -18,6 +18,7 @@ import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
 import { registerWebTools } from "../web/index.js";
 import { registerMediaTools, type MediaToolRegistration } from "../media/index.js";
+import { registerDocumentTools } from "../documents/index.js";
 import { registerLibraryTools } from "../library/index.js";
 import type { LibraryStore } from "../../library/store.js";
 
@@ -149,6 +150,10 @@ export function registerNativeTools(
   }
   if (options.media !== undefined) {
     registerMediaTools(gate, options.media);
+    // The document tool reads through the same service, and exists exactly
+    // when the generation tools do: a harness with no media has no provider
+    // to read a page through.
+    registerDocumentTools(gate, { media: options.media.media });
   }
   registerWebTools(
     gate,

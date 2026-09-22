@@ -18,6 +18,7 @@ import {
   sweepOrphanConversationTrees,
 } from "../../../conversations/purge.js";
 import type { ConversationStore } from "../../../conversations/store.js";
+import { ConversationDocumentStore, type ConversationDocument } from "../../../conversations/documents.js";
 import type { ConversationUsage } from "../../../conversations/context-usage.js";
 import type { CompactionReadiness } from "../../../conversations/compaction.js";
 import type { JobStatus } from "../../../process/background.js";
@@ -114,6 +115,19 @@ async function body(context: { req: { json(): Promise<unknown> } }): Promise<unk
 
 const purgeBodySchema = v.object({ ids: v.array(v.pipe(v.string(), v.minLength(1))) });
 
+const documentUploadSchema = v.object({
+  fileName: v.pipe(v.string(), v.minLength(1)),
+  mimeType: v.pipe(v.string(), v.minLength(1)),
+  /** The bytes, base64; a leading `data:` prefix is accepted. */
+  data: v.pipe(v.string(), v.minLength(1)),
+});
+
+/** Base64 arrives in JSON; a `data:` URL prefix is tolerated and dropped. */
+function decodedBase64(data: string): Buffer {
+  const comma = data.startsWith("data:") ? data.indexOf(",") : -1;
+  return Buffer.from(comma === -1 ? data : data.slice(comma + 1), "base64");
+}
+
 function idsForPurge(value: unknown): readonly string[] {
   const parsed = v.safeParse(purgeBodySchema, value);
   if (!parsed.success) {
@@ -140,6 +154,7 @@ export function createConversationRoutes(
   const plans = new PlanItemStore(options.database);
   const questions = new PendingQuestionStore(options.database);
   const folders = new SandboxScopeStore(options.database);
+  const documents = new ConversationDocumentStore(options.database);
 
   routes.get("/", (context) => {
     try {
@@ -256,6 +271,48 @@ export function createConversationRoutes(
     }
   });
 
+  // The documents a person attaches. The bytes travel as base64 in JSON,
+  // the one body shape the webview's transport carries (a request goes
+  // through Rust as a string, `STUDIO/src/platform/harness/transport.ts`),
+  // the same way the library takes a file. A third again on the wire for a
+  // fifty-megabyte file is the cost, named in the plan's parked storage
+  // work. The upload reads the document once and answers what the model
+  // will be told; the announcement itself waits for the next user message.
+  // A document taken back before that is deleted here with its file.
+  routes.get("/:id/documents", (context) => {
+    try {
+      return context.json({ documents: documents.list(context.req.param("id")).map(publicDocument) });
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  routes.post("/:id/documents", async (context) => {
+    try {
+      const parsed = parseBody(documentUploadSchema, await body(context));
+      const document = await documents.add(context.req.param("id"), {
+        fileName: parsed.fileName,
+        mimeType: parsed.mimeType,
+        bytes: new Uint8Array(decodedBase64(parsed.data)),
+      });
+      return context.json({ document: publicDocument(document) }, 201);
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  routes.delete("/:id/documents/:documentId", (context) => {
+    try {
+      const removed = documents.remove(context.req.param("id"), context.req.param("documentId"));
+      if (!removed) {
+        throw new StorageError("not_found", { message: "There is no such document." });
+      }
+      return context.body(null, 204);
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
   routes.patch("/:id", async (context) => {
     try {
       const parsed = parseBody(conversationPatchSchema, await body(context));
@@ -308,6 +365,7 @@ export function createConversationRoutes(
           plans,
           questions,
           folders,
+          documents,
           flueJournalPath: resolveFlueJournalPath(),
         },
         [id],
@@ -339,6 +397,7 @@ export function createConversationRoutes(
           plans,
           questions,
           folders,
+          documents,
           flueJournalPath: resolveFlueJournalPath(),
         },
         idsForPurge(await body(context)),
@@ -351,4 +410,34 @@ export function createConversationRoutes(
   });
 
   return routes;
+}
+
+/**
+ * A document as the webview sees it: what the chip shows and what the
+ * composer needs to take it back. The path stays on the harness side - the
+ * model reads it, the person is shown the name - and the inlined text is
+ * the model's, not something to ship to the screen twice.
+ */
+function publicDocument(document: ConversationDocument): PublicDocument {
+  return {
+    id: document.id,
+    fileName: document.fileName,
+    mimeType: document.mimeType,
+    byteLength: document.byteLength,
+    pageCount: document.pageCount,
+    unit: document.unit,
+    emptyPages: document.emptyPages,
+    announced: document.announcedAt !== null,
+  };
+}
+
+export interface PublicDocument {
+  readonly id: string;
+  readonly fileName: string;
+  readonly mimeType: string;
+  readonly byteLength: number;
+  readonly pageCount: number;
+  readonly unit: "page" | "slide" | "sheet";
+  readonly emptyPages: readonly number[];
+  readonly announced: boolean;
 }

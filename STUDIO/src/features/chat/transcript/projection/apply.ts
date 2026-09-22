@@ -19,7 +19,7 @@ import {
 } from './draft'
 import type { PendingSubmission, TranscriptItem } from './shapes'
 import { answerToolCall, appendDelta, appendToolCall } from './segments'
-import { seededFrom } from './seed'
+import { attachDocuments, seededFrom } from './seed'
 import { settleSubmissionFailure } from './settlement'
 
 export function emptyProjection(): TranscriptProjection {
@@ -69,6 +69,7 @@ export function pendingUserItem(
     submissionId: pending.submissionId,
     text: pending.text,
     attachments: [],
+    documents: [],
     timestamp: null,
   }
 }
@@ -188,8 +189,13 @@ export function applyChunk(draft: Draft, chunk: ChunkFacts, arrivedAt: number | 
       })
       const appended = seeded[0]
       // Also the exit for a system message appended live (an abort advisory
-      // crossing the updates stream): seededFrom skips those on purpose.
-      if (appended === undefined) return
+      // crossing the updates stream): seededFrom skips those on purpose. A
+      // documents signal is the one system message with a place to go: the
+      // chips of the user message it follows.
+      if (appended === undefined) {
+        attachDocuments(draft.items, message)
+        return
+      }
       draft.items.push(appended)
       if (appended.kind === 'assistant') {
         draft.assistants.set(appended.id, draft.items.length - 1)

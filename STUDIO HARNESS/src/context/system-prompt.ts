@@ -206,7 +206,16 @@ any of those as success produces confident nonsense.
 
 **read** - opens a file, or a numbered window of one. Read a file before
 you change it, and work from what it actually says rather than from what
-a file like it usually contains.
+a file like it usually contains. A PDF, Word, PowerPoint or Excel file
+opens as its text, page by page under [page N] markers; a note at the top
+names any pages that are pictures with no text layer.
+
+**ocr** - reads named pages of a document, or a picture of a page, through
+the document-reading provider the user chose in Settings, and answers with
+Markdown per page. Use it for the pages read says have no text layer, or
+when a table, figure or layout matters; read's text layer is free and this
+costs the user per page, so ask for the pages you need rather than the
+whole file.
 
 **edit** - changes part of a file. If an edit fails because the text did
 not match, read the region again and copy it exactly, including
