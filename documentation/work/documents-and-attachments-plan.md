@@ -1,6 +1,7 @@
 # Documents and attachments — the plan
 
-**Status:** Planned · **Opened:** 2026-09-22
+**Status:** Built (first cut) · **Opened:** 2026-09-22 · **Landed:** 2026-09-22
+What landed, and where it differs from the plan, is in §11 at the end.
 
 Captured from a spoken brief, checked against the code and against how
 Hermes Agent (NousResearch) does the same job. Two things live here: the
@@ -178,3 +179,36 @@ pipeline exists, not before.
    wired to a configurable route, off by default.
 5. Keep on uploaded documents; library stores bytes plus cache.
 6. Later, as needed: summaries index, embeddings, storage work from §9.
+
+## 11. What landed
+
+Branch `task/native-tool-expansion`, commits "A document-reading slot, and
+the four vendors that fill it" and "Documents: attached to a message, read
+page by page, escalated to OCR".
+
+- **The slot.** `documentReading` is a media slot under a Documents
+  category on the Media page. Mistral OCR (`mistral-ocr-latest`, a new
+  `mistral` media wire), OpenAI's Responses API, Google's Interactions API
+  and OpenRouter's file parts fill it; the three vision routes share one
+  transcription instruction and one page-marker cut. Which chat models
+  earn it is derived: a vision model on Responses or Interactions, and
+  OpenRouter's own `input_modalities=file` listing.
+- **Reading.** `documents/extract.ts` reads PDF (pdf.js), Word,
+  PowerPoint and Excel (a stdlib ZIP reader, no dependency added) into
+  pages with Hermes's coverage rule; the read tool answers all four under
+  `[page N]` markers with the NEEDS-OCR note first. The `ocr` tool sends
+  named pages to the slot's provider.
+- **Attachments.** Documents cannot ride the message (the engine carries
+  images only), so the composer uploads them to
+  `POST /api/conversations/:id/documents` ahead of the words, as base64
+  JSON - the only body the Rust transport carries - and the render's
+  `useAgentStart` appends an `attached_documents` signal naming them,
+  with the whole text inlined under 40k characters. The transcript reads
+  the signal into chips on the user message. Documents whose words did
+  not go are taken back. Keep works on a pending document.
+- **Not in this cut.** No streaming upload (the transport is string
+  bodies; §9). No extracted-text cache, no summaries index, no
+  embeddings. `library_search` does not yet report a document's page
+  count. Nothing renders a PDF page as a picture for the main model - the
+  provider reads the page instead, which is the "real providers, not
+  local" decision.
