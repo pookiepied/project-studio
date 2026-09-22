@@ -6,6 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { present } from '@/platform/harness/contracts/chunks'
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
+import { NavigationProvider } from '@/stores/navigation'
+import { RailProvider } from '@/stores/rail'
+import { WorkspaceProvider } from '@/stores/workspace'
 
 import { RollingCount, STEP_MS } from './RollingCount'
 import { ToolGroups } from './ToolGroups'
@@ -719,6 +722,65 @@ describe('the late native tools', () => {
     expect(screen.queryByText('library_search')).toBeNull()
     expect(screen.queryByText('library_keep')).toBeNull()
   })
+})
+
+/**
+ * Every tool in the harness's native registry, against the rendering. The
+ * list is copied by hand from `STUDIO HARNESS/src/tools` -- the UI cannot
+ * import the harness, so this file is the pin: when a native tool ships,
+ * it goes here AND into the action map (or a family of its own), or it
+ * falls through to its bare wire name with no mark. That fall-through is
+ * right for an extension's tool, whose name we cannot know, and a leak for
+ * ours, whose names we chose -- discover and jobs leaked exactly this way,
+ * silently, because the row still renders. One test per tool, so the
+ * failure names the tool that leaked.
+ */
+describe('every native tool', () => {
+  const NATIVE_TOOLS = [
+    'read',
+    'write',
+    'edit',
+    'delete',
+    'move',
+    'glob',
+    'grep',
+    'git',
+    'shell',
+    'jobs',
+    'discover',
+    'plan',
+    'ask_user_question',
+    'request_folder',
+    'library_search',
+    'library_keep',
+    'studio_image',
+    'studio_video',
+    'web_search',
+    'fetch',
+  ]
+
+  for (const toolName of NATIVE_TOOLS) {
+    it(`never renders ${toolName} under its raw wire name`, () => {
+      // The media and web tools draw their artifact cards, and those cards
+      // reach for the workspace and rail stores; every row here renders
+      // inside the same providers a real transcript sits in.
+      render(
+        <NavigationProvider>
+          <WorkspaceProvider>
+            <RailProvider>
+              <ToolGroups conversationId="conv"
+                groups={groupsOf({
+                  toolName,
+                  calls: [call({ toolName, input: present({ path: 'a.ts' }), output: present('done') })],
+                })}
+              />
+            </RailProvider>
+          </WorkspaceProvider>
+        </NavigationProvider>,
+      )
+      expect(screen.queryByText(toolName)).toBeNull()
+    })
+  }
 })
 
 /**
