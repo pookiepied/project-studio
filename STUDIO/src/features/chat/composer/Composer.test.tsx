@@ -357,12 +357,12 @@ describe('voice on an insecure origin', () => {
  * The slash, end to end but for the socket. Nothing here mocks a module of
  * ours: the address resolves through the same env vars the production read
  * uses, the harness's own answer is served by a stubbed `fetch`, and
- * everything between - the client, the requester, the contract, the picker
- * and the send path - is the code the window runs. What is pinned is the
+ * everything between — the client, the requester, the contract, the picker
+ * and the send path — is the code the window runs. What is pinned is the
  * experience: a slash offers the commands the moment it is typed, Enter
  * completes the picked name, and what goes out is the harness's expansion,
  * not the words. The listing below is what the harness answers, built-in
- * first, its record carrying the hint as the empty string - which is what
+ * first, its record carrying the hint as the empty string — which is what
  * took the record, the listing, the picker and the settings pane down
  * together before the contract learned to read it.
  */
@@ -403,30 +403,50 @@ describe('the slash, from the field', () => {
     vi.stubEnv('VITE_HARNESS_TOKEN', undefined)
   })
 
-  it('offers the commands while the name is typed, completes the picked one, and sends its expansion', async () => {
+  interface Call {
+    readonly url: string
+    readonly method: string
+    readonly body: string | null
+  }
+
+  /** An answer with a JSON body, the way the harness sends its successes. */
+  function jsonResponse(value: unknown): Response {
+    return new Response(JSON.stringify(value), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  /**
+   * Answers what the harness answers on the two routes the slash touches,
+   * and records every ask. The pairing probe 404s, as any host that is not
+   * Studio's listener would.
+   */
+  function serveHarness(): Call[] {
+    const calls: Call[] = []
     vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
     vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url =
-          input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
-        if (url.includes('/api/pairing/state')) return new Response(null, { status: 404 })
-        if (url.endsWith('/api/commands')) {
-          return new Response(JSON.stringify(LISTING), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        }
-        if (/\/api\/commands\/[a-z0-9-]+\/expand$/.test(url)) {
-          return new Response(JSON.stringify({ text: 'Explain the projection layer in plain words, please.' }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        }
-        return new Response(null, { status: 404 })
-      }),
-    )
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const url =
+        input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
+      calls.push({
+        url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? init.body : null,
+      })
+      if (url.includes('/api/pairing/state')) return new Response(null, { status: 404 })
+      if (url.endsWith('/api/commands')) return jsonResponse(LISTING)
+      if (/\/api\/commands\/[a-z0-9-]+\/expand$/.test(url)) {
+        return jsonResponse({ text: 'Explain the projection layer in plain words, please.' })
+      }
+      return new Response(null, { status: 404 })
+    }
+    vi.stubGlobal('fetch', fetch)
+    return calls
+  }
+
+  it('offers the commands while the name is typed, completes the picked one, and sends its expansion', async () => {
+    const calls = serveHarness()
     const onSend = vi.fn(async () => ({ ok: true }))
     renderComposer(onSend)
 
@@ -442,7 +462,7 @@ describe('the slash, from the field', () => {
 
     // Enter takes the picked row: the name completes, the hint's argument
     // comes next, and the picker steps aside for the words. This command
-    // takes an argument, so the second Enter is the send - here the click.
+    // takes an argument, so the second Enter is the send — here the click.
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
     expect(field()).toBe('/explain ')
     expect(screen.queryByRole('listbox')).toBeNull()
@@ -452,5 +472,29 @@ describe('the slash, from the field', () => {
     await waitFor(() =>
       expect(onSend).toHaveBeenCalledWith('Explain the projection layer in plain words, please.', [], []),
     )
+
+    // And the ask that carried it: the picked command's own route, the words
+    // after the name sent as its arguments. What comes back is the harness's
+    // substitution; what this pins is that we asked with the right words.
+    const expand = calls.find((asked) => asked.url.endsWith('/api/commands/explain/expand'))
+    if (expand === undefined) throw new Error('the expansion was never asked for')
+    expect(expand.method).toBe('POST')
+    expect(expand.body).toBe('{"arguments":"the projection layer"}')
+  })
+
+  it('dismisses the picker with Escape and leaves the drafted name, space and all', async () => {
+    serveHarness()
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    type('/explain')
+    await waitFor(() => expect(screen.getByRole('listbox', { name: 'Commands' })).toBeTruthy())
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
+
+    expect(screen.queryByRole('listbox')).toBeNull()
+    // The draft stays — the name completed by the space its arguments
+    // follow — so dismissing is not losing; the words are the next
+    // keystrokes.
+    expect(field()).toBe('/explain ')
   })
 })
