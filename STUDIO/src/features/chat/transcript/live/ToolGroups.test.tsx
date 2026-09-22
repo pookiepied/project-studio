@@ -212,21 +212,23 @@ describe('expanding a call', () => {
   })
 
   it('falls back to the raw input for a call with no diff', () => {
+    // A read used to stand in here, but a read is a statement now; the
+    // property moved to the next tool whose input carries no diff.
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
-          toolName: 'read',
+          toolName: 'move',
           calls: [
             call({
-              toolName: 'read',
-              input: present({ file_path: 'a.ts' }),
-              output: present('contents'),
+              toolName: 'move',
+              input: present({ from: 'a.ts', to: 'b/c.ts' }),
+              output: present('Moved a.ts to b/c.ts'),
             }),
           ],
         })}
       />,
     )
-    fireEvent.click(screen.getByText('Read'))
+    fireEvent.click(screen.getByText('Moved'))
     expect(screen.getByText(/in:/)).toBeTruthy()
     expect(screen.getByText(/out:/)).toBeTruthy()
   })
@@ -255,12 +257,12 @@ describe('expanding a call', () => {
     const plain = render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
-          toolName: 'read',
-          calls: [call({ toolName: 'read', input: present({ file_path: 'a.ts' }) })],
+          toolName: 'glob',
+          calls: [call({ toolName: 'glob', input: present({ pattern: '*.ts' }) })],
         })}
       />,
     )
-    fireEvent.click(plain.getByText('Reading'))
+    fireEvent.click(plain.getByText('Searching'))
     const plainBody = plain.container.querySelector('[class*="mt-1.5"]')
     expect(plainBody?.className).toContain('border-l-2')
   })
@@ -565,11 +567,10 @@ describe('the answer', () => {
     expect(screen.queryByText(/out:/)).toBeNull()
   })
 
-  it('renders a read answer as its page, the numbers true, not as quoted JSON', () => {
-    // The read's expansion used to be the raw `out:` slab; it is now the
-    // page the read returned, on the same card grammar a diff uses. The
-    // property the old test pinned -- a string answer renders as itself,
-    // never as quoted JSON -- still holds, row by row.
+  it('renders a read as a statement that opens onto nothing', () => {
+    // The read's answer is the page the model read -- the model's business,
+    // and a slab a reader was never meant to wade through -- so the row is
+    // a statement: no chevron, no region, nothing to open.
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
@@ -584,11 +585,12 @@ describe('the answer', () => {
         })}
       />,
     )
+    const row = screen.getByText('Read').closest('button')
+    expect(row?.getAttribute('aria-expanded')).toBeNull()
+    expect(row?.disabled).toBe(true)
     fireEvent.click(screen.getByText('Read'))
-    expect(screen.getByText('first line')).toBeTruthy()
-    expect(screen.getByText('second line')).toBeTruthy()
+    expect(screen.queryByText('first line')).toBeNull()
     expect(screen.queryByText(/out:/)).toBeNull()
-    expect(screen.queryByText('\\n')).toBeNull()
   })
 
   it('prints a structured answer as JSON', () => {
@@ -612,59 +614,31 @@ describe('the answer', () => {
 })
 
 /**
- * The read's page, as a card. The harness answers a read with `cat -n`
- * lines whose numbers are the file's own; the card prints them into a
- * gutter and refuses to draw anything that does not carry that shape --
- * a prose answer falls back to the raw rendering rather than being drawn
- * as a page it is not.
+ * A read is a statement, not a disclosure -- except when it failed. The
+ * error is the one part of a read's answer a person may need, and it lives
+ * nowhere else, so failure is the one read that still opens.
  */
-describe('the read page', () => {
-  const readCall = (output: string) =>
-    call({
-      toolName: 'read',
-      input: present({ path: 'snake/script.js' }),
-      output: present(output),
-    })
-
-  it('names the window the footer reported, and repeats it once', () => {
+describe('the read that failed', () => {
+  it('keeps its disclosure, and the error under it', () => {
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
           toolName: 'read',
           calls: [
-            readCall('     1\tconst a = 1\n     2\tconst b = 2\n[showing lines 1-2 of 9; read again with offset 3 for more]'),
+            call({
+              toolName: 'read',
+              input: present({ path: 'notes.txt' }),
+              errorText: 'There is no file at notes.txt.',
+            }),
           ],
         })}
       />,
     )
     fireEvent.click(screen.getByText('Read'))
-    expect(screen.getByText('lines 1-2 of 9')).toBeTruthy()
-    // The footer says it once in the harness's words, under the rows.
-    expect(screen.getByText('Showing lines 1-2 of 9.')).toBeTruthy()
+    expect(screen.getByText(/There is no file at notes\.txt\./)).toBeTruthy()
   })
 
-  it('names the range on a read that reached the end of its file', () => {
-    render(
-      <ToolGroups conversationId="conv"
-        groups={groupsOf({ toolName: 'read', calls: [readCall('     1\tconst a = 1')] })}
-      />,
-    )
-    fireEvent.click(screen.getByText('Read'))
-    expect(screen.getByText('lines 1-1')).toBeTruthy()
-  })
-
-  it('falls back to the raw answer when the shape is not a page', () => {
-    render(
-      <ToolGroups conversationId="conv"
-        groups={groupsOf({ toolName: 'read', calls: [readCall('(this file is empty)')] })}
-      />,
-    )
-    fireEvent.click(screen.getByText('Read'))
-    expect(screen.getByText(/out:/).textContent).toContain('(this file is empty)')
-    expect(screen.queryByText('lines 1-1')).toBeNull()
-  })
-
-  it('renders an image read as the picture, and never the base64 as text', () => {
+  it('renders an image read as the same statement, its bytes never printed', () => {
     const { container } = render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
@@ -684,10 +658,9 @@ describe('the read page', () => {
         })}
       />,
     )
-    fireEvent.click(screen.getByText('Read'))
-    const picture = container.querySelector('img')
-    expect(picture?.getAttribute('src')).toBe('data:image/png;base64,aGVsbG8=')
-    expect(screen.getByText('Attached: snake.png (image/png).')).toBeTruthy()
+    const row = screen.getByText('Read').closest('button')
+    expect(row?.disabled).toBe(true)
+    expect(container.querySelector('img')).toBeNull()
     expect(container.textContent).not.toContain('aGVsbG8=')
   })
 })

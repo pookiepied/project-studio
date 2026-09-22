@@ -9,7 +9,6 @@ import { netOf } from './groupNet'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
-import { FileRead, readPage, type ReadPage } from './FileRead'
 import { RollingCount } from './RollingCount'
 import { BrowserReport } from './BrowserReport'
 import { MediaCallArtifact } from './MediaCallArtifact'
@@ -397,10 +396,42 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const running = call.errorText === null && !answered
   const verb =
     action === undefined ? call.toolName : running ? action.running : action.done
-  // A read is the third framed card, beside the write's and edit's diffs:
-  // its answer IS a page of the file, and the card is that page.
-  const read = readPageOf(call)
-  const attachments = read === null ? attachmentsOf(call) : null
+
+  // A read is a statement, not a disclosure. Its answer is the page the
+  // model read -- the model's business, and a slab a reader was never meant
+  // to wade through -- and everything the chip could say about it, the verb
+  // and the file, it already says. So a read that came back intact opens
+  // onto nothing and carries no chevron promising an opening. The exception
+  // is failure: the error is the one part of a read's answer a person may
+  // need, and it lives nowhere else.
+  if (call.toolName === 'read' && call.errorText === null) {
+    return (
+      <DisclosureRow
+        leading={action === undefined ? undefined : <action.mark />}
+        entering={live}
+        label={
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              className={cn(
+                'shrink-0',
+                running && live && 'studio-shimmer inline-block whitespace-nowrap',
+              )}
+            >
+              {verb}
+            </span>
+            {file !== null ? <FileTypeMark path={file} /> : null}
+            {file !== null ? <FileSubject path={file} /> : null}
+            {running && !live ? (
+              <span className="shrink-0 opacity-60">pending</span>
+            ) : null}
+          </span>
+        }
+        open={false}
+        onToggle={() => {}}
+        disabled
+      />
+    )
+  }
 
   return (
     <DisclosureRow
@@ -451,18 +482,10 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       // A diff arrives as its own framed card, so the body stands flush: the
       // rule would draw a second edge a hand's width from the card's, and
       // the indent would park the diff off the boundary every other response
-      // element shares. A read page and a read's picture are cards by the
-      // same reasoning. Loose working-out keeps the rule.
-      flush={diff !== null && file !== null || read !== null || attachments !== null}
+      // element shares. Loose working-out keeps the rule.
+      flush={diff !== null && file !== null}
     >
-      <CallWorkingOut
-        call={call}
-        diff={diff}
-        file={file}
-        outcome={outcome}
-        read={read}
-        attachments={attachments}
-      />
+      <CallWorkingOut call={call} diff={diff} file={file} outcome={outcome} />
     </DisclosureRow>
   )
 }
@@ -470,35 +493,27 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
 /**
  * What opens under a chip: the call's working-out, in the shape its own kind
  * names. A file-writing call shows the diff it described and the harness's
- * own sentence; a read shows the page it returned as a card of numbered
- * lines, and a read of a picture shows the picture itself; a question call
- * shows each question and the exact answer it was given; everything else
- * shows the raw input and answer, pretty-printed but untouched.
+ * own sentence; a question call shows each question and the exact answer
+ * it was given; everything else shows the raw input and answer, pretty-
+ * printed but untouched. A read lands here only when it failed -- the error
+ * is its working-out -- because an answered read is a statement, not a
+ * disclosure.
  */
 function CallWorkingOut({
   call,
   diff,
   file,
   outcome,
-  read = null,
-  attachments = null,
 }: {
   call: ToolCallView
   diff: LineDiff | null
   file: string | null
   outcome: FileToolOutcome | null
-  /** A read's answer parsed into its page; null for every other call. */
-  read?: ReadPage | null
-  /** A read that attached pictures; null for every other call. */
-  attachments?: ReadAttachments | null
 }) {
   const diffed = diff !== null && file !== null
-  const readCard = read !== null && file !== null
   return (
     <div className="flex flex-col gap-1">
-      {readCard ? (
-        <FileRead path={file} page={read} />
-      ) : diffed ? (
+      {diffed ? (
         <FileDiff path={file} diff={diff} />
       ) : call.toolName === 'ask_user_question' ? (
         <AskWorkingOut call={call} />
@@ -523,8 +538,6 @@ function CallWorkingOut({
           // facts the card does not; the echo is the card, whose gutters now
           // carry the echo's own numbers.
           <OutcomeSentence outcome={outcome} />
-        ) : readCard ? null : attachments !== null ? (
-          <ReadAttachmentViews attachments={attachments} />
         ) : call.toolName === 'ask_user_question' ? null : (
           <div className="font-mono text-code text-muted-foreground">
             <Detail label="out" value={call.output} />
@@ -718,76 +731,6 @@ function outcomeOf(call: ToolCallView): FileToolOutcome | null {
   if (call.output === null || !call.output.present) return null
   const value: unknown = call.output.value
   return typeof value === 'string' ? parseFileToolOutcome(value) : null
-}
-
-/**
- * A read's answer as its page, or null. The read tool answers with the
- * `cat -n` lines the harness formats (`formatNumbered`, in the harness's
- * `filesystem/read.ts`), so the numbers this parses are the file's own.
- * Anything else -- an answer that has not arrived, prose, an error -- is
- * null, and the call falls back to the raw rendering.
- */
-function readPageOf(call: ToolCallView): ReadPage | null {
-  if (call.toolName !== 'read') return null
-  if (call.output === null || !call.output.present) return null
-  const value: unknown = call.output.value
-  return typeof value === 'string' ? readPage(value) : null
-}
-
-/** A read's answer when it attached pictures: its text and image blocks. */
-interface ReadAttachments {
-  readonly text: readonly string[]
-  readonly images: readonly { readonly data: string; readonly mimeType: string }[]
-}
-
-/**
- * The pictures a read attached, read out of the answer's content blocks.
- * The blocks mirror the harness's own `ReadOutput` shape, read defensively
- * like every answer is. Only an answer that carries a picture needs this
- * rendering -- and it needs it, because the raw fallback would print the
- * picture's base64 as text, a slab of noise nothing on screen can use.
- */
-function attachmentsOf(call: ToolCallView): ReadAttachments | null {
-  if (call.toolName !== 'read') return null
-  if (call.output === null || !call.output.present) return null
-  const value: unknown = call.output.value
-  if (!isRecord(value)) return null
-  const content = value['content']
-  if (!Array.isArray(content)) return null
-  const text: string[] = []
-  const images: { data: string; mimeType: string }[] = []
-  for (const block of content) {
-    if (!isRecord(block)) continue
-    const data = block['data']
-    const mimeType = block['mimeType']
-    if (block['type'] === 'text' && typeof block['text'] === 'string') {
-      text.push(block['text'])
-    } else if (block['type'] === 'image' && typeof data === 'string' && typeof mimeType === 'string') {
-      images.push({ data, mimeType })
-    }
-  }
-  return images.length === 0 ? null : { text, images }
-}
-
-/** The picture blocks of an image read, rendered; the text beside them. */
-function ReadAttachmentViews({ attachments }: { attachments: ReadAttachments }) {
-  return (
-    <div className="flex flex-col gap-1">
-      {attachments.text.length > 0 ? (
-        <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-muted-foreground">
-          {attachments.text.join('\n')}
-        </pre>
-      ) : null}
-      {attachments.images.map((image, index) => (
-        <img
-          key={index}
-          src={`data:${image.mimeType};base64,${image.data}`}
-          alt="The picture the read attached"
-          className="max-h-72 self-start rounded-md border border-hairline"
-        />
-      ))}
-    </div>
-  )
 }
 
 /**
