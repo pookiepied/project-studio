@@ -565,7 +565,11 @@ describe('the answer', () => {
     expect(screen.queryByText(/out:/)).toBeNull()
   })
 
-  it('renders a string answer as itself, not as quoted JSON', () => {
+  it('renders a read answer as its page, the numbers true, not as quoted JSON', () => {
+    // The read's expansion used to be the raw `out:` slab; it is now the
+    // page the read returned, on the same card grammar a diff uses. The
+    // property the old test pinned -- a string answer renders as itself,
+    // never as quoted JSON -- still holds, row by row.
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
@@ -574,14 +578,16 @@ describe('the answer', () => {
             call({
               toolName: 'read',
               input: present({ path: 'notes.txt' }),
-              output: present('1  first line\n2  second line'),
+              output: present('     1\tfirst line\n     2\tsecond line'),
             }),
           ],
         })}
       />,
     )
     fireEvent.click(screen.getByText('Read'))
-    expect(screen.getByText(/out:/).textContent).toContain('\n')
+    expect(screen.getByText('first line')).toBeTruthy()
+    expect(screen.getByText('second line')).toBeTruthy()
+    expect(screen.queryByText(/out:/)).toBeNull()
     expect(screen.queryByText('\\n')).toBeNull()
   })
 
@@ -602,6 +608,143 @@ describe('the answer', () => {
     )
     fireEvent.click(screen.getByText('Ran'))
     expect(screen.getByText(/out:/).textContent).toContain('"branch"')
+  })
+})
+
+/**
+ * The read's page, as a card. The harness answers a read with `cat -n`
+ * lines whose numbers are the file's own; the card prints them into a
+ * gutter and refuses to draw anything that does not carry that shape --
+ * a prose answer falls back to the raw rendering rather than being drawn
+ * as a page it is not.
+ */
+describe('the read page', () => {
+  const readCall = (output: string) =>
+    call({
+      toolName: 'read',
+      input: present({ path: 'snake/script.js' }),
+      output: present(output),
+    })
+
+  it('names the window the footer reported, and repeats it once', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf({
+          toolName: 'read',
+          calls: [
+            readCall('     1\tconst a = 1\n     2\tconst b = 2\n[showing lines 1-2 of 9; read again with offset 3 for more]'),
+          ],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Read'))
+    expect(screen.getByText('lines 1-2 of 9')).toBeTruthy()
+    // The footer says it once in the harness's words, under the rows.
+    expect(screen.getByText('Showing lines 1-2 of 9.')).toBeTruthy()
+  })
+
+  it('names the range on a read that reached the end of its file', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf({ toolName: 'read', calls: [readCall('     1\tconst a = 1')] })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Read'))
+    expect(screen.getByText('lines 1-1')).toBeTruthy()
+  })
+
+  it('falls back to the raw answer when the shape is not a page', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf({ toolName: 'read', calls: [readCall('(this file is empty)')] })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Read'))
+    expect(screen.getByText(/out:/).textContent).toContain('(this file is empty)')
+    expect(screen.queryByText('lines 1-1')).toBeNull()
+  })
+
+  it('renders an image read as the picture, and never the base64 as text', () => {
+    const { container } = render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf({
+          toolName: 'read',
+          calls: [
+            call({
+              toolName: 'read',
+              input: present({ path: 'snake.png' }),
+              output: present({
+                content: [
+                  { type: 'text', text: 'Attached: snake.png (image/png).' },
+                  { type: 'image', data: 'aGVsbG8=', mimeType: 'image/png' },
+                ],
+              }),
+            }),
+          ],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Read'))
+    const picture = container.querySelector('img')
+    expect(picture?.getAttribute('src')).toBe('data:image/png;base64,aGVsbG8=')
+    expect(screen.getByText('Attached: snake.png (image/png).')).toBeTruthy()
+    expect(container.textContent).not.toContain('aGVsbG8=')
+  })
+})
+
+/**
+ * The four native tools that shipped after the action map was first
+ * written. Like `discover` and `jobs` above, an unmapped native tool falls
+ * through to its bare wire name with no mark -- right for an extension's
+ * tool, wrong for ours. Each of these also pins the subject the chip names:
+ * the path the act touched, or the query that drove it.
+ */
+describe('the late native tools', () => {
+  it('gives delete its mark and its path', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf({
+          toolName: 'delete',
+          calls: [call({ toolName: 'delete', input: present({ path: 'STUDIO/src/old.ts' }), output: present('Deleted STUDIO/src/old.ts') })],
+        })}
+      />,
+    )
+    expect(screen.getByText('Deleted')).toBeTruthy()
+    // Only the file tools split a path into name and way; delete names the
+    // path whole.
+    expect(screen.getByText('STUDIO/src/old.ts')).toBeTruthy()
+    expect(screen.queryByText('delete')).toBeNull()
+  })
+
+  it('gives move its mark and names the file that moved', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf({
+          toolName: 'move',
+          calls: [call({ toolName: 'move', input: present({ from: 'a.ts', to: 'b/c.ts' }), output: present('Moved a.ts to b/c.ts') })],
+        })}
+      />,
+    )
+    expect(screen.getByText('Moved')).toBeTruthy()
+    expect(screen.getByText('a.ts')).toBeTruthy()
+    expect(screen.queryByText('move')).toBeNull()
+  })
+
+  it('gives the library tools their marks and their subjects', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf(
+          { toolName: 'library_search', calls: [call({ toolName: 'library_search', input: present({ query: 'the logo' }), output: present('Found 1.') })] },
+          { toolName: 'library_keep', calls: [call({ toolName: 'library_keep', toolCallId: 'call-11', input: present({ path: 'out.png' }), output: present('Kept.') })] },
+        )}
+      />,
+    )
+    expect(screen.getByText('Searched')).toBeTruthy()
+    expect(screen.getByText('the logo')).toBeTruthy()
+    expect(screen.getByText('Kept')).toBeTruthy()
+    expect(screen.getByText('out.png')).toBeTruthy()
+    expect(screen.queryByText('library_search')).toBeNull()
+    expect(screen.queryByText('library_keep')).toBeNull()
   })
 })
 

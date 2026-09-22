@@ -32,7 +32,7 @@ import {
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
-  FastForward, CircleAlert, Clapperboard, FileText,
+  FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
   Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus,
   type LucideIcon,
@@ -225,6 +225,10 @@ const REGISTRY = {
   fileRead: { mark: BookOpen },
   fileWrite: { mark: FilePlus },
   run: { mark: Terminal },
+  // A file going into a folder: the move tool, whose whole act is a file
+  // gaining a new place. Not the pencil, which is an edit to a file's
+  // contents; nothing here changes what is inside the file.
+  move: { mark: FolderInput },
 
   // — File formats ---------------------------------------------------------
   // Three formats no brand speaks for: SQL, XML and YAML are standards, not

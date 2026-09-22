@@ -9,6 +9,7 @@ import { netOf } from './groupNet'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
+import { FileRead, readPage, type ReadPage } from './FileRead'
 import { RollingCount } from './RollingCount'
 import { BrowserReport } from './BrowserReport'
 import { MediaCallArtifact } from './MediaCallArtifact'
@@ -195,6 +196,14 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   // wrong place to announce that.
   discover: { mark: Icons.mcp, running: 'Discovering', done: 'Discovered' },
   jobs: { mark: Icons.backgroundJobs, running: 'Checking', done: 'Checked' },
+  delete: { mark: Icons.delete, running: 'Deleting', done: 'Deleted' },
+  move: { mark: Icons.move, running: 'Moving', done: 'Moved' },
+  // The library tools wear the library's own mark, not the search glass:
+  // glob and grep search the project, and these search -- or add to -- the
+  // library, which is the thing the settings pane already taught the reader
+  // to recognise by that grid of tiles.
+  library_search: { mark: Icons.library, running: 'Searching', done: 'Searched' },
+  library_keep: { mark: Icons.keep, running: 'Keeping', done: 'Kept' },
 }
 
 /** The tools whose subject is a file path, and so earns the file's own mark. */
@@ -388,6 +397,10 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const running = call.errorText === null && !answered
   const verb =
     action === undefined ? call.toolName : running ? action.running : action.done
+  // A read is the third framed card, beside the write's and edit's diffs:
+  // its answer IS a page of the file, and the card is that page.
+  const read = readPageOf(call)
+  const attachments = read === null ? attachmentsOf(call) : null
 
   return (
     <DisclosureRow
@@ -438,10 +451,18 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       // A diff arrives as its own framed card, so the body stands flush: the
       // rule would draw a second edge a hand's width from the card's, and
       // the indent would park the diff off the boundary every other response
-      // element shares. Loose working-out keeps the rule.
-      flush={diff !== null && file !== null}
+      // element shares. A read page and a read's picture are cards by the
+      // same reasoning. Loose working-out keeps the rule.
+      flush={diff !== null && file !== null || read !== null || attachments !== null}
     >
-      <CallWorkingOut call={call} diff={diff} file={file} outcome={outcome} />
+      <CallWorkingOut
+        call={call}
+        diff={diff}
+        file={file}
+        outcome={outcome}
+        read={read}
+        attachments={attachments}
+      />
     </DisclosureRow>
   )
 }
@@ -449,25 +470,35 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
 /**
  * What opens under a chip: the call's working-out, in the shape its own kind
  * names. A file-writing call shows the diff it described and the harness's
- * own sentence; a question call shows each question and the exact answer
- * it was given; everything else shows the raw input and answer, pretty-
- * printed but untouched.
+ * own sentence; a read shows the page it returned as a card of numbered
+ * lines, and a read of a picture shows the picture itself; a question call
+ * shows each question and the exact answer it was given; everything else
+ * shows the raw input and answer, pretty-printed but untouched.
  */
 function CallWorkingOut({
   call,
   diff,
   file,
   outcome,
+  read = null,
+  attachments = null,
 }: {
   call: ToolCallView
   diff: LineDiff | null
   file: string | null
   outcome: FileToolOutcome | null
+  /** A read's answer parsed into its page; null for every other call. */
+  read?: ReadPage | null
+  /** A read that attached pictures; null for every other call. */
+  attachments?: ReadAttachments | null
 }) {
   const diffed = diff !== null && file !== null
+  const readCard = read !== null && file !== null
   return (
     <div className="flex flex-col gap-1">
-      {diffed ? (
+      {readCard ? (
+        <FileRead path={file} page={read} />
+      ) : diffed ? (
         <FileDiff path={file} diff={diff} />
       ) : call.toolName === 'ask_user_question' ? (
         <AskWorkingOut call={call} />
@@ -492,6 +523,8 @@ function CallWorkingOut({
           // facts the card does not; the echo is the card, whose gutters now
           // carry the echo's own numbers.
           <OutcomeSentence outcome={outcome} />
+        ) : readCard ? null : attachments !== null ? (
+          <ReadAttachmentViews attachments={attachments} />
         ) : call.toolName === 'ask_user_question' ? null : (
           <div className="font-mono text-code text-muted-foreground">
             <Detail label="out" value={call.output} />
@@ -688,6 +721,76 @@ function outcomeOf(call: ToolCallView): FileToolOutcome | null {
 }
 
 /**
+ * A read's answer as its page, or null. The read tool answers with the
+ * `cat -n` lines the harness formats (`formatNumbered`, in the harness's
+ * `filesystem/read.ts`), so the numbers this parses are the file's own.
+ * Anything else -- an answer that has not arrived, prose, an error -- is
+ * null, and the call falls back to the raw rendering.
+ */
+function readPageOf(call: ToolCallView): ReadPage | null {
+  if (call.toolName !== 'read') return null
+  if (call.output === null || !call.output.present) return null
+  const value: unknown = call.output.value
+  return typeof value === 'string' ? readPage(value) : null
+}
+
+/** A read's answer when it attached pictures: its text and image blocks. */
+interface ReadAttachments {
+  readonly text: readonly string[]
+  readonly images: readonly { readonly data: string; readonly mimeType: string }[]
+}
+
+/**
+ * The pictures a read attached, read out of the answer's content blocks.
+ * The blocks mirror the harness's own `ReadOutput` shape, read defensively
+ * like every answer is. Only an answer that carries a picture needs this
+ * rendering -- and it needs it, because the raw fallback would print the
+ * picture's base64 as text, a slab of noise nothing on screen can use.
+ */
+function attachmentsOf(call: ToolCallView): ReadAttachments | null {
+  if (call.toolName !== 'read') return null
+  if (call.output === null || !call.output.present) return null
+  const value: unknown = call.output.value
+  if (!isRecord(value)) return null
+  const content = value['content']
+  if (!Array.isArray(content)) return null
+  const text: string[] = []
+  const images: { data: string; mimeType: string }[] = []
+  for (const block of content) {
+    if (!isRecord(block)) continue
+    const data = block['data']
+    const mimeType = block['mimeType']
+    if (block['type'] === 'text' && typeof block['text'] === 'string') {
+      text.push(block['text'])
+    } else if (block['type'] === 'image' && typeof data === 'string' && typeof mimeType === 'string') {
+      images.push({ data, mimeType })
+    }
+  }
+  return images.length === 0 ? null : { text, images }
+}
+
+/** The picture blocks of an image read, rendered; the text beside them. */
+function ReadAttachmentViews({ attachments }: { attachments: ReadAttachments }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {attachments.text.length > 0 ? (
+        <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-muted-foreground">
+          {attachments.text.join('\n')}
+        </pre>
+      ) : null}
+      {attachments.images.map((image, index) => (
+        <img
+          key={index}
+          src={`data:${image.mimeType};base64,${image.data}`}
+          alt="The picture the read attached"
+          className="max-h-72 self-start rounded-md border border-hairline"
+        />
+      ))}
+    </div>
+  )
+}
+
+/**
  * The one fact worth showing as the chip's object: which file, which command
  * -- taken from the input the model actually sent, by field name, never
  * inferred. A question call's object is its first question's header, with
@@ -698,7 +801,9 @@ function subjectOf(call: ToolCallView): string | null {
   const input: unknown = call.input.value
   if (!isRecord(input)) return typeof input === 'string' && input.length > 0 ? input : null
   if (call.toolName === 'ask_user_question') return askSubject(input)
-  for (const key of ['path', 'file_path', 'command', 'pattern', 'query', 'url']) {
+  // `from` first for a move: the row's object is the file that exists, and
+  // the destination it gained is the call's working-out, not its subject.
+  for (const key of ['path', 'file_path', 'from', 'command', 'pattern', 'query', 'url']) {
     const value = input[key]
     if (typeof value === 'string' && value.length > 0) return value
   }
