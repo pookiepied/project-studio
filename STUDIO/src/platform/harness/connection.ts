@@ -45,6 +45,15 @@
  *   VITE_HARNESS_BASE_URL   e.g. http://127.0.0.1:4319
  *   VITE_HARNESS_TOKEN      the bearer credential that launch printed
  *
+ * What they buy, stated honestly: the harness serves no CORS headers, and
+ * `vite dev`'s origin is cross-origin to a loopback port, so a real browser
+ * under it never gets past the request's preflight — which carries no
+ * credential, and which the admission middleware answers 401. The working
+ * consumer of this branch is vitest, where `fetch` is stubbed and the
+ * preflight that would lose never happens (`request.ts` carries the longer
+ * story of why the webview itself sends through Rust). A plain browser
+ * meeting this bundle for real is the listener's guest, the section below.
+ *
  * With neither set this returns `null` and the app runs with no harness and
  * no network calls at all. Callers must treat `null` as the normal case, not
  * an error.

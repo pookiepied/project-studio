@@ -49,8 +49,8 @@ export function parseCommand(value: unknown): CommandRecord | null {
   if (!isRecord(value)) return null
   const id = text(value['id'])
   const description = text(value['description'])
-  // The hint is legitimately the empty string - it is what "nothing to type"
-  // reads as, and the built-in actions ship it - so it does not go through
+  // The hint is legitimately the empty string — it is what "nothing to type"
+  // reads as, and the built-in actions ship it — so it does not go through
   // `text`, whose non-empty rule failed the record, the listing and the
   // picker with it.
   const argumentHint = value['argumentHint'] === '' ? '' : text(value['argumentHint'])
@@ -115,8 +115,8 @@ export function parseCommandDetail(value: unknown): CommandDetail | null {
 
 export function parseCommandExpansion(value: unknown): string | null {
   if (!isRecord(value)) return null
-  // An expansion of nothing is a real answer - a body that is only `$1`,
-  // expanded against no arguments - so it does not go through `text`.
+  // An expansion of nothing is a real answer — a body that is only `$1`,
+  // expanded against no arguments — so it does not go through `text`.
   const expanded = value['text']
   return typeof expanded === 'string' ? expanded : null
 }
