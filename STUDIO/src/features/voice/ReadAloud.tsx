@@ -76,9 +76,12 @@ export function ReadAloud({ text }: { text: string }) {
     narration.current?.stop()
     // The narration says `loading` synchronously, before it is the current
     // one and while the guard below still refuses it, so the pill says it
-    // here.
+    // here. `started` is declared ahead of the call for that same reason: the
+    // guard runs before the assignment lands, and a const read that early
+    // throws rather than comparing.
     setState({ stage: 'loading' })
-    const started = narrate({
+    let started: Narration | null = null
+    started = narrate({
       text,
       speak: speakText,
       openSink: openWebAudioSink,

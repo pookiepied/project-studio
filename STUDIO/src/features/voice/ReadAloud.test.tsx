@@ -41,6 +41,23 @@ function begin(): void {
 }
 
 describe('the read-aloud pill', () => {
+  it('survives a narration that reports loading before it has returned', () => {
+    // The real narration says `loading` from inside `narrate`, before the
+    // caller holds it. The pill once read its own handle in that callback
+    // and threw, which made every click on the button an uncaught error.
+    narrate.mockImplementationOnce((options: NarrationOptions) => {
+      options.onChange({ stage: 'loading' })
+      report = options.onChange
+      return { pause: vi.fn(), resume: vi.fn(), stop }
+    })
+    render(<ReadAloud text="Good morning." />)
+    expect(() => begin()).not.toThrow()
+    expect(screen.getByText('Reading aloud')).toBeTruthy()
+
+    act(() => report?.({ stage: 'done' }))
+    expect(screen.getByRole('button', { name: 'Read aloud' })).toBeTruthy()
+  })
+
   it('shows a refusal until it is dismissed, with a retry beside it', () => {
     render(<ReadAloud text="Good morning." />)
     begin()
