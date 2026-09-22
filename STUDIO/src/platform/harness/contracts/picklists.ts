@@ -124,6 +124,7 @@ export const CAPABILITY_SLOTS = [
   'videoGeneration',
   'speechGeneration',
   'transcription',
+  'documentReading',
   'embeddings',
   'webSearch',
   'webFetch',
@@ -160,6 +161,7 @@ export function kindOfCapability(capability: ModelCapability): ProviderKind {
     'videoGeneration',
     'speechGeneration',
     'transcription',
+    'documentReading',
     'embeddings',
   ]
   if (media.some((slot) => capability[slot] === 'supported')) return 'media'
@@ -169,7 +171,7 @@ export function kindOfCapability(capability: ModelCapability): ProviderKind {
 /** The capability slots each kind of provider fills. */
 export const SLOTS_BY_KIND: Readonly<Record<ProviderKind, readonly CapabilitySlot[]>> = {
   language: ['textGeneration'],
-  media: ['imageGeneration', 'imageEditing', 'videoGeneration', 'speechGeneration', 'transcription', 'embeddings'],
+  media: ['imageGeneration', 'imageEditing', 'videoGeneration', 'speechGeneration', 'transcription', 'documentReading', 'embeddings'],
   retrieval: ['webSearch', 'webFetch'],
 }
 

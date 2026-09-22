@@ -95,12 +95,49 @@ export type Generation =
   | { readonly shape: "sync"; readonly result: Promise<readonly MediaBytes[]> }
   | { readonly shape: "poll"; readonly job: PolledGeneration };
 
+/**
+ * A document to read as text: the bytes of a PDF or a picture of a page,
+ * and which of its pages are wanted.
+ *
+ * Two kinds of vendor answer this. A dedicated OCR model (Mistral) takes
+ * the file and answers page by page. A vision language model (Gemini, GPT
+ * on the Responses API, anything OpenRouter routes a file to) takes the
+ * file beside an instruction to transcribe it, and its prose answer is cut
+ * into pages by the markers the instruction asked for. Both come back as
+ * the same shape, so the caller - the read tool's escalation for a scanned
+ * page - never knows which kind of vendor it is talking to.
+ *
+ * `pages` is one-based, the way a person and the read tool count them.
+ * Absent, the whole document is read; a document worth reading whole is
+ * usually the small one, and the caller that has already counted the pages
+ * asks for the ones without a text layer.
+ */
+export interface DocumentReadingInput {
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+  /** The name the file carries; vendors that take one show it to the model. */
+  readonly fileName: string;
+  readonly modelId: string;
+  readonly pages?: readonly number[];
+}
+
+export interface DocumentPage {
+  /** One-based, as the caller asked. */
+  readonly number: number;
+  readonly markdown: string;
+}
+
+export interface DocumentReadingResult {
+  readonly pages: readonly DocumentPage[];
+}
+
 export interface MediaAdapter {
   readonly protocol: MediaProtocol;
   readonly speak?: SpeechDriver;
   readonly transcribe?: TranscriptionDriver;
   generateImage?(input: ImageGenerationInput, endpoint: DriverEndpoint): Promise<Generation>;
   generateVideo?(input: VideoGenerationInput, endpoint: DriverEndpoint): Promise<Generation>;
+  readDocument?(input: DocumentReadingInput, endpoint: DriverEndpoint): Promise<DocumentReadingResult>;
 }
 
 /** The adapters the service dispatches through, keyed by the wire they speak. */

@@ -131,6 +131,7 @@ function capabilityFromDeclared(model: DeclaredModel): ModelCapability {
     videoGeneration: "unknown",
     speechGeneration: "unknown",
     transcription: "unknown",
+    documentReading: "unknown",
     webSearch: "unknown",
     webFetch: "unknown",
     contextWindow: "unknown",
@@ -234,6 +235,7 @@ const CAPABILITY_STATES = [
   "videoGeneration",
   "speechGeneration",
   "transcription",
+  "documentReading",
   "webSearch",
   "webFetch",
 ] as const satisfies readonly (keyof Omit<ModelCapability, "contextWindow" | "maxOutputTokens">)[];
@@ -303,6 +305,7 @@ const MEDIA_LISTINGS: Readonly<Record<MediaProtocol, MediaListing | undefined>> 
   deepgram: undefined,
   "fish-audio": undefined,
   minimax: undefined,
+  mistral: undefined,
 };
 
 /**

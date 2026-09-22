@@ -16,13 +16,17 @@ import type { CapabilitySlot } from '@/platform/harness'
  *   Video   generation, with its own vendors.
  *   Voice   speech and transcription. The audio vendors are voice houses -
  *           ElevenLabs, Deepgram, Fish Audio serve both directions.
+ *   Documents  reading a PDF or a scanned page as text: an OCR engine
+ *           (Mistral) or a vision model that takes a file (OpenAI, Google,
+ *           OpenRouter). One slot; the read tool escalates to it for pages
+ *           with no text layer.
  *
  * Embeddings has no category and so no place on the page: nothing invokes it
  * yet, and a picker for something that cannot be used is the clutter this
  * grouping exists to remove. It returns with the feature that needs it.
  */
 
-export type MediaCategory = 'images' | 'video' | 'voice'
+export type MediaCategory = 'images' | 'video' | 'voice' | 'documents'
 
 export interface MediaCategoryInfo {
   readonly id: MediaCategory
@@ -51,6 +55,12 @@ export const MEDIA_CATEGORIES: readonly MediaCategoryInfo[] = [
     description: 'The voice that reads replies aloud, and the ear that takes dictation.',
     slots: ['speechGeneration', 'transcription'],
   },
+  {
+    id: 'documents',
+    name: 'Documents',
+    description: 'The model that reads a scanned page or a whole PDF as text when the read tool asks.',
+    slots: ['documentReading'],
+  },
 ]
 
 /**
@@ -64,6 +74,7 @@ export const SLOT_VERBS: Readonly<Partial<Record<CapabilitySlot, string>>> = {
   videoGeneration: 'Generate',
   speechGeneration: 'Read aloud',
   transcription: 'Dictation',
+  documentReading: 'Read',
 }
 
 export function mediaCategory(id: MediaCategory): MediaCategoryInfo {

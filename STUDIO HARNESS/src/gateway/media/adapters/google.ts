@@ -2,7 +2,10 @@ import { HttpError, requestBinary, requestDirect } from "../../../net/http.js";
 import type { UrlAuthor } from "../../../net/destination.js";
 import { MediaError } from "../../../contracts/media.js";
 import type { DriverEndpoint, SpeechSlotInput, TranscriptionSlotInput } from "../drivers/types.js";
+import { pagesOfTranscript, transcriptionInstruction } from "./document-transcript.js";
 import type {
+  DocumentReadingInput,
+  DocumentReadingResult,
   Generation,
   ImageGenerationInput,
   MediaAdapter,
@@ -353,10 +356,59 @@ async function download(uri: string, endpoint: DriverEndpoint): Promise<MediaByt
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Documents                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The same inline ceiling as audio: the Interactions API takes a request
+ * under 20 MB, and the Files API above it is not taken here. A 50 MB scan
+ * is refused with the size in the sentence, so the person knows to pick a
+ * vendor with a bigger door or split the file.
+ */
+const MAX_INLINE_DOCUMENT_BYTES = 19 * 1024 * 1024;
+const DOCUMENT_TIMEOUT_MS = 300_000;
+
+/**
+ * `POST /interactions` with a `document` block and the shared instruction,
+ * checked against ai.google.dev on 2026-09-22. Gemini reads a PDF's pages
+ * as pictures, so a scan comes back as text; any other document kind it
+ * sees as plain text. A picture of a page goes as an `image` block.
+ */
+async function readDocument(input: DocumentReadingInput, endpoint: DriverEndpoint): Promise<DocumentReadingResult> {
+  if (input.bytes.length > MAX_INLINE_DOCUMENT_BYTES) {
+    throw new MediaError("document-too-large", "The document is over 19 MB, the most Google takes inline.");
+  }
+  const block = {
+    type: input.mimeType.startsWith("image/") ? "image" : "document",
+    data: Buffer.from(input.bytes).toString("base64"),
+    mime_type: input.mimeType,
+  };
+  const interaction = await interact(
+    {
+      model: input.modelId,
+      input: [block, { type: "text", text: transcriptionInstruction(input.pages) }],
+    },
+    "document",
+    endpoint,
+    DOCUMENT_TIMEOUT_MS,
+  );
+  const text = outputBlocks(interaction)
+    .filter((block) => block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text as string)
+    .join("\n");
+  const pages = pagesOfTranscript(text, input.pages);
+  if (pages.length === 0) {
+    throw new MediaError("provider-refused", "Google's document answer carried no text.");
+  }
+  return { pages };
+}
+
 export const googleMedia: MediaAdapter = {
   protocol: "google",
   speak,
   transcribe,
   generateImage,
   generateVideo,
+  readDocument,
 };

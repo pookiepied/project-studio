@@ -676,6 +676,7 @@ function unknownCapability(): ModelCapability {
     videoGeneration: "unknown",
     speechGeneration: "unknown",
     transcription: "unknown",
+    documentReading: "unknown",
     webSearch: "unknown",
     webFetch: "unknown",
     contextWindow: "unknown",

@@ -73,6 +73,7 @@ export const mediaProtocolSchema = v.picklist([
   "deepgram",
   "fish-audio",
   "minimax",
+  "mistral",
 ]);
 
 export type MediaProtocol = v.InferOutput<typeof mediaProtocolSchema>;
@@ -219,6 +220,7 @@ const KIND_SLOTS: Readonly<Record<"media" | "retrieval", readonly CapabilitySlot
     "videoGeneration",
     "speechGeneration",
     "transcription",
+    "documentReading",
     "embeddings",
   ],
   retrieval: ["webSearch", "webFetch"],
@@ -365,6 +367,7 @@ const CAPABILITY_SLOTS = [
   "videoGeneration",
   "speechGeneration",
   "transcription",
+  "documentReading",
   "embeddings",
   "webSearch",
   "webFetch",

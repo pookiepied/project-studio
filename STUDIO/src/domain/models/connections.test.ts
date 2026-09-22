@@ -28,6 +28,7 @@ const CAPABILITY: ModelCapability = {
   videoGeneration: 'unsupported',
   speechGeneration: 'unsupported',
   transcription: 'unsupported',
+  documentReading: 'unsupported',
   webSearch: 'unsupported',
   webFetch: 'unsupported',
   contextWindow: 200_000,

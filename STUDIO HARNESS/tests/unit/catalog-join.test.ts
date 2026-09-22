@@ -24,8 +24,8 @@ import type { ProviderConnectionDraft } from "../../src/contracts/providers.js";
  * catalogue of 122 sources' truth and one of 121.
  */
 
-const LISTED = { images: 54, videos: 29, speech: 18, transcription: 20 } as const;
-const LIVE_TOTAL = LISTED.images + LISTED.videos + LISTED.speech + LISTED.transcription;
+const LISTED = { images: 54, videos: 29, speech: 18, transcription: 20, documents: 7 } as const;
+const LIVE_TOTAL = LISTED.images + LISTED.videos + LISTED.speech + LISTED.transcription + LISTED.documents;
 
 /** A model entry as the vendor spells it; extra fields ride along. */
 function listed(id: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -63,6 +63,16 @@ beforeEach(async () => {
         data: Array.from({ length: LISTED.transcription }, (_, at) =>
           listed(`stand-in/transcription-${at}`),
         ),
+      });
+    }
+    if (url === "/api/v1/models?input_modalities=file") {
+      // The colliding Pi id again: a chat model that takes a file joins its
+      // language row, the same way the image half does.
+      return JSON.stringify({
+        data: [
+          listed(firstPi.id),
+          ...Array.from({ length: LISTED.documents - 1 }, (_, at) => listed(`stand-in/document-${at}`)),
+        ],
       });
     }
     if (url === "/api/v1/images/models") return JSON.stringify({ data: images });
@@ -127,17 +137,18 @@ describe("the Media pane's answer, joined at the catalog", () => {
 
     const models = await catalog.listModels({ connectionId: "openrouter-everything" });
 
-    // Every Pi model, and every listed model, on one shared id: 333 + 121
-    // less the one they both name. One MORE row fewer than that is the leak
-    // this pins.
+    // Every Pi model, and every listed model, on one shared id: 333 + 128
+    // less the one they all name, listed twice (images and documents). One
+    // MORE row fewer than that is the leak this pins.
     const piCount = getBuiltinModels("openrouter").length;
-    expect(models).toHaveLength(piCount + LIVE_TOTAL - 1);
+    expect(models).toHaveLength(piCount + LIVE_TOTAL - 2);
 
     const byId = new Map(models.map((model) => [model.modelId, model]));
     const joined = byId.get(firstPiId());
     expect(joined?.capability.textGeneration).toBe("supported");
     expect(joined?.capability.imageGeneration).toBe("supported");
     expect(joined?.capability.imageEditing).toBe("supported");
+    expect(joined?.capability.documentReading).toBe("supported");
     // The listing's classification, sliced the way the Media page slices it:
     // exactly what the vendor listed, nothing more.
     expect(
@@ -152,9 +163,12 @@ describe("the Media pane's answer, joined at the catalog", () => {
     expect(
       models.filter((model) => model.capability.transcription === "supported"),
     ).toHaveLength(LISTED.transcription);
+    expect(
+      models.filter((model) => model.capability.documentReading === "supported"),
+    ).toHaveLength(LISTED.documents);
   });
 
-  it("asks the four listings without a credential, because the listing is public", async () => {
+  it("asks the five listings without a credential, because the listing is public", async () => {
     await connections.add({
       ...OPENROUTER,
       baseUrl: `http://127.0.0.1:${String(port)}/api/v1`,
@@ -165,6 +179,7 @@ describe("the Media pane's answer, joined at the catalog", () => {
 
     expect(seen.map((call) => call.url).sort()).toEqual([
       "/api/v1/images/models",
+      "/api/v1/models?input_modalities=file",
       "/api/v1/models?output_modalities=speech",
       "/api/v1/models?output_modalities=transcription",
       "/api/v1/videos/models",

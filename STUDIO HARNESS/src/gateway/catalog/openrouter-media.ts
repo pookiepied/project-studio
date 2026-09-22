@@ -17,9 +17,9 @@ import type { CatalogSourceModel } from "./index.js";
  * static: the listing moves weekly - 52 image models and 29 video models on
  * the day this was written - and a hand-kept copy would be stale before it
  * was committed. So a connection that serves OpenRouter's media wire reads
- * the four listings OpenRouter publishes, without a key, and the shared
+ * the five listings OpenRouter publishes, without a key, and the shared
  * machinery in `media-listing.ts` caches each connection's answer for an
- * hour: long enough that a settings screen does not fetch four listings on
+ * hour: long enough that a settings screen does not fetch five listings on
  * every paint, short enough that a model released this morning is there
  * this afternoon.
  *
@@ -76,9 +76,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * One of the four listings, read and mapped. A listing that fails or answers
+ * One of the five listings, read and mapped. A listing that fails or answers
  * nonsense is that kind's empty, not the catalogue's failure: a settings
- * screen shows the three the vendor did answer, and the fourth answers on the
+ * screen shows the four the vendor did answer, and the fifth answers on the
  * next read, when the empty-not-cached rule brings the questions back.
  */
 async function oneListing(
@@ -106,13 +106,20 @@ export const openrouterListing: MediaListing = createMediaListing({
     // Each listing answers exactly its own kind, so nothing the vendor lists
     // goes unclassified and the dropped count stays zero: the query did the
     // filtering.
-    const [speech, transcription, images, videos] = await Promise.all([
+    const [speech, transcription, documents, images, videos] = await Promise.all([
       oneListing(`${origin}/models?output_modalities=speech`, listingFetch, () => ({
         earned: { speechGeneration: "supported" },
         shape: "sync",
       })),
       oneListing(`${origin}/models?output_modalities=transcription`, listingFetch, () => ({
         earned: { transcription: "supported" },
+        shape: "sync",
+      })),
+      // The chat models that take a file as input: the ones a PDF reaches
+      // whole, pages and pictures, rather than through the parser. They are
+      // language models Pi already lists, so this half joins theirs by id.
+      oneListing(`${origin}/models?input_modalities=file`, listingFetch, () => ({
+        earned: { documentReading: "supported" },
         shape: "sync",
       })),
       oneListing(`${origin}/images/models`, listingFetch, (entry) => ({
@@ -131,7 +138,7 @@ export const openrouterListing: MediaListing = createMediaListing({
     ]);
 
     return {
-      models: [...speech, ...transcription, ...images, ...videos],
+      models: [...speech, ...transcription, ...documents, ...images, ...videos],
       dropped: 0,
     };
   },

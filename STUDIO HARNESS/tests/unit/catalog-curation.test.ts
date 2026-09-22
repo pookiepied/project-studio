@@ -42,7 +42,7 @@ const CURATED_LANGUAGE = [
   "zai",
 ];
 
-const CURATED_MEDIA = ["openai", "google", "openrouter", "fal", "elevenlabs", "deepgram", "fish-audio", "minimax"];
+const CURATED_MEDIA = ["openai", "google", "openrouter", "fal", "elevenlabs", "deepgram", "fish-audio", "minimax", "mistral"];
 const CURATED_RETRIEVAL = ["tavily", "brave", "exa", "jina", "firecrawl"];
 
 let scratch: string | undefined;

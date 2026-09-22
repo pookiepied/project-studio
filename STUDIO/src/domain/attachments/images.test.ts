@@ -108,6 +108,7 @@ describe('visionRefusal speaks before the provider does', () => {
     videoGeneration: 'unsupported',
     speechGeneration: 'unsupported',
     transcription: 'unsupported',
+    documentReading: 'unsupported',
     webSearch: 'unsupported',
     webFetch: 'unsupported',
     contextWindow: 'unknown',

@@ -22,11 +22,26 @@ function limit(value: number | undefined): number | "unknown" {
  * live in a separate Pi collection. Tool calling is the honest exception: Pi's
  * model record carries no tool-calling flag, so it stays `"unknown"` instead of
  * being guessed from the provider.
+ *
+ * Document reading is the one media dimension a language model earns: a
+ * vision model reads a PDF's pages as pictures when its wire carries a
+ * file - OpenAI's Responses API and Google's Interactions API both do, and
+ * the media adapters for those two vendors drive it. A vision model on any
+ * other wire is not promised the file, because the adapter would have no
+ * way to hand it one. (OpenRouter's models earn it from OpenRouter's own
+ * listing, which says per model whether a file is an input.)
  */
+const WIRES_THAT_CARRY_A_FILE: ReadonlySet<string> = new Set([
+  "openai-responses",
+  "google-generative-ai",
+]);
+
 export function capabilityFromPiModel(model: Model<Api>): ModelCapability {
   const vision: CapabilityState = model.input.includes("image")
     ? "supported"
     : "unsupported";
+  const documentReading: CapabilityState =
+    vision === "supported" && WIRES_THAT_CARRY_A_FILE.has(model.api) ? "supported" : "unsupported";
 
   return {
     textGeneration: "supported",
@@ -41,6 +56,7 @@ export function capabilityFromPiModel(model: Model<Api>): ModelCapability {
     videoGeneration: "unsupported",
     speechGeneration: "unsupported",
     transcription: "unsupported",
+    documentReading,
     webSearch: "unsupported",
     webFetch: "unsupported",
     contextWindow: limit(model.contextWindow),
@@ -103,6 +119,7 @@ const UNDESCRIBED_CAPABILITY: ModelCapability = {
   videoGeneration: "unknown",
   speechGeneration: "unknown",
   transcription: "unknown",
+  documentReading: "unknown",
   webSearch: "unknown",
   webFetch: "unknown",
   contextWindow: "unknown",

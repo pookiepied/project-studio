@@ -88,6 +88,7 @@ function model(capability: Partial<Parameters<typeof rowCapabilities>[0]['capabi
       videoGeneration: 'unsupported',
       speechGeneration: 'unsupported',
       transcription: 'unsupported',
+      documentReading: 'unsupported',
       webSearch: 'unsupported',
       webFetch: 'unsupported',
       contextWindow: 200_000,

@@ -64,6 +64,7 @@ const CAPABILITY_CHOICES: readonly {
   { key: 'videoGeneration', label: SLOT_LABELS.videoGeneration, hint: 'Produces video' },
   { key: 'speechGeneration', label: SLOT_LABELS.speechGeneration, hint: 'Speaks text aloud' },
   { key: 'transcription', label: SLOT_LABELS.transcription, hint: 'Transcribes audio' },
+  { key: 'documentReading', label: SLOT_LABELS.documentReading, hint: 'Reads a PDF or a scanned page as text' },
   { key: 'embeddings', label: SLOT_LABELS.embeddings, hint: 'Produces embeddings' },
   { key: 'webSearch', label: SLOT_LABELS.webSearch, hint: 'Searches the web' },
   { key: 'webFetch', label: SLOT_LABELS.webFetch, hint: 'Fetches a named page' },

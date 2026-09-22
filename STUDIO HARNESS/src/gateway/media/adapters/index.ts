@@ -5,6 +5,7 @@ import { falMedia } from "./fal.js";
 import { fishAudioMedia } from "./fish-audio.js";
 import { googleMedia } from "./google.js";
 import { minimaxMedia } from "./minimax.js";
+import { mistralMedia } from "./mistral.js";
 import { openaiMedia } from "./openai.js";
 import { openrouterMedia } from "./openrouter.js";
 
@@ -30,6 +31,7 @@ export function builtinMediaAdapters(): MediaAdapters {
       deepgramMedia,
       fishAudioMedia,
       minimaxMedia,
+      mistralMedia,
     ].map((adapter) => [adapter.protocol, adapter]),
   );
 }

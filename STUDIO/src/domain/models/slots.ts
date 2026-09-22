@@ -1,7 +1,7 @@
 import { CAPABILITY_SLOTS, type CapabilitySlot } from '@/platform/harness'
 
 /**
- * The nine capability slots, with the words the product uses for them.
+ * The ten capability slots, with the words the product uses for them.
  *
  * `CAPABILITY_SLOTS` is the contract's own list; this file is the only place
  * that gives the slots display copy, so a slot added to the contract has
@@ -16,6 +16,7 @@ export const SLOT_LABELS: Readonly<Record<CapabilitySlot, string>> = {
   videoGeneration: 'Video',
   speechGeneration: 'Speech',
   transcription: 'Transcription',
+  documentReading: 'Document reading',
   embeddings: 'Embeddings',
   webSearch: 'Web search',
   webFetch: 'Web fetch',

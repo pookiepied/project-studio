@@ -200,6 +200,8 @@ export interface ModelCapability {
   readonly videoGeneration: CapabilityState;
   readonly speechGeneration: CapabilityState;
   readonly transcription: CapabilityState;
+  /** Reading a document's pages - a PDF, scanned or not - as text. OCR, and the vision models that read a PDF whole. */
+  readonly documentReading: CapabilityState;
   /** Retrieving web results for a query. Distinct from webFetch: a search answers a question, a fetch retrieves one named page. */
   readonly webSearch: CapabilityState;
   readonly webFetch: CapabilityState;
@@ -228,6 +230,10 @@ export const modelCapabilitySchema = v.object({
   videoGeneration: capabilityStateSchema,
   speechGeneration: capabilityStateSchema,
   transcription: capabilityStateSchema,
+  // Optional on the wire because model records written before the dimension
+  // existed sit in `provider_model_manual` without it; a stored row is not
+  // corrupt for predating a capability, it is merely undescribed on it.
+  documentReading: v.optional(capabilityStateSchema, "unknown"),
   webSearch: capabilityStateSchema,
   webFetch: capabilityStateSchema,
   contextWindow: v.union([v.number(), v.literal("unknown")]),

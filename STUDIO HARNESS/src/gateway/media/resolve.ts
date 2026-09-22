@@ -16,12 +16,13 @@ import type { DriverEndpoint } from "./drivers/types.js";
  * who can fix a refusal is reading it from the composer, not from a taxonomy.
  */
 
-const LABELS: Readonly<Record<GenerationSlot | "speechGeneration" | "transcription", string>> = {
+const LABELS: Readonly<Record<GenerationSlot | "speechGeneration" | "transcription" | "documentReading", string>> = {
   speechGeneration: "read-aloud",
   transcription: "dictation",
   imageGeneration: "image",
   imageEditing: "image editing",
   videoGeneration: "video",
+  documentReading: "document reading",
 };
 
 export type GenerationSlot = "imageGeneration" | "imageEditing" | "videoGeneration";
@@ -77,6 +78,41 @@ export async function bindGenerationSlot(
     slot,
     protocol,
     baseUrl,
+    credential: resolution.credential,
+    modelId: requestedModelId ?? model.modelId,
+  };
+}
+
+/**
+ * Binding the document-reading slot: a media wire or nothing, like a
+ * generation. The OpenAI-shaped audio fallback has no counterpart here
+ * because reading a file through the Responses API is OpenAI's own wire,
+ * not the compatible surface a self-hosted endpoint copies.
+ */
+export async function bindDocumentSlot(
+  resolver: CapabilityResolver,
+  requestedModelId?: string,
+): Promise<MediaBinding & { readonly protocol: MediaProtocol }> {
+  const slot = "documentReading";
+  const resolution: CapabilityResolution | undefined = await resolver.resolve(slot);
+  if (resolution === undefined) {
+    throw new MediaError(
+      "slot-unset",
+      `No ${LABELS[slot]} model is connected. Choose one in Settings - Providers.`,
+    );
+  }
+  const { connection, model } = resolution;
+  const protocol = connection.serves.media;
+  if (protocol === undefined) {
+    throw new MediaError(
+      "slot-protocol",
+      `The connected ${LABELS[slot]} provider serves no media wire.`,
+    );
+  }
+  return {
+    slot,
+    protocol,
+    baseUrl: addressOf(connection, slot),
     credential: resolution.credential,
     modelId: requestedModelId ?? model.modelId,
   };

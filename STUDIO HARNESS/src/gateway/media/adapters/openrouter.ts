@@ -2,7 +2,10 @@ import { HttpError, requestBinary, requestDirect } from "../../../net/http.js";
 import type { UrlAuthor } from "../../../net/destination.js";
 import { MediaError } from "../../../contracts/media.js";
 import type { DriverEndpoint, SpeechSlotInput, TranscriptionSlotInput } from "../drivers/types.js";
+import { pagesOfTranscript, transcriptionInstruction } from "./document-transcript.js";
 import type {
+  DocumentReadingInput,
+  DocumentReadingResult,
   Generation,
   ImageGenerationInput,
   MediaAdapter,
@@ -35,6 +38,14 @@ import type {
  *   documented, so a Stop stops asking. The content route streams the
  *   upstream provider's file, so the download happens here, inside the
  *   poll that saw `completed`, and nothing above keeps a vendor URL.
+ *
+ * Documents, checked on 2026-09-22, ride `POST /chat/completions` as a
+ * `file` content part - a data URL and a filename - beside the shared
+ * transcription instruction. OpenRouter parses the file for the model:
+ * natively when the model takes files, else through its own OCR engine
+ * (`file-parser` plugin, Mistral OCR by default, billed to the OpenRouter
+ * account per page). The parsed pages reach the model, and the model's
+ * prose answer is cut into pages by the instruction's markers.
  *
  * The credential travels in the `Authorization` header and nowhere else.
  * The app name headers OpenRouter asks integrators for are sent so the
@@ -364,10 +375,78 @@ async function download(jobId: string, endpoint: DriverEndpoint): Promise<MediaB
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Documents                                                                   */
+/* -------------------------------------------------------------------------- */
+
+const DOCUMENT_TIMEOUT_MS = 300_000;
+const DOCUMENT_MAX_ANSWER_BYTES = 64 * 1024 * 1024;
+/** Mistral's OCR ceiling, which is what OpenRouter's default parser is. */
+const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
+
+/** The assistant's text from the first choice; a string or text parts, as vendors vary. */
+function completionText(completion: unknown): string {
+  if (!isRecord(completion) || !Array.isArray(completion.choices)) return "";
+  const first: unknown = completion.choices[0];
+  if (!isRecord(first) || !isRecord(first.message)) return "";
+  const content = first.message.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part: unknown): part is Record<string, unknown> => isRecord(part) && typeof part.text === "string")
+    .map((part) => part.text as string)
+    .join("\n");
+}
+
+async function readDocument(
+  input: DocumentReadingInput,
+  endpoint: DriverEndpoint,
+): Promise<DocumentReadingResult> {
+  if (input.bytes.length > MAX_DOCUMENT_BYTES) {
+    throw new MediaError("document-too-large", "The document is over 50 MB, the parser's ceiling for one file.");
+  }
+  const dataUrl = `data:${input.mimeType};base64,${Buffer.from(input.bytes).toString("base64")}`;
+  const part = input.mimeType.startsWith("image/")
+    ? { type: "image_url", image_url: { url: dataUrl } }
+    : { type: "file", file: { filename: input.fileName, file_data: dataUrl } };
+  const answered = await requestDirect({
+    url: `${origin(endpoint)}/chat/completions`,
+    author: AUTHOR,
+    method: "POST",
+    headers: headersFor(endpoint, true),
+    body: JSON.stringify({
+      model: input.modelId,
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: transcriptionInstruction(input.pages) }, part],
+        },
+      ],
+    }),
+    timeoutMs: endpoint.timeoutMs ?? DOCUMENT_TIMEOUT_MS,
+    maxBytes: DOCUMENT_MAX_ANSWER_BYTES,
+  }).catch((error: unknown) => {
+    throw unreachable("document", error);
+  });
+  if (answered.status >= 400) throw refused("document", answered.status, answered.body);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(answered.body);
+  } catch {
+    throw new MediaError("provider-refused", "OpenRouter's document answer was not JSON.");
+  }
+  const pages = pagesOfTranscript(completionText(parsed), input.pages);
+  if (pages.length === 0) {
+    throw new MediaError("provider-refused", "OpenRouter's document answer carried no text.");
+  }
+  return { pages };
+}
+
 export const openrouterMedia: MediaAdapter = {
   protocol: "openrouter",
   speak,
   transcribe,
   generateImage,
   generateVideo,
+  readDocument,
 };

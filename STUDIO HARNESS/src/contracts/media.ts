@@ -21,6 +21,8 @@ import { StudioError } from "./errors.js";
  *   drive yet. Fixed by connecting a provider that does.
  * - `audio-too-large`: the recording passed the provider's own ceiling before
  *   the wire was touched.
+ * - `document-too-large`: the document passed the provider's own ceiling -
+ *   bytes or pages - before the wire was touched.
  * - `provider-refused`: the provider answered, and the answer was no. The
  *   provider's own sentence travels; keys never do.
  */
@@ -28,6 +30,7 @@ export type MediaFailureKind =
   | "slot-unset"
   | "slot-protocol"
   | "audio-too-large"
+  | "document-too-large"
   | "provider-refused";
 
 export class MediaError extends StudioError {

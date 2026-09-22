@@ -47,6 +47,7 @@
     { "id": "deepgram", "kind": "media", "enabled": true },
     { "id": "fish-audio", "kind": "media", "enabled": true },
     { "id": "minimax", "kind": "media", "enabled": true },
+    { "id": "mistral", "kind": "media", "enabled": true },
 
     { "id": "tavily", "kind": "retrieval", "enabled": true },
     { "id": "brave", "kind": "retrieval", "enabled": true },

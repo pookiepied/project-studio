@@ -177,14 +177,41 @@ export const DECLARED_PROVIDERS: readonly DeclaredProvider[] = [
   {
     id: "openrouter",
     displayName: "OpenRouter",
-    // OpenRouter serves speech, transcription, images and video on the chat
-    // key. Its models are not declared here: the listing is live, moves
-    // weekly, and `openrouter-media.ts` reads it from OpenRouter's own
-    // endpoints for a connection that serves the wire.
+    // OpenRouter serves speech, transcription, documents, images and video
+    // on the chat key. Its models are not declared here: the listing is
+    // live, moves weekly, and `openrouter-media.ts` reads it from
+    // OpenRouter's own endpoints for a connection that serves the wire.
     serves: { language: "openai-completions", media: "openrouter" },
     baseUrl: "https://openrouter.ai/api/v1",
     models: [],
-    liveCapabilities: ["imageGeneration", "imageEditing", "videoGeneration", "speechGeneration", "transcription"],
+    liveCapabilities: [
+      "imageGeneration",
+      "imageEditing",
+      "videoGeneration",
+      "speechGeneration",
+      "transcription",
+      "documentReading",
+    ],
+  },
+  {
+    id: "mistral",
+    displayName: "Mistral",
+    // The chat models are Pi's; what is declared is the Document AI OCR
+    // processor, one alias the vendor keeps pointed at its newest OCR
+    // model, checked against docs.mistral.ai on 2026-09-22. It reads PDFs,
+    // Office files and pictures of pages, scanned or not, and is the one
+    // model here that is OCR and nothing else.
+    serves: { language: "mistral-conversations", media: "mistral" },
+    baseUrl: "https://api.mistral.ai/v1",
+    models: [
+      {
+        id: "mistral-ocr-latest",
+        displayName: "Mistral OCR",
+        capability: { ...NOT_CHAT, documentReading: "supported" },
+        shape: "sync",
+        featured: true,
+      },
+    ],
   },
   {
     id: "google",

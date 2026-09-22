@@ -7,6 +7,8 @@ import {
 } from "../../contracts/media.js";
 import { builtinMediaAdapters } from "./adapters/index.js";
 import type {
+  DocumentReadingInput,
+  DocumentReadingResult,
   ImageGenerationInput,
   MediaAdapter,
   MediaAdapters,
@@ -20,7 +22,7 @@ import type {
   TranscriptionDriver,
   TranscriptionSlotInput,
 } from "./drivers/types.js";
-import { bindAudioSlot, bindGenerationSlot, type GenerationSlot } from "./resolve.js";
+import { bindAudioSlot, bindDocumentSlot, bindGenerationSlot, type GenerationSlot } from "./resolve.js";
 
 /**
  * The one module routes and tools both read for media.
@@ -54,6 +56,7 @@ const SLOT_WORDS: Partial<Record<CapabilitySlot, string>> = {
   imageGeneration: "image",
   imageEditing: "image editing",
   videoGeneration: "video",
+  documentReading: "document reading",
 };
 
 export interface MediaAdministration {
@@ -200,6 +203,27 @@ export class MediaService {
       throw new MediaError("slot-protocol", "Media generation is not available in this harness.");
     }
     return this.#jobs;
+  }
+
+  /**
+   * A document's pages as text, through whatever the document-reading slot
+   * names: an OCR engine or a vision model, the adapter's business. The
+   * caller is the read tool meeting a page with no text layer, so this is
+   * the model-invoked half; nothing in the app calls it directly.
+   */
+  async readDocument(input: Omit<DocumentReadingInput, "modelId"> & { readonly modelId?: string }): Promise<DocumentReadingResult> {
+    const binding = await bindDocumentSlot(this.#resolver, input.modelId);
+    const adapter = this.#adapterFor(binding.protocol, "documentReading");
+    if (adapter.readDocument === undefined) {
+      throw new MediaError(
+        "slot-protocol",
+        "The connected document reading provider's adapter does not read documents.",
+      );
+    }
+    return adapter.readDocument(
+      { ...input, modelId: binding.modelId },
+      binding satisfies DriverEndpoint,
+    );
   }
 
   async transcribe(input: {

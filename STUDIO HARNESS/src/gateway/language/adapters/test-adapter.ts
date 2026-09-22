@@ -91,6 +91,7 @@ const TEST_CAPABILITY: ModelCapability = {
   videoGeneration: "unsupported",
   speechGeneration: "unsupported",
   transcription: "unsupported",
+  documentReading: "unsupported",
   webSearch: "unsupported",
   webFetch: "unsupported",
   contextWindow: CONTEXT_WINDOW,

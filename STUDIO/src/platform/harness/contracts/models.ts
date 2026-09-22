@@ -25,6 +25,8 @@ export interface ModelCapability {
   readonly videoGeneration: CapabilityState
   readonly speechGeneration: CapabilityState
   readonly transcription: CapabilityState
+  /** Reading a document's pages - scanned or not - as text. */
+  readonly documentReading: CapabilityState
   /** Retrieving web results for a query. */
   readonly webSearch: CapabilityState
   /** Retrieving one named page. */
@@ -34,7 +36,7 @@ export interface ModelCapability {
 }
 
 /**
- * The fourteen state-valued keys, listed once so the parser cannot drift from
+ * The fifteen state-valued keys, listed once so the parser cannot drift from
  * the interface: a name that is not a capability key fails to compile.
  */
 export const CAPABILITY_STATE_KEYS = [
@@ -50,6 +52,7 @@ export const CAPABILITY_STATE_KEYS = [
   'videoGeneration',
   'speechGeneration',
   'transcription',
+  'documentReading',
   'webSearch',
   'webFetch',
 ] as const satisfies readonly (keyof ModelCapability)[]
@@ -141,6 +144,7 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
     videoGeneration,
     speechGeneration,
     transcription,
+    documentReading,
     webSearch,
     webFetch,
   } = states
@@ -157,6 +161,7 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
     videoGeneration === undefined ||
     speechGeneration === undefined ||
     transcription === undefined ||
+    documentReading === undefined ||
     webSearch === undefined ||
     webFetch === undefined
   ) {
@@ -176,6 +181,7 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
     videoGeneration,
     speechGeneration,
     transcription,
+    documentReading,
     webSearch,
     webFetch,
     contextWindow,
