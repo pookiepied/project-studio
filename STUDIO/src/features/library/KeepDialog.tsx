@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { Button, Dialog, TextArea, TextField } from '@/components/primitives'
-import type { HarnessFailure, LibraryDescription, LibraryFacts, LibraryItem } from '@/platform/harness'
+import {
+  useHarnessClient,
+  type HarnessFailure,
+  type LibraryDescription,
+  type LibraryFacts,
+  type LibraryItem,
+} from '@/platform/harness'
 import type { KeepCandidate } from '@/features/library/client'
-import { useLibraryClient } from '@/features/library/client'
 
 /**
  * Keeping a file in the library, or editing what was said about one.
@@ -45,7 +50,7 @@ export function KeepDialog({
   /** The item as the harness recorded it. */
   onKept?: (item: LibraryItem) => void
 }) {
-  const connect = useLibraryClient()
+  const connect = useHarnessClient()
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
   const [tags, setTags] = useState('')

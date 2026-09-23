@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  createHarnessClient,
-  resolveHarnessAddress,
+  useHarnessClient,
   type HarnessClient,
   type HarnessFailure,
   type ProjectRecord,
@@ -56,7 +55,7 @@ export function useEnvironments(): Environments {
   const [view, setView] = useState<EnvironmentsView>({ status: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
   const [lastError, setLastError] = useState<string | null>(null)
-  const client = useRef<HarnessClient | null>(null)
+  const connect = useHarnessClient()
   const live = useRef(true)
   const projectId = useRef<string | null>(null)
 
@@ -65,14 +64,6 @@ export function useEnvironments(): Environments {
     return () => {
       live.current = false
     }
-  }, [])
-
-  const connect = useCallback(async (): Promise<HarnessClient | null> => {
-    if (client.current) return client.current
-    const address = await resolveHarnessAddress()
-    if (address === null) return null
-    client.current = createHarnessClient(address)
-    return client.current
   }, [])
 
   const load = useCallback(async (selected: string | null, background: boolean) => {

@@ -5,7 +5,8 @@
  * parsers that refuse anything else. `client` is the only module in STUDIO
  * that speaks HTTP. `connection` is the only module that decides where the
  * harness is. `transport` is the only module that decides how a request
- * leaves the process. Import from here, not from the files.
+ * leaves the process. `react` is the only module that binds the harness to
+ * React. Import from here, not from the files.
  */
 
 export {
@@ -26,6 +27,8 @@ export {
   harnessFailureReason,
   harnessIsStarting,
 } from './connection'
+
+export { useHarnessClient } from './react'
 
 export {
   attachmentDataUrl,

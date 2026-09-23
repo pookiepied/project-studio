@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  createHarnessClient,
-  resolveHarnessAddress,
+  useHarnessClient,
   type HarnessClient,
   type HarnessFailure,
   type McpServerDraft,
@@ -82,7 +81,7 @@ function readScope(
 export function useMcpServers(scope: McpScopeTarget = {}): McpServers {
   const [view, setView] = useState<McpView>({ status: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
-  const client = useRef<HarnessClient | null>(null)
+  const connect = useHarnessClient()
   /**
    * Guards every `setState` after an await.
    *
@@ -96,14 +95,6 @@ export function useMcpServers(scope: McpScopeTarget = {}): McpServers {
     return () => {
       live.current = false
     }
-  }, [])
-
-  const connect = useCallback(async (): Promise<HarnessClient | null> => {
-    if (client.current) return client.current
-    const address = await resolveHarnessAddress()
-    if (address === null) return null
-    client.current = createHarnessClient(address)
-    return client.current
   }, [])
 
   // The scope's fields, held apart from the object: the caller builds the

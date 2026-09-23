@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  createHarnessClient,
-  resolveHarnessAddress,
+  useHarnessClient,
   type CommandDetail,
   type CommandListing,
   type HarnessClient,
@@ -46,7 +45,7 @@ const NO_HARNESS: HarnessFailure = {
 export function useCommands(): Commands {
   const [view, setView] = useState<CommandsView>({ status: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
-  const client = useRef<HarnessClient | null>(null)
+  const connect = useHarnessClient()
   const live = useRef(true)
 
   useEffect(() => {
@@ -54,14 +53,6 @@ export function useCommands(): Commands {
     return () => {
       live.current = false
     }
-  }, [])
-
-  const connect = useCallback(async (): Promise<HarnessClient | null> => {
-    if (client.current) return client.current
-    const address = await resolveHarnessAddress()
-    if (address === null) return null
-    client.current = createHarnessClient(address)
-    return client.current
   }, [])
 
   const readAll = useCallback(

@@ -1,36 +1,19 @@
-import { useCallback, useRef } from 'react'
 import { base64OfBytes } from '@/lib/base64'
-import {
-  createHarnessClient,
-  resolveHarnessAddress,
-  type HarnessClient,
-  type HarnessFailure,
-} from '@/platform/harness'
+import type { HarnessFailure } from '@/platform/harness'
 
 /**
- * The library's own connection to the harness.
- *
- * Its own rather than the workspace's bound client, the way the Settings
- * panes connect: the library is reached from the composer, from an
- * artifact card and from Settings, none of which should have to thread a
- * store through for one request. The address is resolved once per mount.
+ * The library's shared pieces: the failure it answers with when the harness
+ * is not running, the base64 helpers for the bytes that cross the dialog,
+ * and the shape of what the composer hands it. The harness connection is
+ * `useHarnessClient` from the platform — the same one the Settings panes
+ * use, since none of these callers should have to thread a store through
+ * for one request.
  */
 
 export const NO_HARNESS: HarnessFailure = {
   kind: 'not-reachable',
   message: 'The harness is not running.',
   timedOut: false,
-}
-
-export function useLibraryClient(): () => Promise<HarnessClient | null> {
-  const client = useRef<HarnessClient | null>(null)
-  return useCallback(async () => {
-    if (client.current) return client.current
-    const address = await resolveHarnessAddress()
-    if (address === null) return null
-    client.current = createHarnessClient(address)
-    return client.current
-  }, [])
 }
 
 /** A file's bytes as the base64 the harness takes. */

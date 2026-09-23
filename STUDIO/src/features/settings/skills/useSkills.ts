@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  createHarnessClient,
-  resolveHarnessAddress,
+  useHarnessClient,
   type HarnessClient,
   type HarnessFailure,
   type SkillListing,
@@ -52,7 +51,7 @@ function readScope(
 export function useSkills(scope: SkillScopeTarget = {}): Skills {
   const [view, setView] = useState<SkillsView>({ status: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
-  const client = useRef<HarnessClient | null>(null)
+  const connect = useHarnessClient()
   const live = useRef(true)
 
   useEffect(() => {
@@ -60,14 +59,6 @@ export function useSkills(scope: SkillScopeTarget = {}): Skills {
     return () => {
       live.current = false
     }
-  }, [])
-
-  const connect = useCallback(async (): Promise<HarnessClient | null> => {
-    if (client.current) return client.current
-    const address = await resolveHarnessAddress()
-    if (address === null) return null
-    client.current = createHarnessClient(address)
-    return client.current
   }, [])
 
   // Held apart from the object for the reason `useMcpServers` gives: the

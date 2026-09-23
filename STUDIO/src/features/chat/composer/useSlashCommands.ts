@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  createHarnessClient,
-  resolveHarnessAddress,
+  useHarnessClient,
   type CommandRecord,
-  type HarnessClient,
 } from '@/platform/harness'
 import { useCompactNow } from '@/features/chat/compaction/useCompactNow'
 import { matchingCommands, readSlash, slashQuery } from '@/features/chat/composer/slash'
@@ -31,17 +29,9 @@ export type SlashOutcome =
 
 export function useSlashCommands(text: string, conversationId: string | null) {
   const [commands, setCommands] = useState<readonly CommandRecord[] | null>(null)
-  const client = useRef<HarnessClient | null>(null)
   const loading = useRef(false)
+  const connect = useHarnessClient()
   const { compactNow } = useCompactNow()
-
-  const connect = useCallback(async (): Promise<HarnessClient | null> => {
-    if (client.current !== null) return client.current
-    const address = await resolveHarnessAddress()
-    if (address === null) return null
-    client.current = createHarnessClient(address)
-    return client.current
-  }, [])
 
   // Read once, the first time a slash is typed. A command written in
   // Settings meanwhile is picked up by the next window; the list is small

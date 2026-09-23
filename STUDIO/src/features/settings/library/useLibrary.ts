@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { HarnessFailure, LibraryKind, LibraryListing } from '@/platform/harness'
-import { NO_HARNESS, useLibraryClient } from '@/features/library/client'
+import {
+  useHarnessClient,
+  type HarnessFailure,
+  type LibraryKind,
+  type LibraryListing,
+} from '@/platform/harness'
+import { NO_HARNESS } from '@/features/library/client'
 
 /**
  * The Library pane's data: the listing under the current filter, and the
@@ -32,7 +37,7 @@ export interface Library {
 const EMPTY_FILTER: LibraryFilter = { query: '', kind: null, subject: null }
 
 export function useLibrary(): Library {
-  const connect = useLibraryClient()
+  const connect = useHarnessClient()
   const [view, setView] = useState<LibraryView>({ status: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<LibraryFilter>(EMPTY_FILTER)
