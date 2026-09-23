@@ -39,12 +39,19 @@
 //! while the feature is off nothing of it is running, the same rule the
 //! listener itself follows (§3.8 — not bound-and-refusing, not created).
 //!
-//! Two honest limits. Addresses are read when the switch turns on, so a
+//! Three honest limits. Addresses are read when the switch turns on, so a
 //! machine that changes networks while the feature is on advertises its old
 //! answer until the record's TTL ages it out (mdns-sd's host TTL, two
-//! minutes). And the records are IPv4 only: the URL a person types is the
+//! minutes). The records are IPv4 only: the URL a person types is the
 //! IPv4 path, and the IPv6 addresses a home machine has are link-local ones
-//! whose scope a browser on another device does not carry.
+//! whose scope a browser on another device does not carry. And the name is
+//! claimed, not owned: when another machine on the link already answers for
+//! `studio.local`, mdns-sd resolves the conflict by renaming this machine's
+//! host (`studio-2.local`, …) — a rename that happens inside its daemon
+//! after the register above was accepted, so `is_published` keeps saying yes
+//! and the settings screen keeps printing the name Studio asked for rather
+//! than the one the network handed over. The raw address and the QR code
+//! work either way; the name is the memorable one, not the guaranteed one.
 
 use std::net::Ipv4Addr;
 use std::time::Duration;

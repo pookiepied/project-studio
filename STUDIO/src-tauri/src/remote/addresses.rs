@@ -36,6 +36,16 @@ pub(crate) struct Addresses {
     /// `studio.local`, when it is currently published. Absent when it is not:
     /// a name shown for a machine that is not answering to it would send
     /// someone to a page that never loads.
+    ///
+    /// What is published here is the name Studio asked for, not the name the
+    /// network may have negotiated. mDNS names are claimed, not owned: if
+    /// another machine on the link already answers for `studio.local`, the
+    /// responder settles the conflict by renaming this machine's host
+    /// (`studio-2.local`, then `-3`, …), and that rename happens inside the
+    /// responder after the registration was accepted — so this field still
+    /// names a machine that is not ours. On a network where the name was
+    /// lost, the raw addresses and the QR code are the paths that do not
+    /// lie; the name is the memorable one, not the guaranteed one.
     pub(crate) home_name: Option<String>,
     /// The address that works away from home, when Tailscale is on this
     /// machine.
