@@ -5,7 +5,7 @@
  */
 
 import { isRecord } from '@/lib/guards'
-import { listOf, oneOf, text } from './guards'
+import { listOf, oneOf, text, textOrEmpty } from './guards'
 
 export const COMMAND_PROVENANCES = ['builtin', 'system', 'user'] as const
 export type CommandProvenance = (typeof COMMAND_PROVENANCES)[number]
@@ -53,7 +53,7 @@ export function parseCommand(value: unknown): CommandRecord | null {
   // reads as, and the built-in actions ship it — so it does not go through
   // `text`, whose non-empty rule failed the record, the listing and the
   // picker with it.
-  const argumentHint = value['argumentHint'] === '' ? '' : text(value['argumentHint'])
+  const argumentHint = textOrEmpty(value['argumentHint'])
   const provenance = oneOf(COMMAND_PROVENANCES, value['provenance'])
   const kind = oneOf(COMMAND_KINDS, value['kind'])
   const path = value['path'] === null ? null : text(value['path'])
@@ -87,7 +87,14 @@ export function parseCommandListing(value: unknown): CommandListing | null {
   return { commands, problems, userDirectory }
 }
 
-/** `GET /api/commands/:id`: the record, and the file's halves for a prompt command. */
+/**
+ * `GET /api/commands/:id`: the record, and the file's halves for a prompt
+ * command. The harness always writes both frontmatter keys, even when they
+ * are empty, so anything less here is a wire this side no longer trusts: it
+ * refuses rather than inventing the halves, because the dialog saves what it
+ * was seeded with and an invented field would quietly erase the person's on
+ * the next save.
+ */
 export interface CommandDetail {
   readonly command: CommandRecord
   readonly source: CommandSource | null
@@ -98,18 +105,17 @@ export function parseCommandDetail(value: unknown): CommandDetail | null {
   const command = parseCommand(value['command'])
   if (command === null) return null
   const raw = value['source']
-  if (raw === null || raw === undefined) return { command, source: null }
+  if (raw === null) return { command, source: null }
   if (!isRecord(raw)) return null
-  const frontmatter = isRecord(raw['frontmatter']) ? raw['frontmatter'] : {}
+  const frontmatter = raw['frontmatter']
+  if (!isRecord(frontmatter)) return null
+  const description = textOrEmpty(frontmatter['description'])
+  const argumentHint = textOrEmpty(frontmatter['argumentHint'])
   const body = text(raw['body'])
-  if (body === null) return null
+  if (description === null || argumentHint === null || body === null) return null
   return {
     command,
-    source: {
-      description: text(frontmatter['description']) ?? '',
-      argumentHint: text(frontmatter['argumentHint']) ?? '',
-      body,
-    },
+    source: { description, argumentHint, body },
   }
 }
 

@@ -182,4 +182,28 @@ describe("the slash commands, through the routes", () => {
     });
     expect(unreadable.status).toBe(400);
   });
+
+  it("reads one of the person's commands, halves and all, even when they are empty", async () => {
+    const saved = await call(built.app, authorization, "/api/commands/note-it", "PUT", {
+      body: "Remember $ARGUMENTS.",
+    });
+    expect(saved.status).toBe(200);
+
+    const detail = await call(built.app, authorization, "/api/commands/note-it");
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toEqual({
+      command: {
+        id: "note-it",
+        description: "Remember $ARGUMENTS.",
+        // No description was asked for, so the record shows the first line of
+        // the prompt; the source, which is what an editor would open, carries
+        // the honest empties - both keys, both "".
+        argumentHint: "",
+        provenance: "user",
+        kind: "prompt",
+        path: join(built.home, "note-it.md"),
+      },
+      source: { frontmatter: { description: "", argumentHint: "" }, body: "Remember $ARGUMENTS." },
+    });
+  });
 });

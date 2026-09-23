@@ -11,7 +11,9 @@ const command = (id: string): CommandRecord => ({
   path: null,
 })
 
-const COMMANDS = [command('compact'), command('review'), command('explain'), command('re-explain')]
+// Listed deliberately out of alphabetical order: re-explain before explain,
+// so the expectations below can tell the harness's order from the match's.
+const COMMANDS = [command('compact'), command('review'), command('re-explain'), command('explain')]
 
 describe('readSlash', () => {
   it('reads a known name and what follows it', () => {
@@ -47,9 +49,18 @@ describe('matchingCommands', () => {
       'review',
       're-explain',
     ])
+    // `explain` is listed after `re-explain`, yet comes first: what starts
+    // with the query outranks what merely contains it.
     expect(matchingCommands('expl', COMMANDS).map((entry) => entry.id)).toEqual([
       'explain',
       're-explain',
+    ])
+  })
+
+  it('keeps the order the harness listed, among the names that merely contain the query', () => {
+    expect(matchingCommands('xpl', COMMANDS).map((entry) => entry.id)).toEqual([
+      're-explain',
+      'explain',
     ])
   })
 })

@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -150,5 +151,36 @@ describe("CommandRegistry", () => {
     // A later mtime and a different size: the memo is invalid either way.
     writeFileSync(path, "Second version\n");
     expect(registry.expand("alpha", "")).toBe("Second version");
+  });
+});
+
+describe("the shipped commands, as installed", () => {
+  // The repo's own commands folder. The packaged installation carries its
+  // copied twin; these are the files both of them hold, so what is shipped
+  // is pinned where it is written, not hoped about in the installed copy.
+  const shipped = fileURLToPath(new URL("../../commands", import.meta.url));
+  const registry = new CommandRegistry({ roots: [{ directory: shipped, provenance: "system" }] });
+
+  it("lists what Studio ships, under the built-in and beside its hints", () => {
+    const listed = registry.list();
+    expect(listed.map((record) => record.id)).toEqual(["compact", "explain", "review"]);
+    expect(listed.map((record) => record.provenance)).toEqual(["builtin", "system", "system"]);
+    expect(listed.find((record) => record.id === "explain")?.argumentHint).toBe("<what to explain>");
+    expect(listed.find((record) => record.id === "review")?.argumentHint).toBe("[focus]");
+  });
+
+  it("expands the shipped explain so an argumentless run still reads as a sentence", () => {
+    // The argumentless expansion used to read "Explain  in plain English" -
+    // the doubled space where the missing argument stood. The slot now ends
+    // the line, so nothing stands where nothing was typed.
+    const [first] = registry.expand("explain", "").split("\n\n");
+    expect(first).toBe(
+      "Explain the following in plain English, for someone who knows the field but not this codebase: ",
+    );
+
+    const [asked] = registry.expand("explain", "the projection layer").split("\n\n");
+    expect(asked).toBe(
+      "Explain the following in plain English, for someone who knows the field but not this codebase: the projection layer",
+    );
   });
 });

@@ -4,6 +4,7 @@ import {
   parseCommandDetail,
   parseCommandExpansion,
   parseCommandListing,
+  parseCommandProblem,
 } from './commands'
 
 /**
@@ -119,21 +120,58 @@ describe('parseCommandDetail', () => {
     })
   })
 
-  it('reads frontmatter that says nothing as the empty fields, not a refusal', () => {
-    const read = parseCommandDetail({ command: USER, source: { frontmatter: {}, body: 'Write it down.' } })
+  it('reads the frontmatter of a command written without description or hint, both keys, both empty', () => {
+    // What the harness actually sends for a prompt the person wrote bare:
+    // the keys are there and say "", which is a value, not an absence.
+    const read = parseCommandDetail({
+      command: USER,
+      source: { frontmatter: { description: '', argumentHint: '' }, body: 'Write it down.' },
+    })
     expect(read).toEqual({
       command: USER,
       source: { description: '', argumentHint: '', body: 'Write it down.' },
     })
   })
 
-  it('reads a detail with no source halves at all as no source, which an unnamed action is', () => {
-    expect(parseCommandDetail({ command: COMPACT })).toEqual({ command: COMPACT, source: null })
+  it('refuses a detail whose source key is absent, which the harness never sends', () => {
+    expect(parseCommandDetail({ command: COMPACT })).toBeNull()
   })
 
   it('refuses a detail whose record does not read', () => {
     expect(parseCommandDetail({ command: { ...COMPACT, kind: 'mystery' }, source: null })).toBeNull()
     expect(parseCommandDetail({})).toBeNull()
+  })
+
+  it('refuses a source that is not the halves the harness writes, rather than inventing them', () => {
+    // The dialog saves what it was seeded with, so a half-read source would
+    // quietly erase the person's frontmatter on the next save.
+    expect(parseCommandDetail({ command: COMPACT, source: { frontmatter: 'no', body: 'b' } })).toBeNull()
+    expect(parseCommandDetail({ command: EXPLAIN, source: { frontmatter: {}, body: 'b' } })).toBeNull()
+    expect(
+      parseCommandDetail({ command: EXPLAIN, source: { frontmatter: { description: 'd', argumentHint: 'h' } } }),
+    ).toBeNull()
+    expect(parseCommandDetail({ command: EXPLAIN, source: { frontmatter: null, body: 'b' } })).toBeNull()
+  })
+})
+
+describe('parseCommandProblem', () => {
+  it('reads the path and the reason, as a skipped file reports them', () => {
+    expect(
+      parseCommandProblem({
+        path: 'C:/studio/commands/WIP.md',
+        reason: 'The file has no prompt under its frontmatter.',
+      }),
+    ).toEqual({
+      path: 'C:/studio/commands/WIP.md',
+      reason: 'The file has no prompt under its frontmatter.',
+    })
+  })
+
+  it('refuses a problem that is not the pair, rather than listing it half-read', () => {
+    expect(parseCommandProblem({ path: 'C:/x' })).toBeNull()
+    expect(parseCommandProblem({ reason: 'no path' })).toBeNull()
+    expect(parseCommandProblem({ path: '', reason: 'r' })).toBeNull()
+    expect(parseCommandProblem('nope')).toBeNull()
   })
 })
 

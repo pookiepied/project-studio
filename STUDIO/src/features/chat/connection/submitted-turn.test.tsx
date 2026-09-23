@@ -209,6 +209,33 @@ describe('what the receipt licenses the page to say', () => {
     })
   })
 
+  it('carries an empty body with its settings, as a document sent without words does', async () => {
+    // The harness's own delivered-message type says `body: string` — no
+    // minimum — so the admission takes an empty body, and this side's job
+    // is to send it as one instead of inventing a default.
+    const script = turnScript()
+    const channels = recordingChannels()
+    const rendered = mount({ script, channels })
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
+
+    await act(async () => {
+      await rendered.result.current.submit('', SETTINGS)
+    })
+    const submission = script.calls.find(
+      (call) =>
+        call.command === 'service_fetch' &&
+        String(call.args['path']).endsWith('/agents/studio/cnv_1'),
+    )
+    const init = submission?.args['init']
+    const body = isRecord(init) && typeof init['body'] === 'string' ? init['body'] : ''
+    expect(JSON.parse(body)).toEqual({
+      kind: 'user',
+      body: '',
+      modelId: SETTINGS.modelId,
+      reasoningLevel: SETTINGS.reasoningLevel,
+    })
+  })
+
   it('stays submitted while the new read catches up', async () => {
     // `up-to-date` says where the READ is. It arrives on the very read the
     // submission just opened, and a turn already known to be under way

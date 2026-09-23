@@ -1,3 +1,4 @@
+import { isRecord } from '@/lib/guards'
 import {
   parseCommand,
   parseCommandDetail,
@@ -48,8 +49,7 @@ export function commandClient({ json, empty }: Requester): CommandClient {
 
     saveCommand(id, source) {
       return json('PUT', commandPath(id), source, (value) => {
-        if (typeof value !== 'object' || value === null) return null
-        return parseCommand((value as Record<string, unknown>)['command'])
+        return isRecord(value) ? parseCommand(value['command']) : null
       })
     },
 

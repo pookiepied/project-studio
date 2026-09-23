@@ -666,6 +666,138 @@ describe('the skill writes', () => {
 })
 
 /**
+ * The command routes, on the wire.
+ *
+ * The commands had contract tests that pinned what a listing should parse as,
+ * and nothing that pinned what the routes are: the URLs, the methods, the
+ * bodies. Both halves typed-checked while disagreeing — the way the dictation
+ * body once did — so these walk the five methods the way their callers do.
+ * The case that taught the contract its lesson is here too: the hint arrives
+ * as the empty string, an expansion of nothing is the empty string, and both
+ * were once read as broken wires.
+ */
+describe('the command routes', () => {
+  const LISTING = {
+    commands: [
+      {
+        id: 'compact',
+        description: 'Compact the conversation: fold the earlier turns into a summary',
+        argumentHint: '',
+        provenance: 'builtin',
+        kind: 'action',
+        path: null,
+      },
+      {
+        id: 'explain',
+        description: 'Explain a file, a function or a concept in plain words',
+        argumentHint: '<what to explain>',
+        provenance: 'system',
+        kind: 'prompt',
+        path: 'C:/studio/commands/explain.md',
+      },
+    ],
+    problems: [
+      { path: 'C:/studio/commands/WIP.md', reason: 'The file has no prompt under its frontmatter.' },
+    ],
+    userDirectory: 'C:/studio/commands',
+  }
+
+  it('reads the listing the picker feeds on, hint and problems whole', async () => {
+    const stub = stubFetch(() => jsonResponse(LISTING))
+
+    const result = await clientWith(stub.fetch).listCommands()
+
+    expect(stub.calls[0]?.method).toBe('GET')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/commands`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.commands[0]?.argumentHint).toBe('')
+    expect(result.value.problems).toEqual(LISTING.problems)
+    expect(result.value.userDirectory).toBe('C:/studio/commands')
+  })
+
+  it('reads one command with its halves, present and empty', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({
+        command: LISTING.commands[1],
+        source: { frontmatter: { description: '', argumentHint: '' }, body: 'Explain the following: $ARGUMENTS' },
+      }),
+    )
+
+    const result = await clientWith(stub.fetch).readCommand('explain')
+
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/commands/explain`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.source?.description).toBe('')
+    expect(result.value.source?.argumentHint).toBe('')
+  })
+
+  it('keeps the harness sentence when a read meets a command that is not there', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'No command named "gone" exists.', code: 'extend.not_installed' }, 404),
+    )
+
+    const result = await clientWith(stub.fetch).readCommand('gone')
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.kind).toBe('harness-error')
+    if (result.error.kind !== 'harness-error') return
+    expect(result.error.status).toBe(404)
+    expect(result.error.message).toBe('No command named "gone" exists.')
+    expect(result.error.code).toBe('extend.not_installed')
+  })
+
+  it('saves through the PUT, with the fields exactly as the dialog wrote them', async () => {
+    const SOURCE = { description: 'File a note away', argumentHint: '', body: 'File $1 away.' }
+    const SAVED = {
+      id: 'notes',
+      description: 'File a note away',
+      argumentHint: '',
+      provenance: 'user',
+      kind: 'prompt',
+      path: 'C:/studio/commands/notes.md',
+    }
+    const stub = stubFetch(() => jsonResponse({ command: SAVED }))
+
+    const result = await clientWith(stub.fetch).saveCommand('notes', SOURCE)
+
+    expect(stub.calls[0]?.method).toBe('PUT')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/commands/notes`)
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual(SOURCE)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toEqual(SAVED)
+  })
+
+  it('removes by DELETE and takes the 204 as done', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+
+    const result = await clientWith(stub.fetch).removeCommand('notes')
+
+    expect(stub.calls[0]?.method).toBe('DELETE')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/commands/notes`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toBeUndefined()
+  })
+
+  it("asks the expansion at the command's own route, and takes the empty answer as one", async () => {
+    const stub = stubFetch(() => jsonResponse({ text: '' }))
+
+    const result = await clientWith(stub.fetch).expandCommand('explain', 'the projection layer')
+
+    expect(stub.calls[0]?.method).toBe('POST')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/commands/explain/expand`)
+    expect(stub.calls[0]?.body).toBe('{"arguments":"the projection layer"}')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toBe('')
+  })
+})
+
+/**
  * The harness-side folder browser, on the wire (plan step 6).
  *
  * The path rides the query, because it is the address being asked about, and

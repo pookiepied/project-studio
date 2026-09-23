@@ -21,6 +21,17 @@ export function text(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
+/**
+ * A string field whose emptiness is a value, not an absence. The commands'
+ * argument hint reads as "" when there is nothing to type, and so does every
+ * field of a command file's frontmatter, which the harness always writes —
+ * both keys, even when they are empty — so a plain `text` would refuse what
+ * the harness legitimately sends.
+ */
+export function textOrEmpty(value: unknown): string | null {
+  return value === '' ? '' : text(value)
+}
+
 /** An optional non-empty string: absent is fine, present but wrong is not. */
 export function optionalText(value: unknown): { ok: true; value?: string } | { ok: false } {
   if (value === undefined) return { ok: true }

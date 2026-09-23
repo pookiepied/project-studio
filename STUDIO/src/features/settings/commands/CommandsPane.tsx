@@ -198,7 +198,7 @@ function Problems({ problems }: { problems: readonly CommandProblem[] }) {
       <ul className="flex flex-col gap-1.5">
         {problems.map((problem) => (
           <li key={problem.path} className="text-caption text-muted-foreground">
-            <span className="text-foreground">{problem.path}</span> - {problem.reason}
+            <span className="text-foreground">{problem.path}</span> — {problem.reason}
           </li>
         ))}
       </ul>

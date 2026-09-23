@@ -410,9 +410,9 @@ describe('the slash, from the field', () => {
   }
 
   /** An answer with a JSON body, the way the harness sends its successes. */
-  function jsonResponse(value: unknown): Response {
+  function jsonResponse(value: unknown, status = 200): Response {
     return new Response(JSON.stringify(value), {
-      status: 200,
+      status,
       headers: { 'Content-Type': 'application/json' },
     })
   }
@@ -420,9 +420,10 @@ describe('the slash, from the field', () => {
   /**
    * Answers what the harness answers on the two routes the slash touches,
    * and records every ask. The pairing probe 404s, as any host that is not
-   * Studio's listener would.
+   * Studio's listener would. A listing status other than 200 is how the
+   * tests below make the harness useless without making it absent.
    */
-  function serveHarness(): Call[] {
+  function serveHarness(listingStatus = 200): Call[] {
     const calls: Call[] = []
     vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
     vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
@@ -435,7 +436,10 @@ describe('the slash, from the field', () => {
         body: typeof init?.body === 'string' ? init.body : null,
       })
       if (url.includes('/api/pairing/state')) return new Response(null, { status: 404 })
-      if (url.endsWith('/api/commands')) return jsonResponse(LISTING)
+      if (url.endsWith('/api/commands')) {
+        if (listingStatus === 200) return jsonResponse(LISTING)
+        return jsonResponse({ error: 'The listing broke.', code: 'extend.internal' }, 500)
+      }
       if (/\/api\/commands\/[a-z0-9-]+\/expand$/.test(url)) {
         return jsonResponse({ text: 'Explain the projection layer in plain words, please.' })
       }
@@ -480,6 +484,57 @@ describe('the slash, from the field', () => {
     if (expand === undefined) throw new Error('the expansion was never asked for')
     expect(expand.method).toBe('POST')
     expect(expand.body).toBe('{"arguments":"the projection layer"}')
+  })
+
+  it('shows what follows the name, and nothing where nothing is expected', async () => {
+    serveHarness()
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    type('/')
+    await waitFor(() => expect(screen.getByRole('listbox', { name: 'Commands' })).toBeTruthy())
+
+    const explain = screen.getByRole('option', { name: /explain/ })
+    expect(explain.textContent).toContain('<what to explain>')
+    // The built-in takes nothing, so its row carries no hint at all — not
+    // even the empty one the record ships.
+    const compact = screen.getByRole('option', { name: /compact/ })
+    expect(compact.textContent).not.toContain('<what to explain>')
+    expect(compact.textContent.startsWith('/compact')).toBe(true)
+  })
+
+  it('tells the person a name matched nothing, and sends it as written', async () => {
+    const calls = serveHarness()
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    type('/zzz')
+    await waitFor(() => expect(calls.some((asked) => asked.url.endsWith('/api/commands'))).toBe(true))
+    expect(screen.getByText('No command by that name. Sent as written.')).toBeTruthy()
+    expect(screen.queryByRole('listbox')).toBeNull()
+
+    // And the promise holds once the arguments begin: the note steps aside,
+    // and what goes out is what was typed, slash and all.
+    type('/zzz promptly')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('/zzz promptly', [], []))
+  })
+
+  it('sends the words as typed when the harness answers but lists nothing', async () => {
+    const calls = serveHarness(500)
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    type('/')
+    await waitFor(() => expect(calls.some((asked) => asked.url.endsWith('/api/commands'))).toBe(true))
+    // No picker, and no note either: without the listing the composer has
+    // nothing to say about it. The field still works.
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByText(/No command by that name/)).toBeNull()
+
+    type('/exp plain')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('/exp plain', [], []))
   })
 
   it('dismisses the picker with Escape and leaves the drafted name, space and all', async () => {
