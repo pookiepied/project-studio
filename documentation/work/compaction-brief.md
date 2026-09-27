@@ -5,7 +5,8 @@ Steps 1 to 4 of §8 are in. The open choices of §7 were taken as
 recommended: reserve = max(20k, 15%), cool-down 30% and one measured turn,
 the summariser-model setting deferred (step 5), the patches landed here
 first (upstream still to do). What landed, and where it differs from the
-plan, is in §9 at the end.
+plan, is in §9 at the end. The cool-down was tuned on 2026-09-27 —
+min(30k, 30%) now, §4.7 below.
 
 This is the captured version of a long spoken brief, checked against the
 code and against Flue's own source rather than transcribed. Where the brief
@@ -280,6 +281,25 @@ Below that the button is present and disabled with the reason: "Nothing
 to compact yet — the conversation is 12% full." A person who really wants
 a fresh start at 12% wants a new conversation, and the sidebar has one.
 The 30% figure is a starting point to tune; it is a constant in one place.
+
+**Tuned 2026-09-27, for exactly the reason the line above warned about.**
+The 30% share was picked when windows were 200k-sized, and on the windows
+that arrived since it became a wall: 30% of 1M held "Compact now" behind
+300k tokens of conversation, and the person who wanted it folded at 100k
+was told it was 10% full — refused for having a bigger window, which is
+backwards. What makes a conversation worth folding is how much
+conversation there is, not how large the window is, so the floor is now
+**min(30,000 tokens, 30% of the window)**: the flat 30k the
+unknown-window rule always had, everywhere the share would have been
+larger, and the share kept where it is smaller, so the button still
+exists on a small window — a 30k floor would be nearly four windows on an
+8k model and a control that never lights. 8k compacts from 2.4k as
+before, 32k from 9.6k as before, 200k now from 30k (was 60k), 1M now
+from 30k (was 300k), unknown at 30k as before. The re-arm rule is
+unchanged and is now stated with the floor: a compaction's provisional
+row refuses outright, and the first real measurement after it must clear
+the floor again — the button comes back when the conversation has
+actually grown, never on a second press.
 
 ### 4.8 Fail-safety — cancel, crash, quit, model change
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { compactConversation, compactionReadiness } from "../../src/conversations/compaction.js";
+import {
+  compactConversation,
+  compactionReadiness,
+  coolDownTokensFor,
+} from "../../src/conversations/compaction.js";
 import type { ConversationUsage } from "../../src/conversations/context-usage.js";
 import { StorageError } from "../../src/storage/errors.js";
 
@@ -14,7 +18,26 @@ function usage(total: number, estimated = false): ConversationUsage {
 }
 
 const KNOWN = { contextWindow: 200_000, maxOutputTokens: 64_000 } as const;
+const MILLION = { contextWindow: 1_000_000, maxOutputTokens: 200_000 } as const;
+const SMALL = { contextWindow: 32_000, maxOutputTokens: 8_000 } as const;
 const UNKNOWN = { contextWindow: "unknown", maxOutputTokens: "unknown" } as const;
+
+describe("coolDownTokensFor", () => {
+  it("is the flat 30k wherever 30% of the window would be more", () => {
+    expect(coolDownTokensFor(MILLION)).toBe(30_000);
+    expect(coolDownTokensFor(KNOWN)).toBe(30_000);
+    expect(coolDownTokensFor({ contextWindow: 100_000, maxOutputTokens: 32_000 })).toBe(30_000);
+  });
+
+  it("is the share of the window where that is smaller, so the button exists at all", () => {
+    expect(coolDownTokensFor(SMALL)).toBe(9_600);
+    expect(coolDownTokensFor({ contextWindow: 8_192, maxOutputTokens: 4_096 })).toBe(2_457);
+  });
+
+  it("is the flat 30k with no window to compare against", () => {
+    expect(coolDownTokensFor(UNKNOWN)).toBe(30_000);
+  });
+});
 
 describe("compactionReadiness", () => {
   it("refuses a conversation no turn has measured", () => {
@@ -29,17 +52,48 @@ describe("compactionReadiness", () => {
     if (!refused.available) expect(refused.reason).toMatch(/Already compacted/);
   });
 
-  it("refuses below a share of a known window, and says how full it is", () => {
-    const refused = compactionReadiness(usage(24_000), KNOWN);
-    expect(refused).toEqual({
+  it("folds from the flat 30k on a million-token window, not from 30% of it", () => {
+    // The rule this replaced held the button behind 300k tokens on this
+    // model and answered "10% full" to a conversation of 100k.
+    expect(compactionReadiness(usage(12_000), MILLION)).toEqual({
       available: false,
-      reason: "Nothing to compact yet: the conversation is 12% full.",
+      reason: "Nothing to compact yet: the conversation is 12k tokens; folding starts at 30k.",
     });
+    expect(compactionReadiness(usage(100_000), MILLION)).toEqual({ available: true });
+  });
+
+  it("refuses below the flat floor on a 200k window too, which used to ask 60k", () => {
+    expect(compactionReadiness(usage(24_000), KNOWN)).toEqual({
+      available: false,
+      reason: "Nothing to compact yet: the conversation is 24k tokens; folding starts at 30k.",
+    });
+    expect(compactionReadiness(usage(30_000), KNOWN)).toEqual({ available: true });
+    // The old 30% boundary still passes, as it should.
     expect(compactionReadiness(usage(60_000), KNOWN)).toEqual({ available: true });
   });
 
-  it("falls back to a flat count when the window is unknown", () => {
-    expect(compactionReadiness(usage(12_000), UNKNOWN)).toMatchObject({ available: false });
+  it("never rounds the refusal up to the bar it refuses against", () => {
+    // 29,999 reads as 29k, not 30k: a sentence that said "30k of the 30k"
+    // would argue with itself.
+    const refused = compactionReadiness(usage(29_999), MILLION);
+    expect(refused.available).toBe(false);
+    if (!refused.available) expect(refused.reason).toContain("29k tokens");
+  });
+
+  it("keeps the share of the window on a small one, where it is the smaller number", () => {
+    const refused = compactionReadiness(usage(9_000), SMALL);
+    expect(refused).toEqual({
+      available: false,
+      reason: "Nothing to compact yet: the conversation is 28% full.",
+    });
+    expect(compactionReadiness(usage(9_600), SMALL)).toEqual({ available: true });
+  });
+
+  it("falls back to the flat count when the window is unknown", () => {
+    expect(compactionReadiness(usage(12_000), UNKNOWN)).toEqual({
+      available: false,
+      reason: "Nothing to compact yet: the conversation is 12k tokens; folding starts at 30k.",
+    });
     expect(compactionReadiness(usage(30_000), UNKNOWN)).toEqual({ available: true });
   });
 });
