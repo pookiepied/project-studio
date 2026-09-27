@@ -153,7 +153,7 @@ describe('CommandsPane', () => {
     // harness's truth, arrived in the field the person would otherwise
     // have to refill from nothing.
     await within(dialog).findByText('Description')
-    expect(within(dialog).getByLabelText('Argument hint').value).toBe('')
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Argument hint').value).toBe('')
     expect(within(dialog).getByLabelText<HTMLInputElement>('Description').value).toBe('File a note away')
     // The Prompt label's text runs on — the textarea's own words and the
     // rule under it are inside the label too — so the query matches from
