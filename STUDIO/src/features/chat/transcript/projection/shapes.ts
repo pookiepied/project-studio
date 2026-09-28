@@ -148,7 +148,8 @@ export type TranscriptItem =
       /**
        * Where the conversation was compacted. The items above it are still
        * the log and still readable; from here the model reads the summary
-       * instead of them. One line at rest, the summary behind a disclosure.
+       * instead of them. One quiet line, and nothing behind it — the
+       * summary is the model's working state, not reading for a person.
        */
       readonly kind: 'compaction'
       readonly id: string

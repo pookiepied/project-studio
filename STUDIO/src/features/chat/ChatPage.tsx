@@ -78,7 +78,7 @@ const OPEN_MIN_WAIT_MS = 700
 
 export function ChatPage({ conversation }: { conversation: Conversation }) {
   const { touch, settings, catalog } = useWorkspace()
-  const { markRunning, markContextReport, contextRevisions } = useLiveWork()
+  const { markRunning, markContextReport, contextRevisions, compacting } = useLiveWork()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
@@ -185,6 +185,35 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       watching = false
     }
   }, [gallery, conversation.id, running, contextRevision])
+
+  /**
+   * A compaction of this conversation, and the re-read one leaves behind.
+   *
+   * The harness writes the compaction into the conversation's record, and an
+   * attached stream delivers a snapshot only when a read begins — so the page
+   * that asked for the compaction would otherwise show the wait row collapse
+   * and then nothing, the record waiting for the conversation to be reopened.
+   * A reattach is the re-read: quiet in both directions (an `attaching` phase
+   * renders no notice, and compaction cannot run while a turn holds the
+   * session), and the reseeded projection brings the marker in at the tail,
+   * exactly where the wait row stood. Witnessed per conversation, so a flag
+   * still set for another conversation cannot re-read this one.
+   */
+  const compactingHere = !gallery && compacting.has(conversation.id)
+  const compactingWitnessed = useRef<string | null>(null)
+  useEffect(() => {
+    if (compactingHere) {
+      compactingWitnessed.current = conversation.id
+      return
+    }
+    if (compactingWitnessed.current !== conversation.id) return
+    compactingWitnessed.current = null
+    live.resume()
+    // `live.resume` is identity-stable — a useCallback over the attach, whose
+    // own inputs outlive a conversation — while `live` is a fresh object every
+    // render; depending on it would re-run this on every streamed delta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compactingHere, conversation.id, live.resume])
 
   // What the history costs, reported to the store so the top strip can show
   // it. This page is the only witness: the strip has no transcript of its
@@ -416,6 +445,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                 phase={gallery ? { status: 'idle' } : live.phase}
                 viewport={viewport}
                 conversationId={conversation.id}
+                compacting={compactingHere}
                 onBranch={gallery ? undefined : onBranch}
               />
             </motion.div>

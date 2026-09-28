@@ -232,6 +232,9 @@ export function Composer({
   // while the first was still being judged.
   const [sending, setSending] = useState(false)
   const field = useRef<ComposerFieldHandle>(null)
+  // The frame itself, which the slash picker opens above — see
+  // `SlashSuggestions` for why the panel is not part of this box.
+  const frame = useRef<HTMLDivElement>(null)
   const voice = useVoiceModeContext()
 
   // Whether the mic is ours to ask for here (plan §3.7): read per render,
@@ -468,6 +471,8 @@ export function Composer({
 
   return (
     <div
+      ref={frame}
+      data-composer-frame
       onFocusCapture={() => setFocused(true)}
       onBlurCapture={(event) => {
         if (event.currentTarget.contains(event.relatedTarget)) return
@@ -599,15 +604,17 @@ export function Composer({
         editing={null}
         onClose={() => setKeeping(null)}
       />
-      {/* The slash picker, while a name is being typed. */}
-      {slash.suggestions !== null ? (
-        <SlashSuggestions
-          commands={slash.suggestions}
-          selected={slash.selected}
-          onPick={(command) => pickSuggestion(command.id)}
-          onHover={slash.setSelected}
-        />
-      ) : null}
+      {/* The slash picker, while a name is being typed. Mounted always: it
+          renders nothing until a slash offers rows, and staying mounted is
+          what lets its panel play an exit instead of being torn out. It
+          portals above this frame — the ref is its anchor. */}
+      <SlashSuggestions
+        anchor={frame}
+        commands={slash.suggestions}
+        selected={slash.selected}
+        onPick={(command) => pickSuggestion(command.id)}
+        onHover={slash.setSelected}
+      />
       {commandNote !== null ? (
         <p className="mb-2 text-caption text-muted-foreground" role="status">
           {commandNote}

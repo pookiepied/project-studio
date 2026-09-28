@@ -11,6 +11,10 @@ import type { TurnImageWire } from '@/platform/harness'
 // The permission control beside the field reads the workspace store, and
 // needs one real mode id to render; a stub keeps this test about the receipt
 // mechanics alone.
+const liveWork = vi.hoisted(() => ({
+  markCompacting: vi.fn(),
+  bumpContext: vi.fn(),
+}))
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
     settings: { permission: 'ask' },
@@ -21,11 +25,13 @@ vi.mock('@/stores/workspace', () => ({
     conversations: [],
     setConversationPermission: vi.fn(),
   }),
-  // The slash's "/compact" reads the compacting set; nothing here compacts.
+  // The slash's "/compact" reads and marks the compacting set; the fns are
+  // held so a test can watch the mark being made — it is what turns the
+  // transcript's compaction row on.
   useLiveWork: () => ({
     compacting: new Set<string>(),
-    markCompacting: vi.fn(),
-    bumpContext: vi.fn(),
+    markCompacting: liveWork.markCompacting,
+    bumpContext: liveWork.bumpContext,
   }),
 }))
 
@@ -443,6 +449,7 @@ describe('the slash, from the field', () => {
       if (/\/api\/commands\/[a-z0-9-]+\/expand$/.test(url)) {
         return jsonResponse({ text: 'Explain the projection layer in plain words, please.' })
       }
+      if (url.endsWith('/compact')) return new Response(null, { status: 200 })
       return new Response(null, { status: 404 })
     }
     vi.stubGlobal('fetch', fetch)
@@ -469,7 +476,9 @@ describe('the slash, from the field', () => {
     // takes an argument, so the second Enter is the send — here the click.
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
     expect(field()).toBe('/explain ')
-    expect(screen.queryByRole('listbox')).toBeNull()
+    // The panel now LEAVES rather than being torn out — an exit on the
+    // clock — so the going takes a moment and the test waits it out.
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 
     type('/explain the projection layer')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -484,6 +493,28 @@ describe('the slash, from the field', () => {
     if (expand === undefined) throw new Error('the expansion was never asked for')
     expect(expand.method).toBe('POST')
     expect(expand.body).toBe('{"arguments":"the projection layer"}')
+  })
+
+  it('offers the commands in a panel above the frame, not inside it', async () => {
+    // The picker used to render in the composer's own flow: the frame grew
+    // upward and the rows sat on the field's raised surface, which read as
+    // the commands living inside the text field. The panel is a portal now —
+    // a separate surface floating over the transcript — and this pins the
+    // seam: no row is a descendant of the composer's frame.
+    serveHarness()
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    type('/')
+    await waitFor(() => expect(screen.getByRole('listbox', { name: 'Commands' })).toBeTruthy())
+
+    const frame = document.querySelector('[data-composer-frame]')
+    if (!(frame instanceof HTMLElement)) throw new Error('no composer frame')
+    const panel = screen.getByRole('listbox', { name: 'Commands' }).closest('div')
+    if (panel === null) throw new Error('no picker panel')
+    expect(frame.contains(panel)).toBe(false)
+    expect(frame.contains(screen.getByRole('option', { name: /compact/ }))).toBe(false)
+    expect(document.body.contains(panel)).toBe(true)
   })
 
   it('shows what follows the name, and nothing where nothing is expected', async () => {
@@ -546,10 +577,39 @@ describe('the slash, from the field', () => {
     await waitFor(() => expect(screen.getByRole('listbox', { name: 'Commands' })).toBeTruthy())
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
 
-    expect(screen.queryByRole('listbox')).toBeNull()
+    // Dismissal is an exit now, not an unmount: the panel plays its leaving.
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
     // The draft stays — the name completed by the space its arguments
     // follow — so dismissing is not losing; the words are the next
     // keystrokes.
     expect(field()).toBe('/explain ')
+  })
+
+  it('runs /compact where it stands: marks the conversation, asks the harness, and sends nothing', async () => {
+    // An action command is not a message: nothing goes to the turn endpoint,
+    // the field clears, and the mark the transcript's compaction row reads is
+    // made around the harness's own ask — true while it runs, cleared when it
+    // answers, the context bumped either way so the meter re-reads.
+    const calls = serveHarness()
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    type('/compact')
+    await waitFor(() => expect(screen.getByRole('listbox', { name: 'Commands' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() =>
+      expect(calls.some((asked) => asked.url.endsWith('/api/conversations/cnv_1/compact'))).toBe(
+        true,
+      ),
+    )
+    expect(onSend).not.toHaveBeenCalled()
+    await waitFor(() => expect(field()).toBe(''))
+    expect(liveWork.markCompacting).toHaveBeenCalledWith('cnv_1', true)
+    expect(liveWork.markCompacting).toHaveBeenCalledWith('cnv_1', false)
+    expect(liveWork.bumpContext).toHaveBeenCalledWith('cnv_1')
+    // The action ran; the composer holds no sentence about a success — the
+    // transcript's row is the one place the state is said.
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

@@ -1,9 +1,11 @@
+import { AnimatePresence } from 'framer-motion'
 import { EarlierBoundary, useTranscriptWindow } from '@/features/chat/transcript/paging'
 import { AssistantTurn } from '@/features/chat/transcript/live/AssistantTurn'
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
 import { RetryWait } from '@/features/chat/transcript/live/RetryWait'
 import { SubmissionFailed } from '@/features/chat/transcript/live/SubmissionFailed'
 import { CompactionMarker } from '@/features/chat/transcript/live/CompactionMarker'
+import { CompactingRow } from '@/features/chat/transcript/live/CompactingRow'
 import { isTurnRunning, type ConversationPhase } from '@/features/chat/connection/useConversation'
 import {
   isMessageBeingWritten,
@@ -49,6 +51,7 @@ export function LiveTranscript({
   phase,
   viewport,
   conversationId,
+  compacting = false,
   onBranch,
 }: {
   items: readonly TranscriptItem[]
@@ -63,6 +66,12 @@ export function LiveTranscript({
   viewport: React.RefObject<HTMLElement | null>
   /** The conversation the tool calls ran in, which keys their attachments. */
   conversationId: string
+  /**
+   * A compaction of this conversation is running: the store flag both
+   * controls — the model menu and `/compact` — mark. Drawn as the tail's
+   * working line, in the place the record will land.
+   */
+  compacting?: boolean
   /** Forks the conversation with everything up to the named answer. */
   onBranch?: (messageId: string) => void
 }) {
@@ -141,6 +150,14 @@ export function LiveTranscript({
           drops this and the real item is already in the list above, so the
           swap moves nothing. */}
       {pending !== null ? <LiveUserMessage item={pendingUserItem(pending)} /> : null}
+
+      {/* A compaction in flight, at the very tail — the cut it is working on
+          lands after everything the log holds, so the wait stands where the
+          record will. The collapse in its exit is what hands this slot to the
+          marker: one line settling from the wait into the fact. */}
+      <AnimatePresence initial={false}>
+        {compacting ? <CompactingRow key="compacting" /> : null}
+      </AnimatePresence>
 
       {/* A scheduled retry, and nothing else. It is named in words because
           "nothing is moving" and "the provider said no" look identical

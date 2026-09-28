@@ -103,6 +103,7 @@ function show(
   items: readonly TranscriptItem[],
   phase: ConversationPhase,
   pending: PendingSubmission | null = null,
+  compacting = false,
 ) {
   return render(
     <LiveTranscript
@@ -111,6 +112,7 @@ function show(
       phase={phase}
       viewport={createRef<HTMLElement>()}
       conversationId="conv"
+      compacting={compacting}
     />,
   )
 }
@@ -311,5 +313,58 @@ describe('the tail of a turn that has just been sent', () => {
     show([user('u1', 'earlier'), assistant('a1', 'an answer from before')], SUBMITTED, HELD)
     expect(screen.getByText('what did you make of it?')).toBeTruthy()
     expect(screen.queryByText(/Thinking|Thought|Working/)).toBeNull()
+  })
+})
+
+/**
+ * A compaction, from the ask to the record.
+ *
+ * The ask used to be silence: the field cleared, the request ran for
+ * seconds, and the record only appeared when the conversation was reopened.
+ * Now the ask says itself at the tail — the same line the record will speak
+ * from — and the record is a statement, not a control.
+ */
+describe('a compaction of this conversation', () => {
+  function compaction(id: string, tokensBefore: number): TranscriptItem {
+    return {
+      kind: 'compaction',
+      id,
+      summary: 'The model folded the earlier turns into a working summary.',
+      tokensBefore,
+      timestamp: null,
+    }
+  }
+
+  it('says the compaction is running, at the tail, while the store marks it', () => {
+    show([user('u1', 'earlier'), assistant('a1', 'an answer')], { status: 'idle' }, null, true)
+    expect(screen.getByText('Compacting conversation')).toBeTruthy()
+  })
+
+  it('says nothing about a compaction no one asked for', () => {
+    const { container } = show([user('u1', 'earlier')], { status: 'idle' })
+    expect(screen.queryByText('Compacting conversation')).toBeNull()
+    silence(container)
+  })
+
+  it('lands the record as one quiet line, with what the window held', () => {
+    show([user('u1', 'earlier'), compaction('c1', 172_000)], { status: 'idle' })
+    expect(screen.getByText(/Conversation compacted/)).toBeTruthy()
+    expect(screen.getByText(/172k folded into a summary/)).toBeTruthy()
+  })
+
+  it('is a statement, not a control — and keeps the summary to the model', () => {
+    // Alone on the page, so the only button a match could find would be the
+    // row's own — which is the claim being refused.
+    show([compaction('c1', 172_000)], { status: 'idle' })
+    // Nothing on the row is a button: no disclosure to open, no chevron
+    // promising a body. The summary rides in the item and must not be drawn.
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByText(/folded the earlier turns into a working summary/)).toBeNull()
+  })
+
+  it('says nothing about how much moved when nothing was measured', () => {
+    show([compaction('c1', 0)], { status: 'idle' })
+    expect(screen.getByText(/Conversation compacted/)).toBeTruthy()
+    expect(screen.queryByText(/folded into a summary/)).toBeNull()
   })
 })
