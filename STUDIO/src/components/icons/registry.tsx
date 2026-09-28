@@ -31,7 +31,7 @@ import {
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
-  SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
+  SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
   Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus,
@@ -318,6 +318,10 @@ const REGISTRY = {
 
   // — Confirmation and destructive ----------------------------------------
   check: { mark: Check },
+  // Selecting several at once — the library's select mode. A box with the
+  // mark inside it, because what the mode does is put exactly that beside
+  // every card.
+  select: { mark: SquareCheckBig },
   // Turning something off that stays installed. Not `permissionAsk`, which
   // is a Pause and belongs to the execution modes: a provider you switched off
   // is not a provider waiting to be asked about.

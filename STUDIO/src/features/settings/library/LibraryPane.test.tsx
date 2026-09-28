@@ -92,7 +92,7 @@ function jsonResponse(value: unknown, status = 200): Response {
  * remove — and records every ask. The listing is served per test through
  * `next`, because the tests below change what the library holds.
  */
-function serveLibrary(next: () => unknown): Call[] {
+function serveLibrary(next: (url: string) => unknown): Call[] {
   const calls: Call[] = []
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
@@ -104,7 +104,7 @@ function serveLibrary(next: () => unknown): Call[] {
     if (url.includes('/api/pairing/state')) return new Response(null, { status: 404 })
     if (/\/api\/library\/[^/]+\/bytes$/.test(url)) return new Response(null, { status: 404 })
     if (/\/api\/library\/[^/]+$/.test(url)) return new Response(null, { status: 200 })
-    if (url.includes('/api/library')) return jsonResponse(next())
+    if (url.includes('/api/library')) return jsonResponse(next(url))
     return new Response(null, { status: 404 })
   }
   vi.stubGlobal('fetch', fetch)
@@ -140,14 +140,54 @@ describe('LibraryPane', () => {
     render(<LibraryPane />)
     await screen.findByRole('button', { name: 'Edit Bruno' })
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search the library' }), {
-      target: { value: 'logo' },
-    })
+    // Search is collapsed until the magnifier asks for it: no permanent
+    // field squatting on the row.
+    expect(screen.queryByRole('textbox', { name: 'Search the library' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    const field = await screen.findByRole('textbox', { name: 'Search the library' })
+
+    fireEvent.change(field, { target: { value: 'logo' } })
     // A word waits a beat before it is asked; the wait is shorter than the
     // test's patience, so this also pins that the ask eventually happens.
     await waitFor(() =>
       expect(calls.some((asked) => asked.url.includes('query=logo'))).toBe(true),
     )
+
+    // Dismissing the search takes its words with it — a closed magnifier
+    // keeping a stale filter would be a wall silently narrowed.
+    fireEvent.keyDown(field, { key: 'Escape' })
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Search the library' })).toBeNull(),
+    )
+    await waitFor(() => {
+      const last = calls.filter((asked) => asked.url.includes('/api/library?')).at(-1)
+      expect(last?.url.includes('query=')).toBe(false)
+    })
+  })
+
+  it('says when a search found nothing, and gives the wall back', async () => {
+    harnessConfigured()
+    serveLibrary((url) => (url.includes('query=') ? EMPTY : LISTING))
+    render(<LibraryPane />)
+    await screen.findByRole('button', { name: 'Edit Bruno' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Search the library' }), {
+      target: { value: 'zzz' },
+    })
+
+    await screen.findByText('Nothing matches.')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Edit Bruno' })).toBeNull(),
+    )
+
+    // And the words leaving give the wall back — the dismissal is a
+    // round trip, not a state the pane keeps.
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search the library' }), {
+      key: 'Escape',
+    })
+    await waitFor(() => expect(screen.queryByText('Nothing matches.')).toBeNull())
+    expect(screen.getByRole('button', { name: 'Edit Bruno' })).toBeTruthy()
   })
 
   it('narrows by kind on the wire', async () => {
@@ -190,15 +230,56 @@ describe('LibraryPane', () => {
     expect(screen.getByText('Nothing kept yet.')).toBeTruthy()
   })
 
-  it('says what an empty library is, in one quiet line', async () => {
+  it('says what an empty library is, with a pictogram and one line', async () => {
     harnessConfigured()
     serveLibrary(() => EMPTY)
     render(<LibraryPane />)
 
     await screen.findByText('Nothing kept yet.')
-    // The empty state keeps its one helpful clause — how a file gets here —
-    // and drops the lecture.
-    expect(screen.getByText(/add a file here/)).toBeTruthy()
+    // The empty state is a pictogram and the quiet line — no second
+    // sentence of instructions, no lecture. A role of status so it is
+    // spoken, and the pictogram carries nothing a reader must see.
+    expect(screen.getByRole('status', { name: undefined })).toBeTruthy()
+    expect(screen.queryByText(/add a file here/)).toBeNull()
+    expect(screen.queryByText(/bookmark/)).toBeNull()
+  })
+
+  it('selects several, deletes them as one, and puts the tray away', async () => {
+    let reads = 0
+    harnessConfigured()
+    const calls = serveLibrary(() => {
+      reads += 1
+      return reads > 1 ? EMPTY : LISTING
+    })
+    render(<LibraryPane />)
+    await screen.findByRole('button', { name: 'Edit Bruno' })
+
+    // The mode rises with its tray, count honest at zero.
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    expect(screen.getByText('0 selected')).toBeTruthy()
+
+    // A click becomes a toggle, and the card says so.
+    const card = screen.getByRole('button', { name: 'Select Bruno' })
+    expect(card.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(card)
+    expect(card.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('1 selected')).toBeTruthy()
+
+    // Delete is one ask per kept file, and the wall empties.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() =>
+      expect(calls.some((asked) => asked.url.endsWith('/api/library/img_1') && asked.method === 'DELETE')).toBe(
+        true,
+      ),
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Select Bruno|Edit Bruno/ })).toBeNull(),
+    )
+    expect(screen.getByText('Nothing kept yet.')).toBeTruthy()
+
+    // The tray leaves when its work is done — there is nothing selected
+    // and no mode to be in.
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull())
   })
 
   it('says the truth when there is no harness to read', async () => {
