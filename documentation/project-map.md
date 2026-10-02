@@ -12,11 +12,12 @@ products designed to work together.
 |---|---|---|
 | **Studio Harness** | The runtime. Agents, permissions, sandboxing, policy, execution, storage, MCP. Everything with authority. | `STUDIO HARNESS/` |
 | **Studio Client** | The Tauri desktop application over the Harness. | `STUDIO/` |
-| **Studio Gateway** | A Cloudflare Worker, **retired** — not built, not tested, not shipped, not imported. Kept as a design reference only; decision #14, answered as keep. | `STUDIO Gateway/` |
 
-The Harness is the primary codebase, and the Gateway must not shape its
-architecture. Its replacement is a local TypeScript gateway bundled with Studio,
-so the Worker's deployment half does not carry over at all.
+The Harness is the primary codebase. The retired Gateway does not shape its
+architecture and never will again: the cloud was cancelled — the Worker in
+`bd4d389`, the Harness's client for it in `45233d55` (2026-08-24) — and local
+BYOK over Pi (ADR 0009) is the operational model source. The provider contract
+still reserves the name "gateway" for a possible future *user-hosted* source.
 
 ## Where everything lives
 
@@ -35,8 +36,7 @@ Project Studio/                ONE git repository. No submodules.
 │   └── archive/                Superseded, banner-marked.
 │
 ├── STUDIO HARNESS/            THE RUNTIME. 250 tracked files. Primary codebase.
-├── STUDIO/                    THE DESKTOP CLIENT. 129 tracked files.
-└── STUDIO Gateway/            RETIRED. Reference only, self-contained.
+└── STUDIO/                    THE DESKTOP CLIENT. 129 tracked files.
 ```
 
 Products are directories inside one repository, not separate repositories. Each

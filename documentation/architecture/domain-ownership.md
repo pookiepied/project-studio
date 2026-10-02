@@ -2,6 +2,19 @@
 
 > **SEQ start gate — C-01 / C-08.** One Harness process composing domain subsystems. Each subsystem owns its rules, state, repository, invariants and lifecycle. One database *file* is acceptable; cross-domain *raw table* access is not. New behaviour crosses domains via a typed port / event / application service.
 
+> **Written 2026-08-15, at the 008.3 gate — read it as that survey.** Since it
+> was written, the Flue 2 migration (2026-09) changed the run identity this
+> matrix predates: ADR 0033's amendment splits it into instance and
+> submission, and the "one admitted piece of durable work" vocabulary in the
+> rows below needs that split read into it. ADR 0057 (2026-09-19) deleted the
+> Windows containment that §14 still schedules as future work — the gate is
+> the boundary, there is no ProcessContainer, and the Linux `bwrap` backend is
+> opt-in. The "current violations" list below is the 008.3 snapshot; the
+> remediation register closed most of its rows (#19, #4, #22 and #24 among
+> them) and is the authority on what, if anything, still stands. The ownership
+> reasoning itself survived both migrations; that is why this file is
+> bannered, not rewritten.
+
 ### Durable vs process-local classification
 
 | Owner | What | Primary location | Handle |

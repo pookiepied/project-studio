@@ -84,10 +84,15 @@ that share the parent's durability envelope, MCP transports, and skills.
 
 ### Why the dependency risk is acceptable
 
-`@flue/runtime` is at `1.0.0-beta.9`. Two things contain the risk:
+`@flue/runtime` is at `2.0.3`, patched under `STUDIO HARNESS/patches/` (the
+1.0.0-beta.9 pin this paragraph carried is retired; the upgrade's own record
+is `work/flue-2-migration.md`). Two things contain the risk:
 
-1. **Only 9 files** in the harness import `@flue`. That containment already
-   exists and must be maintained.
+1. **24 files** in the harness's `src/` import `@flue` (measured 2026-09-29;
+   the "only 9" this bullet said in the 1.0.0-beta.9 days counted a much
+   smaller harness — the containment held, the tree grew). It is a boundary to
+   maintain, not a boast: every new `@flue` import is a vote for Flue's shape
+   over ours.
 2. **Flue sits on Pi rather than hiding it.** Worst case we drop one layer and
    drive Pi directly — we lose the loop and durability, not the stack.
 

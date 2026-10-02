@@ -12,17 +12,22 @@ anything inside it.
 ```
 STUDIO/                  desktop app — React 19, Vite, Tailwind v4, Tauri v2
 STUDIO HARNESS/          the harness — TypeScript, Flue + Pi, Hono
-documentation/           this layer: meta docs spanning both halves
-tasks/                   batches of work in progress, with checklists
-archive/                 previous attempts and superseded work, kept for mining
+documentation/           this layer: meta docs spanning both halves; its
+                         archive/ holds the superseded work, kept for mining
+prompts/                 the task prompts that drove the recent work; what the
+                         work itself owed and owed back is tracked in
+                         documentation/work/
+report/                  the reports those work sessions wrote
 README.md
 ```
 
-`archive/` holds v1 STUDIO (~83k lines), the Backend/Cloud service (in
-production, deployed from elsewhere), the Discord bot, and old api/auth/docs.
-Nothing there is live from this repo. It is reference material, not dead weight
-— the vendoring manifest, the Rust OAuth loopback server, and the MCP/skill
-libraries are all worth pulling forward.
+`documentation/archive/` holds the superseded work: the phase-11-MCP task
+files (of which `002-design.md` and `008-phase-1-11-completion.md` were
+archived), the retired KNOWN-ISSUES and open-questions registers, the sandbox
+findings ADR 0057 archived, and the umbrella design. Nothing there is live; it
+is reference material, not dead weight. What was worth pulling forward — the
+vendored ripgrep, the MCP and skill machinery — has been pulled; what remains
+is provenance.
 
 ---
 
@@ -62,6 +67,14 @@ may import from `demo/`.
 ## Harness layout
 
 Established, not proposed. See `STUDIO HARNESS/src/`.
+
+> **The `src/` listing below is the Flue-1 tree, read 2026-08, and it lags.**
+> The Flue-2 migration and everything after it moved names and added
+> directories it does not know: `models/` became `gateway/` — studio-cloud and
+> all gone with it (ADR 0009, `45233d55`) — and `sandbox/`, `storage/`,
+> `tools/`, `conversations/`, `library/` and others arrived after it was
+> written. Read the listing for the layout's argument; the truthful tree is
+> `ls "STUDIO HARNESS/src"`.
 
 Two directories sit beside `src/` rather than inside it, because neither is
 TypeScript the build compiles: `vendor/` holds the programs we ship, laid out
@@ -136,20 +149,25 @@ The harness continues on its own roadmap; the app connects at the end.
 |---|---|---|
 | 1–8 | foundation, loop, persistence, observability, providers, gateway, auth | done |
 | 9 | permission and containment kernel | foundation done |
-| 10 | native tools | implemented in dirty tree; local/manual posture |
-| 11 | MCP and audit remediation | **in progress** |
-| 12 | Skills | |
-| 13 | Subagents and tasks | |
+| 10 | native tools | implemented; local posture, gate-only on Windows since ADR 0057 |
+| 11 | MCP and audit remediation | shipped; what remains is tracked in the remediation register |
+| 12 | Skills | shipped 2026-09-15 (ADR 0056) |
+| 13 | Subagents and tasks | the agent-platform plan (work/agent-platform-plan.md); Stage 0 measured, ADR 0058 records |
 | 14–17 | projects, memory, workflows, evals | |
 | 18 | product integration — the frontend seam | |
 
 **The chain is clear** — snapshots, call bounds, trust/modes, native registrars,
-and the P1/P2 MCP/permission remediation are source-backed in the dirty tree.
-Task 007 records the remaining listener/Host, Gateway wire, restart-durability,
-and intentionally deferred product boundaries.
+and the P1/P2 MCP/permission remediation are source-backed. What remained of
+task 007's reminders (listener/Host, gateway wire, restart durability) was
+superseded by the remediation register: the Host lifecycle gaps are #88 and
+#89 there, restart durability closed with #43/#63/#64, and the gateway
+decision is #13 — Harness-side-only for 1.0, recommendation recorded.
 
-**Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with
-discovery can run. They measure whether the Flue/Pi bet holds, and they are
+**C-01 and C-02** — the Pi cache measurement and the `expandedTools`
+durability check — are still the recorded open questions, retired with their
+register to `documentation/archive/open-questions.md`. Their precondition has
+since arrived (MCP shipped, real multi-turn sessions run), which is what they
+were waiting on. They measure whether the Flue/Pi bet holds, and they are
 cheap to run and expensive to skip.
 
 The dogfooding rule stands: if STUDIO is not being used for real work shortly

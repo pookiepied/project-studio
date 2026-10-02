@@ -16,17 +16,18 @@ Three properties break every tie:
 |---|---|---|
 | **Studio Harness** | The runtime. Agents, permissions, sandboxing, policy, execution, storage, MCP. Everything with authority. | `STUDIO HARNESS/` |
 | **Studio Client** | The Tauri desktop application over the Harness. | `STUDIO/` |
-| **Studio Gateway** | A Cloudflare Worker, **retired**. Not built, not tested, not shipped, not imported. Kept as a design reference only. | `STUDIO Gateway/` |
 
 One git repository, no submodules. Each product has its own `package.json` and
 `pnpm-workspace.yaml`, so they are independent builds within one history and a
 single commit can span both. The Harness is the primary codebase.
 
-`Backend/` and `opencode/` are reference material. Read them; do not modify them.
+`Backend/` is a separate project — the undeployed `pookiepied.dev` umbrella scaffold — kept in
+this repository as reference material. Ignore it: it is not part of any product here, and no
+task in this repository modifies it.
 
 ## Stack
 
-**Harness** — TypeScript on Node 22.18.0, Flue, Hono, `node:sqlite`. No ORM, no
+**Harness** — TypeScript on Node 24.19.0, Flue, Hono, `node:sqlite`. No ORM, no
 external database, no required network service.
 
 **Client** — React 19, Vite, Tailwind v4, Framer Motion, Tauri v2 (Rust).
@@ -69,6 +70,20 @@ pnpm test         # vitest
 worse than no check at all.
 
 Rust side: `cargo clippy --all-targets` must be zero warnings.
+
+### Both workspaces
+
+From the repository root:
+
+```bash
+pnpm typecheck    # the Harness's, then the Client's — the minimum gate
+pnpm check        # both workspaces' full checks, strictly one at a time
+```
+
+`pnpm check` at the root is the gate for the whole repository: the Harness's
+check (typecheck, lint, build, the full suite) and then the Client's, never in
+parallel — the suites contend for sandbox resources. A client break fails the
+root command exactly as a harness break does.
 
 ## Layout
 

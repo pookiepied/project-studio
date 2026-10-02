@@ -32,7 +32,6 @@ Full version: `documentation/mental-model.md`. Read it once.
 Project Studio/
   STUDIO/            React 19 + Vite + Tailwind v4 + Tauri v2. The desktop UI.
   STUDIO HARNESS/    TypeScript on Flue + Pi + Hono. The runtime. Your work.
-  STUDIO Gateway/    Retired Cloudflare Worker. Reference only -- see its README.
   documentation/     Repo-wide. decisions/, architecture/, phases/, work/, archive/.
                      Work in progress lives in work/; this file lives here.
 ```
@@ -194,7 +193,7 @@ over `checkHostType`.
 decision, a trade-off, or a bug that happened. If the code already says it, do
 not say it again. No banners, no `====` dividers, no TODOs.
 
-Comments in code and prose in `docs/` use full prose with em dashes. **Your chat
+Comments in code and prose in `documentation/` use full prose with em dashes. **Your chat
 report to the reviewer does not** — keep that plain and short.
 
 ## 8. Testing
@@ -231,8 +230,11 @@ pnpm check
 That is `tsc --noEmit` then a Flue build then vitest. It must be green.
 
 If pnpm prompts on this machine, use `CI=true pnpm check`. The full suite takes
-about two minutes. Node is 22.18.0 and `node:sqlite` prints an experimental
-warning that is expected and not your problem.
+about two minutes. Node is pinned at 24.19.0 — the version its own
+dependencies' `engines` floors force, measured into `src/platform/runtime.ts`
+and reported by the harness at every start (the #79 register row) — and on it
+the old `node:sqlite` experimental warning is gone, which was measured before
+it was claimed.
 
 **Add no dependency.** Not one. Node's standard library and what is already in
 `package.json`.
@@ -252,9 +254,11 @@ warning that is expected and not your problem.
   everything else.
 - **Do not reformat code you are not changing.** No import reordering, no
   whitespace tidying, no unrelated fixes. The diff contains only your task.
-- **Do not edit anything in `docs/`, `documentation/`, or `tasks/`.** The
-  reviewer writes those. A wrong amendment note is worse than a missing one,
-  because the next person believes it. Put your findings in your report instead.
+- **Do not edit anything in `documentation/` unless the task tells you to.** The
+  reviewer writes those; the `docs/` and `tasks/` folders this bullet used to
+  name were consolidated away in 2026-08 (the one-root rule, mental-model's
+  record of it). A wrong amendment note is worse than a missing one, because
+  the next person believes it. Put your findings in your report instead.
 - **Stay inside the files your task names.** If the task cannot be done without
   touching another, stop and say so rather than widening.
 

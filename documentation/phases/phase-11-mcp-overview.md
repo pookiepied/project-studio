@@ -2,15 +2,16 @@
 
 A readable account, not a checklist. For the operational version — what to
 read before working, how to route an issue, what "done" requires — see
-`tasks/META-INSTRUCTIONS.md`. For the line-by-line record, see
-`tasks/phase-11-mcp/003-work-plan.md` and `tasks/phase-11-mcp/005-loose-ends.md`.
-The cross-cutting Harness client boundary is settled in ADR 0028 and planned in
-`tasks/phase-11-mcp/006-harness-admission.md`.
-The current P1/P2 audit remediation is tracked in
-`tasks/phase-11-mcp/007-audit-remediation.md`.
-The complete Phase 1-11 closure order is tracked in
-`tasks/phase-11-mcp/008-phase-1-11-completion.md`; that file is the active
-checklist and requires API/client boundaries without requiring product UI work.
+`documentation/README.md` and the remediation register
+(`../work/phases-1-11-remediation.md`), which superseded this phase's task
+files in the 2026-08 consolidation. Those task files were archived, not all of
+them faithfully: of `tasks/phase-11-mcp/` only the 002 design and the 008
+completion record survive, under `../archive/phase-11-mcp/` — the 008 is the
+readable detail behind the register's #49–#62. The rationale the 003 work plan
+carried lives in the ADRs (0029, 0048) and the code's own comments; the
+Harness-client boundary this phase planned is ADR 0028 with ADR 0040's second
+transport; the P1/P2 audit remediation the 007 file tracked is the register's
+#36–#42 and #78–#80 rows.
 
 This document is a snapshot. Trust the source files it summarizes over this
 prose the moment they disagree.
@@ -37,12 +38,13 @@ did not write: local processes over stdio, or remote endpoints over HTTP. Two
 protocol eras exist in the wild (legacy, back to 2024, and a modern revision
 from mid-2026), and STUDIO speaks both from one client.
 
-Phase 11 is organized as eight numbered pieces, `003.1` through `003.8`, and
-tracked in one running document that explains *why* each was built the way it
-was: `tasks/phase-11-mcp/003-work-plan.md`. A second, shorter document exists
-because a long "why" entry about a finished piece reads exactly like one about
-a half-finished piece — `tasks/phase-11-mcp/005-loose-ends.md` asks the harsher
-question directly: what is still not done.
+Phase 11 is organized as eight numbered pieces, `003.1` through `003.8`. Their
+build rationale lived in a running work plan, and a second, shorter document
+asked the harsher question directly — what is still not done
+(`tasks/phase-11-mcp/003-work-plan.md`, `005-loose-ends.md`). Neither survived
+the 2026-08 consolidation; what they settled now lives in the ADRs (0029, 0048)
+and, for what was never finished, the remediation register's Needs
+Implementation rows.
 
 ## The shape the phase was built in, on purpose
 

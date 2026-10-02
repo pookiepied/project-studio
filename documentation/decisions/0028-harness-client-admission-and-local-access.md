@@ -8,6 +8,16 @@ and containment); it does not replace them.
 
 **Implementation record:** `tasks/phase-11-mcp/006-harness-admission.md`
 
+> **Amended 2026-09-29.** The implementation record above did not survive the
+> 2026-08 documentation consolidation: of the `tasks/phase-11-mcp/` files, only
+> `002-design.md` and `008-phase-1-11-completion.md` were archived, under
+> `documentation/archive/phase-11-mcp/`. What the missing file sequenced is not
+> lost — it is this ADR, the shipped supervisor and verifier it described, ADR
+> 0040 (the second, stdin-transported half of the same bootstrap protocol,
+> carried by #87), and the remediation register's #74 row (the
+> child-environment policy that implementation shipped under). The pointer is
+> left because a correction is more honest than a rewrite.
+
 ## Context
 
 Project Studio has two process roles:
@@ -333,5 +343,6 @@ work is a boundary and lifecycle layer around it, not a second agent runtime.
 `src/app.ts` becomes a composition root that imports the admission verifier and
 HTTP application factory rather than containing authentication or route logic.
 
-The full implementation sequence is recorded separately in
-`tasks/phase-11-mcp/006-harness-admission.md`.
+The full implementation sequence was recorded separately in
+`tasks/phase-11-mcp/006-harness-admission.md`, which did not survive the 2026-08
+documentation consolidation — see the amendment note at this ADR's head.

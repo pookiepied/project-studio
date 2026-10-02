@@ -1,0 +1,8 @@
+{
+  "name": "project-studio",
+  "private": true,
+  "scripts": {
+    "typecheck": "pnpm -C \"STUDIO HARNESS\" typecheck && pnpm -C STUDIO typecheck",
+    "check": "pnpm -C \"STUDIO HARNESS\" check && pnpm -C STUDIO check"
+  }
+}

@@ -5,6 +5,20 @@
 **Amends:** ADR 0008 and ADR 0028 by defining what identity is available inside
 the single local Harness process. It does not claim account-backed tenancy.
 
+> **Amended 2026-09-29.** Two of the five points have moved since this ADR was
+> written, and both are recorded here rather than rewritten into the list.
+> **Point 2** described 1.0: Flue 2.0 exposes the canonical conversation id to
+> the authored initializer, and it IS the agent instance id — the caller passes
+> the product's conversation id bare, the `conversation:` prefix is gone from
+> the scope vocabulary, and `conversationId` is required with no default (ADR
+> 0038, which landed the change under #69 and carries its tests). Measured, not
+> inferred: the sandbox factory's `createSandbox` receives the instance id in
+> `options.id`, and the scope is built from it directly. **Point 5's** subagent
+> half is answered by [ADR 0058](0058-agent-definitions-and-delegation.md) —
+> the runtime derives the child scope from the parent conversation's settled
+> row plus the definition, within the local boundary this ADR names. The
+> multi-user deferral itself stays deferred.
+
 ## Decision
 
 1. One Harness launch has one admitted local client identity and one session id.

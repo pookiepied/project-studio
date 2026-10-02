@@ -59,6 +59,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0040](0040-one-bootstrap-protocol-two-transports.md) | One bootstrap protocol, two transports — how the credential reaches the Harness on a platform with no `dup2` |
 | [0041](0041-containment-is-the-kernel-s-job.md) | Containment is the kernel's job — a launcher that applies an AppContainer, why availability is probed and registration is not, and what it writes to the user's disk — **Windows half superseded by 0057** |
 | [0057](0057-the-gate-is-the-boundary.md) | The gate is the boundary — the Windows AppContainer sandbox is removed, `bwrap` stays as an opt-in fence, two modes, a scope question is a rule and not an ACL |
+| [0058](0058-agent-definitions-and-delegation.md) | Agent definitions and delegation — a delegate's policy is declared, its containment inherited, its approvals never; the `task` roster's factual miss, the measured ids, and the one hunk that makes the tool list honest per agent |
 | [0024](0024-capabilities-are-on-and-the-list-is-honest.md) | Capabilities are on, and the list is honest |
 | [0036](0036-user-decisions-are-durable.md) | A user decision is durable — approvals and answers live in SQL, never in process memory |
 

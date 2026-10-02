@@ -6,6 +6,18 @@
 >
 > Task 008 records this section as 5/5. It is not. The discrepancy is meta-task **#39**; the full set of corrections to that file is meta-task **#42**, recorded in its header.
 
+> **A 2026-08-15 photograph, not a census.** This file is 008.4's route survey,
+> taken at the remediation's Stage 4. Since then the Flue 2 migration rebuilt
+> the vocabulary behind the same receipt — the instance/submission identity
+> split, the idempotency key reopened and declined (ADR 0033, amended
+> 2026-09-02) — the skills phase (ADR 0056) mounted `/api/skills`, and the
+> provider, conversation, project, media, question, plan, library, sandbox,
+> command and lifecycle route groups were added or grew. None of them is named
+> below; the struck #73 rows are what Stage 1 of the agent-platform plan
+> (`documentation/work/agent-platform-plan.md`) closes. The registrations in
+> `src/transport/http/create-app.ts` and the scope tables in
+> `src/admission/scopes.ts` are the living truth; this file is the photograph.
+
 ## 1. Route Inventory (Harness HTTP surface)
 
 All routes are behind `src/transport/http/middleware/admission.ts:34` `createAdmissionMiddleware` which validates `Authorization: Bearer <ADMISSION_CREDENTIAL>` (32B base64url, `src/admission/credential.ts:19`) and injects `AuthContext` + `ExecutionContext` (`X-Project-Studio-Request-Id` if valid UUID else new). `src/transport/http/create-app.ts:25` composes.

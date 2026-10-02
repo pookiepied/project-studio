@@ -31,6 +31,11 @@ capability path without an architecture decision.
 
 ### Phase 7: Studio Gateway Integration
 
+> **Removed since (2026-08-24).** The Studio Cloud gateway was cancelled: the Worker went in
+> `bd4d389`, the Harness's client for it in `45233d55` — nothing this phase delivered, nor the
+> 7.5 review's splits of it, is in the tree. `local` BYOK (ADR 0009) is the operational source;
+> ADR 0002 and ADR 0006 carry the record under their superseded banners.
+
 - Operational `studio-cloud` model source, selected at process bootstrap.
 - Native Pi-facing Studio Gateway adapter parsing the gateway's own SSE contract, with streamed
   reasoning/text, preserved multiple tool calls, tool-result continuation, finish reasons, usage,
@@ -66,6 +71,12 @@ Recorded, deliberately not changed:
   as a decided seam, and it is exercised only by a unit test today.
 
 ### Phase 8: Product Authentication, Secure Credentials, And Local BYOK
+
+> **Removed since (2026-08-24), named so the list below reads honestly:** item 1's public API proxy
+> went with the cancelled gateway's Worker (`bd4d389`), and item 3's single-flight refreshing
+> `AccessTokenProvider` went with the Harness's client for it (`45233d55`). The sign-in flow stays —
+> `src/auth/` is the Project Studio account session, distinct from any model gateway, though its
+> refresh surface has been caller-less since (TASK-20 §7.2). Items 2, 4 and 5 stand as written.
 
 Ordered so that storage exists before anything needs to store a secret. A session token is itself a
 credential, so wiring login first would have required a temporary plaintext step.
@@ -222,7 +233,9 @@ Add a registry and separate transports for local MCP and authenticated cloud MCP
 capability, permission, cancellation, telemetry, and result policy as native tools. Include tool
 provenance, collision handling, health, reconnect, and connection teardown.
 
-Design and protocol research: `tasks/phase-11-mcp/002-design.md`. The protocol split into two eras on
+Design and protocol research: `../archive/phase-11-mcp/002-design.md` — the phase's task
+files were archived in the 2026-08 documentation consolidation, and this one
+survives there. The protocol split into two eras on
 2026-07-28 — a stateless core with no `initialize` handshake, no session id, and no
 server-initiated requests. We speak the modern revision by default and probe for the legacy one.
 
