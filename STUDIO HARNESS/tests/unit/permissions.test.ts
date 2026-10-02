@@ -401,8 +401,8 @@ describe("grants", () => {
     await kernel.authorize({ namespace: "native", name: "write_file" }, SCOPE);
 
     expect(grants.list()).toHaveLength(1);
-    expect(grants.list("studio")).toHaveLength(1);
-    expect(grants.list("someone-else")).toEqual([]);
+    expect(grants.list({ agentId: "studio" })).toHaveLength(1);
+    expect(grants.list({ agentId: "someone-else" })).toEqual([]);
   });
 });
 

@@ -40,6 +40,35 @@ export interface PermissionGrant {
   readonly grantedAt: number;
 }
 
+/**
+ * What a grant listing may be narrowed by, for the surface that shows the
+ * person what they have approved. Each field is a conjunction on the column
+ * it names; an absent field says nothing about that column. A conversation
+ * filter matches the rows granted *in* that conversation — the column is set
+ * exactly for `duration: "conversation"` approvals — and a standing grant
+ * belongs to no conversation, so no conversation filter can name one. That is
+ * the honest answer to "what was approved here"; the standing approvals a
+ * conversation also runs under are the unfiltered list's to show.
+ */
+export interface GrantFilters {
+  readonly agentId?: string;
+  readonly projectId?: string;
+  readonly conversationId?: string;
+}
+
+/**
+ * The grants surface a route is allowed to hold: the two operations that
+ * answer to the person. `find` and `grant` stay off it deliberately — they
+ * are the kernel's side of the wall, and a route that could mint an approval
+ * would be a second door around the ask. The store satisfies this
+ * structurally; routes take the view so their type says what they may do
+ * rather than where it happens to come from.
+ */
+export interface PermissionGrantsView {
+  list(filters?: GrantFilters): readonly PermissionGrant[];
+  revoke(grantId: string): boolean;
+}
+
 interface GrantRow {
   id: string;
   capability_key: string;
@@ -67,7 +96,7 @@ function toGrant(row: GrantRow): PermissionGrant {
   };
 }
 
-export class PermissionGrantStore {
+export class PermissionGrantStore implements PermissionGrantsView {
   readonly #db: StudioDatabase;
 
   constructor(db: StudioDatabase) {
@@ -215,25 +244,35 @@ export class PermissionGrantStore {
     return toGrant(grant);
   }
 
-  /** Everything the user could revoke, newest first. */
-  list(agentId?: string): readonly PermissionGrant[] {
-    const rows = (
-      agentId === undefined
-        ? this.#db
-            .prepare(
-              `SELECT ${COLUMNS}
-                 FROM permission_grant WHERE revoked_at IS NULL
-                ORDER BY granted_at DESC`,
-            )
-            .all()
-        : this.#db
-            .prepare(
-              `SELECT ${COLUMNS}
-                 FROM permission_grant WHERE revoked_at IS NULL AND agent_id = ?
-                ORDER BY granted_at DESC`,
-            )
-            .all(agentId)
-    ) as unknown as GrantRow[];
+  /**
+   * Everything the user could revoke, newest first, narrowed by the filters
+   * given. Each filter is a conjunction on its column; an absent filter says
+   * nothing about that column. See `GrantFilters` for what a conversation
+   * filter does and does not match.
+   */
+  list(filters: GrantFilters = {}): readonly PermissionGrant[] {
+    const conditions = ["revoked_at IS NULL"];
+    const params: string[] = [];
+    if (filters.agentId !== undefined) {
+      conditions.push("agent_id = ?");
+      params.push(filters.agentId);
+    }
+    if (filters.projectId !== undefined) {
+      conditions.push("project_id = ?");
+      params.push(filters.projectId);
+    }
+    if (filters.conversationId !== undefined) {
+      conditions.push("conversation_id = ?");
+      params.push(filters.conversationId);
+    }
+    const rows = this.#db
+      .prepare(
+        `SELECT ${COLUMNS}
+           FROM permission_grant
+          WHERE ${conditions.join(" AND ")}
+          ORDER BY granted_at DESC`,
+      )
+      .all(...params) as unknown as GrantRow[];
 
     return rows.map(toGrant);
   }

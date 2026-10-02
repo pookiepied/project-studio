@@ -133,6 +133,46 @@ describe("one conversation with one MCP server", () => {
     });
   });
 
+  describe("a deadline ends the wait, not the connection", () => {
+    it("settles a request nobody answers, and keeps serving afterwards", async () => {
+      // The timeout half of 008.2, unproven until #66. The per-request
+      // deadline is the whole answer to a server that stops answering without
+      // dying: the channel stays up, so "the other end went away" never fires,
+      // and without a deadline the caller waits forever inside a map that
+      // still looks alive. The deadline here is short and real rather than
+      // faked, because the property under test is that a real timer settles a
+      // real wait — if the deadline were removed, this request would never
+      // settle and the test would fail by hanging, which is the shape of the
+      // defect itself.
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel, { requestTimeoutMs: 100 });
+
+      // The envelope variant, so the timeout path also exercises the
+      // wants-envelope cleanup: that id is removed however the request
+      // settles, timeout included — a documented property that had no test.
+      const waiting = connection.requestEnvelope("tools/call");
+      const sent = channel.lastSent();
+
+      await expect(waiting).rejects.toMatchObject({ kind: "timed_out" });
+      expect(connection.inFlight).toBe(0);
+
+      // An answer that arrives after its deadline is ignored rather than
+      // fatal: a late response for an id that already timed out is normal
+      // when a server is slow, and it must neither end the connection nor
+      // leave anything behind in the map.
+      channel.emit({ jsonrpc: "2.0", id: sent.id, result: "late" });
+      expect(connection.closed).toBe(false);
+
+      // And what the deadline retired was one exchange, not the connection —
+      // the next request is registered, answered, and cleaned up as ever. A
+      // timed-out call must not wedge the connection it happened on.
+      const later = connection.request("tools/list");
+      channel.emit({ jsonrpc: "2.0", id: channel.lastSent().id, result: { tools: [] } });
+      await expect(later).resolves.toEqual({ tools: [] });
+      expect(connection.inFlight).toBe(0);
+    });
+  });
+
   describe("one bad line does not end a good connection", () => {
     it("keeps answering after a line it cannot read", async () => {
       const channel = new FakeChannel();

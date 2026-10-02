@@ -150,25 +150,6 @@ export function createChildExecutionContext(
   };
 }
 
-/**
- * A new attempt at the same operation: same `requestId`, same `operationId`,
- * fresh `attemptId`.
- *
- * **Declared, not wired.** ADR 0033 specifies `attemptId` as "new for each
- * execution/retry attempt", and nothing in the Harness retries yet — Flue owns
- * recovery, and automatic retry is off pending decision #12. So this has a test
- * and no production caller, deliberately, and is not dead code to be deleted on
- * the next sweep. The caller arrives with retry.
- */
-export function createRetryExecutionContext(
-  operation: ExecutionContext,
-): ExecutionContext {
-  return {
-    ...operation,
-    attemptId: createStudioUuid(),
-  };
-}
-
 export function currentExecutionContext(): ExecutionContext | undefined {
   return executionStorage.getStore();
 }

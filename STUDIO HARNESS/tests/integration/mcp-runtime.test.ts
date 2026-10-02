@@ -10,6 +10,7 @@ import type { SecureCredentialStore } from "../../src/credentials/credential-sto
 import { conversationScope, projectScope } from "../../src/extend/selection.js";
 import type { McpProvenance } from "../../src/extend/mcp/registry.js";
 import { CUSTOMIZATION_SERVER_ID } from "../../src/extend/mcp/builtin.js";
+import { SLOW_SERVER } from "../fixtures/mcp-servers.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
 import { openDatabase } from "../../src/storage/database.js";
@@ -148,15 +149,33 @@ describe("MCP application runtime", () => {
    * between the two cases: it is the only question the withhold asks, and
    * nothing in the harness's own client writes it, so a test that wants the
    * eager path has to write the row with `system` here.
+   *
+   * The extension itself is parameterizable because the cancellation case
+   * (#66) mounts the slow fixture from `tests/fixtures/mcp-servers.ts` — a
+   * server written for exactly that gap — in place of the echo one; the
+   * default keeps the echo server every case here was written against.
    */
-  async function startedRuntime(provenance: McpProvenance) {
+  async function startedRuntime(
+    provenance: McpProvenance,
+    extension: {
+      readonly script: string;
+      readonly id: string;
+      readonly title: string;
+      readonly description: string;
+    } = {
+      script: SERVER,
+      id: "echo-server",
+      title: "Echo server",
+      description: "Echoes text back, for testing.",
+    },
+  ) {
     const directory = await mkdtemp(join(tmpdir(), "studio-mcp-runtime-"));
     temporaryDirectories.push(directory);
     const projectRoot = join(directory, "project");
     await mkdir(projectRoot, { recursive: true });
     const script = join(directory, "server.mjs");
     const databasePath = join(directory, "studio.db");
-    await writeFile(script, SERVER, "utf8");
+    await writeFile(script, extension.script, "utf8");
 
     // Opened explicitly rather than set through the environment. The runtime
     // used to resolve a process-global connection, so this test got whichever
@@ -172,9 +191,9 @@ describe("MCP application runtime", () => {
     });
 
     runtime.servers.save({
-      id: "echo-server",
-      title: "Echo server",
-      description: "Echoes text back, for testing.",
+      id: extension.id,
+      title: extension.title,
+      description: extension.description,
       transport: "stdio",
       command: process.execPath,
       args: [script],
@@ -182,7 +201,7 @@ describe("MCP application runtime", () => {
       auth: "none",
       provenance,
     }, AUTH_CONTEXT);
-    runtime.servers.setEnabled(projectScope(runtime.projectId), "echo-server", true, AUTH_CONTEXT);
+    runtime.servers.setEnabled(projectScope(runtime.projectId), extension.id, true, AUTH_CONTEXT);
     // Trust is not on the runtime's surface; the store owns it and this test
     // has the database, so it writes through the owner like any other caller.
     new WorkspaceTrustStore(database).set(projectRoot, true);
@@ -199,9 +218,9 @@ describe("MCP application runtime", () => {
       return state === "ready" || state === "given-up" || state === "idle";
     };
     for (let attempt = 0; ; attempt += 1) {
-      if (answered("echo-server") && answered(CUSTOMIZATION_SERVER_ID)) break;
+      if (answered(extension.id) && answered(CUSTOMIZATION_SERVER_ID)) break;
       if (attempt > 300) {
-        const silent = ["echo-server", CUSTOMIZATION_SERVER_ID].filter((id) => !answered(id));
+        const silent = [extension.id, CUSTOMIZATION_SERVER_ID].filter((id) => !answered(id));
         throw new Error(`an enabled server never answered for the inventory to settle on: ${silent.join(", ")}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -664,6 +683,64 @@ describe("MCP application runtime", () => {
       else process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL = previousCredential;
       if (previousPort === undefined) delete process.env.PROJECT_STUDIO_BOUND_PORT;
       else process.env.PROJECT_STUDIO_BOUND_PORT = previousPort;
+    }
+  }, 30_000);
+
+  // 008.2's cancellation half, against the real thing (#66): the abort chain
+  // this proof runs along is caller → the model tool's execute → `gate.call`
+  // → the bounds' composed signal → the MCP tool's execute →
+  // `connection.request` → the pending entry — every hop wired, over a real
+  // stdio server that holds its answer for eight seconds. What each hop is
+  // caught by, when removed, is worth saying because no single test here
+  // could catch all of them: drop the caller's signal before the gate and
+  // this call never rejects — it resolves when the slow answer finally lands,
+  // and the rejection assertion fails on a resolution; drop the signal at the
+  // connection request itself and the capabilities unit test's exact-signal
+  // assertion fails; drop the pending entry's abort handling and the
+  // connection unit test fails. What only this test can say is that the
+  // assembled system — the real gate, the real connection, a real process —
+  // cancels a real in-flight call when the caller withdraws.
+  itRuns("cancels an in-flight MCP tool call when the caller aborts", async () => {
+    const { runtime, database } = await startedRuntime("user", {
+      script: SLOW_SERVER,
+      id: "slow-server",
+      title: "Slow server",
+      description: "Answers a tool call eight seconds late, for testing cancellation.",
+    });
+    try {
+      const sandbox = runtime.createAgentSandbox({ agentId: "agent", conversationId: "agent" });
+      const env = await sandbox.createSandbox({ id: "agent" });
+      const before = sandbox.tools?.(env, { subagents: {} }) ?? [];
+      const discovery = before.find((tool) => tool.name === "discover");
+      expect(discovery).toBeDefined();
+      await discovery?.execute("discover-1", { scope: "mcp:slow-server/slow" });
+      const registered = sandbox.tools?.(env, { subagents: {} }) ?? [];
+      const slow = registered.find((tool) => tool.name === "mcp__11_slow-server__4_slow");
+      expect(slow).toBeDefined();
+      if (slow === undefined) return;
+
+      // The abort lands mid-call: half a second in, the request is long since
+      // on the wire and the server is inside its eight-second wait.
+      const controller = new AbortController();
+      const startedAt = Date.now();
+      const call = slow.execute("cancel-1", { text: "abandoned" }, controller.signal);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      controller.abort();
+
+      // The vocabulary, not merely "something threw": the bounds abandoned a
+      // call that had started, and this descriptor's `idempotent: false` is
+      // what makes the abandonment tell the model to check the current state
+      // before repeating it.
+      await expect(call).rejects.toMatchObject({ kind: "cancelled" });
+      // And promptly — well inside the eight seconds the server's own answer
+      // would have taken, so the rejection is the abort's doing and not the
+      // slow reply arriving to an abandoned race.
+      expect(Date.now() - startedAt).toBeLessThan(7_500);
+    } finally {
+      // Awaited, as everywhere above: the child runs in a directory afterEach
+      // removes.
+      await runtime.stop();
+      database.close();
     }
   }, 30_000);
 });

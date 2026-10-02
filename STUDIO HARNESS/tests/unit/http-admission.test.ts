@@ -120,6 +120,7 @@ describe("Harness HTTP admission", () => {
     let retrievalEntered = 0;
     let conversationEntered = 0;
     let projectEntered = 0;
+    let grantsEntered = 0;
 
     const app = createHttpApp({
       // A port, so the double is the three lines the route actually uses
@@ -172,6 +173,15 @@ describe("Harness HTTP admission", () => {
           return [];
         },
       } as unknown as PermissionApprovalBroker,
+      // The real interface shape, no cast: the route takes the narrow view,
+      // and a plain object with the two methods is exactly that view.
+      grants: {
+        list: () => {
+          grantsEntered += 1;
+          return [];
+        },
+        revoke: () => false,
+      },
       conversations: {
         list: () => {
           conversationEntered += 1;
@@ -201,9 +211,11 @@ describe("Harness HTTP admission", () => {
       "/agents/studio/ordering-probe",
       "/api/mcp/servers",
       "/api/permissions/pending",
+      "/api/permissions/grants",
       "/api/providers/connections",
       "/api/providers/retrieval",
       "/api/conversations",
+      "/api/conversations/conv-1/snapshots",
       "/api/projects",
     ]) {
       const response = await app.request(`http://harness.test${path}`, {
@@ -229,6 +241,7 @@ describe("Harness HTTP admission", () => {
     expect(retrievalEntered).toBe(0);
     expect(conversationEntered).toBe(0);
     expect(projectEntered).toBe(0);
+    expect(grantsEntered).toBe(0);
 
     // The boundary is provably BEFORE the agent mount: an admitted request
     // to a mounted path is no longer answered by admission at all. Without
@@ -259,11 +272,19 @@ describe("Harness HTTP admission", () => {
         headers: { authorization: `Bearer ${session.credential}` },
       },
     );
+    const admittedGrants = await app.request("http://harness.test/api/permissions/grants", {
+      headers: { authorization: `Bearer ${session.credential}` },
+    });
     expect(admittedMcp.status).toBe(200);
     expect(admittedPermissions.status).toBe(200);
     expect(admittedProviders.status).toBe(200);
+    expect(admittedGrants.status).toBe(200);
     expect(mcpEntered).toBe(1);
     expect(permissionEntered).toBe(1);
     expect(providerEntered).toBe(1);
+    // And the grants route is mounted, not merely admitted: a 404 here would
+    // also not be 401, so the status is asserted and the double's entry
+    // proves the request reached the handler behind the boundary.
+    expect(grantsEntered).toBe(1);
   });
 });

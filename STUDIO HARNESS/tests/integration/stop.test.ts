@@ -87,6 +87,11 @@ async function stopHarness(child: ChildProcess): Promise<void> {
 }
 
 describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
+  // The file's title names four concerns; the tests here cover two of them
+  // end to end (stop and disconnect) plus the settlement vocabulary. The
+  // other two live where the machinery they bind lives (#66): the per-request
+  // deadline in tests/unit/mcp-connection.test.ts, and the cancellation of a
+  // real in-flight MCP tool call in tests/integration/mcp-runtime.test.ts.
   const toClean: (() => Promise<void>)[] = [];
 
   afterEach(async () => {

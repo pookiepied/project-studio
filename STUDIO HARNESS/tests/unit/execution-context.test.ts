@@ -2,25 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   createChildExecutionContext,
-  createRetryExecutionContext,
   createRootExecutionContext,
   currentExecutionContext,
   runWithExecutionContext,
 } from "../../src/execution/context.js";
 
 describe("execution context", () => {
-  it("keeps one request family across child operations and retries", () => {
+  it("keeps one request family across child operations", () => {
     const root = createRootExecutionContext({ clientId: "client", sessionId: "session" });
     const tool = createChildExecutionContext(root, { kind: "tool", flue: { toolCallId: "tool-1" } });
-    const retry = createRetryExecutionContext(tool);
 
     expect(tool.requestId).toBe(root.requestId);
     expect(tool.parentOperationId).toBe(root.operationId);
     expect(tool.kind).toBe("tool");
     expect(tool.flueToolCallId).toBe("tool-1");
-    expect(retry.requestId).toBe(root.requestId);
-    expect(retry.operationId).toBe(tool.operationId);
-    expect(retry.attemptId).not.toBe(tool.attemptId);
   });
 
   it("propagates through async work without mutable global state", async () => {

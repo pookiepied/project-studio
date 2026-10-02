@@ -19,6 +19,7 @@ import {
 import { createAdmissionSession } from "./admission/verifier.js";
 import { PermissionApprovalBroker } from "./application/approval-broker.js";
 import { QuestionBroker } from "./application/question-broker.js";
+import { PermissionGrantStore } from "./permissions/grant-store.js";
 import { PendingApprovalStore } from "./permissions/pending-approvals.js";
 import { PendingQuestionStore } from "./questions/pending-questions.js";
 import { PlanItemStore } from "./plan/plan-items.js";
@@ -316,6 +317,12 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // until now nothing could - and an unwritten table means every project
     // folder is undecided, so every project conversation could only read.
     const trust = new WorkspaceTrustStore(database);
+    // The approvals already given, for the settings pane to list and
+    // withdraw. Its own instance over the same table, like `scopes` and
+    // `trust`: the kernel holds one too for the reading side, and both are
+    // rows in this one database, so a revocation written here is the very
+    // row the kernel's next `find()` reads.
+    const grants = new PermissionGrantStore(database);
     // The automatic titling pass: watches the runtime for a conversation's
     // first exchange settling and writes the title agent's answer into the
     // index, once, while the row is still unnamed by a person. Subscribes
@@ -386,6 +393,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       // cache directory; the window asks here and never the site.
       favicons: new FaviconStore({ directory: studioPath("cache", "favicons") }),
       approvals,
+      grants,
       questions,
       plans,
       conversations,
@@ -397,6 +405,15 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       database,
       titling,
       contextUsage,
+      // The undo surface: the same store the gate's snapshots run on, reached
+      // through the conversation that owns the writes. Restoring is the
+      // person acting, not a run asking — the kernel is not consulted, which
+      // is the point: an undo the agent could refuse would not be an undo.
+      snapshots: {
+        list: (conversationId, limit) => runtime.snapshotStoreFor(conversationId).list(limit),
+        restore: (conversationId, snapshotId) =>
+          runtime.snapshotStoreFor(conversationId).restore(snapshotId),
+      },
       // Manual compaction: the cool-down reads the same tracker the meter
       // reads and the same window the render hands Flue, so the button, the
       // refusal and the threshold all stand on one set of numbers.

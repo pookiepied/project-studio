@@ -639,6 +639,19 @@ export class StudioRuntime implements AgentHost {
    */
   readonly #turnSnapshots = new Map<string, TurnSnapshots>();
   /**
+   * One store per project, shared by everything that touches a shadow
+   * repository.
+   *
+   * The repository's lock is an in-process promise queue per instance
+   * (T-17), not a file lock: a second `SnapshotStore` over the same git
+   * directory would run its captures *beside* the gate's instead of behind
+   * them, which is the exact overlap the queue exists to prevent. Every
+   * consumer — the turn snapshots below, and `snapshotStoreFor` for the
+   * undo route — gets its store from here, so capture and restore can only
+   * ever join one chain.
+   */
+  readonly #snapshotStores = new Map<string, SnapshotStore>();
+  /**
    * What each conversation has read, for as long as the conversation lasts.
    *
    * Held here rather than built inside `registerNativeTools`, because that
@@ -925,6 +938,40 @@ export class StudioRuntime implements AgentHost {
 
   get projectRoot(): string {
     return this.#projectRoot;
+  }
+
+  /**
+   * The undo store a conversation's writes are recorded against: the same
+   * instance the conversation's gate holds, reached by resolving the project
+   * the way `createAgentSandbox` does — a filed conversation stands in the
+   * project's first folder, an unfiled one in its own workspace directory.
+   * Exists for the undo route's sake (register #86): the history is recorded
+   * on every write-bearing turn and was reachable by nothing, and under Auto
+   * "you can undo it" is the safety story.
+   *
+   * The caller is expected to have checked the conversation exists. A store
+   * resolved for an id nobody owns would mint an empty shadow repository for
+   * it on first use, which is a quieter corruption than a wrong restore but
+   * the same kind.
+   */
+  snapshotStoreFor(conversationId: string): SnapshotStore {
+    const conversationProject = this.#conversationProject(conversationId);
+    const projectRecord =
+      conversationProject === undefined
+        ? undefined
+        : this.#projects.get(conversationProject);
+    const firstFolder = (projectRecord?.folders ?? []).map((folder) => folder.path)[0];
+    const projectRoot = resolve(firstFolder ?? conversationWorkspaceDirectory(conversationId));
+    return this.#snapshotStore(conversationProject ?? projectKey(projectRoot), projectRoot);
+  }
+
+  #snapshotStore(projectId: string, projectRoot: string): SnapshotStore {
+    let store = this.#snapshotStores.get(projectId);
+    if (store === undefined) {
+      store = new SnapshotStore({ workspaceRoot: projectRoot });
+      this.#snapshotStores.set(projectId, store);
+    }
+    return store;
   }
 
   conversationTurnSettings(conversationId: string): {
@@ -1613,7 +1660,7 @@ export class StudioRuntime implements AgentHost {
     let snapshots = this.#turnSnapshots.get(projectId);
     if (snapshots === undefined) {
       snapshots = new TurnSnapshots({
-        store: new SnapshotStore({ workspaceRoot: projectRoot }),
+        store: this.#snapshotStore(projectId, projectRoot),
         required: () => requiresUndo(mode()),
         reporter,
       });

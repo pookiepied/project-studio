@@ -85,6 +85,7 @@ beforeEach(() => {
       speak: () => Promise.resolve({ audio: "", mimeType: "audio/mpeg" }),
     },
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
+    grants: { list: () => [], revoke: () => false },
     conversations: new ConversationStore(db),
     projects: new ProjectStore(db),
     database: db,

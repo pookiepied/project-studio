@@ -14,14 +14,12 @@ import {
   conversationsDirectory,
   databasePath,
   flueDatabasePath,
-  durableDirectories,
   installationRoot,
   logsDirectory,
   managedBinaryDirectory,
   projectsDirectory,
   resolveConfigured,
   sessionsDirectory,
-  settingsPath,
   shippedBinaryDirectory,
   snapshotsDirectory,
   studioHome,
@@ -67,7 +65,6 @@ describe("the Studio home", () => {
 
     expect(databasePath()).toBe(join(workspace, "data", "studio.db"));
     expect(snapshotsDirectory()).toBe(join(workspace, "data", "snapshots"));
-    expect(settingsPath()).toBe(join(workspace, "config", "settings.json"));
     expect(managedBinaryDirectory()).toBe(join(workspace, "tools", "bin"));
     expect(cacheDirectory()).toBe(join(workspace, "cache"));
   });
@@ -81,7 +78,6 @@ describe("the Studio home", () => {
     for (const path of [
       databasePath(),
       snapshotsDirectory(),
-      settingsPath(),
       managedBinaryDirectory(),
       projectsDirectory(),
       sessionsDirectory(),
@@ -92,20 +88,6 @@ describe("the Studio home", () => {
       const top = relative(workspace, path).split(/[\\/]/)[0];
       expect(categories).toContain(top);
     }
-  });
-
-  it("can enumerate what a backup must keep", () => {
-    // Derived from the same accessors everything else uses, so a new durable
-    // directory cannot be added and then forgotten by the backup.
-    process.env.PROJECT_STUDIO_HOME = workspace;
-
-    expect(durableDirectories()).toEqual([
-      join(workspace, "config"),
-      join(workspace, "data"),
-      join(workspace, "skills"),
-      join(workspace, "commands"),
-    ]);
-    expect(durableDirectories()).not.toContain(cacheDirectory());
   });
 });
 

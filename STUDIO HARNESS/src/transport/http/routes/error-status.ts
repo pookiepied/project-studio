@@ -1,6 +1,7 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { StorageError } from "../../../storage/errors.js";
+import { SnapshotError } from "../../../snapshots/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 
 /**
@@ -10,6 +11,12 @@ import { toErrorReport } from "../../../observability/error-reporter.js";
  * conversation and project surfaces are built on `StorageError`, whose kinds
  * already say what went wrong and deserve statuses that say the same thing.
  * One mapping, then, rather than four copies that drift.
+ *
+ * `SnapshotError` joins the same idea from the undo surface: a snapshot id
+ * nothing recorded is a missing row, an undo taken while git or the store is
+ * out of action is a degraded service, and every other snapshot failure is
+ * ours. Naming the codes here keeps the restore route from inventing its own
+ * statuses beside the ones the rest of the file answers with.
  */
 export function statusOf(error: unknown): ContentfulStatusCode {
   if (error instanceof StorageError) {
@@ -20,6 +27,16 @@ export function statusOf(error: unknown): ContentfulStatusCode {
         return 409;
       case "invalid":
         return 400;
+      case "unavailable":
+        return 503;
+      default:
+        return 500;
+    }
+  }
+  if (error instanceof SnapshotError) {
+    switch (error.kind) {
+      case "unknown_snapshot":
+        return 404;
       case "unavailable":
         return 503;
       default:

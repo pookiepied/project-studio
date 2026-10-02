@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { AdmissionVerifier } from "../../admission/verifier.js";
 import { ADMISSION_SCOPES } from "../../admission/scopes.js";
 import type { PermissionApprovalBroker } from "../../application/approval-broker.js";
+import type { PermissionGrantsView } from "../../permissions/grant-store.js";
 import type { QuestionBroker } from "../../application/question-broker.js";
 import type { McpAdministration } from "../../application/mcp-management.js";
 import type { SkillAdministration } from "../../application/skill-management.js";
@@ -28,11 +29,13 @@ import type { BackgroundJobs } from "../../process/background.js";
 import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
 import type { CompactionReadiness } from "../../conversations/compaction.js";
+import type { ConversationSnapshots } from "../../snapshots/store.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMediaRoutes } from "./routes/media.js";
 import type { TextImproverPort } from "../../application/text-improver.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
+import { createGrantsRoutes } from "./routes/grants.js";
 import { createQuestionRoutes } from "./routes/questions.js";
 import { createPlanRoutes } from "./routes/plans.js";
 import { createProjectRoutes } from "./routes/projects.js";
@@ -91,6 +94,14 @@ export interface CreateHttpAppOptions {
   readonly favicons?: FaviconSource;
   readonly approvals: PermissionApprovalBroker;
   /**
+   * The stored grants, as the narrow view a route may hold. Required the way
+   * `approvals` is: an approval the user cannot see or take back is worse
+   * than never having asked, so a composition without this is not a smaller
+   * product but a broken one — it should fail to compose rather than serve
+   * permissions nobody can withdraw.
+   */
+  readonly grants: PermissionGrantsView;
+  /**
    * The ask-a-question channel, beside - never inside - the approval one. The
    * two surfaces answer the same kind of silence from the person and are kept
    * apart so neither grows the other's semantics. Optional the way `titling`
@@ -121,6 +132,13 @@ export interface CreateHttpAppOptions {
     readiness(conversationId: string): CompactionReadiness;
     compact(conversationId: string): Promise<void>;
   };
+  /**
+   * The undo surface — a conversation's snapshot history and its restore —
+   * read by `createConversationRoutes` through `options`, the same way
+   * `compaction` is. The store behind it is the runtime's own, so a restore
+   * joins the same queue the gate's captures run on rather than racing them.
+   */
+  readonly snapshots?: ConversationSnapshots;
   /**
    * The runtime's background commands, for the panel that lists them.
    * `createConversationRoutes` reads it through `options`, so this only has to
@@ -220,6 +238,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
     createMediaRoutes(options.media, options.improver === undefined ? {} : { improver: options.improver }),
   );
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
+  app.route("/api/permissions/grants", createGrantsRoutes(options.grants));
   if (options.favicons !== undefined) {
     app.route("/api/web", createWebRoutes(options.favicons));
   }

@@ -2,14 +2,15 @@
  * Minimal MCP stdio servers, as source for `node <script>`.
  *
  * These were written inside `stop.test.ts` for the timeout and MCP-tool
- * cancellation half of 008.2 and never used by a test — the file has four
- * tests and none of them involves an MCP tool. They are kept, and moved here
- * rather than deleted, because deleting them would erase the only evidence
- * that the coverage was planned and is missing.
+ * cancellation half of 008.2 and for a while used by no test — kept, and
+ * moved here rather than deleted, because deleting them would have erased
+ * the only evidence that the coverage was planned and missing (#66).
  *
- * **This file does not prove anything.** The gap is #66 in
- * `documentation/work/phases-1-11-remediation.md` and stays open until 008.2
- * has the test.
+ * `SLOW_SERVER` is now that coverage's server: the cancellation test in
+ * `mcp-runtime.test.ts` mounts it, discovers through the gate, and aborts
+ * the call mid-flight. `ECHO_SERVER` stays beside it as the ordinary shape —
+ * a server that answers immediately — for the next test that needs one
+ * without the wait; presence here is availability, not coverage.
  */
 
 export const ECHO_SERVER = `

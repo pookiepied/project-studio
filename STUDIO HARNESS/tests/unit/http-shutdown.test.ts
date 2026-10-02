@@ -70,6 +70,7 @@ function composeApp(clientType: "studio-host" | "studio-client") {
       speak: () => Promise.resolve({ audio: "", mimeType: "audio/mpeg" }),
     },
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
+    grants: { list: () => [], revoke: () => false },
     conversations: {
       list: () => [],
     } as unknown as ConversationStore,

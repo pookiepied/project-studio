@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { runProcess } from "../process/exec.js";
@@ -177,6 +177,17 @@ export class ShadowRepository {
 
   /** Runs git against this repository. Non-zero exit is returned, not thrown. */
   async run(args: readonly string[], signal?: AbortSignal): Promise<GitResult> {
+    // The work tree may not exist: a conversation created but never run has
+    // no workspace directory, and reading its history must answer "empty"
+    // rather than fail to spawn. Git only needs a real working directory for
+    // the commands that touch the tree — `add` and `restore` fail loudly on
+    // their own against a missing one, which is the honest answer — while
+    // `log`, `rev-parse` and `cat-file` answer from the repository alone.
+    // The git directory stands in when the tree is absent: `ensure` has
+    // always created it by the time anything runs, and with `--git-dir` and
+    // `--work-tree` both explicit, a working directory git never reads
+    // should not decide whether the command starts.
+    const cwd = existsSync(this.workspaceRoot) ? this.workspaceRoot : this.gitDir;
     return runProcess({
       executable: this.#executable(),
       args: [
@@ -187,7 +198,7 @@ export class ShadowRepository {
         "core.quotepath=false",
         ...args,
       ],
-      cwd: this.workspaceRoot,
+      cwd,
       timeoutMs: GIT_TIMEOUT_MS,
       ...(signal ? { signal } : {}),
     });

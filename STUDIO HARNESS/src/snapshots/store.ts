@@ -24,6 +24,24 @@ export interface Snapshot {
   readonly takenAt: number;
 }
 
+/**
+ * The undo surface a transport may hold, scoped to the project one
+ * conversation writes to. The runtime implements it over the store it
+ * already owns; a route takes the port so its type says what it may do —
+ * list a history and restore to a point, and nothing that writes history
+ * the person did not ask for.
+ */
+export interface ConversationSnapshots {
+  /** The recorded points for the conversation's project, newest first. */
+  list(conversationId: string, limit?: number): Promise<readonly Snapshot[]>;
+  /**
+   * Returns the project to a recorded point. The state being left behind is
+   * captured first — undo that cannot itself be undone is a second way to
+   * lose work — and comes back as `undo`.
+   */
+  restore(conversationId: string, snapshotId: string): Promise<{ undo: Snapshot }>;
+}
+
 export interface SnapshotStoreOptions {
   readonly workspaceRoot: string;
   /** Overrides where shadow repositories live. Tests use this. */
@@ -142,6 +160,13 @@ export class SnapshotStore {
   }
 
   async #list(limit: number, signal?: AbortSignal): Promise<readonly Snapshot[]> {
+    // A shadow repository that was never created holds no history, and
+    // "nothing has written yet" is the whole answer — so it is answered
+    // before git is asked. Reading a conversation that exists but never ran
+    // must not `init` a repository for the privilege: that is work, and a
+    // directory on disk, spent on a question that was already answered.
+    if (!existsSync(this.#repo.gitDir)) return [];
+
     await this.#repo.ensure(signal);
 
     const result = await this.#repo.run(

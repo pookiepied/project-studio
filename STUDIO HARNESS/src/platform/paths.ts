@@ -146,15 +146,6 @@ export function flueDatabasePath(): string {
   return studioPath("data", "flue.db");
 }
 
-/** User-authored settings. Backed up, synced, and safe to hand-edit. */
-function configDirectory(): string {
-  return studioPath("config");
-}
-
-export function settingsPath(): string {
-  return join(configDirectory(), "settings.json");
-}
-
 /**
  * Per-project shadow git repositories — the undo history.
  *
@@ -182,8 +173,9 @@ export function temporaryDirectory(): string {
 /**
  * The skills the person installed by hand: `<name>/SKILL.md` per folder.
  *
- * Top level rather than under `config/`; the header says why. Enumerated by
- * `durableDirectories` because losing it loses work the person wrote.
+ * Top level rather than under `config/`, beside `commands/` — both hold files
+ * the person authored, and losing either loses work the person wrote, which
+ * is not what a settings directory is for.
  */
 export function userSkillsDirectory(): string {
   return studioPath("skills");
@@ -197,8 +189,8 @@ export function userCommandsDirectory(): string {
 /**
  * The library: files the person chose to keep beyond one conversation.
  *
- * Under `data/` beside `conversations/`, so the backup enumerates it with
- * the rest of what the person owns. Flat, one file per record id: a
+ * Under `data/` beside `conversations/`, with the rest of what the person
+ * owns. Flat, one file per record id: a
  * re-tagged item never moves, two uploads called `photo.png` never collide,
  * and a new kind of file needs no new folder rule. Read by every
  * conversation's sandbox, written only by the harness - the same doctrine
@@ -335,16 +327,6 @@ export function conversationArtifactsDirectory(conversationId: string): string {
  */
 export function conversationTrashDirectory(conversationId: string): string {
   return join(conversationDirectory(conversationId), "trash");
-}
-
-/**
- * Everything that must survive, for a backup or export to enumerate.
- *
- * Derived from the same accessors the rest of the application uses, so a new
- * durable directory cannot be added and then forgotten by the backup.
- */
-export function durableDirectories(): readonly string[] {
-  return [configDirectory(), studioPath("data"), userSkillsDirectory(), userCommandsDirectory()];
 }
 
 /**

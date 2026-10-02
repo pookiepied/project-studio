@@ -1,13 +1,16 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
+import { ConversationStore } from "../../src/conversations/store.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
 import { SnapshotStore } from "../../src/snapshots/store.js";
+import { ProjectStore } from "../../src/projects/store.js";
+import { conversationWorkspaceDirectory } from "../../src/platform/paths.js";
 import { openDatabase } from "../../src/storage/database.js";
 
 /**
@@ -183,6 +186,131 @@ describe("the model-turn boundary", () => {
 
         const history = await new SnapshotStore({ workspaceRoot: projectRoot }).list();
         expect(history.map((snapshot) => snapshot.label)).toEqual(["turn 2", "turn 1"]);
+      } finally {
+        await runtime.stop();
+        database.close();
+      }
+    },
+    60_000,
+  );
+
+  /**
+   * The undo route's store is the gate's store.
+   *
+   * `snapshotStoreFor` exists so the undo history is reachable at all
+   * (register #86), and its one non-negotiable property is that it resolves
+   * to the same `SnapshotStore` instance the conversation's gate holds: the
+   * shadow repository's lock is an in-process queue per instance (T-17), so
+   * a second instance would run a restore *beside* the captures instead of
+   * behind them. Instance identity is the observable, and a write through
+   * the gate showing up in the route's history is its end-to-end proof.
+   */
+  it(
+    "hands the undo route the same store the gate captures into",
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "studio-undo-route-"));
+      temporaryDirectories.push(directory);
+      const projectRoot = join(directory, "project");
+      await mkdir(projectRoot, { recursive: true });
+      previousHome = process.env.PROJECT_STUDIO_HOME;
+      process.env.PROJECT_STUDIO_HOME = join(directory, "home");
+
+      const database = openDatabase({ path: join(directory, "studio.db") });
+      const runtime = new StudioRuntime({
+        database,
+        projectRoot,
+        credentials,
+        approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
+      });
+
+      try {
+        new WorkspaceTrustStore(database).set(projectRoot, true);
+
+        const fromRoute = runtime.snapshotStoreFor(SAME_CONVERSATION.conversationId);
+        // The map is the whole mechanism: every ask resolves to the one
+        // store, never a fresh one over the same git directory.
+        expect(runtime.snapshotStoreFor(SAME_CONVERSATION.conversationId)).toBe(fromRoute);
+        // An unfiled conversation's undo history is its own workspace
+        // directory — the same root the agent hands the sandbox factory, and
+        // the same one the run builder resolves to, which is the point: the
+        // route must resolve the way the run does.
+        expect(fromRoute.workspaceRoot).toBe(
+          resolve(conversationWorkspaceDirectory(SAME_CONVERSATION.conversationId)),
+        );
+
+        // The workspace does not exist yet — nothing has run. Reading the
+        // history through the route's store must answer empty, not fail to
+        // spawn, because a conversation that exists but never ran is an
+        // ordinary thing to open the history of.
+        expect(await fromRoute.list()).toEqual([]);
+
+        // Now the precondition a run creates (the sandbox factory
+        // ensureDirectories the conversation's workspace), and the turn
+        // writes for real — with the projectRoot the real agent passes,
+        // because the factory called bare, as the tests above call it, falls
+        // back to the runtime root and the run resolves somewhere else.
+        await mkdir(conversationWorkspaceDirectory(SAME_CONVERSATION.conversationId), {
+          recursive: true,
+        });
+        new WorkspaceTrustStore(database).set(
+          resolve(conversationWorkspaceDirectory(SAME_CONVERSATION.conversationId)),
+          true,
+        );
+        const sandbox = runtime.createAgentSandbox({
+          ...SAME_CONVERSATION,
+          projectRoot: conversationWorkspaceDirectory(SAME_CONVERSATION.conversationId),
+        });
+        await runtime.prepareModelTurn();
+        const env = await sandbox.createSandbox({ id: "studio" });
+        const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
+        const tool = tools.find((candidate) => candidate.name === "write");
+        await tool?.execute("call", { path: "undo.txt", content: "undo" });
+
+        const history = await fromRoute.list();
+        expect(history).toHaveLength(1);
+      } finally {
+        await runtime.stop();
+        database.close();
+      }
+    },
+    60_000,
+  );
+
+  /**
+   * A filed conversation's undo history is the project's first folder's, not
+   * its own workspace directory. The accessor resolves the project the way
+   * `createAgentSandbox` does, because a restore that returned the wrong
+   * tree would be worse than no restore at all: it would look like one.
+   */
+  it(
+    "resolves a filed conversation's undo history to the project's first folder",
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "studio-undo-filed-"));
+      temporaryDirectories.push(directory);
+      const projectRoot = join(directory, "project");
+      await mkdir(projectRoot, { recursive: true });
+      const projectFolder = join(directory, "repo");
+      await mkdir(projectFolder, { recursive: true });
+      previousHome = process.env.PROJECT_STUDIO_HOME;
+      process.env.PROJECT_STUDIO_HOME = join(directory, "home");
+
+      const database = openDatabase({ path: join(directory, "studio.db") });
+      const runtime = new StudioRuntime({ database, projectRoot, credentials });
+
+      try {
+        const project = new ProjectStore(database).create({
+          name: "repo",
+          icon: "arc",
+          folders: [{ name: "repo", path: projectFolder }],
+        });
+        new ConversationStore(database).record({
+          id: "thread-filed",
+          firstMessage: "filed",
+          projectId: project.id,
+        });
+
+        const store = runtime.snapshotStoreFor("thread-filed");
+        expect(store.workspaceRoot).toBe(resolve(projectFolder));
       } finally {
         await runtime.stop();
         database.close();

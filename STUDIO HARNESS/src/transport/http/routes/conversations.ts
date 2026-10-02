@@ -25,6 +25,7 @@ import type { JobStatus } from "../../../process/background.js";
 import type { StudioDatabase } from "../../../storage/database.js";
 import { StorageError } from "../../../storage/errors.js";
 import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
+import type { ConversationSnapshots } from "../../../snapshots/store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
 
 export interface ConversationRoutesOptions {
@@ -57,6 +58,16 @@ export interface ConversationRoutesOptions {
     readiness(conversationId: string): CompactionReadiness;
     compact(conversationId: string): Promise<void>;
   };
+  /**
+   * The undo surface: one conversation's snapshot history and the restore
+   * that returns its project to a recorded point. The store behind the port
+   * is the runtime's own, so a restore joins the same queue the gate's
+   * captures run on. Optional like `compaction` — a composition with no
+   * runtime has no history to answer with, and the routes say so rather
+   * than pretending — and production always wires it, because an undo
+   * nobody can reach does not back the safety story Auto runs on.
+   */
+  readonly snapshots?: ConversationSnapshots;
   /**
    * The background commands, for the panel that shows them.
    *
@@ -216,6 +227,72 @@ export function createConversationRoutes(
     try {
       await options.compaction.compact(context.req.param("id"));
       return context.json({ compacted: true });
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  /**
+   * The undo history of the project this conversation writes to, and the one
+   * action on it, behind the same `project` scope as the index: the history
+   * is project state, and a restore is the person acting on their own files,
+   * not a run asking permission. The port resolves to the runtime's own
+   * store — the same instance the gate's captures run on — so a restore
+   * joins the capture queue instead of racing it.
+   *
+   * Recorded on every write-bearing turn since snapshots existed and
+   * reachable by nothing until now (register #86): under Auto, "you can undo
+   * it" is the safety story, and an undo nobody can reach does not back it.
+   * An unknown conversation answers 404 before the port is touched, because
+   * resolving an undo store for an id nobody owns would mint an empty shadow
+   * repository for it — a quieter corruption than a wrong restore, but the
+   * same kind.
+   */
+  routes.get("/:id/snapshots", async (context) => {
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) {
+      return context.json(
+        failure(new StorageError("not_found", { message: `No conversation "${id}".` })),
+        404,
+      );
+    }
+    if (options.snapshots === undefined) {
+      return context.json(
+        failure(new StorageError("unavailable", { message: "Undo is not available." })),
+        503,
+      );
+    }
+    try {
+      return context.json(await options.snapshots.list(id));
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  /**
+   * Returns the conversation's project to a recorded point. The state being
+   * left behind is captured first — undo that cannot itself be undone is a
+   * second way to lose work — and comes back as `undo`, so the caller can
+   * say what just happened and offer to take it back.
+   */
+  routes.post("/:id/snapshots/:snapshotId/restore", async (context) => {
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) {
+      return context.json(
+        failure(new StorageError("not_found", { message: `No conversation "${id}".` })),
+        404,
+      );
+    }
+    if (options.snapshots === undefined) {
+      return context.json(
+        failure(new StorageError("unavailable", { message: "Undo is not available." })),
+        503,
+      );
+    }
+    try {
+      return context.json(
+        await options.snapshots.restore(id, context.req.param("snapshotId")),
+      );
     } catch (error) {
       return context.json(failure(error), statusOf(error));
     }
