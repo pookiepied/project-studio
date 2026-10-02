@@ -97,6 +97,10 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     id: 'agent',
     name: 'Agent',
     sections: [
+      // First: it answers the group's own question before anything else in
+      // it. What the agent may do was decided by an approval, and the
+      // approvals are the one thing here a person can take back.
+      { id: 'permissions', name: 'Permissions', icon: Icons.permissions },
       { id: 'skills', name: 'Skills', icon: Icons.skill },
       // Under Agent beside skills: a command is a prompt the person keeps,
       // and what it drives is the agent, not the program.

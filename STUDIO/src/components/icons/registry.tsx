@@ -30,7 +30,7 @@ import {
   CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
-  RefreshCw, Search, Settings2, SlidersHorizontal, Split,
+  RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Split,
   SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
@@ -278,6 +278,11 @@ const REGISTRY = {
   account: { mark: CircleUser },
   coding: { mark: Code },
   archive: { mark: Archive },
+  // Permissions: the standing rules themselves. A shield here is right —
+  // the chat's ask/auto pair deliberately is not one (choosing "ask" is a
+  // request, not a wall) — because this page is the wall, seen from the
+  // side that owns it.
+  permissions: { mark: ShieldCheck },
   // The retrieval vendors a run can call on - web search and page fetch.
   // A wrench, because the page is named Tools and the mark should agree
   // with the name; it was the search glass, which said "a search box" about

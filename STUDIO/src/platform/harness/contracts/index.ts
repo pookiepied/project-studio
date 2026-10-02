@@ -121,6 +121,18 @@ export {
 } from './approvals'
 
 export {
+  type GrantRecord,
+  parseGrants,
+} from './grants'
+
+export {
+  type SnapshotRecord,
+  type SnapshotRestore,
+  parseSnapshots,
+  parseSnapshotRestore,
+} from './snapshots'
+
+export {
   type PendingQuestionRecord,
   parsePendingQuestions,
 } from './questions'

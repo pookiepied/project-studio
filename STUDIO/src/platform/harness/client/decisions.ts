@@ -1,8 +1,10 @@
 import {
+  parseGrants,
   parsePendingApprovals,
   parsePendingQuestions,
   parsePlanSnapshot,
   type ApprovalAnswer,
+  type GrantRecord,
   type PendingApprovalRecord,
   type PendingQuestionRecord,
   type PlanSnapshot,
@@ -10,16 +12,26 @@ import {
 import type { HarnessResult, Requester } from './request'
 
 /**
- * What a run asks a person to decide: the permission questions the kernel
- * parks, the questions a run raises for an answer, and the plan a person
- * ticks. Three routes, one credential - every one sits behind the APPROVAL
- * admission scope, the same credential as everything else in the client.
+ * What a run asks a person to decide, and what a person has already decided:
+ * the permission questions the kernel parks, the questions a run raises for
+ * an answer, the plan a person ticks, and the grants those answers have
+ * accumulated into. Three routes, one credential - every one sits behind the
+ * APPROVAL admission scope, the same credential as everything else in the
+ * client.
  */
 
 const PENDING_APPROVALS_PATH = '/api/permissions/pending'
 const PENDING_QUESTIONS_PATH = '/api/questions/pending'
 const QUESTION_STOP_PATH = '/api/questions/stop'
 const PLANS_PATH = '/api/plans'
+const GRANTS_PATH = '/api/permissions/grants'
+
+/** Which columns a grants listing is narrowed by; an absent one says nothing. */
+export interface GrantFiltersInput {
+  readonly agentId?: string
+  readonly projectId?: string
+  readonly conversationId?: string
+}
 
 export interface DecisionClient {
   /**
@@ -35,6 +47,16 @@ export interface DecisionClient {
   answerApproval(id: string, answer: ApprovalAnswer): Promise<HarnessResult<void>>
   /** Withdraws one question without answering it; 204 or a 404 for a row already gone. */
   cancelApproval(id: string): Promise<HarnessResult<void>>
+
+  /**
+   * The approvals already given — the rows an answered "always" or "this
+   * conversation" wrote — so the person can see them and take one back.
+   * Behind the same credential as the pending list, because giving a
+   * permission and withdrawing it are one act seen from its two ends.
+   */
+  listGrants(filters?: GrantFiltersInput): Promise<HarnessResult<readonly GrantRecord[]>>
+  /** Marks one grant revoked; 204, or a 404 for an id already gone. */
+  revokeGrant(id: string): Promise<HarnessResult<void>>
 
   /**
    * The questions the harness's runs are asking for a decision, under the
@@ -81,9 +103,26 @@ export function decisionClient({ json, empty }: Requester): DecisionClient {
       return empty('POST', `${PENDING_APPROVALS_PATH}/${encodeURIComponent(id)}`, answer)
     },
 
-    cancelApproval(id) {
-      return empty('DELETE', `${PENDING_APPROVALS_PATH}/${encodeURIComponent(id)}`)
-    },
+  cancelApproval(id) {
+    return empty('DELETE', `${PENDING_APPROVALS_PATH}/${encodeURIComponent(id)}`)
+  },
+
+  listGrants(filters) {
+    // A filter names a column to conjoin; an absent one says nothing about
+    // that column, and an empty query is the whole list.
+    const params = new URLSearchParams()
+    if (filters?.agentId !== undefined) params.set('agentId', filters.agentId)
+    if (filters?.projectId !== undefined) params.set('projectId', filters.projectId)
+    if (filters?.conversationId !== undefined) {
+      params.set('conversationId', filters.conversationId)
+    }
+    const query = params.toString()
+    return json('GET', query === '' ? GRANTS_PATH : `${GRANTS_PATH}?${query}`, undefined, parseGrants)
+  },
+
+  revokeGrant(id) {
+    return empty('DELETE', `${GRANTS_PATH}/${encodeURIComponent(id)}`)
+  },
 
     listPendingQuestions() {
       return json('GET', PENDING_QUESTIONS_PATH, undefined, parsePendingQuestions)

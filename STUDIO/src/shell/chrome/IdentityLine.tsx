@@ -5,6 +5,7 @@ import { Icons } from '@/components/icons'
 import { InlineRename, MenuItem, MenuLabel, MenuSeparator, NavRow, Popover } from '@/components/primitives'
 import { ConversationExtensionsDialog } from '@/shell/ConversationExtensionsDialog'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
+import { SnapshotsDialog } from '@/shell/SnapshotsDialog'
 import { cn } from '@/lib/cn'
 import { ProjectIconMark } from '@/features/projects'
 import { useNavigation } from '@/stores/navigation'
@@ -58,6 +59,7 @@ export function IdentityLine({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [branchOpen, setBranchOpen] = useState(false)
   const [extensionsOpen, setExtensionsOpen] = useState(false)
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false)
   const [editing, setEditing] = useState(false)
 
   // Leaving a conversation abandons any half-finished rename with it.
@@ -67,6 +69,7 @@ export function IdentityLine({
     setConfirmingDelete(false)
     setBranchOpen(false)
     setExtensionsOpen(false)
+    setSnapshotsOpen(false)
   }, [conversation.id])
 
   if (!conversation.title) return null
@@ -188,6 +191,21 @@ export function IdentityLine({
           Extensions
         </MenuItem>
 
+        {/* What the agent wrote left a point behind, and this is where the
+            person takes the project back to one. It sits with the
+            conversation's own facts rather than in Settings, because undo is
+            wanted in the middle of the work it undoes - the same reasoning
+            that put the extension scope here. */}
+        <MenuItem
+          icon={<Icons.undo />}
+          onSelect={() => {
+            setMenuOpen(false)
+            setSnapshotsOpen(true)
+          }}
+        >
+          Project history
+        </MenuItem>
+
         {/* No project list here.
             This menu hangs off the conversation's own title, opened from
             inside that conversation — which means the project is already
@@ -222,6 +240,10 @@ export function IdentityLine({
         conversation={extensionsOpen ? conversation : null}
         projectName={project?.name ?? null}
         onClose={() => setExtensionsOpen(false)}
+      />
+      <SnapshotsDialog
+        conversation={snapshotsOpen ? conversation : null}
+        onClose={() => setSnapshotsOpen(false)}
       />
       <DeleteConversationDialog
         conversation={confirmingDelete ? conversation : null}

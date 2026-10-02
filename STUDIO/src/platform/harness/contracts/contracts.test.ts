@@ -6,6 +6,7 @@ import {
   parseBackgroundJob,
   parseBackgroundJobs,
   parseFolderListing,
+  parseGrants,
   parseHarnessErrorBody,
   parseMcpServer,
   parseMcpServers,
@@ -1017,5 +1018,36 @@ describe('parseSkill', () => {
     expect(listing?.problems).toEqual([{ directory: 'C:\\skills\\bad', reason: 'missing YAML frontmatter' }])
     expect(parseSkillListing({ skills: [SKILL], problems: [{ directory: 'x' }] })).toBeNull()
     expect(parseSkillListing({ skills: [SKILL] })).toBeNull()
+  })
+})
+
+describe('parseGrants', () => {
+  const GRANT = {
+    id: 'grt_1',
+    capabilityKey: 'native/write_file',
+    agentId: 'studio',
+    projectId: 'proj_1',
+    grantedAt: 1727000000000,
+  }
+
+  it('reads a standing grant, and reads absent optional columns as null', () => {
+    const parsed = parseGrants([GRANT])
+    expect(parsed).toEqual([
+      { ...GRANT, conversationId: null, resourcePattern: null, definitionHash: null },
+    ])
+  })
+
+  it('reads a conversation-scoped, resource-narrowed grant', () => {
+    const parsed = parseGrants([{ ...GRANT, conversationId: 'cnv_1', resourcePattern: 'src/**' }])
+    expect(parsed?.[0]?.conversationId).toBe('cnv_1')
+    expect(parsed?.[0]?.resourcePattern).toBe('src/**')
+  })
+
+  it('refuses a row missing its identity, its capability, or its grant time', () => {
+    expect(parseGrants([{ ...GRANT, id: '' }])).toBeNull()
+    expect(parseGrants([{ ...GRANT, capabilityKey: undefined }])).toBeNull()
+    expect(parseGrants([{ ...GRANT, agentId: null }])).toBeNull()
+    expect(parseGrants([{ ...GRANT, grantedAt: 'now' }])).toBeNull()
+    expect(parseGrants('grants')).toBeNull()
   })
 })

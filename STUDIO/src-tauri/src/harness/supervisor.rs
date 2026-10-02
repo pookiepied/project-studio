@@ -144,6 +144,142 @@ fn tail(text: String) -> String {
     format!("…{}", &text[start..])
 }
 
+/// Node, resolved to an absolute path, or a sentence the user can act on.
+///
+/// `Command::new("node")` — the one bare name this crate ever handed the OS —
+/// was the exact thing `assertRunnableCommand` refuses on the TypeScript side:
+/// a bare name is resolved by the OS's own search, which on Windows consults
+/// the *current directory* before PATH and everywhere puts the choice of
+/// binary in the hands of whatever is on the machine. In a packaged desktop
+/// app that meant whichever `node` is first on the user's path, at whatever
+/// version — the runtime the whole product runs on, chosen by accident
+/// (meta-task #88).
+///
+/// The shape mirrors the harness's own vendor resolver
+/// (`STUDIO HARNESS/src/vendor/resolver.ts`), whose rule this is: **nothing is
+/// ever guessed.** An explicit override, the well-known install locations, and
+/// then PATH — searched *by us*, so the choice is ours to log and to refuse.
+/// Reading PATH here is locating a program, which is a different act from
+/// delegating to it; the child's environment stays the allowlist's
+/// (`environment.rs`), and this lookup does not touch it.
+///
+/// A set override that does not resolve is an error, not a fallback. Falling
+/// through would silently run a different binary than the one someone named —
+/// the failure mode this whole function exists to close.
+pub(crate) fn resolve_node_path(
+    override_path: Option<&str>,
+    search_path: Option<&str>,
+) -> Result<PathBuf, String> {
+    if let Some(named) = override_path {
+        let named = PathBuf::from(named);
+        return if named.is_file() {
+            Ok(named)
+        } else {
+            Err(format!(
+                "PROJECT_STUDIO_NODE points at {}, which is not a file.",
+                named.display()
+            ))
+        };
+    }
+
+    let directories = node_candidate_directories(search_path);
+    find_node_in(&directories).ok_or_else(|| {
+        "Node was not found on this machine. Install Node.js 22 or newer, \
+         or set PROJECT_STUDIO_NODE to the full path of the node binary."
+            .to_string()
+    })
+}
+
+/// The directories a node binary is looked for in, in order.
+///
+/// The well-known install locations come first, so a machine whose PATH is
+/// minimal — a GUI launch or the autostart entry inherits the registry's
+/// environment, not a shell's — still finds the standard installs. PATH
+/// entries follow. Relative entries are skipped: a search that consults the
+/// working directory is the resolution this exists to replace, and a
+/// packaged app's working directory is not ours to reason about.
+fn node_candidate_directories(search_path: Option<&str>) -> Vec<PathBuf> {
+    let mut directories: Vec<PathBuf> = Vec::new();
+
+    #[cfg(windows)]
+    for variable in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(root) = std::env::var_os(variable) {
+            let root = PathBuf::from(root);
+            if root.is_absolute() {
+                // The machine-wide installer's location.
+                directories.push(root.join("nodejs"));
+            }
+        }
+    }
+    #[cfg(windows)]
+    if let Some(root) = std::env::var_os("LocalAppData") {
+        let root = PathBuf::from(root);
+        if root.is_absolute() {
+            // The per-user installer's location, distinct from the
+            // machine-wide ones above; both are checked because both are real.
+            directories.push(root.join("Programs").join("nodejs"));
+        }
+    }
+    #[cfg(not(windows))]
+    for known in ["/usr/local/bin", "/usr/bin", "/opt/homebrew/bin"] {
+        directories.push(PathBuf::from(known));
+    }
+
+    let search = search_path
+        .map(|path| path.to_string())
+        .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default());
+    for entry in std::env::split_paths(&search) {
+        let entry = entry.to_string_lossy().trim().trim_matches('"').to_string();
+        if entry.is_empty() {
+            continue;
+        }
+        let directory = PathBuf::from(&entry);
+        if directory.is_absolute() && !directories.contains(&directory) {
+            directories.push(directory);
+        }
+    }
+
+    directories
+}
+
+/// The first directory in the list that holds a node binary we would run.
+///
+/// On Windows, only the extensions `Command` would spawn without a shell.
+/// On Unix the executable bit is checked here rather than left to `spawn`,
+/// for the reason the harness's own resolver records: a binary that exists
+/// and cannot be executed has a message at the resolution site, and a spawn
+/// failure two layers down does not.
+fn find_node_in(directories: &[PathBuf]) -> Option<PathBuf> {
+    #[cfg(windows)]
+    let names: &[&str] = &["node.exe", "node.com"];
+    #[cfg(not(windows))]
+    let names: &[&str] = &["node"];
+
+    for directory in directories {
+        for name in names {
+            let candidate = directory.join(name);
+            let runnable = std::fs::metadata(&candidate)
+                .map(|metadata| {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        metadata.is_file()
+                    }
+                })
+                .unwrap_or(false);
+            if runnable {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
+}
+
 /// What the supervisor tells the webview as the Harness lifecycle moves.
 ///
 /// The names are the contract the frontend subscribes to; the payloads are
@@ -903,9 +1039,15 @@ impl HarnessSupervisor {
         let bootstrap_json = serde_json::to_string(&bootstrap)
             .map_err(|e| format!("failed to serialize bootstrap: {e}"))?;
 
-        // Build command
-        let mut cmd = Command::new("node");
+        // Node is resolved the way every other binary the product runs is:
+        // declared places, searched explicitly, and logged — never the bare
+        // name whose resolution belongs to whatever is on the machine's
+        // search path (meta-task #88).
+        let node = resolve_node_path(std::env::var("PROJECT_STUDIO_NODE").ok().as_deref(), None)?;
+        let mut cmd = Command::new(&node);
         cmd.arg(&server_path);
+
+        log::info!("Harness supervisor: node resolved to {}", node.display());
 
         // The environment is decided in one place, not here. This used to read
         // "for now inherit all except credential", which handed the Harness
@@ -1971,5 +2113,76 @@ mod tests {
         assert!(matches!(outcome, PoliteOutcome::DrainExceeded), "{outcome:?}");
         HarnessSupervisor::terminate_child(&mut child);
         assert!(child.try_wait().expect("poll the child").is_some());
+    }
+
+    /// The override is a decision, not a preference: a real file wins over
+    /// everything, and a name that resolves to nothing is refused with the
+    /// override named rather than silently falling through to the machine —
+    /// which would run a different binary than the one someone named.
+    #[test]
+    fn the_node_override_wins_and_must_be_real() {
+        let exe = std::env::current_exe().expect("the test binary exists");
+        let found = resolve_node_path(Some(exe.to_string_lossy().as_ref()), Some(""))
+            .expect("the override is a real file");
+        assert_eq!(found, exe);
+
+        let error = resolve_node_path(Some("/nowhere/node"), Some(""))
+            .expect_err("a missing override cannot fall through");
+        assert!(error.contains("PROJECT_STUDIO_NODE"), "{error}");
+    }
+
+    /// The order is declared, not discovered: the well-known install places
+    /// come before anything PATH holds, and a relative PATH entry — a search
+    /// that consults the working directory, which is the resolution this
+    /// exists to replace — is skipped outright.
+    #[test]
+    #[cfg(windows)]
+    fn node_candidates_put_the_well_known_places_first_and_skip_relative_ones() {
+        let directories =
+            node_candidate_directories(Some("relative\\junk;\"C:\\quoted dir\";C:\\real"));
+
+        let program_files =
+            PathBuf::from(std::env::var("ProgramFiles").expect("a Windows machine")).join("nodejs");
+        assert_eq!(
+            directories.first().map(|p| p.as_path()),
+            Some(program_files.as_path()),
+            "the machine-wide install location is searched first"
+        );
+        let joined: Vec<String> = directories
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        assert!(joined.iter().any(|p| p.ends_with("quoted dir")), "{joined:?}");
+        assert!(joined.iter().any(|p| p.ends_with("real")), "{joined:?}");
+        assert!(
+            !joined.iter().any(|p| p.contains("relative")),
+            "a relative PATH entry is the search this replaces: {joined:?}"
+        );
+    }
+
+    /// The walk takes the first directory that holds a node we would run, and
+    /// answers nothing rather than a directory that holds nothing — which is
+    /// what turns, one level up, into the sentence that says what to do.
+    #[test]
+    fn the_node_walk_takes_the_first_directory_that_holds_a_real_file() {
+        let directory = std::env::temp_dir().join("studio-node-resolution-test");
+        std::fs::create_dir_all(&directory).expect("create the scratch directory");
+        let stand_in = directory.join(if cfg!(windows) { "node.exe" } else { "node" });
+        std::fs::write(&stand_in, b"not really node").expect("write the stand-in");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&stand_in, std::fs::Permissions::from_mode(0o755))
+                .expect("make the stand-in executable");
+        }
+
+        let found = find_node_in(&[directory.clone()]).expect("the stand-in is found");
+        assert_eq!(found, stand_in);
+
+        let empty = directory.join("empty");
+        std::fs::create_dir_all(&empty).expect("create the empty directory");
+        assert!(find_node_in(&[empty]).is_none());
+
+        std::fs::remove_file(&stand_in).ok();
     }
 }

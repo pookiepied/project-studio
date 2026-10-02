@@ -8,6 +8,8 @@ import {
   parseOrphanSweepOutcome,
   parseOrphanTrees,
   parsePurgeOutcome,
+  parseSnapshotRestore,
+  parseSnapshots,
   type BackgroundJob,
   type ConversationCreateDraft,
   type ConversationPatch,
@@ -17,6 +19,8 @@ import {
   type OrphanSweepOutcome,
   type OrphanTrees,
   type PurgeOutcome,
+  type SnapshotRecord,
+  type SnapshotRestore,
 } from '../contracts'
 import { MCP_PATH } from './mcp'
 import { SKILLS_PATH } from './skills'
@@ -118,6 +122,19 @@ export interface ConversationIndexClient {
    * Answers whether a driver was actually running, for the same reason.
    */
   stopConversationComputer(id: string): Promise<HarnessResult<boolean>>
+  /**
+   * The undo history of the project this conversation writes to, newest
+   * first. Recorded on every write-bearing turn; the read is the one that
+   * makes the history reachable, which under Auto is the safety story
+   * itself (register #86).
+   */
+  conversationSnapshots(id: string): Promise<HarnessResult<readonly SnapshotRecord[]>>
+  /**
+   * Returns the conversation's project to a recorded point. The state being
+   * left behind is captured first and comes back as `undo`, so taking the
+   * restore back is itself one call.
+   */
+  restoreConversationSnapshot(id: string, snapshotId: string): Promise<HarnessResult<SnapshotRestore>>
 }
 
 function conversationPath(id: string, suffix = ''): string {
@@ -257,6 +274,19 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
               ? (value as Record<string, unknown>)['job']
               : null,
           ),
+      )
+    },
+
+    conversationSnapshots(id) {
+      return json('GET', conversationPath(id, '/snapshots'), undefined, parseSnapshots)
+    },
+
+    restoreConversationSnapshot(id, snapshotId) {
+      return json(
+        'POST',
+        conversationPath(id, `/snapshots/${encodeURIComponent(snapshotId)}/restore`),
+        undefined,
+        parseSnapshotRestore,
       )
     },
   }
