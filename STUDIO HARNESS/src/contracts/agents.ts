@@ -1,7 +1,8 @@
 import * as v from "valibot";
 
 import { modelIdSchema, reasoningChoiceSchema } from "./models.js";
-import { executionModeSchema } from "../permissions/mode.js";
+import type { CapabilityEffect } from "./capabilities.js";
+import { executionModeSchema, type ExecutionMode } from "../permissions/mode.js";
 
 /**
  * Agent identity.
@@ -58,6 +59,18 @@ export const IMPROVE_AGENT_ID = "improve";
 export const DESCRIBE_AGENT_ID = "describe";
 
 /**
+ * The read-only research delegate (ADR 0058, D11 — the Stage 3 roster).
+ *
+ * Named beside the four live ids now so the definition vocabulary and its
+ * tests can speak it from Stage 2 on, the same way `STUDIO_AGENT_ID` existed
+ * before anything read it: the id is a pinned literal, not a computed value,
+ * and nothing dispatches to it yet. Stage 3 mounts it through `useSubagent`
+ * and gives it a render; this constant is what its definition, its scope,
+ * and its grants will key on when that happens.
+ */
+export const EXPLORE_AGENT_ID = "explore";
+
+/**
  * The turn settings a submission may carry beside its message.
  *
  * A submission body cannot carry these through to the run: Flue parses every
@@ -102,3 +115,242 @@ export const submissionTurnSettingsSchema = v.object({
 });
 
 export type SubmissionTurnSettings = v.InferOutput<typeof submissionTurnSettingsSchema>;
+
+/**
+ * ---------------------------------------------------------------------------
+ * The agent-definition vocabulary (ADR 0058 D1, Stage 2).
+ * ---------------------------------------------------------------------------
+ *
+ * An agent is a definition: a typed record that says what the agent is, what
+ * it may see, and how long it may run — plus the agent function Flue already
+ * requires. Data first, so adding an agent type is a declaration, not a
+ * runtime fork. The definitions live in `src/agents/definitions/`, never in
+ * `src/extend/`: a subagent consumes MCP, skills and hooks; it is not one of
+ * them (the recorded rule from the Phase 11 design).
+ *
+ * Three kinds, mapped onto what exists:
+ *
+ * - `conversation` — today's `studio`: mounted at `/agents/studio/<cnv_>`,
+ *   owned by the product's conversation index. The richest definition; it
+ *   keeps its bespoke render, and its tools and skills stay per-conversation
+ *   state rather than a static allowlist.
+ * - `background` — the `title` / `improve` / `describe` pattern generalized:
+ *   dispatch-only, one-shot, addressed by a task instance id the product
+ *   mints, never mounted on the HTTP surface.
+ * - `delegate` — a subagent declared by a conversation agent and reached
+ *   through Flue's `task` tool (ADR 0058 D2). None exists yet; the shape
+ *   below is what Stage 3's `explore` will fill in.
+ *
+ * The kind is a closed union because the registry and the architecture tests
+ * read it: a new kind is a new runtime path, and it must fail the typecheck
+ * until the registry knows what it means.
+ */
+export type AgentKind = "conversation" | "background" | "delegate";
+
+/**
+ * What a definition may say about tools, per kind.
+ *
+ * A `conversation` or `background` agent says nothing: the conversation's
+ * gate composes its own array (per-conversation state for `studio`, nothing
+ * at all for the background three, which mount no sandbox and so can call
+ * nothing — a security property the title agent's tests already assert by
+ * shape). A `delegate` says an allowlist, because visibility must equal
+ * authority (ADR 0058 D4): the parent conversation holds all the tools, and
+ * what the delegate's model *sees* is the intersection of the definition's
+ * list with what the gate holds.
+ *
+ * The list is closed and by name: `read`, `glob`, `grep` — the same names
+ * the capability registry and the model-facing tool table use. `discover` is
+ * withheld from delegates in v1 (a delegate adopting a tool would leak into
+ * the parent's conversation-keyed adopted set — the two-writer bug ADR 0029
+ * exists to prevent), and MCP namespaces are a separate list so a delegate's
+ * MCP surface can be resolved at spawn from the catalog against the static
+ * allowlist, never by the delegate at runtime.
+ */
+export interface AgentToolPolicy {
+  /**
+   * Native tool names this agent's model may see. Validated against the
+   * registered native names at load — a typo'd allowlist would otherwise
+   * silently widen into "the delegate cannot use the tool it was named for"
+   * at the least convenient moment.
+   */
+  readonly natives: readonly string[];
+  /** MCP namespace keys (`mcp:<server-id>`) this agent may see, if any. */
+  readonly mcpNamespaces: readonly string[];
+}
+
+/**
+ * What a definition may say about skills, per kind.
+ *
+ * `conversation` is the per-conversation selection chain — not a definition
+ * field. `background` agents mount no skills. A `delegate` gets the
+ * intersection of this list with the conversation's selection: a skill
+ * enabled for the conversation but absent here is invisible to the delegate.
+ */
+export interface AgentSkillPolicy {
+  /** Skill ids (the SKILL.md folder name) this agent may mount, if any. */
+  readonly ids: readonly string[];
+}
+
+/**
+ * What a definition may say about permissions, per kind.
+ *
+ * `conversation` reads its mode from the settled turn settings. `background`
+ * agents hold no tools, so no permission applies to them. A `delegate` has
+ * its own consent default — `ask` for every delegate in the initial roster,
+ * because a delegate never inherits an approval (ADR 0038's grant-isolation
+ * property, #49) and the honest default is the child asks.
+ */
+export interface AgentPermissionPolicy {
+  /**
+   * The ceiling on effects this agent's calls may earn. Not booleans: the
+   * effects vocabulary is the permission system's own (`read`, `write`,
+   * `execute`, `network`), and read-only is expressible as `["read"]` — one
+   * layer of a three-layer agreement (allowlist ∩ ceiling ∩ kernel) that
+   * must all say the same thing before a Stage 3 delegate runs.
+   */
+  readonly maxEffects: readonly CapabilityEffect[];
+  /** The delegate's own consent default when the person has not answered. */
+  readonly mode: ExecutionMode;
+}
+
+/**
+ * How a definition chooses a model.
+ *
+ * `background` agents pin either a specifier (the title agent's ladder read)
+ * or the person's default (`improve`, `describe`); a `delegate` either
+ * inherits the parent conversation's model or names a cheap one; a
+ * `conversation` agent reads its model from the settled turn settings and
+ * says nothing here. `useModel` inside a delegate render is Flue-forbidden;
+ * the override rides the definition, and Stage 3 wires it to
+ * `useSubagent`'s `model` field.
+ */
+export type AgentModelPolicy =
+  /** The conversation's settled model and level (studio). */
+  | { readonly inherit: true }
+  /** A pinned specifier; the level is a literal because a background agent has no reason to spend. */
+  | { readonly specifier: string; readonly thinkingLevel: "off" };
+
+/**
+ * How long one run of an agent may take and retry, stated per agent rather
+ * than inherited from the runtime's defaults (1 hour, 10 attempts — values
+ * chosen for interactive conversations, which is not what a background
+ * titling run or a bounded delegate should silently get). These are the same
+ * fields Flue's `AgentStatics.durability` carries; the definition is the
+ * single source the agent module's static assignment reads, so the two
+ * cannot drift.
+ */
+export interface AgentDurabilityPolicy {
+  readonly maxAttempts: number;
+  readonly timeoutMs: number;
+}
+
+/**
+ * The definition record. Every field is a constraint the registry validates
+ * at load: a definition that fails validation fails the process start, not
+ * the first conversation unlucky enough to dispatch it.
+ */
+export interface StudioAgentDefinition {
+  readonly identity: {
+    /** The pinned literal the module's `agentName` static also carries. */
+    readonly agentName: string;
+    /** One line for a settings row or a roster list. */
+    readonly title: string;
+    /** What the parent's model reads when deciding to delegate. */
+    readonly description: string;
+  };
+  readonly kind: AgentKind;
+  /**
+   * The fixed instruction set. Static per agent, composed per render the way
+   * Studio composes its own: the cache-prefix argument for byte-identical
+   * instructions belongs to the render, not to this record.
+   */
+  readonly instructions: string;
+  readonly model: AgentModelPolicy;
+  /**
+   * Which tools and skills apply, per the per-kind rules above. Optional
+   * because the per-kind contract (enforced by the registry) is that only a
+   * delegate carries them: conversation and background agents compose their
+   * surface from live state or nothing at all.
+   */
+  readonly tools?: AgentToolPolicy | undefined;
+  readonly skills?: AgentSkillPolicy | undefined;
+  readonly permissions?: AgentPermissionPolicy | undefined;
+  readonly durability: AgentDurabilityPolicy;
+}
+
+/**
+ * The union of every status a durable run may settle into, shared by
+ * conversation submissions, process jobs, media jobs, and (Stage 4) agent
+ * tasks. ADR 0033's set: the observation layer already emits these as
+ * settlement outcomes, and one vocabulary is what lets the task index be a
+ * projection of the stream rather than a second opinion about what happened.
+ *
+ * `waiting_for_user` is a live state, not a settlement: a run parked on a
+ * question or an approval. It exists in the union because the task rail will
+ * show it between `running` and a settlement, and because a task that dies
+ * while parked settles `unknown` on restart — the honest answer for a state
+ * the stream cannot prove.
+ */
+export type AgentTaskStatus =
+  | "queued"
+  | "running"
+  | "waiting_for_user"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "unknown";
+
+const agentToolPolicySchema = v.object({
+  natives: v.array(v.string()),
+  mcpNamespaces: v.array(v.string()),
+});
+
+const agentSkillPolicySchema = v.object({
+  ids: v.array(v.string()),
+});
+
+const agentPermissionPolicySchema = v.object({
+  maxEffects: v.pipe(
+    v.array(v.picklist(["read", "write", "execute", "network"])),
+    // Non-empty on purpose: an empty ceiling is not "nothing" but "nobody
+    // stated it", and the three-layer read-only agreement (allowlist ∩
+    // ceiling ∩ kernel) only works when every layer says something.
+    v.minLength(1),
+  ),
+  mode: executionModeSchema,
+});
+
+const agentModelPolicySchema = v.union([
+  v.object({ inherit: v.literal(true) }),
+  v.object({
+    specifier: v.string(),
+    thinkingLevel: v.literal("off"),
+  }),
+]);
+
+/**
+ * The wire-level validation of a definition record. The registry runs this
+ * at load, then applies the cross-field rules a schema cannot express (a
+ * delegate with no tool policy, a conversation agent with one) — those are
+ * code, because they encode the per-kind contract, not the shape.
+ */
+export const studioAgentDefinitionSchema = v.object({
+  identity: v.object({
+    agentName: v.pipe(v.string(), v.nonEmpty()),
+    title: v.pipe(v.string(), v.nonEmpty()),
+    description: v.pipe(v.string(), v.nonEmpty()),
+  }),
+  kind: v.picklist(["conversation", "background", "delegate"]),
+  instructions: v.pipe(v.string(), v.nonEmpty()),
+  model: agentModelPolicySchema,
+  tools: v.optional(agentToolPolicySchema),
+  skills: v.optional(agentSkillPolicySchema),
+  permissions: v.optional(agentPermissionPolicySchema),
+  durability: v.object({
+    maxAttempts: v.pipe(v.number(), v.integer(), v.minValue(1)),
+    timeoutMs: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  }),
+});
+
+export type StudioAgentDefinitionInput = v.InferOutput<typeof studioAgentDefinitionSchema>;

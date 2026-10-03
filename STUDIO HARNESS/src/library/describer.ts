@@ -1,8 +1,8 @@
 import { createStudioUuid } from "../contracts/uuid.js";
 
-import { dispatch, observe, type FlueObservation } from "@flue/runtime";
+import { observe, type FlueObservation } from "@flue/runtime";
 
-import { Describe } from "../agents/describe.js";
+import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
 import { DESCRIBE_AGENT_ID } from "../contracts/agents.js";
 import { StudioError } from "../contracts/errors.js";
 import { normalizeTags } from "./store.js";
@@ -131,13 +131,10 @@ export class ImageDescriber implements ImageDescriberPort {
     this.#dispatchJob =
       options.dispatchJob ??
       (async (takeId, request) => {
-        await dispatch(Describe, {
-          id: takeId,
-          message: {
-            kind: "user",
-            body: messageFor(request),
-            attachments: [{ type: "image", data: request.data, mimeType: request.mimeType }],
-          },
+        await dispatchBackgroundAgent(DESCRIBE_AGENT_ID, takeId, {
+          kind: "user",
+          body: messageFor(request),
+          attachments: [{ type: "image", data: request.data, mimeType: request.mimeType }],
         });
       });
     this.#timeoutMs = options.timeoutMs ?? REPLY_TIMEOUT_MS;

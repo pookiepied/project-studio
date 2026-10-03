@@ -4,6 +4,7 @@ import { useModel, type AgentProps } from "@flue/runtime";
 
 import { IMPROVE_PROMPT } from "../context/improve-prompt.js";
 import { STUDIO_MODEL_ID } from "../contracts/models.js";
+import { improveDefinition } from "./definitions/improve.js";
 
 /**
  * The dictation-improving agent.
@@ -37,5 +38,9 @@ export function Improve(_props: AgentProps) {
 /** The durable identity, asserted equal to `IMPROVE_AGENT_ID` by the unit suite. */
 Improve.agentName = "improve";
 
-/** One attempt: a take that could not be tidied stays as it was said. */
-Improve.durability = { maxAttempts: 1, timeoutMs: 30_000 };
+/**
+ * One attempt: a take that could not be tidied stays as it was said. The
+ * numbers live in `agents/definitions/improve.ts` and are read from there,
+ * so the registry and the runtime cannot disagree.
+ */
+Improve.durability = improveDefinition.durability;

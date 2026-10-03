@@ -528,12 +528,44 @@ Rules that hold throughout (from the working rules): one task active; `pnpm chec
 
 ### Stage 2 — Definitions and the registry (still no model-visible change)
 
+**Delivered 2026-10-03.** The four items below, with the shape one deviation
+and one addition worth recording:
+
+- The vocabulary landed as planned, with `maxEffects` validated non-empty
+  (an empty ceiling is "nobody stated it", not "nothing") and the per-kind
+  contract enforced in code beside the schema: a **delegate must** carry
+  tools/skills/permissions (the Stage 0 measurement made the absence the
+  visibility/authority gap), a **conversation or background agent must not**
+  (studio composes live state; the background three hold nothing). The
+  plan's `context`/`limits`/`lifecycle`/`delegates` fields stayed out: every
+  consumer is Stage 3+, and a field nothing reads is the shape #31/#75/#76
+  existed to close.
+- `dispatchBackgroundAgent()` dispatches **by registry name, not function
+  value** — the one deliberate departure from "three copies of one pattern":
+  the registry mediates, so a dispatch cannot name an agent the harness does
+  not know it has. The Windows double-bundle lesson is why `index.ts` (the
+  one cycle-free pairing site) imports the agent modules and the definition
+  files import nothing from them.
+- The ADR 0038 graduation used `improve` (a real registered background id)
+  as the second agent.
+- Migration 30 + `TaskStore` (index, no routes, no writer yet — the
+  migration-14 `model_id` shape), plus `AgentTaskStatus` as the shared
+  settlement union and the `"agents"` error domain.
+
+Gate held: full harness `CI=true pnpm check` green (typecheck, lint, build,
+2,000+ tests), STUDIO `pnpm check` green (142 files / 1,357 tests), the
+built bundle carries each module exactly once (`built-agent-modules.test.ts`
+against a fresh build), and the mutation checks recorded in register #90.
+The Stage 0 instrument lesson repeated itself once: a test written to pass
+in the same millisecond it asserts (`settled_at` idempotency) passed with a
+broken implementation — the sentinel-timestamp fix is in the test now.
+
 1. `src/agents/definitions/` + `StudioAgentDefinition` + validation + the registry; `contracts/agents.ts` gains the definition vocabulary (agent ids stay the pinned literals — `EXPLORE_AGENT_ID` beside `STUDIO_AGENT_ID`).
 2. Refactor the four existing agents onto definitions; extract `dispatchBackgroundAgent()`. **Zero behavior change is the gate for this stage** — every existing suite (titling, describe, improve, conversation flows) passes untouched.
 3. Extend the ADR 0038 tests: a second agent id exists; grant isolation asserted across agents (the "second agent cannot inherit" test graduates from hypothetical to real).
 4. TaskStore migration (table + status enum), no routes yet.
 
-**Tests**: definition validation (unknown tool name, unknown skill, empty effects on a would-be delegate, depth), registry uniqueness (`agentName` collision refuses at load), the refactored agents' existing suites.
+**Tests**: definition validation (unknown tool name, unknown skill, empty effects on a would-be delegate, depth), registry uniqueness (`agentName` collision refuses at load), the refactored agents' existing suites. — **All delivered**: `agents-registry.test.ts` (16), `task-store.test.ts` (9), plus the architecture pair (every capitalized `'use agent'` export registered and vice versa; no agent-module import outside `src/agents` save the composition root).
 
 ### Stage 3 — The first delegate (Explore), vertical slice
 

@@ -1,8 +1,8 @@
 import { createStudioUuid } from "../contracts/uuid.js";
 
-import { dispatch, observe, type FlueObservation } from "@flue/runtime";
+import { observe, type FlueObservation } from "@flue/runtime";
 
-import { Improve } from "../agents/improve.js";
+import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
 import { IMPROVE_AGENT_ID } from "../contracts/agents.js";
 import { StudioError } from "../contracts/errors.js";
 
@@ -118,7 +118,7 @@ export class TextImprover implements TextImproverPort {
     this.#dispatchJob =
       options.dispatchJob ??
       (async (takeId, text) => {
-        await dispatch(Improve, { id: takeId, message: text });
+        await dispatchBackgroundAgent(IMPROVE_AGENT_ID, takeId, text);
       });
     this.#timeoutMs = options.timeoutMs ?? REPLY_TIMEOUT_MS;
   }

@@ -4,6 +4,7 @@ import { useAgentStart, useDelivery, useModel, useSandbox, useSkill, type AgentP
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
+import { studioDefinition } from "./definitions/studio.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
@@ -286,5 +287,9 @@ Studio.agentName = "studio";
  * model's own requests carry their own timeouts, and a person watching has
  * a stop control. What is left for this number to cover is the one thing
  * that legitimately takes a long time: waiting for a human.
+ *
+ * The numbers live in `agents/definitions/studio.ts` and are read from there
+ * so the registry and the runtime cannot disagree; this static is the
+ * definition's value, not a second opinion.
  */
-Studio.durability = { maxAttempts: 3, timeoutMs: 3_600_000 };
+Studio.durability = studioDefinition.durability;

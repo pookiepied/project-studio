@@ -4,6 +4,7 @@ import { useModel, type AgentProps } from "@flue/runtime";
 
 import { DESCRIBE_PROMPT } from "../context/describe-prompt.js";
 import { STUDIO_MODEL_ID } from "../contracts/models.js";
+import { describeDefinition } from "./definitions/describe.js";
 
 /**
  * The image-describing agent, for the library.
@@ -38,5 +39,9 @@ export function Describe(_props: AgentProps) {
 /** The durable identity, asserted equal to `DESCRIBE_AGENT_ID` by the unit suite. */
 Describe.agentName = "describe";
 
-/** One attempt: a picture that could not be described is labelled by hand. */
-Describe.durability = { maxAttempts: 1, timeoutMs: 45_000 };
+/**
+ * One attempt: a picture that could not be described is labelled by hand.
+ * The numbers live in `agents/definitions/describe.ts` and are read from
+ * there, so the registry and the runtime cannot disagree.
+ */
+Describe.durability = describeDefinition.durability;

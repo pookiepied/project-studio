@@ -1,6 +1,6 @@
-import { dispatch, observe, type FlueObservation } from "@flue/runtime";
+import { observe, type FlueObservation } from "@flue/runtime";
 
-import { Title } from "../agents/title.js";
+import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
 import { STUDIO_AGENT_ID, TITLE_AGENT_ID } from "../contracts/agents.js";
 import type { Logger } from "../observability/logger.js";
 import type { ConversationStore } from "./store.js";
@@ -274,22 +274,14 @@ export class ConversationTitler implements ConversationTitlingPort {
       (async (conversationId, message, attempt) => {
         const instanceId =
           attempt === 0 ? conversationId : `${conversationId}-t${attempt}`;
-        // Flue 2.0 dispatches by agent reference, not by name string, and
-        // takes the message as a delivered input (a bare string is shorthand
-        // for a user message). The receipt's submissionId is not read: the
-        // run's own events carry it, and this orchestrator routes on the
-        // instance id, which it already knows.
-        //
-        // `dispatch` resolves its target by FUNCTION VALUE, not by name, so
-        // this import has to be the same module object the build registered
-        // as the `title` agent. On Windows it was not, until Phase 7:
-        // `@flue/vite`'s scanned-agent module imported the file under a
-        // second spelling of its path, the bundle carried two copies, and
-        // every dispatch was refused with "target agent is not registered in
-        // this built application". The fix is a resolver plugin in
-        // `vite.config.ts`; the reason it belongs there rather than here is
-        // written next to it.
-        await dispatch(Title, { id: instanceId, message });
+        // The shared background dispatcher (agents/definitions/dispatch.ts)
+        // resolves the title agent through the registry, which holds the
+        // same function object the build registered - the module-identity
+        // property the `nativeModuleIdentity` vite plugin exists to keep,
+        // after the Windows double-bundle bug. The receipt's submissionId is
+        // not read: the run's own events carry it, and this orchestrator
+        // routes on the instance id, which it already knows.
+        await dispatchBackgroundAgent(TITLE_AGENT_ID, instanceId, message);
       });
   }
 

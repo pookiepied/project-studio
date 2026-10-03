@@ -113,6 +113,13 @@ export type StudioErrorDomain =
    * that is not what its name claims, or that cannot be opened, fails here.
    */
   | "documents"
+  /**
+   * The agent definition registry and the dispatch surface over it. Separate
+   * from `tools`: "this delegate's allowlist names a tool that does not
+   * exist" is a build-time authoring failure, decided at load, while
+   * "the gate refused this call" is a runtime verdict, decided per call.
+   */
+  | "agents"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

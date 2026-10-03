@@ -1252,6 +1252,56 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 30,
+    name: "agent_task",
+    up(db) {
+      // The index half of background agent tasks (ADR 0058 D5, Stage 2's
+      // schema step): one row per agent task the harness dispatches, so the
+      // UI can find it and the person can watch it settle. This table is
+      // deliberately an INDEX, not a second transcript - Flue's stream is
+      // canonical, status is projected from settlement events through the
+      // observer seam, and no row here holds a message or a result body.
+      // `result_summary` is a pointer-shape sentence, not the answer: the
+      // task's own stream (addressed by `id`, ADR 0045's offset mechanism)
+      // is where the answer lives.
+      //
+      // The id IS the task's Flue instance id - `imp_<uuid>`,
+      // `dsc_<uuid>`, `<conversation id>-t<N>`, or (Stage 4's dispatcher,
+      // D2) `<conversation id>-task-<n>` - minted by the dispatching side,
+      // never by the model. `agent_name` is the definition's pinned literal;
+      // `parent_conversation_id` and `origin_submission_id` link the task
+      // into the execution-context graph the interceptor already builds.
+      // Both are nullable because the background three have no parent
+      // conversation (the titler names one only through the conversation it
+      // titles, which the store records as `parent_conversation_id` when
+      // known) - a task is its own thing, not a column on a conversation.
+      //
+      // `status` carries ADR 0033's settlement vocabulary
+      // (`queued|running|waiting_for_user|completed|failed|cancelled|unknown`),
+      // read back through the `AgentTaskStatus` union in contracts/agents.ts.
+      // No CHECK constraint on the column: a status the reader does not
+      // parse settles as `unknown` rather than poisoning the row, which is
+      // the honest answer for a stream this process cannot prove.
+      db.exec(`
+        CREATE TABLE agent_task (
+          id                    TEXT PRIMARY KEY,
+          agent_name            TEXT NOT NULL,
+          parent_conversation_id TEXT,
+          origin_submission_id  TEXT,
+          title                 TEXT NOT NULL DEFAULT '',
+          status                TEXT NOT NULL,
+          created_at            INTEGER NOT NULL,
+          settled_at            INTEGER,
+          result_summary        TEXT
+        ) STRICT;
+
+        CREATE INDEX agent_task_recent ON agent_task (created_at DESC);
+        CREATE INDEX agent_task_conversation
+          ON agent_task (parent_conversation_id, created_at);
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

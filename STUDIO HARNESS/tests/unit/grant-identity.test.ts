@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { STUDIO_AGENT_ID } from "../../src/contracts/agents.js";
+import { IMPROVE_AGENT_ID, STUDIO_AGENT_ID } from "../../src/contracts/agents.js";
 import type { ExecutionScope } from "../../src/contracts/capabilities.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -83,10 +83,12 @@ describe("what a permission grant is keyed by", () => {
 
     // The reason `agentId` is a field rather than a constant folded into the
     // conversation: a subagent must not inherit what its parent was granted.
-    // Nothing creates a second agent today, which is why this is asserted
-    // rather than left to be noticed when one appears.
-    const otherAgent = scopeFor("alpha", { agentId: "reviewer" });
-    expect(grants.find(READ, otherAgent, "src/app.ts")).toBeUndefined();
+    // Stage 2's registry made real agent ids beside `studio` available to
+    // this assertion, so the second agent is now a live one (`improve`, a
+    // registered background agent) rather than the synthetic "reviewer" —
+    // the #49 property against the ids the harness actually dispatches.
+    const background = scopeFor("alpha", { agentId: IMPROVE_AGENT_ID });
+    expect(grants.find(READ, background, "src/app.ts")).toBeUndefined();
   });
 
   it("does not carry a standing approval to a different project", () => {

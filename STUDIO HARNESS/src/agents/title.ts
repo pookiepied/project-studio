@@ -5,6 +5,7 @@ import { useModel, type AgentProps } from "@flue/runtime";
 import { TITLE_PROMPT } from "../context/title-prompt.js";
 import { ProviderConfigurationError, STUDIO_MODEL_ID } from "../contracts/models.js";
 import { backgroundLadderSpecifier } from "../gateway/language/background-model.js";
+import { titleDefinition } from "./definitions/title.js";
 
 /**
  * The automatic titling agent.
@@ -97,6 +98,7 @@ Title.agentName = "title";
 /**
  * One attempt, bounded: a failed titling keeps the derived title, so a
  * durable retry would only spend again for a name the fallback already
- * covers.
+ * covers. The numbers live in `agents/definitions/title.ts` and are read
+ * from there, so the registry and the runtime cannot disagree.
  */
-Title.durability = { maxAttempts: 1, timeoutMs: 30_000 };
+Title.durability = titleDefinition.durability;
