@@ -1,6 +1,7 @@
 # The Agent Platform Plan — Phase 13 and the architecture around it
 
 **Status:** Proposed · 2026-09-29
+**Execution order:** `agent-platform-roadmap.md`, written 2026-10-03 beside this plan — it owns order, gates, and per-stage status (S0–S2 shipped); this plan owns scope and decisions. When the two disagree, this plan is right and the roadmap gets fixed.
 **Written against:** `STUDIO HARNESS` on `@flue/runtime` 2.0.3 (patched), post Flue-2 migration, post ADR 0057.
 **Scope:** The whole agent system — agent types, subagents, tasks, tool exposure, MCP, skills, hooks, permissions, identities, dispatch, persistence — as one architecture, with a staged path from what exists to what should exist.
 
