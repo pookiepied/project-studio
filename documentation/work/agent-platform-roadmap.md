@@ -44,15 +44,16 @@ up the next unshipped row without re-deriving the order.
 | S0 | Ground truth: delegation measurement, ADR 0058, doc reconciliation, dispositions | ✅ **Done** — findings in the plan §"Stage 0 findings"; dispositions executed early in Stage 1 |
 | S1 | Prerequisites: #73 grants surface, #86/#50 snapshot restore, #88/#89 child lifecycle, #66 MCP timeout/cancellation | ✅ **Done** — all four closed, mutation-verified (`7693dbfe`, `068e8838`, `65f068c3`) |
 | S2 | Definitions, registry, `dispatchBackgroundAgent()`, TaskStore migration | ✅ **Done 2026-10-03** — `c9266055`; zero behavior change held (2,272 + 1,357 tests green); register #90 records the proofs |
-| S3 | **The Explore delegate** — the first real subagent | ⬜ Next |
-| S4 | Background agent tasks (routes, projection, signals, rail) | ⬜ |
+| S3 | **The Explore delegate** — the first real subagent | ✅ **Done 2026-10-03** — register row 96: definition, mount, the patch's one budgeted hunk, the gate's agent-aware policy, #49 closed end to end (store + scope + live run) |
+| S4 | Background agent tasks (routes, projection, signals, rail) | ⬜ Next |
 | S5 | The broader roster (`general`, `plan`) + assignment | ⬜ |
 | S6 | Consolidation and the deferred decisions | ⬜ |
 
 Open register rows that touch this map: **#70** (load-dependent suite flake,
 assigned Stage 4b), **#13** (gateway contract, mooted by cancellation — close it
-as No Longer Relevant when convenient), **#49** (grants must not leak parent →
-child — proven at the store level in S2; end-to-end proof is S3's deliverable).
+as No Longer Relevant when convenient). **#49 closed 2026-10-03 at S3.3** —
+grant isolation proven at every layer: store (S2), scope substitution and live
+delegated run (S3, register row 96).
 
 ---
 
@@ -183,7 +184,7 @@ settings UI that edits definitions (Phase 18 product work at the earliest);
 **S3 (Explore, the slice that proves delegation works at all) → S4 (background
 tasks, the surface you watch settle) → S5 (the roster fills out) → S6 (fold the
 decisions and the docs).** Tracks land inside the stage windows named above; the
-map's next unshipped row at any moment is S3.1.
+map's next unshipped row at any moment is S4.1.
 
 *Status of this file:* maintained beside the plan until S6.3 folds the surviving
 content into the durable docs — then it is archived, banner-marked, per the

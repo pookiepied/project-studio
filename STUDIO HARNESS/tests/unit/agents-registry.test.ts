@@ -11,15 +11,18 @@ import {
 } from "../../src/agents/definitions/registry.js";
 import {
   DESCRIBE_AGENT_ID,
+  EXPLORE_AGENT_ID,
   IMPROVE_AGENT_ID,
   STUDIO_AGENT_ID,
   TITLE_AGENT_ID,
 } from "../../src/contracts/agents.js";
 import { describeDefinition } from "../../src/agents/definitions/describe.js";
+import { exploreDefinition } from "../../src/agents/definitions/explore.js";
 import { improveDefinition } from "../../src/agents/definitions/improve.js";
 import { studioDefinition } from "../../src/agents/definitions/studio.js";
 import { titleDefinition } from "../../src/agents/definitions/title.js";
 import { Describe } from "../../src/agents/describe.js";
+import { Explore } from "../../src/agents/explore.js";
 import { Improve } from "../../src/agents/improve.js";
 import { Studio } from "../../src/agents/studio.js";
 import { Title } from "../../src/agents/title.js";
@@ -27,6 +30,7 @@ import { STUDIO_SYSTEM_PROMPT } from "../../src/context/system-prompt.js";
 import { TITLE_PROMPT } from "../../src/context/title-prompt.js";
 import { IMPROVE_PROMPT } from "../../src/context/improve-prompt.js";
 import { DESCRIBE_PROMPT } from "../../src/context/describe-prompt.js";
+import { EXPLORE_PROMPT } from "../../src/context/explore-prompt.js";
 
 /** A valid delegate-shaped definition, for the refusal cases to corrupt one field at a time. */
 function validDelegateInput(): Record<string, unknown> {
@@ -50,30 +54,46 @@ function validDelegateInput(): Record<string, unknown> {
 }
 
 describe("the agent registry", () => {
-  it("holds the four live agents under their contract ids", () => {
+  it("holds the five live agents under their contract ids", () => {
     expect(agentRegistry.get(STUDIO_AGENT_ID)?.definition).toBe(studioDefinition);
     expect(agentRegistry.get(TITLE_AGENT_ID)?.definition).toBe(titleDefinition);
     expect(agentRegistry.get(IMPROVE_AGENT_ID)?.definition).toBe(improveDefinition);
     expect(agentRegistry.get(DESCRIBE_AGENT_ID)?.definition).toBe(describeDefinition);
+    expect(agentRegistry.get(EXPLORE_AGENT_ID)?.definition).toBe(exploreDefinition);
   });
 
   it("pairs each definition with the same function object Flue registers", () => {
     // dispatch() resolves by function value, so the registry carrying a
     // different object than the module exports would dispatch nothing. The
-    // Windows double-bundle bug made exactly this happen once already.
+    // Windows double-bundle bug made exactly this happen once already. For
+    // the delegate the same identity is what the useSubagent mount hands
+    // Flue - a different object here would be a delegate Flue could not
+    // resolve at render time.
     expect(agentRegistry.get(STUDIO_AGENT_ID)?.agent).toBe(Studio);
     expect(agentRegistry.get(TITLE_AGENT_ID)?.agent).toBe(Title);
     expect(agentRegistry.get(IMPROVE_AGENT_ID)?.agent).toBe(Improve);
     expect(agentRegistry.get(DESCRIBE_AGENT_ID)?.agent).toBe(Describe);
+    expect(agentRegistry.get(EXPLORE_AGENT_ID)?.agent).toBe(Explore);
   });
 
   it("hands out exactly one conversation agent", () => {
     expect(agentRegistry.conversationAgent().definition).toBe(studioDefinition);
   });
 
+  it("names exactly the explore delegate in the delegate roster", () => {
+    // Stage 3's roster. The useSubagent mount, the gate's acting-agent
+    // filter, and the scope substitution all resolve through this list;
+    // a delegate missing from it is invisible to all three at once, and
+    // an extra one is a delegate the mount would arm without a
+    // definition's policy behind it.
+    expect(agentRegistry.byKind("delegate").map((entry) => entry.definition.identity.agentName))
+      .toEqual([EXPLORE_AGENT_ID]);
+  });
+
   it("sorts the roster by name", () => {
     expect(agentRegistry.list().map((entry) => entry.definition.identity.agentName)).toEqual([
       DESCRIBE_AGENT_ID,
+      EXPLORE_AGENT_ID,
       IMPROVE_AGENT_ID,
       STUDIO_AGENT_ID,
       TITLE_AGENT_ID,
@@ -148,6 +168,7 @@ describe("the definitions' own modules", () => {
     expect(Title.durability).toEqual(titleDefinition.durability);
     expect(Improve.durability).toEqual(improveDefinition.durability);
     expect(Describe.durability).toEqual(describeDefinition.durability);
+    expect(Explore.durability).toEqual(exploreDefinition.durability);
   });
 
   it("carry the prompts the renders return", () => {
@@ -159,6 +180,7 @@ describe("the definitions' own modules", () => {
     expect(titleDefinition.instructions).toBe(TITLE_PROMPT);
     expect(improveDefinition.instructions).toBe(IMPROVE_PROMPT);
     expect(describeDefinition.instructions).toBe(DESCRIBE_PROMPT);
+    expect(exploreDefinition.instructions).toBe(EXPLORE_PROMPT);
   });
 });
 
@@ -224,7 +246,7 @@ describe("the registry is the one roster (architecture)", () => {
         if (!entry.name.endsWith(".ts")) continue;
         if (relative === "" && allowed.has(entry.name)) continue;
         const source = readFileSync(path, "utf8");
-        if (/from ["'].*agents\/(studio|title|improve|describe)\.js["']/.test(source)) {
+        if (/from ["'].*agents\/(studio|title|improve|describe|explore)\.js["']/.test(source)) {
           offenders.push(path);
         }
       }

@@ -1,10 +1,11 @@
 'use agent';
 
-import { useAgentStart, useDelivery, useModel, useSandbox, useSkill, type AgentProps } from "@flue/runtime";
+import { useAgentStart, useDelivery, useModel, useSandbox, useSkill, useSubagent, type AgentProps } from "@flue/runtime";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
 import { studioDefinition } from "./definitions/studio.js";
+import { agentRegistry } from "./definitions/index.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
@@ -21,6 +22,8 @@ import {
   STUDIO_MODEL_ID,
   type ReasoningLevel,
 } from "../contracts/models.js";
+import type { AgentModelPolicy } from "../contracts/agents.js";
+import type { Agent, AgentFunction } from "@flue/runtime";
 
 /**
  * The model specifier a conversation runs on, from its settled turn settings.
@@ -61,6 +64,59 @@ export function studioThinkingLevel(
   supported: readonly ReasoningLevel[],
 ): ReturnType<typeof runThinkingLevelForChoice> {
   return runThinkingLevelForChoice(reasoningChoiceOr(settings.reasoningLevel), supported);
+}
+
+/**
+ * The `useSubagent` declaration fields one registered delegate carries,
+ * resolved from its definition.
+ *
+ * Exported beside the two settings mappers for the same reason: the
+ * definition-to-mount mapping is the contract between the registry and
+ * the `task` tool's roster, and asserting it keeps a definition's model
+ * policy honest — `{ inherit: true }` MUST mount as an omitted `model`
+ * (Flue's word for "the parent's, verbatim"), and a pinned specifier MUST
+ * mount as that specifier, because `useModel` inside a delegate render is
+ * Flue-forbidden and this field is the only seat the override has. A test
+ * that read `agents/studio.ts` as text could not tell an omitted field
+ * from a `undefined`-valued one; this function can, because the mapping
+ * is executable.
+ */
+export function delegateMount(entry: {
+  readonly definition: {
+    readonly identity: { readonly agentName: string; readonly description: string };
+    readonly model: AgentModelPolicy;
+  };
+  readonly agent: Agent;
+}): {
+  name: string;
+  description: string;
+  // Flue's `SubagentDefinition.agent` is the void-props `AgentFunction`, so
+  // the mount narrows the registry's `Agent` (a full agent with statics,
+  // which `Explore` is) to the delegate arity here — one cast, at the one
+  // boundary where the two vocabularies meet, and the runtime accepts the
+  // same object either way.
+  agent: AgentFunction;
+  model?: string | undefined;
+  thinkingLevel?: "off" | undefined;
+} {
+  const { definition } = entry;
+  // Narrowed once, here: the union's two arms are the two mount shapes,
+  // and a discriminating read keeps the omitted-ness observable — an
+  // omitted `model` is Flue's inheritance, an explicit one is the
+  // override, and returning `undefined` would let the call site decide
+  // which it meant. The `undefined`s in the return type are the same
+  // contract under `exactOptionalPropertyTypes`: the fields are either
+  // absent or valued, never absent-and-`undefined`.
+  const pinned: { readonly specifier: string; readonly thinkingLevel: "off" } | undefined =
+    "specifier" in definition.model ? definition.model : undefined;
+  return {
+    name: definition.identity.agentName,
+    description: definition.identity.description,
+    agent: entry.agent as unknown as AgentFunction,
+    ...(pinned === undefined
+      ? {}
+      : { model: pinned.specifier, thinkingLevel: pinned.thinkingLevel }),
+  };
 }
 
 /**
@@ -165,6 +221,44 @@ export function Studio({ id }: AgentProps) {
   // is mounted, so switching the last skill off removes a tool - rare, and
   // Flue's own trade.
   for (const skill of runtime.conversationSkills?.(id) ?? []) useSkill(skill);
+  // The delegates this conversation may hand work to, declared through
+  // Flue's own mount so the `task` tool the runtime registers
+  // unconditionally finally has a roster to resolve against. Until this
+  // mount, `task` answered every call with a factual miss - the honest
+  // empty-roster behavior Stage 0 measured - and the composed prompt
+  // carried the "declares no subagents" paragraph Flue writes when a
+  // render declares none. With the mount, Flue composes the `## Available
+  // Agents` section from the declaration's `name` and `description`, the
+  // child runs in a fresh session sharing only this conversation's
+  // sandbox, and the child's final message returns as the task tool's
+  // result - nothing else crosses back.
+  //
+  // The roster is the registry's delegate roster, resolved once per render
+  // from the definition data rather than hand-written here: a second
+  // delegate (Stage 5) is a definition file plus a registry entry, and
+  // this loop names it without this file changing. Resolved through the
+  // registry rather than imported directly because the mount needs the
+  // definition AND the function object together, and `definitions/index.ts`
+  // is the one cycle-free site that holds the pairing. Read per render,
+  // like everything else in this function: the roster is not conversation
+  // state, but the mount is a render-scoped declaration and Flue expects
+  // it on every one, not remembered from the first.
+  //
+  // The `model` override rides the declaration's optional field, and is
+  // unset for an `inherit: true` definition: omitted, Flue passes the
+  // parent's model and reasoning level to the child (the definition
+  // contract's word for "the conversation's settled model, verbatim"). A
+  // definition that pins a specifier names it here instead - `useModel`
+  // inside a delegate render is Flue-forbidden, so the declaration is the
+  // only seat the override has. Nothing else about the child is declared
+  // here: its tool visibility is the gate's per-acting-agent filter (the
+  // `tools()` callback reads the child's execution context), its grants
+  // are its own (the scope its calls carry is substituted at call time),
+  // and its instructions are its definition's prompt, rendered in its own
+  // frame - this mount says it exists, not what it is.
+  for (const entry of agentRegistry.byKind("delegate")) {
+    useSubagent(delegateMount(entry));
+  }
   // The pictures this delivery carries, copied where this conversation's own
   // policy can read them. `useDelivery` is the access the model itself will
   // read the message through; this call is the harness's, and the render is

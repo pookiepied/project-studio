@@ -129,6 +129,13 @@ function linksForFlue(
     ...(taskId === undefined ? {} : { taskId }),
     ...(operationId === undefined ? {} : { operationId }),
     ...(operation.type === "tool" ? { toolCallId: operation.toolCallId } : {}),
+    // The Flue patch's one delegation hunk: the delegate's name on a child
+    // task session's frame. The context spreads this onto every operation
+    // under that session, so the gate's tools() callback — which runs inside
+    // the child's assembly, under this frame — reads the acting agent from
+    // the same place the interceptor does. Absent on every parent frame,
+    // which is what makes its presence the signal.
+    ...(context.subagentName === undefined ? {} : { subagentName: context.subagentName }),
   };
 }
 

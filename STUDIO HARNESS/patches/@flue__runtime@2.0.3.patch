@@ -1,5 +1,5 @@
 diff --git a/dist/builtin-providers-DW08g5fh.mjs b/dist/builtin-providers-DW08g5fh.mjs
-index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa0089269b89c 100644
+index 33bee38..7cbc802 100644
 --- a/dist/builtin-providers-DW08g5fh.mjs
 +++ b/dist/builtin-providers-DW08g5fh.mjs
 @@ -1,12 +1,12 @@
@@ -17,7 +17,28 @@ index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa008
  import { i as InMemoryAttachmentStore } from "./format-version-Bmc1L_3t.mjs";
  import { r as ConversationRecordWriter } from "./sql-agent-execution-store-RrAtlpSL.mjs";
  import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-@@ -698,6 +698,12 @@ function createNodeAgentCoordinator(options) {
+@@ -238,7 +238,19 @@ var Harness = class Harness {
+ 			executionContext: {
+ 				...this.executionContext,
+ 				harness: harnessScope,
+-				taskId: options.taskId
++				taskId: options.taskId,
++				// [project-studio patch] The delegate's name, carried beside the taskId
++				// so the host's tools() callback and permission scope can resolve
++				// the ACTING agent for a child session. Stock 2.0.3 leaves the
++				// child's context inheriting the parent's agentName, which is
++				// correct for the conversation and wrong for the delegate: the
++				// host gate filters a delegate's tool visibility by its
++				// definition's allowlist, and that filter needs to know which
++				// delegate is asking. agentName stays the parent's (the submission's
++				// agent, unchanged); subagentName is the delegate. Anchor on
++				// createTaskSession's Session construction, never on a bundle
++				// filename or line number.
++				...(taskAgent?.name !== undefined ? { subagentName: taskAgent.name } : {})
+ 			}
+ 		});
+ 		await session.initializeCanonicalContext();
+@@ -698,6 +710,12 @@ function createNodeAgentCoordinator(options) {
  	/** Unique identifier for this coordinator instance. Used as the owner
  	*  for lease-based submission ownership. */
  	const ownerId = generateOwnerId();
@@ -30,7 +51,7 @@ index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa008
  	/** Heartbeat interval handle; started with the claim loop. */
  	let heartbeatInterval = null;
  	/** Periodic lease-scan wake timer; wakes the claim loop so expired
-@@ -881,6 +887,8 @@ function createNodeAgentCoordinator(options) {
+@@ -881,6 +899,8 @@ function createNodeAgentCoordinator(options) {
  		let progressed = false;
  		for (const submission of runnable) {
  			if (activeSubmissions.has(submission.submissionId)) continue;
@@ -39,7 +60,7 @@ index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa008
  			const claimed = await submissions.claimSubmission({
  				submissionId: submission.submissionId,
  				attemptId: generateAttemptId(),
-@@ -1317,6 +1325,69 @@ function createNodeAgentCoordinator(options) {
+@@ -1317,6 +1337,69 @@ function createNodeAgentCoordinator(options) {
  				activityLease?.release();
  			}
  		},
@@ -109,7 +130,7 @@ index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa008
  		async abortInstance(agentName, instanceId) {
  			const sessionKey = createSessionStorageKey(agentName, instanceId, SUBMISSION_HARNESS_NAME, SUBMISSION_SESSION_NAME);
  			const affected = await submissions.requestSessionAbort(sessionKey);
-@@ -1588,6 +1659,8 @@ async function assembleNodeAgentRuntime(options) {
+@@ -1588,6 +1671,8 @@ async function assembleNodeAgentRuntime(options) {
  		activityGate,
  		createAgentAdmission: (agentName, instanceId) => coordinator.createAdmission(agentName, instanceId),
  		abortAgentInstance: (agentName, instanceId) => coordinator.abortInstance(agentName, instanceId),
@@ -119,7 +140,7 @@ index 33bee3895e9240ff9a4838886ff81368072d3b1d..0926e7fb12a1f6132db9a2ebd89fa008
  		attachmentStore
  	};
 diff --git a/dist/conversation-stream-store-CXwRWonS.mjs b/dist/conversation-stream-store-CXwRWonS.mjs
-index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..102ea0eda7faf33c26fbd96c353532f4c83bbe3a 100644
+index 3fa342b..9a576d5 100644
 --- a/dist/conversation-stream-store-CXwRWonS.mjs
 +++ b/dist/conversation-stream-store-CXwRWonS.mjs
 @@ -423,14 +423,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
@@ -270,7 +291,7 @@ index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..102ea0eda7faf33c26fbd96c353532f4
 -export { isSubmissionPayload as A, renderAgentFunctionWithStructure as C, SUBMISSION_SESSION_NAME as D, SUBMISSION_HARNESS_NAME as E, sameSubmissionChunks as F, DURABILITY_DEFAULT_MAX_ATTEMPTS as I, DURABILITY_DEFAULT_TIMEOUT_MS as L, hydratePersistedSubmissionAttachments as M, matchesPersistedSubmissionAttachments as N, admitSubmissionWithBackend as O, prepareSubmissionAttachments as P, LEASE_DURATION_MS as R, assertRenderStructureInvariance as S, skillCatalogEntries as T, submissionSyntheticRequest as _, admitInstanceContact as a, createPublicSession as b, createDispatchAgentSubmissionInput as c, isInstanceContactRejection as d, materializeSubmissionAttachments as f, settleUnclaimableSubmission as g, serializeSubmissionError as h, ensureSqlConversationStreamTables as i, parseAcceptedAt as j, clampLimit as k, ensureInstanceIdentity as l, reconcileInterruptedSubmission as m, SqliteConversationStreamStore as n, adoptKeyedSubmissionReplay as o, processSubmission as p, StreamListenerRegistry as r, createDirectAgentSubmissionInput as s, InMemoryConversationStreamStore as t, finalizePendingSettlement as u, unreadySubmissionDeadline as v, discoverSessionContext as w, digestInstructions as x, Session as y };
 +export { createAgentSubmissionSessionHandler as projectStudioSessionHandler, isSubmissionPayload as A, renderAgentFunctionWithStructure as C, SUBMISSION_SESSION_NAME as D, SUBMISSION_HARNESS_NAME as E, sameSubmissionChunks as F, DURABILITY_DEFAULT_MAX_ATTEMPTS as I, DURABILITY_DEFAULT_TIMEOUT_MS as L, hydratePersistedSubmissionAttachments as M, matchesPersistedSubmissionAttachments as N, admitSubmissionWithBackend as O, prepareSubmissionAttachments as P, LEASE_DURATION_MS as R, assertRenderStructureInvariance as S, skillCatalogEntries as T, submissionSyntheticRequest as _, admitInstanceContact as a, createPublicSession as b, createDispatchAgentSubmissionInput as c, isInstanceContactRejection as d, materializeSubmissionAttachments as f, settleUnclaimableSubmission as g, serializeSubmissionError as h, ensureSqlConversationStreamTables as i, parseAcceptedAt as j, clampLimit as k, ensureInstanceIdentity as l, reconcileInterruptedSubmission as m, SqliteConversationStreamStore as n, adoptKeyedSubmissionReplay as o, processSubmission as p, StreamListenerRegistry as r, createDirectAgentSubmissionInput as s, InMemoryConversationStreamStore as t, finalizePendingSettlement as u, unreadySubmissionDeadline as v, discoverSessionContext as w, digestInstructions as x, Session as y };
 diff --git a/dist/dispatch-nU3cIlT-.mjs b/dist/dispatch-nU3cIlT-.mjs
-index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..b9c3ef44e048f0f59dbb7eac7303a317647b8e1a 100644
+index c661b21..48db55b 100644
 --- a/dist/dispatch-nU3cIlT-.mjs
 +++ b/dist/dispatch-nU3cIlT-.mjs
 @@ -1,7 +1,7 @@
@@ -564,8 +585,23 @@ index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..b9c3ef44e048f0f59dbb7eac7303a317
  * Node lookup: the root `conversation_created` record is the first record of
  * the instance's stream, so existence and uid come from stream meta plus the
  * first batch.
+diff --git a/dist/observation-IWUJUvRg.d.mts b/dist/observation-IWUJUvRg.d.mts
+index 03d9815..db0d55b 100644
+--- a/dist/observation-IWUJUvRg.d.mts
++++ b/dist/observation-IWUJUvRg.d.mts
+@@ -59,6 +59,10 @@ interface FlueExecutionContext {
+   turnId?: string;
+   taskId?: string;
+   traceCarrier?: FlueTraceCarrier;
++  /** [project-studio patch] The delegate's catalog name, set on child task
++   * sessions by createTaskSession. Absent on parent/conversation sessions,
++   * where the acting agent IS agentName. */
++  subagentName?: string;
+ }
+ type FlueExecutionInterceptor = <T>(operation: FlueExecutionOperation, ctx: FlueExecutionContext, next: () => Promise<T>) => Promise<T>;
+ //#endregion
 diff --git a/dist/types-CVx9SjIx.d.mts b/dist/types-CVx9SjIx.d.mts
-index 0c9ab2477d44e4df8b60c007f5e04c327abb20c3..35c796f4592f6bfb312f1405cdff694e20931b3c 100644
+index 0c9ab24..897f015 100644
 --- a/dist/types-CVx9SjIx.d.mts
 +++ b/dist/types-CVx9SjIx.d.mts
 @@ -520,6 +520,19 @@ interface CompactionConfig {
@@ -588,3 +624,15 @@ index 0c9ab2477d44e4df8b60c007f5e04c327abb20c3..35c796f4592f6bfb312f1405cdff694e
  }
  interface DurabilityConfig {
    /**
+@@ -581,9 +594,9 @@ interface SubagentDefinition {
+   /** The delegate's agent function — it defines the delegate's whole world. */
+   agent: AgentFunction;
+   /** Model specifier override. Inherits the parent's model when omitted. */
+-  model?: string;
++  model?: string | undefined;
+   /** Reasoning-effort override. Inherits when omitted. */
+-  thinkingLevel?: ThinkingLevel;
++  thinkingLevel?: ThinkingLevel | undefined;
+ }
+ /** The internal runtime-config shape one render of an agent composes. */
+ interface AgentRuntimeConfig {

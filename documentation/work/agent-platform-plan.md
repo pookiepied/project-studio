@@ -570,6 +570,38 @@ broken implementation — the sentinel-timestamp fix is in the test now.
 
 ### Stage 3 — The first delegate (Explore), vertical slice
 
+**Delivered 2026-10-03.** The six items below as planned, with the
+mechanisms the Stage 0 measurement chose and one lesson the live run
+forced:
+
+- The mount is a loop over `agentRegistry.byKind("delegate")` in studio's
+  render, mapped through the exported `delegateMount()` — so a Stage 5
+  delegate is a definition file plus a registry entry, and `studio.ts`
+  names it without changing. `AgentModelPolicy`'s two arms map to the
+  declaration's optional fields by OMISSION, not by value: `{inherit:
+  true}` mounts with no `model` field at all (Flue's word for "the
+  parent's, verbatim").
+- The Flue patch hunk (the stage's one budgeted line, ledger entry 9)
+  carries the delegate's name onto the child session's execution context
+  as `subagentName`; the interceptor maps it to
+  `FlueExecutionLinks.subagentName` → `ExecutionContext.flueSubagentName`,
+  and the gate reads it from `currentExecutionContext()` — (a)'s seam,
+  made honest by (b)'s one line, exactly as the D4 mechanism record said.
+- The gate's policy lives in `permissions/agent-policy.ts`, the one module
+  all three readers import (the `tools()` filter, the scope substitution,
+  the effects ceiling). The ceiling refusal happens in the `execute`
+  closure BEFORE the kernel is consulted, so a violation is a refusal the
+  model can read.
+- The delegation section replaced the "declares no subagents" paragraph;
+  the roster section remains Flue's own composed `## Available Agents`
+  (byte-stability for an unchanged roster is Flue's, not ours — the
+  section is composed from the mount each render).
+- The scripted test model's delegation scenarios (`[delegate]`, `[task]`,
+  `[report]`, `[try-write]`) each carry their own loop guard: the task
+  prompt is the child's WHOLE conversation, so every re-entry carries the
+  same user text and an unguarded tool branch is an infinite loop — the
+  first run of the suite measured exactly that before the guards landed.
+
 1. Mount `useSubagent(explorerSubagent)` in `Studio`'s render — unconditionally, cached-prefix-safe, roster section now non-empty.
 2. Agent-aware tool policy at the gate (D4) using the Stage 0 mechanism; `discover` withheld from delegates; per-delegate MCP/skills resolution (both empty for Explore).
 3. The delegate's scope carries `agentId: "explore"` (the factory already receives the acting identity via the Stage 0 mechanism); approval broker requests render with the agent's title.

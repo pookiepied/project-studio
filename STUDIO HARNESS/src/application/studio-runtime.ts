@@ -45,6 +45,14 @@ import {
   PermissionKernel,
   type PermissionApprover,
 } from "../permissions/kernel.js";
+import {
+  actingAgentPolicy,
+  effectsWithinCeiling,
+  scopeForActingAgent,
+  visibleToAgent,
+} from "../permissions/agent-policy.js";
+import { agentRegistry } from "../agents/definitions/index.js";
+import { currentExecutionContext } from "../execution/context.js";
 import { requiresUndo, type ExecutionMode } from "../permissions/mode.js";
 import { posture, WorkspaceTrustStore } from "../permissions/trust.js";
 import { createErrorReporter } from "../observability/error-reporter.js";
@@ -1904,8 +1912,31 @@ export class StudioRuntime implements AgentHost {
       },
       tools: (_env, _options) => {
         refreshTools();
+        // Who is acting, answered per assembly: a delegate's session asks
+        // with `subagentName` on its execution-context frame (the Flue
+        // patch's one delegation hunk), the parent's assemblies ask with
+        // nothing. Resolved here — at the top of every assembly, parent
+        // and child alike — because the Stage 0 measurement showed this
+        // callback runs five to six times per two-turn submission and each
+        // call re-answers for one session against the same shared
+        // environment. The conversation agent's answer is the unchanged
+        // full list (it composes its own surface); a delegate's answer is
+        // its definition's allowlist ∩ what the gate holds, `discover`
+        // withheld by name (D4: adoption would write into the parent's
+        // conversation-keyed set — the two-writer bug ADR 0029 exists to
+        // prevent).
+        const acting = actingAgentPolicy(
+          currentExecutionContext()?.flueSubagentName,
+          agentRegistry,
+        );
         const names = new Set<string>();
         return gate.list().flatMap((descriptor) => {
+          // The per-acting-agent filter, applied before the name-conflict
+          // check so a hidden tool never claims its name in this assembly.
+          // Visibility is authority's mirror, not authority itself: what
+          // survives here is still decided by the kernel at call time,
+          // under the delegate's own scope.
+          if (!visibleToAgent(descriptor, acting)) return [];
           const name = modelToolName(descriptor.id.namespace, descriptor.id.name);
           if (names.has(name)) {
             throw new ToolError("name_conflict", {
@@ -1927,6 +1958,24 @@ export class StudioRuntime implements AgentHost {
               input: unknown,
               signal?: AbortSignal,
             ): Promise<ModelToolResult> => {
+              // Who is acting, answered again at call time rather than read
+              // from the assembly: the assembly's answer named the session
+              // this tool was offered to, and the call's frame is the one
+              // the kernel's decision should ride on. Same resolution, one
+              // moment later — the frame carries `subagentName` for a
+              // delegate's calls, nothing for the conversation's own.
+              const caller = actingAgentPolicy(
+                currentExecutionContext()?.flueSubagentName,
+                agentRegistry,
+              );
+              // The delegate's scope: the conversation's captured scope with
+              // the agentId substituted to the acting delegate. The
+              // substitution is what makes ADR 0038's grant isolation real
+              // for delegates (#49) — the kernel and the grant store match
+              // on the scope they are handed, so a standing grant given to
+              // `studio` does not match a call from `explore`, and a grant
+              // given to `explore` does not reach `studio`.
+              const callScope = scopeForActingAgent(scope, caller);
               // A stop through the question card holds the door here. Past it
               // the run's calls are answered rather than run, and every answer
               // terminates its batch, so the loop ends after the model's one
@@ -1943,11 +1992,38 @@ export class StudioRuntime implements AgentHost {
                   terminate: true,
                 };
               }
+              // The effects ceiling, checked before the kernel consults
+              // anything: a delegate's call may only earn effects its
+              // definition allows, and a violation is a refusal the model
+              // can read rather than a tool that silently does nothing.
+              // This is the second layer of the three-layer read-only
+              // agreement (allowlist kept the tool out of the delegate's
+              // array; this refuses it if it somehow gets called; the
+              // sandbox holds the boundary either way). Read-only is the
+              // Stage 3 delegate's whole permission story, and this is
+              // where it is enforced regardless of what any grant says.
+              if (!effectsWithinCeiling(descriptor, caller)) {
+                return {
+                  content: [
+                    {
+                      type: "text",
+                      text: `${descriptor.title} did not run: the ${caller.subagentName} agent is read-only, and this tool can change or run things. Give the work to the conversation instead.`,
+                    },
+                  ],
+                  details: {
+                    isError: true,
+                    ceiling: [...(caller.maxEffects ?? [])],
+                    effects: [...descriptor.effects],
+                    agent: caller.subagentName,
+                  },
+                  isError: true,
+                };
+              }
               try {
                 const result = await gate.call({
                   name: capabilityKey(descriptor.id),
                   input,
-                  scope,
+                  scope: callScope,
                   ...(signal === undefined ? {} : { signal }),
                 });
                 // A job that ended mid-turn is told here, on the way back

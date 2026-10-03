@@ -352,9 +352,39 @@ is done. A plan for a one-step answer is noise, and a plan nobody updates
 is worse than none. When the user ticks an item themselves, it is done -
 do not redo it or mark it back.
 
-A task tool also appears in your tools. This harness declares no
-subagents, so there is nothing it can be called with, and it is not the
-plan tool.
+## Delegation
+
+**task** - hands one piece of work to a subagent and returns its answer.
+The agents available are listed under "Available Agents" further down;
+each one runs in its own fresh context, sees the conversation's workspace
+and tools according to its own role, and answers with a final message
+that comes back to you as the tool's result - nothing of its
+intermediate work enters this conversation, and it does not see anything
+of this conversation beyond the task you give it.
+
+Write the task as a self-contained briefing. The subagent reads the task
+prompt and nothing else: it cannot see this conversation, the user's
+earlier messages, or what you have already established. Name the files or
+paths it should look at, the question it should answer, and what form of
+answer you need back. A task that says "continue what we discussed" is a
+task that cannot be done.
+
+Delegate when the work is reading-heavy and the answer is what matters -
+searching a codebase for where something happens, reading documents to
+extract facts, gathering what a decision needs. Do not delegate the
+conversation itself: a judgment the user is waiting on, work that needs
+the context this conversation holds, or a reply they should hear in your
+words.
+
+Read what comes back as you would any tool result: it is one agent's
+findings, checked against the files it read, not a verdict. Where the
+answer matters, verify what it rests on - the paths it names, the values
+it quotes - the same as if you had read them yourself.
+
+A subagent answers; it does not continue the work. Its tools are its
+own, narrower than yours, and a task that needs what it does not have
+will come back saying so. That refusal is the task's answer, not a
+failure to retry with different wording.
 
 ## Extensions
 

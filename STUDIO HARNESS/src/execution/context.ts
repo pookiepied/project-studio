@@ -52,6 +52,15 @@ export interface FlueExecutionLinks {
   readonly taskId?: string;
   readonly operationId?: string;
   readonly toolCallId?: string;
+  /**
+   * The delegate's catalog name, present only on child task sessions (the
+   * Flue patch's one delegation hunk). `agentName` on those frames stays
+   * the submission's agent — the parent conversation's — which is correct
+   * for "who owns this durable work" and wrong for "who is acting now";
+   * this field is the acting half, and the gate's per-agent tool policy
+   * and the delegate-scope substitution resolve through it.
+   */
+  readonly subagentName?: string;
 }
 
 export interface ExecutionContext {
@@ -76,6 +85,8 @@ export interface ExecutionContext {
   readonly flueTaskId?: string;
   readonly flueOperationId?: string;
   readonly flueToolCallId?: string;
+  /** The acting delegate on a child task session; see `FlueExecutionLinks`. */
+  readonly flueSubagentName?: string;
 }
 
 export interface RootExecutionContextOptions {
@@ -105,6 +116,7 @@ function mappedFlueLinks(links: FlueExecutionLinks | undefined): Partial<Executi
     ...(links.taskId === undefined ? {} : { flueTaskId: links.taskId }),
     ...(links.operationId === undefined ? {} : { flueOperationId: links.operationId }),
     ...(links.toolCallId === undefined ? {} : { flueToolCallId: links.toolCallId }),
+    ...(links.subagentName === undefined ? {} : { flueSubagentName: links.subagentName }),
   };
 }
 

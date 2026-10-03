@@ -171,6 +171,18 @@ function hasMcpToolResult(context: Context): boolean {
   );
 }
 
+/**
+ * Whether the framework's `task` tool has answered — the delegation scenario's
+ * "the parent delegated" half. The child's own answers are read the same way
+ * with the native helpers below, keyed by tool name, because a delegate's
+ * transcript is its own: only the child's context carries them.
+ */
+function hasTaskResult(context: Context): boolean {
+  return context.messages.some(
+    (message) => message.role === "toolResult" && message.toolName === "task",
+  );
+}
+
 /** Whether the discovery has answered at least once, transcript-wide. */
 function hasDiscoverResult(context: Context): boolean {
   return context.messages.some(
@@ -439,6 +451,175 @@ export function stream(
         }
       }
 
+      // The delegation scenario (Stage 3). Two roles in one script:
+      //
+      // The PARENT — a message naming `[delegate]` makes the model call the
+      // framework's `task` tool with the registered delegate's name and a
+      // self-contained prompt, the way a model that read the roster section
+      // would. Once the task's result is back, the closing reports what the
+      // child's final message said, so the test can assert the return path:
+      // the tool result carries the child's answer, verbatim, and nothing of
+      // the child's intermediate tool use.
+      //
+      // The CHILD — the delegate's own session runs this same scripted
+      // stream with a context of its own: its latest user text is the task
+      // prompt (`[task] ...` below), its system prompt is the delegate's
+      // instructions, and its tool array is the gate's filtered answer for
+      // the acting delegate. A message naming `[report]` closes by listing
+      // EXACTLY what that array contained and which prompt section it read,
+      // so the test can assert the two halves of the D4 policy from inside
+      // the child: visibility (the allowlist is the whole array) and
+      // briefing (the roster section exists and names the delegate).
+      const toolNameOf = (name: string): string | undefined =>
+        context.tools?.find((tool) => tool.name === name)?.name;
+      const toolNames = (): string[] =>
+        (context.tools ?? []).map((tool) => tool.name).sort();
+      if (userText.includes("[delegate]") && !hasTaskResult(context)) {
+        // The write-refusal variant: a parent message carrying [try-write]
+        // delegates a task whose prompt carries the marker too, and the
+        // CHILD then attempts a call to `write` — a tool the delegate's
+        // array does not hold. What comes back is the hidden-tool
+        // refusal, the allowlist layer of the three-layer read-only
+        // agreement, and the child's report quotes it.
+        const wantsWrite = userText.includes("[try-write]");
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "delegate-task-1",
+          name: "task",
+          arguments: {
+            agent: "explore",
+            prompt: wantsWrite
+              ? "[try-write] attempt a write and [report] what happened"
+              : "[task] find the workspace files [report] what you can see",
+          },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+      if (userText.includes("[delegate]") && hasTaskResult(context)) {
+        // The parent's closing, after the task answered: quote the child's
+        // final message from the tool result so the return path is asserted
+        // end to end — what the parent's model receives is the child's
+        // answer, and the child's intermediate steps never appear.
+        const taskResult = context.messages.toReversed().find(
+          (message) => message.role === "toolResult" && message.toolName === "task",
+        );
+        const childAnswer =
+          typeof taskResult?.content === "string"
+            ? taskResult.content
+            : (taskResult?.content ?? [])
+                .filter((part) => part.type === "text")
+                .map((part) => part.text)
+                .join("") || "(no task result)";
+        const text = `Delegated. The explorer answered: ${childAnswer}`;
+        const partial = createMessage(model, [{ type: "text", text: "" }]);
+        events.push({ type: "text_start", contentIndex: 0, partial });
+        partial.content = [{ type: "text", text }];
+        events.push({ type: "text_delta", contentIndex: 0, delta: text, partial });
+        events.push({
+          type: "text_end",
+          contentIndex: 0,
+          content: text,
+          partial: createMessage(model, [{ type: "text", text }]),
+        });
+        events.push({ type: "done", reason: "stop", message: createMessage(model, [{ type: "text", text }]) });
+        return;
+      }
+      if (userText.includes("[try-write]") && !userText.includes("[delegate]") && !hasAnyToolResult(context)) {
+        // The child's forbidden step: attempt `write`, a tool outside the
+        // delegate's allowlist. The framework answers with the
+        // unknown-tool refusal — the model asked for something its array
+        // never held — and the child's next call (guarded, like [task],
+        // by the tool result now present) falls through to the [report]
+        // close, which the closing branch composes with what the refusal
+        // said. This is the three-layer agreement's first layer, live:
+        // the writer is invisible, so the call is refused as unknown.
+        //
+        // The `[delegate]` guard keeps this the CHILD's scenario: the
+        // parent's message carries both markers, and without the guard
+        // the parent — which DOES hold `write` in its array — would run
+        // the write and park on the permission kernel, hanging the run
+        // on an approval nobody answers in a test.
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "delegate-write-1",
+          name: "write",
+          arguments: { path: "probe.txt", content: "no" },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+      if (userText.includes("[report]")) {
+        // The child's own report. Reading `context.tools` here is reading
+        // what the gate's per-acting-agent filter handed the delegate's
+        // session — the exact array the child's model would see — so the
+        // report is the visibility assertion, from the only context that
+        // can see it. The system prompt read is the briefing's other half.
+        const seesTask = toolNameOf("task");
+        const seesWrite = toolNameOf("write");
+        const seesShell = toolNameOf("shell");
+        const seesDiscover = toolNameOf("discover");
+        const roster = (context.systemPrompt ?? "").includes("**explore**")
+          ? "named"
+          : "absent";
+        // A write attempt that was refused names the refusal, read back
+        // from the last tool result — the [try-write] scenario's whole
+        // answer. Anything else is the plain visibility report.
+        const writeRefused = lastToolResultIncludes(context, "not found")
+          ? ", write refused as unknown"
+          : "";
+        const text =
+          `Delegate sees ${toolNames().length} tools` +
+          (seesTask === undefined ? ", no task" : ", task present") +
+          (seesWrite === undefined ? ", no write" : ", WRITE VISIBLE") +
+          (seesShell === undefined ? ", no shell" : ", SHELL VISIBLE") +
+          (seesDiscover === undefined ? ", no discover" : ", DISCOVER VISIBLE") +
+          writeRefused +
+          `, roster ${roster}.`;
+        const partial = createMessage(model, [{ type: "text", text: "" }]);
+        events.push({ type: "text_start", contentIndex: 0, partial });
+        partial.content = [{ type: "text", text }];
+        events.push({ type: "text_delta", contentIndex: 0, delta: text, partial });
+        events.push({
+          type: "text_end",
+          contentIndex: 0,
+          content: text,
+          partial: createMessage(model, [{ type: "text", text }]),
+        });
+        events.push({ type: "done", reason: "stop", message: createMessage(model, [{ type: "text", text }]) });
+        return;
+      }
+      if (userText.includes("[task]") && !hasToolResult(context)) {
+        // The child's working step: call the read-only tool the delegate
+        // exists to use, the way a model that read its instructions would.
+        // The gate runs it under the delegate's substituted scope; the
+        // result lands in the child's transcript only. Guarded by
+        // `!hasToolResult` so the child's SECOND model call (same user
+        // text — the task prompt is the child's whole conversation) falls
+        // through to the report below instead of calling the tool again:
+        // an unguarded branch here is a model that loops forever, which
+        // is exactly what the first run of this scenario did.
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "delegate-glob-1",
+          name: "glob",
+          arguments: { pattern: "**/*" },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
       const skillClosing = ((): string | undefined => {
         if (!userText.toLowerCase().includes("skill")) return undefined;
         const listed = (context.systemPrompt ?? "").includes("**hello**") ? "yes" : "no";

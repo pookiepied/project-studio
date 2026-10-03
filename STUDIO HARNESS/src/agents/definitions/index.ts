@@ -1,4 +1,5 @@
 import { Describe } from "../describe.js";
+import { Explore } from "../explore.js";
 import { Improve } from "../improve.js";
 import { Studio } from "../studio.js";
 import { Title } from "../title.js";
@@ -8,6 +9,7 @@ import { studioDefinition } from "./studio.js";
 import { titleDefinition } from "./title.js";
 import { improveDefinition } from "./improve.js";
 import { describeDefinition } from "./describe.js";
+import { exploreDefinition } from "./explore.js";
 
 /**
  * The harness's agent registry: every agent the runtime mounts or the
@@ -34,6 +36,12 @@ export const agentRegistry = new AgentRegistry([
   { definition: titleDefinition, agent: Title },
   { definition: improveDefinition, agent: Improve },
   { definition: describeDefinition, agent: Describe },
+  // The one delegate of Stage 3. Resolving by name here is what the
+  // `useSubagent` mount in `agents/studio.ts` reads (the mount needs the
+  // function object, and this is the cycle-free site that holds it beside
+  // the definition), and what the tool-policy filter at the gate resolves
+  // the acting agent's allowlist through.
+  { definition: exploreDefinition, agent: Explore },
 ]);
 
 export { AgentRegistry, type RegisteredAgent };

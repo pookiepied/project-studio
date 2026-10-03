@@ -224,8 +224,12 @@ The remaining order in this phase is fixed by that chain:
    content, which no permission dialog addresses and which ships as a rule and a label rather than
    as taint machinery.
 
-`task` and `skill` stay in Phases 13 and 12, so **Phase 10 is closed at nine of ten** — every tool
-that belongs to this phase.
+`skill` stays in Phase 12. `task` is the framework's own tool, always registered, and its roster
+armed with Stage 3 of the agent-platform plan (2026-10-03, register row 96): the Explore delegate
+is declared through `useSubagent`, the parent's prompt carries the delegation section, and the
+child's tool visibility, scope, and effects ceiling are decided per acting agent at the gate. So
+**Phase 10 closed at ten of ten** — every tool that belongs to this phase, `task` included by
+virtue of the delegation slice that gave it a roster worth gating.
 
 ### Phase 11: MCP
 

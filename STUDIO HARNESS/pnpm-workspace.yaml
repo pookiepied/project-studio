@@ -110,6 +110,21 @@ allowBuilds:
 #      src/context/compaction-prompt.ts; the engine's are a fixed constant
 #      upstream with no hook.
 #
+#   9. builtin-providers-*.mjs, createTaskSession - the delegate's catalog
+#      name lands on the child session's execution context as
+#      `subagentName`, beside the taskId (Stage 3's one budgeted hunk, ADR
+#      0058 D4's mechanism). Stock 2.0.3 leaves the child's context
+#      inheriting the parent's agentName - correct for "who owns this
+#      durable work", wrong for "who is acting now" - and the host's
+#      tools() callback and the delegate-scope substitution need the
+#      acting half. `agentName` is deliberately NOT changed (the
+#      submission's agent, unchanged); observation-*.d.mts declares the
+#      field so the host's interceptor reads it typed.
+#      types-*.d.mts, SubagentDefinition - `model?`/`thinkingLevel?` gain
+#      `| undefined`, aligning the declaration with the
+#      exactOptionalPropertyTypes discipline the host compiles under; the
+#      runtime never writes undefined, only omits.
+#
 #   How to re-derive at the next upgrade: every hunk carries its own recipe
 #   in a `[project-studio patch]` comment, and every recipe says to anchor
 #   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of

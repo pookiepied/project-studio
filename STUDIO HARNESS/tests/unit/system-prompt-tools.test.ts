@@ -77,15 +77,27 @@ describe("the prompt's account of the tools", () => {
     expect(declared.length).toBeGreaterThanOrEqual(11);
     expect(declared).toContain("shell");
 
-    expect([...listedTools()].sort()).toEqual(declared);
+    // `task` is the one name this file contributes itself: the framework's
+    // tool, not a native capability under src/tools, but the prompt's
+    // Delegation section describes it with the same **name** - list form so
+    // the model scans it the same way. Everything else must come from the
+    // descriptors on disk.
+    const withFrameworkTask = [...new Set([...declared, "task"])].sort();
+    expect([...listedTools()].sort()).toEqual(withFrameworkTask);
   });
 
   it("does not describe a subagent surface this harness does not have", () => {
-    // The task tool is framework-owned and always present, and this harness
-    // registers no subagents for it. The prompt says so; if that sentence goes
-    // while the situation holds, a model spends calls on a tool that cannot
-    // be called with anything.
-    expect(STUDIO_SYSTEM_PROMPT).toContain("declares no");
-    expect(STUDIO_SYSTEM_PROMPT).toContain("subagents, so there is nothing it can be called with");
+    // The task tool is framework-owned and always present; with a delegate
+    // registered (Stage 3's `explore`), the prompt must describe the
+    // delegation surface and teach the briefing discipline, and it must
+    // not carry the old "declares no subagents" paragraph that would tell
+    // the model the tool has nothing to be called with while Flue composes
+    // a roster behind it. The roster itself (which agent is available) is
+    // Flue's `## Available Agents` section, composed per render - this
+    // prompt owns the how-to, not the who.
+    expect(STUDIO_SYSTEM_PROMPT).toContain("## Delegation");
+    expect(STUDIO_SYSTEM_PROMPT).toContain("self-contained briefing");
+    expect(STUDIO_SYSTEM_PROMPT).toContain("Available Agents");
+    expect(STUDIO_SYSTEM_PROMPT).not.toContain("declares no");
   });
 });
