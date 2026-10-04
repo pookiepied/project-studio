@@ -301,6 +301,24 @@ export type AgentTaskStatus =
   | "cancelled"
   | "unknown";
 
+/**
+ * Whether one task status is terminal.
+ *
+ * The cancellation route's question ("is there anything left to stop") and the
+ * projector's transition check ("has this settlement been seen before") both
+ * ask it, so it lives beside the union rather than beside either consumer —
+ * one opinion about the vocabulary, the same way the store's own settlement
+ * branch and the projector's announce condition both read it.
+ */
+export function isSettledTaskStatus(status: AgentTaskStatus): boolean {
+  return (
+    status === "completed" ||
+    status === "failed" ||
+    status === "cancelled" ||
+    status === "unknown"
+  );
+}
+
 const agentToolPolicySchema = v.object({
   natives: v.array(v.string()),
   mcpNamespaces: v.array(v.string()),

@@ -2,7 +2,12 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import type { Sandbox, SandboxFactory, SkillReference } from "@flue/runtime";
+import type {
+  FlueObservation,
+  Sandbox,
+  SandboxFactory,
+  SkillReference,
+} from "@flue/runtime";
 
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
@@ -84,6 +89,13 @@ import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
 import { BackgroundJobs, finishedNotice, type JobStatus } from "../process/background.js";
 import { JobPings } from "../process/job-pings.js";
+import { TaskStore } from "../agents/definitions/task-store.js";
+import {
+  TaskProjector,
+  taskEndedLine,
+  taskRunningLine,
+} from "../agents/task-projector.js";
+import { isSettledTaskStatus } from "../contracts/agents.js";
 import { MediaService } from "../gateway/media/service.js";
 import type { MediaJobs } from "../gateway/media/jobs.js";
 import type { MediaAdapters } from "../gateway/media/adapters/types.js";
@@ -155,6 +167,16 @@ export interface StudioRuntimeOptions {
    * simply does not wake anybody, rather than pretending to.
    */
   readonly deliverJobPing?: (conversationId: string, body: string) => Promise<void>;
+  /**
+   * Replaces the task projector's live observation subscription.
+   *
+   * Tests inject a queue so settlements can be driven without a running
+   * Flue, exactly as the titler's `subscribe` does; production leaves it
+   * unset and the projector subscribes to the process-global bus itself.
+   */
+  readonly subscribeTaskSettlements?: (
+    handler: (observation: FlueObservation) => void,
+  ) => () => void;
   // There was a `mode?: () => ExecutionMode` here, and nothing passed it: the
   // mode was a process-wide callback with no writer, so every conversation ran
   // Manual forever. It is gone rather than kept as dead surface. The mode is a
@@ -504,6 +526,17 @@ export interface AgentHost {
    */
   conversationBackgroundJobs?(conversationId: string): readonly string[];
   /**
+   * The background agent tasks to name in this turn's environment block.
+   *
+   * Beside the background commands, and a READ where that one drains: a
+   * running task is current state named every turn it runs, while an ended
+   * task's news belongs to the finished-task announcement. Lines rather than
+   * records, like the commands'; empty when nothing is under way, which
+   * leaves the block byte-identical for every conversation that has none.
+   * Optional so a test double that predates tasks still satisfies the host.
+   */
+  conversationBackgroundTasks?(conversationId: string): readonly string[];
+  /**
    * The capability inventory section for this conversation's system block.
    *
    * Empty when nothing is enabled, and the render appends it unconditionally -
@@ -708,6 +741,37 @@ export class StudioRuntime implements AgentHost {
   readonly #mediaJobs: MediaJobs | undefined;
   readonly #library: LibraryStore | undefined;
   readonly #documents: ConversationDocumentStore;
+  /**
+   * The task index: one row per dispatched background agent task (ADR 0058
+   * D5). Built here because everything that reads or writes it already hangs
+   * off this runtime — the dispatcher records through the callers the
+   * composition root wires to `agents`, the projector settles rows below,
+   * and the routes read it through `tasks`.
+   */
+  readonly #tasks: TaskStore;
+  /**
+   * The finished-job hub, when this composition can deliver. Held so the
+   * task projector can announce through the same hub the other sources use —
+   * one drain, one arbiter, not a second delivery mechanism.
+   */
+  readonly #pings: JobPings | undefined;
+  /**
+   * The task ids the announcement has already carried.
+   *
+   * The tasks source's own ended-but-untold marker, the same shape the shell
+   * registry keeps per job. In-memory because the announce only fires on a
+   * settlement *transition* — a row already terminal never re-announces,
+   * whatever a recovery replay replays — so the marker only has to be right
+   * within one process's lifetime, exactly like the shell jobs' own marker.
+   */
+  readonly #toldTasks = new Set<string>();
+  /**
+   * The settlement projector: watches the observation bus for a task run's
+   * end and settlement and writes what it saw into the row. Started in the
+   * constructor (the bus is process-global and the runtime outlives every
+   * dispatch) and stopped in `stop()`.
+   */
+  readonly #taskProjector: TaskProjector;
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -722,6 +786,7 @@ export class StudioRuntime implements AgentHost {
     this.#sessionId = options.sessionId ?? "standalone";
 
     this.#db = options.database;
+    this.#tasks = new TaskStore(this.#db);
     this.#mediaJobs = options.mediaJobs;
     this.#library = options.library;
     this.#documents = new ConversationDocumentStore(this.#db);
@@ -891,8 +956,41 @@ export class StudioRuntime implements AgentHost {
         });
         this.#mediaJobs?.onEnded((conversationId) => pings.announce(conversationId));
       }
+      // The third source: agent tasks. The projector announces a settlement
+      // to the conversation its dispatch named, and this drain answers with
+      // the ended-but-untold rows' lines - the same ended/running split the
+      // other two sources keep, so a task's ending is told exactly once by
+      // whichever of the three delivery points drains first.
+      pings.addSource({
+        drain: (conversationId) => {
+          const lines: string[] = [];
+          for (const record of this.#tasks.list({ parentConversationId: conversationId })) {
+            if (!isSettledTaskStatus(record.status) || this.#toldTasks.has(record.id)) {
+              continue;
+            }
+            this.#toldTasks.add(record.id);
+            lines.push(taskEndedLine(record));
+          }
+          return lines;
+        },
+      });
       this.#jobs.onEnded((conversationId) => pings.announce(conversationId));
+      this.#pings = pings;
     }
+
+    // The settlement projector: rows settle from the stream whether or not
+    // this composition can announce them, because the routes and the rail
+    // read the rows, not the stream - a composition without a delivery port
+    // still gets settled tasks, just no pings about them.
+    this.#taskProjector = new TaskProjector({
+      tasks: this.#tasks,
+      ...(this.#pings === undefined ? {} : { pings: this.#pings }),
+      ...(options.logger === undefined ? {} : { logger: options.logger }),
+      ...(options.subscribeTaskSettlements === undefined
+        ? {}
+        : { subscribe: options.subscribeTaskSettlements }),
+    });
+    this.#taskProjector.start();
   }
 
   /** The MCP administration surface, for the HTTP layer. */
@@ -1282,6 +1380,24 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
+   * What this conversation's background agent tasks are, for the turn's block.
+   *
+   * Running tasks only, and a read rather than a drain: a task under way is
+   * current state the turn can use (it does not start the same work twice),
+   * and its ending is news that belongs to the finished-task announcement,
+   * whose drain owns the exactly-once. A task is this conversation's when its
+   * dispatch named the conversation as the parent — the background three
+   * (title, improve, describe) name none, because their results reach their
+   * callers directly, so they are never named here.
+   */
+  conversationBackgroundTasks(conversationId: string): readonly string[] {
+    return this.#tasks
+      .list({ parentConversationId: conversationId })
+      .filter((record) => !isSettledTaskStatus(record.status))
+      .map((record) => taskRunningLine(record));
+  }
+
+  /**
    * Files one delivery's pictures where the conversation's own permission
    * policy can read them.
    *
@@ -1317,6 +1433,26 @@ export class StudioRuntime implements AgentHost {
    */
   get backgroundJobs(): BackgroundJobs {
     return this.#jobs;
+  }
+
+  /**
+   * The task index, for the routes that list and cancel background agent
+   * tasks and for the cancel port's read of what it is cancelling. The same
+   * store the dispatcher records into and the projector settles — one table,
+   * one truth about what the harness has dispatched.
+   */
+  get tasks(): TaskStore {
+    return this.#tasks;
+  }
+
+  /**
+   * The finished-job hub, when this composition can deliver. Exposed for the
+   * task projector's announce, which fires from the settlement path and must
+   * reach the same hub — and therefore the same exactly-once drain — the
+   * shell and media sources use.
+   */
+  get jobPings(): JobPings | undefined {
+    return this.#pings;
   }
 
   /**
@@ -2070,6 +2206,9 @@ export class StudioRuntime implements AgentHost {
    * composition root that opened the connection closes it (ADR 0035 §4).
    */
   async stop(): Promise<void> {
+    // Before the work below, so a settlement arriving during the drain
+    // writes a row but announces nothing to a runtime already going quiet.
+    this.#taskProjector.stop();
     // Before the supervisor, because these are the children nothing else
     // knows about: a dev server the model started still holding port 3000
     // after Studio has closed is a process the person never started and

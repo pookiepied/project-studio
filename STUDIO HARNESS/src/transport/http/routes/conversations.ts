@@ -26,6 +26,7 @@ import type { StudioDatabase } from "../../../storage/database.js";
 import { StorageError } from "../../../storage/errors.js";
 import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
 import type { ConversationSnapshots } from "../../../snapshots/store.js";
+import { TaskStore } from "../../../agents/definitions/task-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
 
 export interface ConversationRoutesOptions {
@@ -166,6 +167,9 @@ export function createConversationRoutes(
   const questions = new PendingQuestionStore(options.database);
   const folders = new SandboxScopeStore(options.database);
   const documents = new ConversationDocumentStore(options.database);
+  // The task index, for the purge: a conversation's rows go the way its
+  // grants and questions go - with the conversation they were indexed under.
+  const tasks = new TaskStore(options.database);
 
   routes.get("/", (context) => {
     try {
@@ -443,6 +447,7 @@ export function createConversationRoutes(
           questions,
           folders,
           documents,
+          tasks,
           flueJournalPath: resolveFlueJournalPath(),
         },
         [id],
@@ -475,6 +480,7 @@ export function createConversationRoutes(
           questions,
           folders,
           documents,
+          tasks,
           flueJournalPath: resolveFlueJournalPath(),
         },
         idsForPurge(await body(context)),

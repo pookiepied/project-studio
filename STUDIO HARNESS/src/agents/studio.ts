@@ -350,6 +350,10 @@ export function Studio({ id }: AgentProps) {
       // The library, when this harness has one: the folder that outlives
       // conversations, named so the model asks its tool instead of globbing.
       runtime.libraryDirectory?.(),
+      // The background agent tasks under way, a read rather than a drain:
+      // current state beside the running commands, while an ended task's
+      // news arrives through the finished-task announcement.
+      runtime.conversationBackgroundTasks?.(id),
     ),
   )}${capabilities}`;
 }

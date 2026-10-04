@@ -257,3 +257,39 @@ prevent — the list and the rule must be asked from one place.
   findings record the disposal); the behaviors this ADR states as measured
   are re-derived by Stage 3's tests, which assert them against the real
   delegate.
+
+## Amendment — the D10 design point, decided (2026-10-03, at S4.1)
+
+The Consequences note above records D10 as open: a task's transcript is not
+addressable through the product routes, measured. Stage 4's first row was the
+deadline for deciding it, and it is decided now, split by the two task kinds
+the TaskStore actually indexes — the split the Stage 0 measurement drew and
+the plan's D2 correction already made:
+
+**Background agent tasks** (the `title` / `improve` / `describe` dispatches,
+and every future `background`-kind dispatch): **the existing reader, decided —
+ADR 0045's transcript reader, pointed at `agents/<agentName>/<instanceId>`.**
+These tasks *have* agent instances — the product mints the instance id at
+dispatch, which is the whole reason the TaskStore's id column is the instance
+id — so the 404 the measurement recorded does not apply to them; it recorded
+delegate ids only. What is missing is the mount: 2.0 has no catch-all router,
+and `create-app.ts` mounts the studio agent alone. The mount lands when the
+product surface that reads a task's transcript is built, with one guard that
+keeps the security property the background modules' docblocks state — the
+agent router's `POST /:id` admits a prompt, and the background three must
+never be promptable — so the mount carries middleware refusing every method
+but GET/HEAD before the router. A transcript read is not a conversation
+start; the two move through the same URL shape and only one of them is
+admission.
+
+**Delegate task sessions** (the model-driven `task` tool's children):
+**deferred until the UI feature that reads one is built, with the tie-breaker
+recorded now.** A delegate has no agent instance — the measured 404s stand —
+so the reader has no id to point at, and this is the one place the plan's
+original D10 sentence stays false. The two options are unchanged: an
+in-process product route served from Flue's own stream store, or a Flue
+change. The tie-breaker: prefer the in-process route if a seam reaches the
+stream store without a patch hunk; spend the stage's one budgeted patch hunk
+on a Flue change only if the measurement proves no seam exists. The
+tie-breaker is recorded so the decision is a measurement away, not a design
+session away, and so it does not spend the patch budget by default.

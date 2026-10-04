@@ -46,7 +46,7 @@ export function RailTabs() {
               entry.kind === 'artifact'
                 ? entry.artifact.title
                 : entry.kind === 'jobs'
-                  ? 'Background commands'
+                  ? 'Background work'
                   : entry.kind === 'browser'
                     ? familyById(entry.family).label
                     : 'Plan'

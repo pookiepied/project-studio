@@ -118,6 +118,56 @@ describe('the chip is the default', () => {
   })
 })
 
+describe('the delegation chip', () => {
+  it('names the agent the model chose, in both tenses', () => {
+    // The task call's one readable fact is which agent the work went to: the
+    // chip's subject is the call's `agent` field, the verb delegates, and the
+    // raw wire name must not leak. Settled, it quotes the child's final
+    // message behind the disclosure - the only thing that crossed back.
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf(
+          {
+            toolName: 'task',
+            calls: [
+              call({
+                toolName: 'task',
+                input: present({ agent: 'explore', prompt: 'find the sandbox tests' }),
+                output: present('Delegate sees 7 tools, no write.'),
+              }),
+            ],
+          },
+        )}
+      />,
+    )
+
+    expect(screen.getByText('Delegated to')).toBeTruthy()
+    expect(screen.getByText('explore')).toBeTruthy()
+    expect(screen.queryByText('task')).toBeNull()
+  })
+
+  it('says delegating while the child is still running', () => {
+    render(
+      <ToolGroups conversationId="conv"
+        groups={groupsOf(
+          {
+            toolName: 'task',
+            calls: [
+              call({
+                toolName: 'task',
+                toolCallId: 'call-task-2',
+                input: present({ agent: 'explore', prompt: 'look around' }),
+              }),
+            ],
+          },
+        )}
+      />,
+    )
+
+    expect(screen.getByText('Delegating to')).toBeTruthy()
+  })
+})
+
 describe('the verb', () => {
   it('runs while the answer has not arrived, on a live turn', () => {
     const { container } = render(

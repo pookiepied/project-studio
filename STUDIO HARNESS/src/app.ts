@@ -11,7 +11,7 @@
 // reason; module evaluation makes the second import a no-op.
 import "./host/bootstrap.js";
 
-import { dispatch } from "@flue/runtime";
+import { dispatch, init } from "@flue/runtime";
 
 import {
   admissionCredentialFromEnvironment,
@@ -44,6 +44,7 @@ import {
 import { createHttpApp } from "./transport/http/create-app.js";
 import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
 import { Studio } from "./agents/studio.js";
+import { agentRegistry } from "./agents/definitions/index.js";
 import { compactConversation, compactionReadiness } from "./conversations/compaction.js";
 import { CommandRegistry } from "./extend/commands/registry.js";
 import { ImageDescriber } from "./library/describer.js";
@@ -328,16 +329,20 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // index, once, while the row is still unnamed by a person. Subscribes
     // here because the event bus is process-global and the composition root
     // is the one place lifecycle is owned; unsubscribed in the drain below.
+    // The runtime's task index rides along because the shared dispatcher
+    // indexes every dispatch - the titling runs are rows in it like the
+    // rest, and their settlements are projected by the runtime itself.
     const titling = new ConversationTitler({
       conversations,
       logger: observability.logger,
+      tasks: runtime.tasks,
     });
     titling.start();
     // The dictation improver: one request, one reply, on the same bus. It
     // subscribes on its first request and is stopped in the drain below.
-    const improver = new TextImprover();
+    const improver = new TextImprover({ tasks: runtime.tasks });
     // The library's describer: the same one-request-one-reply shape.
-    const describer = new ImageDescriber();
+    const describer = new ImageDescriber({ tasks: runtime.tasks });
     // The measured context, from the same process-global bus and for the same
     // reason it is subscribed here rather than deeper: a run's own usage is
     // reported to the observer, not to the transcript, and the webview cannot
@@ -431,6 +436,22 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
           }),
       },
       backgroundJobs: runtime.backgroundJobs,
+      // The background agent tasks: the index the rail's Tasks section reads,
+      // and the person's stop for one. The cancel maps to Flue's instance
+      // abort through the registry's own agent function - the same durable
+      // stop the conversation's stop control performs, addressed to the task's
+      // instance id - and the settlement then reaches the row through the
+      // projector, so the route records the intent and the stream records the
+      // outcome. A settled row never reaches here; the route refuses first.
+      tasks: runtime.tasks,
+      taskControl: {
+        cancel: async (task) => {
+          const registered = agentRegistry.get(task.agentName);
+          if (registered === undefined) return false;
+          await init(registered.agent, { id: task.id }).abort();
+          return true;
+        },
+      },
       browser: { stop: (conversationId) => runtime.stopBrowser(conversationId) },
       computer: { stop: (conversationId) => runtime.stopComputer(conversationId) },
       admission: admission.verifier,

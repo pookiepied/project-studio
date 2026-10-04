@@ -128,6 +128,8 @@ export {
   type BackgroundJob,
   type MediaJob,
   type MediaArtifactFile,
+  type AgentTask,
+  type AgentTaskStatus,
 } from './contracts'
 
 export {

@@ -346,10 +346,25 @@ export function stream(
 
   void (async () => {
     try {
-      const userText = latestUserText(context);
-      if (userText.includes("[slow]")) {
-        await waitForDelay(10_000, options?.signal);
-      }
+  const userText = latestUserText(context);
+  if (userText.includes("[slow]")) {
+    await waitForDelay(10_000, options?.signal);
+  }
+
+  // The background-task scenario. A first message carrying `[hold-task]` is
+  // also the titling agent's prompt (the titler dispatches the conversation's
+  // first message), and the titling run is recognizable by its own system
+  // prompt - the parent's turn carries the same user text under the studio
+  // system prompt, so this hold is the CHILD's alone. Holding keeps the task
+  // row `running` in the index for the seconds a test needs to read it there,
+  // cancel it, or kill the harness underneath it; the abort signal rejects
+  // the wait, which is how a cancel reaches the run.
+  if (
+    userText.includes("[hold-task]") &&
+    (context.systemPrompt ?? "").includes("title-generation task")
+  ) {
+    await waitForDelay(12_000, options?.signal);
+  }
 
       // A provider failure, on demand. `[fail]` alone reads as a transient
       // 429 — the case Flue retries and then gives up on —

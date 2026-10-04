@@ -18,6 +18,7 @@ import { PlanItemStore } from "../../src/plan/plan-items.js";
 import { PendingQuestionStore } from "../../src/questions/pending-questions.js";
 import { SandboxScopeStore } from "../../src/sandbox/scope-store.js";
 import { ConversationDocumentStore } from "../../src/conversations/documents.js";
+import { TaskStore } from "../../src/agents/definitions/task-store.js";
 import {
   conversationWorkspaceDirectory,
   conversationsDirectory,
@@ -80,6 +81,7 @@ function dependencies(
     questions: new PendingQuestionStore(db),
     folders: new SandboxScopeStore(db),
     documents: new ConversationDocumentStore(db),
+    tasks: new TaskStore(db),
     flueJournalPath,
   };
 }
@@ -258,6 +260,40 @@ describe("a complete purge", () => {
     });
     expect(scopedCounts("cnv_live")).toEqual({ grants: 1, scopes: 1 });
     expect(existsSync(conversationWorkspaceDirectory("cnv_live"))).toBe(true);
+  });
+
+  it("refuses a conversation with a background task still running, on any attempt id", async () => {
+    // The submission check keys on the instance id, which a task's ladder
+    // retry does not share with the conversation (`cnv_task-t2` is not
+    // `cnv_task`), so the row check is the one that holds for every attempt.
+    // The journal here is quiet - the task's submission would not trip it.
+    const store = new ConversationStore(db);
+    const flueJournalPath = journalFile();
+    store.record({ id: "cnv_task", firstMessage: "Tasked" });
+    seedJournal(flueJournalPath, "cnv_task", "settled");
+    const deps = dependencies(store, flueJournalPath);
+    deps.tasks.record({
+      id: "cnv_task-t2",
+      agentName: "title",
+      parentConversationId: "cnv_task",
+    });
+
+    const outcome = await purgeConversations(deps, ["cnv_task"]);
+
+    expect(outcome.removed).toEqual([]);
+    expect(outcome.cleanupFailures["cnv_task"]).toMatch(/background task still running/);
+    expect(outcome.details["cnv_task"]).toMatchObject({ errorCode: "storage.conflict" });
+    // Nothing destroyed: the row, the journal rows, and the task row stand
+    // for the retry once the task settles.
+    expect(store.get("cnv_task")).toBeDefined();
+    expect(journalCounts(flueJournalPath, "cnv_task").streams).toBe(2);
+    expect(deps.tasks.get("cnv_task-t2")).toBeDefined();
+
+    // And once the task settles, the purge goes through.
+    deps.tasks.setStatus("cnv_task-t2", "completed", "Titled.");
+    const settled = await purgeConversations(deps, ["cnv_task"]);
+    expect(settled.removed).toEqual(["cnv_task"]);
+    expect(deps.tasks.get("cnv_task-t2")).toBeUndefined();
   });
 
   it("keeps the index row when the journal cannot be reached", async () => {

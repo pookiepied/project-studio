@@ -141,6 +141,18 @@ export interface EnvironmentFacts {
    * the turn, that its download finished - which is worth more than the cache.
    */
   readonly backgroundJobs?: readonly string[];
+  /**
+   * The background agent tasks this conversation has under way, as lines to
+   * render.
+   *
+   * Separate from `backgroundJobs` and conditional on non-empty for the same
+   * cached-prefix reason: the overwhelming majority of turns have no task
+   * running, and the block must stay byte-identical for every one of them.
+   * Running tasks only — their endings are news, delivered once through the
+   * finished-task announcement — so the lines are always current state, and
+   * a turn that knows a task is under way can speak of it without asking.
+   */
+  readonly backgroundTasks?: readonly string[];
 }
 
 /**
@@ -188,6 +200,7 @@ export function environmentFacts(
   attachmentsDirectory?: string,
   artifactsDirectory?: string,
   libraryDirectory?: string,
+  backgroundTasks?: readonly string[],
 ): EnvironmentFacts {
   return {
     workspace,
@@ -210,6 +223,9 @@ export function environmentFacts(
     ...(backgroundJobs === undefined || backgroundJobs.length === 0
       ? {}
       : { backgroundJobs }),
+    ...(backgroundTasks === undefined || backgroundTasks.length === 0
+      ? {}
+      : { backgroundTasks }),
   };
 }
 
@@ -485,6 +501,27 @@ function backgroundJobsStatement(facts: EnvironmentFacts): readonly string[] {
   ];
 }
 
+/**
+ * The background agent tasks, when there are any.
+ *
+ * A separate statement from the commands' rather than more lines under their
+ * heading, because the two answer different questions: a command is something
+ * this conversation's model started and can read back with the jobs tool, a
+ * task is work the harness dispatched on the conversation's behalf, and
+ * there is no tool to poll — the news of its ending arrives by itself. The
+ * person's own phrasing covers both in the rail; here, where the model reads
+ * one line at a time, the difference is worth the second heading.
+ */
+function backgroundTasksStatement(facts: EnvironmentFacts): readonly string[] {
+  if (facts.backgroundTasks === undefined || facts.backgroundTasks.length === 0) return [];
+  return [
+    "Background agent tasks under way:",
+    ...facts.backgroundTasks,
+    "Their results arrive on their own when they finish; there is nothing to poll.",
+    "",
+  ];
+}
+
 function projectFoldersStatement(facts: EnvironmentFacts): readonly string[] {
   if (facts.kind !== "project") return [];
   const folders = facts.projectFolders ?? [];
@@ -615,6 +652,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
     ...libraryStatement(facts),
     ...projectFoldersStatement(facts),
     ...backgroundJobsStatement(facts),
+    ...backgroundTasksStatement(facts),
     ...extraRootsStatement(facts.extraRoots),
     ...reachStatement(),
     ...(shell === undefined

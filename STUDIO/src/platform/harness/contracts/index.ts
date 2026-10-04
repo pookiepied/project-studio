@@ -242,6 +242,14 @@ export {
 } from './jobs'
 
 export {
+  type AgentTask,
+  type AgentTaskStatus,
+  TASK_STATUSES,
+  parseAgentTasks,
+  parseAgentTask,
+} from './tasks'
+
+export {
   readChunkFacts,
   readConversationSnapshot,
   type ChunkFacts,

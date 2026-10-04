@@ -19,6 +19,8 @@ import {
   hasActiveFlueSubmissions,
 } from "../storage/flue-journal-delete.js";
 import { openFlueJournal, resolveFlueJournalPath } from "../storage/flue-journal.js";
+import { isSettledTaskStatus } from "../contracts/agents.js";
+import type { TaskStore } from "../agents/definitions/task-store.js";
 import type { ConversationStore } from "./store.js";
 
 /**
@@ -87,6 +89,8 @@ export interface PurgeDependencies {
   readonly folders: SandboxScopeStore;
   /** The one owner of `conversation_document`; the files themselves go with the tree. */
   readonly documents: ConversationDocumentStore;
+  /** The one owner of `agent_task`; a conversation's task rows are indexed under it. */
+  readonly tasks: TaskStore;
   /**
    * The journal file to delete from. Resolved per call from the same rule
    * Flue itself follows when unset, so tests point it at a fixture.
@@ -162,7 +166,7 @@ export async function purgeConversations(
   dependencies: PurgeDependencies,
   ids: readonly string[],
 ): Promise<PurgeOutcome> {
-  const { conversations, grants, selection, plans, questions, folders, documents, flueJournalPath } =
+  const { conversations, grants, selection, plans, questions, folders, documents, tasks, flueJournalPath } =
     dependencies;
   const removed: string[] = [];
   const cleanupFailures: Record<string, string> = {};
@@ -182,6 +186,25 @@ export async function purgeConversations(
     let errorCode: string | undefined;
 
     try {
+      // A background task dispatched under this conversation is work in
+      // flight the same way a turn is, and this check runs BEFORE anything
+      // is destroyed - the refusal below must leave the id exactly as it
+      // was. It is checked here rather than inferred from the journal
+      // because the submission check keys on the instance id, which a
+      // task's ladder retry does not share with the conversation
+      // (`cnv_task-t2` is not `cnv_task`); the row is what holds for every
+      // attempt.
+      const runningTask = tasks
+        .list({ parentConversationId: id })
+        .find((record) => !isSettledTaskStatus(record.status));
+      if (runningTask !== undefined) {
+        throw new StorageError("conflict", {
+          message:
+            `Conversation "${id}" has a background task still running ` +
+            `("${runningTask.title}"), so the delete was stopped. ` +
+            "Try again once it has settled.",
+        });
+      }
       deleteFlueJournalForConversation(flueJournalPath, id);
       // A submission admitted while the transcript was being deleted would
       // recreate journal rows for a conversation about to lose its index row.
@@ -195,6 +218,7 @@ export async function purgeConversations(
         });
       }
       journal = true;
+
     } catch (unknown) {
       const failure = failureOf(unknown);
       error = failure.message;
@@ -216,6 +240,12 @@ export async function purgeConversations(
         // long as the conversation exists.
         folders.clearConversation(id);
         documents.clearConversation(id);
+        // A task indexed under this conversation goes with it - the row is
+        // the index, the conversation was the thing indexed, and a rail
+        // listing tasks of a conversation nobody holds would point at
+        // nothing. The task's own stream goes with the journal deletion
+        // above (every stream of the conversation across all agent names).
+        tasks.deleteConversation(id);
         scoped = true;
       } catch (unknown) {
         const failure = failureOf(unknown);

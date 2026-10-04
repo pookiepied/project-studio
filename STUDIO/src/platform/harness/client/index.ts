@@ -35,6 +35,7 @@ import { skillClient, type SkillClient } from './skills'
 import { commandClient, type CommandClient } from './commands'
 import { libraryClient, type LibraryClient } from './library'
 import { documentClient, type DocumentClient } from './documents'
+import { taskClient, type TaskClient } from './tasks'
 
 export type {
   HarnessAddress,
@@ -56,7 +57,8 @@ export interface HarnessClient
     MediaClient,
     ConversationIndexClient,
     DecisionClient,
-    ProjectClient {}
+    ProjectClient,
+    TaskClient {}
 
 export function createHarnessClient(options: HarnessClientOptions): HarnessClient {
   const request = createRequester(options)
@@ -71,5 +73,6 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     ...conversationIndexClient(request),
     ...decisionClient(request),
     ...projectClient(request),
+    ...taskClient(request),
   }
 }

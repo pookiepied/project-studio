@@ -488,6 +488,75 @@ describe("the background commands in the block", () => {
 })
 
 /**
+ * The background agent tasks, beside the commands.
+ *
+ * The same cached-prefix argument, one stricter consequence: the section is
+ * a different one from the commands', because the two kinds answer different
+ * questions and there is no jobs tool for a task to read back with. It is
+ * also a read and not a drain - running tasks only, named every turn while
+ * they run, because the ending arrives by itself.
+ */
+describe("the background agent tasks in the block", () => {
+  const day = new Date(2026, 7, 30, 12, 0, 0)
+
+  it("says nothing at all when no task is under way", () => {
+    const without = environmentBlock(environmentFacts("/work", day))
+    const withEmpty = environmentBlock(
+      environmentFacts("/work", day, "conversation", undefined, undefined, undefined, undefined, undefined, undefined, undefined, []),
+    )
+
+    expect(withEmpty).toBe(without)
+  })
+
+  it("names the running tasks and says the ending arrives on its own", () => {
+    const block = environmentBlock(
+      environmentFacts(
+        "/work",
+        day,
+        "conversation",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ['Task "Titler" is running in the background.'],
+      ),
+    )
+
+    expect(block).toContain("Background agent tasks under way:")
+    expect(block).toContain('Task "Titler" is running in the background.')
+    expect(block).toContain("nothing to poll")
+    // The commands' reader does not claim a task: no jobs-tool sentence in
+    // the tasks' own section.
+    const section = block.split("Background agent tasks under way:")[1] ?? ""
+    expect(section).not.toContain("jobs tool")
+  })
+
+  it("renders the tasks and the commands as two sections, not one list", () => {
+    const block = environmentBlock(
+      environmentFacts(
+        "/work",
+        day,
+        "conversation",
+        undefined,
+        undefined,
+        undefined,
+        ["job_ab1 is running: npm run dev"],
+        undefined,
+        undefined,
+        undefined,
+        ['Task "Titler" is running in the background.'],
+      ),
+    )
+
+    expect(block).toContain("Background work you started:")
+    expect(block).toContain("Background agent tasks under way:")
+  })
+})
+
+/**
  * The two folders this conversation keeps what crosses between the person and
  * the model in.
  *

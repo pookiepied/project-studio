@@ -38,8 +38,11 @@ All routes are behind `src/transport/http/middleware/admission.ts:34` `createAdm
 | `/api/mcp/projects/:projectId/extensions/mcp/:id` | PUT | `project` | `{enabled:boolean}` | `{enabled}` | `400`, `401`, `403` | — | `ExtensionSelectionStore` (`src/extend/selection.ts`) |
 | `/api/permissions/pending` | GET | `permission:approval` (`src/transport/http/routes/permissions.ts`) | — | `PendingPermissionApproval[]` (`src/application/approval-broker.ts:13`) `{id, request, decision, createdAt}` | `401`, `403` | — | `PermissionApprovalBroker` |
 | `/api/permissions/pending/:id` | POST | `permission:approval` | `{verdict:"allow"|"deny", duration:"always"|"session"|"once", scopeId?}` | `{ok}` | `400`, `404`, `401`, `403` | — | `PermissionApprovalBroker` |
-| ~~`/api/permissions/grants`~~ | GET | — | — | — | — | — | **NOT IMPLEMENTED — meta-task #73** |
-| ~~`/api/permissions/grants/:id`~~ | DELETE | — | — | — | — | — | **NOT IMPLEMENTED — meta-task #73** |
+| `/api/permissions/grants` | GET | `approval` (`src/transport/http/routes/grants.ts`) | `?agentId&projectId&conversationId` (conjunction) | `PermissionGrantView[]` | `401`, `403` | — | `PermissionGrantsView` (Stage 1, #73 closed) |
+| `/api/permissions/grants/:id` | DELETE | `approval` | — | `204`, or `404` when absent/revoked | `401`, `403`, `404` | — | `PermissionGrantsView` (Stage 1, #73 closed) |
+| `/api/tasks` | GET | `agent:run` (`src/transport/http/routes/tasks.ts`) | `?agentName&parentConversationId` (conjunction) | `AgentTaskRecord[]` newest first (`src/agents/definitions/task-store.ts`) | `401`, `403` | — | `TaskStore` (Stage 4) |
+| `/api/tasks/:id` | GET | `agent:run` | — | `AgentTaskRecord` | `401`, `403`, `404` | — | `TaskStore` (Stage 4) |
+| `/api/tasks/:id/cancel` | POST | `agent:run` | — | `{cancelled:boolean}` — `false` for an already-settled row, refused at the route before the abort port | `401`, `403`, `404` | — | `TaskStore` + the cancel port (`init().abort()` → Flue instance abort; the settlement reaches the row through the projector) |
 
 **Headers:** `Authorization: Bearer <cred>`, `X-Project-Studio-Request-Id: <StudioUuid>` (for `ExecutionContext`), `Content-Type: application/json`, `Location`, `Stream-Next-Offset` (Flue). No `Idempotency-Key` — removed with the patches under #12.
 

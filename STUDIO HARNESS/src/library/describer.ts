@@ -3,6 +3,8 @@ import { createStudioUuid } from "../contracts/uuid.js";
 import { observe, type FlueObservation } from "@flue/runtime";
 
 import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
+import { AgentRegistryError } from "../agents/definitions/registry.js";
+import type { TaskStore } from "../agents/definitions/task-store.js";
 import { DESCRIBE_AGENT_ID } from "../contracts/agents.js";
 import { StudioError } from "../contracts/errors.js";
 import { normalizeTags } from "./store.js";
@@ -99,6 +101,12 @@ export interface ImageDescriberOptions {
   readonly subscribe?: (handler: (observation: FlueObservation) => void) => () => void;
   readonly dispatchJob?: (takeId: string, request: DescribeRequest) => Promise<void>;
   readonly timeoutMs?: number;
+  /**
+   * The task index the default dispatch records its row into (S4.3: the
+   * dispatcher indexes every dispatched task). Injected `dispatchJob` tests
+   * need none — the injection replaces the dispatch whole.
+   */
+  readonly tasks?: TaskStore;
 }
 
 interface Waiting {
@@ -131,11 +139,18 @@ export class ImageDescriber implements ImageDescriberPort {
     this.#dispatchJob =
       options.dispatchJob ??
       (async (takeId, request) => {
+        const tasks = options.tasks;
+        if (tasks === undefined) {
+          throw new AgentRegistryError(
+          "invalid",
+          "The describer composition gave no task index; the dispatcher cannot record the run.",
+        );
+        }
         await dispatchBackgroundAgent(DESCRIBE_AGENT_ID, takeId, {
           kind: "user",
           body: messageFor(request),
           attachments: [{ type: "image", data: request.data, mimeType: request.mimeType }],
-        });
+        }, { tasks });
       });
     this.#timeoutMs = options.timeoutMs ?? REPLY_TIMEOUT_MS;
   }

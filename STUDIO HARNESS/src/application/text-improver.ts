@@ -3,6 +3,8 @@ import { createStudioUuid } from "../contracts/uuid.js";
 import { observe, type FlueObservation } from "@flue/runtime";
 
 import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
+import { AgentRegistryError } from "../agents/definitions/registry.js";
+import type { TaskStore } from "../agents/definitions/task-store.js";
 import { IMPROVE_AGENT_ID } from "../contracts/agents.js";
 import { StudioError } from "../contracts/errors.js";
 
@@ -92,6 +94,12 @@ export interface TextImproverOptions {
   readonly subscribe?: (handler: (observation: FlueObservation) => void) => () => void;
   readonly dispatchJob?: (takeId: string, text: string) => Promise<void>;
   readonly timeoutMs?: number;
+  /**
+   * The task index the default dispatch records its row into (S4.3: the
+   * dispatcher indexes every dispatched task). Injected `dispatchJob` tests
+   * need none — the injection replaces the dispatch whole.
+   */
+  readonly tasks?: TaskStore;
 }
 
 interface Waiting {
@@ -118,7 +126,14 @@ export class TextImprover implements TextImproverPort {
     this.#dispatchJob =
       options.dispatchJob ??
       (async (takeId, text) => {
-        await dispatchBackgroundAgent(IMPROVE_AGENT_ID, takeId, text);
+        const tasks = options.tasks;
+        if (tasks === undefined) {
+          throw new AgentRegistryError(
+          "invalid",
+          "The improver composition gave no task index; the dispatcher cannot record the run.",
+        );
+        }
+        await dispatchBackgroundAgent(IMPROVE_AGENT_ID, takeId, text, { tasks });
       });
     this.#timeoutMs = options.timeoutMs ?? REPLY_TIMEOUT_MS;
   }

@@ -1,6 +1,9 @@
 import { agentRegistry } from "./index.js";
 import { AgentRegistryError, type RegisteredAgent } from "./registry.js";
-import type { AgentTaskStatus } from "../../contracts/agents.js";
+import {
+  isSettledTaskStatus,
+  type AgentTaskStatus,
+} from "../../contracts/agents.js";
 import type { StudioDatabase } from "../../storage/database.js";
 import { storageErrorFrom } from "../../storage/errors.js";
 
@@ -151,6 +154,28 @@ export class TaskStore {
   }
 
   /**
+   * Links the row to the submission Flue minted for it, after the dispatch's
+   * receipt comes back. Written only once and only while the column is empty:
+   * the row is created before the dispatch (so a run that starts is always
+   * indexed), which leaves a window where the row exists and the id does not,
+   * and this is the one call that closes it. A row already carrying one is
+   * left alone — a second write could only disagree with the first, and two
+   * opinions about which submission a task was is exactly what the
+   * execution-context graph must not hold.
+   */
+  setOriginSubmission(id: string, submissionId: string): void {
+    try {
+      this.#db
+        .prepare(
+          "UPDATE agent_task SET origin_submission_id = ? WHERE id = ? AND origin_submission_id IS NULL",
+        )
+        .run(submissionId, id);
+    } catch (error) {
+      throw storageErrorFrom(error);
+    }
+  }
+
+  /**
    * Every task, newest first, narrowed by the filters a rail will ask for.
    * Each filter is a conjunction on its column; an absent filter says
    * nothing about that column.
@@ -196,7 +221,7 @@ export class TaskStore {
     status: AgentTaskStatus,
     resultSummary?: string,
   ): boolean {
-    const settled = isSettledStatus(status);
+    const settled = isSettledTaskStatus(status);
     const result = this.#db
       .prepare(
         settled
@@ -225,15 +250,6 @@ export class TaskStore {
       .run(parentConversationId);
     return Number(result.changes);
   }
-}
-
-function isSettledStatus(status: AgentTaskStatus): boolean {
-  return (
-    status === "completed" ||
-    status === "failed" ||
-    status === "cancelled" ||
-    status === "unknown"
-  );
 }
 
 /** A store refuses to index a task for an agent that is not a background definition. */

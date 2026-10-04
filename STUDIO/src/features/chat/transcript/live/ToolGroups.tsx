@@ -195,6 +195,12 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   // wrong place to announce that.
   discover: { mark: Icons.mcp, running: 'Discovering', done: 'Discovered' },
   jobs: { mark: Icons.backgroundJobs, running: 'Checking', done: 'Checked' },
+  // Delegation is its own kind of call: the work does not happen here but in
+  // the named delegate's own session, and the only thing that crosses back
+  // is its final message. The chip's subject is the agent the model chose -
+  // the one fact of the call a person can act on - and the branch mark says
+  // the work forked, which is what the verb would otherwise have to carry.
+  task: { mark: Icons.branch, running: 'Delegating to', done: 'Delegated to' },
   delete: { mark: Icons.delete, running: 'Deleting', done: 'Deleted' },
   move: { mark: Icons.move, running: 'Moving', done: 'Moved' },
   // The library tools wear the library's own mark, not the search glass:
@@ -749,7 +755,8 @@ function subjectOf(call: ToolCallView): string | null {
   if (call.toolName === 'ask_user_question') return askSubject(input)
   // `from` first for a move: the row's object is the file that exists, and
   // the destination it gained is the call's working-out, not its subject.
-  for (const key of ['path', 'file_path', 'from', 'command', 'pattern', 'query', 'url']) {
+  // `agent` for a task call: the delegate's name is the row's subject.
+  for (const key of ['path', 'file_path', 'from', 'command', 'pattern', 'query', 'url', 'agent']) {
     const value = input[key]
     if (typeof value === 'string' && value.length > 0) return value
   }

@@ -45,8 +45,8 @@ up the next unshipped row without re-deriving the order.
 | S1 | Prerequisites: #73 grants surface, #86/#50 snapshot restore, #88/#89 child lifecycle, #66 MCP timeout/cancellation | ✅ **Done** — all four closed, mutation-verified (`7693dbfe`, `068e8838`, `65f068c3`) |
 | S2 | Definitions, registry, `dispatchBackgroundAgent()`, TaskStore migration | ✅ **Done 2026-10-03** — `c9266055`; zero behavior change held (2,272 + 1,357 tests green); register #90 records the proofs |
 | S3 | **The Explore delegate** — the first real subagent | ✅ **Done 2026-10-03** — register row 96: definition, mount, the patch's one budgeted hunk, the gate's agent-aware policy, #49 closed end to end (store + scope + live run) |
-| S4 | Background agent tasks (routes, projection, signals, rail) | ⬜ Next |
-| S5 | The broader roster (`general`, `plan`) + assignment | ⬜ |
+| S4 | Background agent tasks (routes, projection, signals, rail) | ✅ **Done 2026-10-03** — register row 97: D10 decided (ADR 0058's amendment), the dispatcher's row, the projector, the third ping source, the routes and cancel port, the rail's Tasks section and the transcript's delegation chip, purge semantics |
+| S5 | The broader roster (`general`, `plan`) + assignment | ⬜ Next |
 | S6 | Consolidation and the deferred decisions | ⬜ |
 
 Open register rows that touch this map: **#70** (load-dependent suite flake,
@@ -75,10 +75,11 @@ saying the same thing.*
 **Also closes:** #49 end-to-end; the roadmap's Phase 10 "nine of ten" note (the
 `task` family completes the tool table — close it in the same commit).
 
-**Known open design point (D10):** the delegate's transcript is not addressable
-through product routes (measured 404s in Stage 0). S3 does not need it; S4's task
-transcript view does. Options recorded in the plan: an in-process route served
-from Flue's own store, or a Flue change. Decide it at S4.1, not before.
+**D10 was decided at S4.1 (2026-10-03)**, recorded as ADR 0058's amendment:
+background task transcripts are the existing reader once the background routers
+are mounted read-only; a delegate's transcript view waits for the UI feature
+that needs it, tie-breaker recorded (no patch hunk unless the measurement
+proves no seam exists).
 
 ---
 
@@ -184,7 +185,7 @@ settings UI that edits definitions (Phase 18 product work at the earliest);
 **S3 (Explore, the slice that proves delegation works at all) → S4 (background
 tasks, the surface you watch settle) → S5 (the roster fills out) → S6 (fold the
 decisions and the docs).** Tracks land inside the stage windows named above; the
-map's next unshipped row at any moment is S4.1.
+map's next unshipped row at any moment is S5.1.
 
 *Status of this file:* maintained beside the plan until S6.3 folds the surviving
 content into the durable docs — then it is archived, banner-marked, per the

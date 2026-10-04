@@ -399,6 +399,18 @@ The local Harness is the only runtime; this plan keeps it the only runtime while
 
 No new transport. The webview already reads any agent stream by path (`platform/harness/conversation.ts` addresses `/agents/<name>/<id>`); a task's transcript is that reader pointed at the task's stream. What gets built is product surface only: the Tasks section of the work panel, the task card in the transcript, agent-attributed approval cards (the broker payload already carries `scope.agentId` — the UI labels with the definition's `title`), and Settings' agent roster (read-only in v1: name, description, tools, skills — the same honest-list rule as MCP).
 
+**Decided at S4.1 (2026-10-03; recorded as ADR 0058's amendment):** the plan's
+one-sentence assumption above is true for background tasks and false for
+delegates, and the decision says so per kind. Background tasks have agent
+instances (the product mints the instance id at dispatch), so ADR 0045's
+reader reaches their streams once the background agents' routers are mounted —
+read-only guarded, because the same router admits prompts and the background
+three must never be promptable. Delegate sessions have no instance id (the
+Stage 0 404s), so a delegate's transcript view waits for the UI feature that
+needs it and then picks between an in-process route from Flue's stream store
+and a Flue change, tie-breaker recorded: no patch hunk unless the measurement
+proves no seam exists.
+
 ---
 
 ## Part III — Keep / Refactor / Remove / Consolidate / Add
@@ -619,11 +631,38 @@ forced:
 
 ### Stage 4 — Background agent tasks
 
-1. `dispatchBackgroundAgent()` + `TaskStore` routes (`GET /api/tasks`, `GET /api/tasks/:id`, `POST /api/tasks/:id/cancel`), status projection via the observer seam, cancellation via `abortInstance`.
-2. `studio.tasks.finished` through the JobPings hub (third source); environment block names running tasks beside running jobs.
-3. Task rail section + task transcript view (the existing reader, addressed at the task stream).
-4. Decide-and-record: no auto-resend (ADR 0033 rule); the idempotency-key reopen condition is recorded on the dispatcher.
-5. Disposition of `createRetryExecutionContext` executed here if the task status projector needs attempts.
+**Delivered 2026-10-03** (register row 97), with two deviations worth having
+on the record:
+
+- **D10 was decided, per kind.** The plan's one-sentence assumption above was
+  true for background tasks and false for delegates; ADR 0058's amendment
+  records the split and the tie-breaker for the delegate half. The S4.1
+  cancel port needed no Flue change at all: `init(agent, {id}).abort()` is
+  the stop control's own seam, resolved at use time — the Track E budget
+  spent nothing.
+- **The task rows are conversation-scoped only when the dispatch says so.**
+  Every dispatch records its row (S4.3's gate), but the three background
+  agents name no parent conversation — a title is not news to the
+  conversation it names, and announcing it would wake every first exchange
+  with news it already has. The settlement signal (`studio.tasks.finished`)
+  and the environment block's running-task lines therefore key on the row's
+  parent column: the mechanism is built, proven by integration test, and
+  waiting for the first caller whose background work is genuinely
+  conversation-owned. The replay rule (S4.5) is proven at the same seam: a
+  replayed settlement finds the row terminal, re-dispatches nothing, and
+  announces nothing.
+- **Measured, not worked around:** a harness SIGKILLed under a running task
+  recovers the row as `running` — still true — and the replacement run
+  settles from the stream; the runtime's durability contract caps recovery
+  attempts, so that settlement can be `failed` with its own recovery
+  sentence. The row is the projection; the test asserts what the stream
+  said.
+
+1. ~~`dispatchBackgroundAgent()` + `TaskStore` routes~~ — delivered as above; cancellation via `init().abort()` (Flue's instance abort), no patch.
+2. `studio.tasks.finished` through the JobPings hub (third source); environment block names running tasks beside running jobs — delivered, keyed on the row's parent.
+3. Task rail section + task card in the transcript — delivered (the rail's background-work entry renders both kinds; the `task` tool call renders a delegation chip). The task transcript view itself is the D10-decided reader, landing with the UI that needs it.
+4. Decide-and-record: no auto-resend (ADR 0033 rule); the idempotency-key reopen condition is recorded on the dispatcher — delivered (dispatch.ts docblock + the replay test).
+5. Disposition of `createRetryExecutionContext` executed here if the task status projector needs attempts — not needed: the projector settles from settlements, not attempts (the Stage 0 disposition already deleted the function; the reopen condition on the dispatcher is what would restore it).
 
 **Tests**: dispatch → run → settle → signal → card (integration, the finished-job-pings pattern); cancel mid-run (aborted settlement, rail updates); restart with a running task (lease recovery, status returns `running` then settles); purge semantics (deleting a parent conversation deletes its task rows and selection-scope rows; the task's stream goes with the Flue purge path).
 

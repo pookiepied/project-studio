@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   executionModeFromWire,
   executionModeToWire,
+  parseAgentTask,
+  parseAgentTasks,
   parseBackgroundJob,
   parseBackgroundJobs,
   parseFolderListing,
@@ -885,6 +887,49 @@ describe('reading background commands', () => {
   it('reads a single job out of a stop answer', () => {
     expect(parseBackgroundJob({ ...row, state: 'stopped', endedAt: 12 })?.state).toBe('stopped')
     expect(parseBackgroundJob(null)).toBeNull()
+  })
+})
+
+describe('reading agent tasks', () => {
+  const row = {
+    id: 'cnv_9f2c-t1',
+    agentName: 'title',
+    parentConversationId: null,
+    title: 'Titler',
+    status: 'running',
+    createdAt: 12,
+    settledAt: null,
+    resultSummary: null,
+  }
+
+  it('keeps a well-formed row and reads the listing array itself', () => {
+    expect(parseAgentTasks([row, row]).map((task) => task.id)).toEqual([
+      'cnv_9f2c-t1',
+      'cnv_9f2c-t1',
+    ])
+    // A body that is not an array is no rows, not a crash.
+    expect(parseAgentTasks({ tasks: [row] })).toEqual([])
+    expect(parseAgentTasks(null)).toEqual([])
+  })
+
+  it('drops a row without an id, an agent, or a status this build knows', () => {
+    expect(parseAgentTasks([{ ...row, id: '' }])).toEqual([])
+    expect(parseAgentTasks([{ ...row, agentName: '' }])).toEqual([])
+    // The harness maps a stored status it cannot parse to `unknown` before
+    // the wire; a status this build has never heard of is a contract change
+    // and the row is dropped rather than rendered blank.
+    expect(parseAgentTasks([{ ...row, status: 'hibernating' }])).toEqual([])
+    expect(parseAgentTasks([{ ...row, status: 'cancelled' }]).map((task) => task.status)).toEqual([
+      'cancelled',
+    ])
+  })
+
+  it('keeps the nullable fields null and reads a single row out of a read', () => {
+    const read = parseAgentTask({ ...row, status: 'completed', settledAt: 99, resultSummary: 'Titled.' })
+    expect(read?.parentConversationId).toBeNull()
+    expect(read?.settledAt).toBe(99)
+    expect(read?.resultSummary).toBe('Titled.')
+    expect(parseAgentTask(null)).toBeNull()
   })
 })
 

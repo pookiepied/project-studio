@@ -28,6 +28,9 @@ import type { ConversationTitlingPort } from "../../conversations/titling.js";
 import type { BackgroundJobs } from "../../process/background.js";
 import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
+import type { TaskStore } from "../../agents/definitions/task-store.js";
+import type { TaskControlPort } from "./routes/tasks.js";
+import { createTaskRoutes } from "./routes/tasks.js";
 import type { CompactionReadiness } from "../../conversations/compaction.js";
 import type { ConversationSnapshots } from "../../snapshots/store.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
@@ -145,6 +148,14 @@ export interface CreateHttpAppOptions {
    * reach the shape it declares.
    */
   readonly backgroundJobs?: BackgroundJobs;
+  /**
+   * The background agent tasks' index and its cancel port, when a runtime
+   * was composed. Optional the way `backgroundJobs` is: absent means no task
+   * routes exist, and production must not be that composition — the rows the
+   * dispatcher records would otherwise be visible to nothing.
+   */
+  readonly tasks?: TaskStore;
+  readonly taskControl?: TaskControlPort;
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
   readonly browser?: { stop(conversationId: string): Promise<boolean> };
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
@@ -247,6 +258,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   }
   if (options.plans !== undefined) {
     app.route("/api/plans", createPlanRoutes(options.plans));
+  }
+  if (options.tasks !== undefined && options.taskControl !== undefined) {
+    app.route("/api/tasks", createTaskRoutes(options.tasks, options.taskControl));
   }
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));

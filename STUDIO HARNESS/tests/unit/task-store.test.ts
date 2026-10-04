@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TaskStore } from "../../src/agents/definitions/task-store.js";
+import { dispatchBackgroundAgent } from "../../src/agents/definitions/dispatch.js";
 import { AgentRegistryError } from "../../src/agents/definitions/registry.js";
 import { IMPROVE_AGENT_ID, STUDIO_AGENT_ID, TITLE_AGENT_ID } from "../../src/contracts/agents.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -109,6 +110,19 @@ describe("the task index", () => {
     expect(tasks.get("imp_b")).toBeDefined();
   });
 
+  it("links the origin submission once, and never overwrites it", () => {
+    tasks.record({ id: "imp_link", agentName: IMPROVE_AGENT_ID });
+    expect(tasks.get("imp_link")?.originSubmissionId).toBeUndefined();
+
+    tasks.setOriginSubmission("imp_link", "sub_first");
+    expect(tasks.get("imp_link")?.originSubmissionId).toBe("sub_first");
+
+    // A second write could only disagree with the first - a recovery replay
+    // handing a different id, say - and the row holds one opinion.
+    tasks.setOriginSubmission("imp_link", "sub_second");
+    expect(tasks.get("imp_link")?.originSubmissionId).toBe("sub_first");
+  });
+
   it("carries the migration's table with the expected columns", () => {
     // The migration is append-only; this pins the shape the store reads, so
     // a future migration that touches `agent_task` fails here rather than
@@ -128,5 +142,48 @@ describe("the task index", () => {
       "settled_at",
       "result_summary",
     ]);
+  });
+});
+
+/**
+ * The dispatcher's recording (S4.3): `dispatchBackgroundAgent` records the
+ * row BEFORE the dispatch - so a run that starts is always indexed - and
+ * settles the row `failed` when the dispatch is refused, which in a unit
+ * test is every run, because Flue's own dispatch answers only inside a
+ * configured runtime. That refusal is exactly the failure mode the ordering
+ * exists to cover, exercised here for real.
+ */
+describe("the background dispatcher's row", () => {
+  it("records the row first and settles it failed when the dispatch is refused", async () => {
+    await expect(
+      dispatchBackgroundAgent(TITLE_AGENT_ID, "cnv_a-t1", "Name this.", { tasks }),
+    ).rejects.toThrow();
+
+    const row = tasks.get("cnv_a-t1");
+    expect(row).toBeDefined();
+    expect(row?.status).toBe("failed");
+    expect(row?.resultSummary).toContain("The task never started:");
+    expect(row?.settledAt).toBeTypeOf("number");
+  });
+
+  it("records a named parent conversation and title verbatim", async () => {
+    await expect(
+      dispatchBackgroundAgent(IMPROVE_AGENT_ID, "cnv_b-task-1", "Do the work.", {
+        tasks,
+        parentConversationId: "cnv_b",
+        title: "Summarize the folder",
+      }),
+    ).rejects.toThrow();
+
+    const row = tasks.get("cnv_b-task-1");
+    expect(row?.parentConversationId).toBe("cnv_b");
+    expect(row?.title).toBe("Summarize the folder");
+  });
+
+  it("refuses a dispatch that names a non-background agent, with no row", async () => {
+    await expect(
+      dispatchBackgroundAgent(STUDIO_AGENT_ID, "cnv_c", "hello", { tasks }),
+    ).rejects.toThrow(AgentRegistryError);
+    expect(tasks.get("cnv_c")).toBeUndefined();
   });
 });

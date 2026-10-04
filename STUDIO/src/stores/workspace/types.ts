@@ -13,6 +13,7 @@ import type {
   PendingQuestionRecord,
   PlanSnapshot,
   BackgroundJob,
+  AgentTask,
   MediaJob,
   MediaArtifactFile,
   ProviderConnection,
@@ -124,6 +125,11 @@ export interface BoundClient {
   readonly backgroundJobs: {
     list: (conversationId: string) => Promise<HarnessResult<readonly BackgroundJob[]>>
     stop: (conversationId: string, jobId: string) => Promise<HarnessResult<BackgroundJob | null>>
+  }
+  /** The harness's dispatched agent tasks, bound like the commands. */
+  readonly tasks: {
+    list: () => Promise<HarnessResult<readonly AgentTask[]>>
+    cancel: (taskId: string) => Promise<HarnessResult<boolean>>
   }
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
   readonly browser: {

@@ -4,7 +4,7 @@ import { FADE, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
-import { JobsPanel } from '@/features/jobs'
+import { BackgroundWorkPanel } from '@/features/jobs'
 import { BrowserPanel } from '@/features/rail/BrowserPanel'
 import { familyById } from '@/features/chat/transcript/live/reportFamily'
 import { PlanPanel } from '@/features/plans'
@@ -25,7 +25,7 @@ const MIN_PAGE_WIDTH = 520
 /** What the header calls the active entry, per kind. */
 function entryTitle(entry: RailEntry): string {
   if (entry.kind === 'artifact') return entry.artifact.title
-  if (entry.kind === 'jobs') return 'Background commands'
+  if (entry.kind === 'jobs') return 'Background work'
   return entry.kind === 'browser' ? familyById(entry.family).label : 'Plan'
 }
 
@@ -183,7 +183,7 @@ export function SideRail({
                     {active.kind === 'artifact' ? (
                       renderArtifact(active.artifact)
                     ) : active.kind === 'jobs' ? (
-                      <JobsPanel conversationId={active.conversationId} />
+                      <BackgroundWorkPanel conversationId={active.conversationId} />
                     ) : active.kind === 'browser' ? (
                       <BrowserPanel entry={active} />
                     ) : (

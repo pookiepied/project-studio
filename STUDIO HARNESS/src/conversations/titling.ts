@@ -1,6 +1,8 @@
 import { observe, type FlueObservation } from "@flue/runtime";
 
 import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
+import { AgentRegistryError } from "../agents/definitions/registry.js";
+import type { TaskStore } from "../agents/definitions/task-store.js";
 import { STUDIO_AGENT_ID, TITLE_AGENT_ID } from "../contracts/agents.js";
 import type { Logger } from "../observability/logger.js";
 import type { ConversationStore } from "./store.js";
@@ -184,6 +186,13 @@ export interface ConversationTitlerOptions {
   readonly conversations: ConversationStore;
   readonly logger?: Logger;
   /**
+   * The task index the titling runs are indexed into. Required by the default
+   * dispatch below since the dispatcher became a product surface (S4.3): every
+   * dispatched background task records its TaskStore row. Injected `dispatchJob`
+   * tests need none — the injection replaces the dispatch whole.
+   */
+  readonly tasks?: TaskStore;
+  /**
    * Defaults to the runtime's own live subscription. Tests inject a queue so
    * the settlement handlers can be driven without a running Flue.
    */
@@ -272,6 +281,13 @@ export class ConversationTitler implements ConversationTitlingPort {
     this.#dispatchJob =
       options.dispatchJob ??
       (async (conversationId, message, attempt) => {
+        const tasks = options.tasks;
+        if (tasks === undefined) {
+          throw new AgentRegistryError(
+          "invalid",
+          "The titling composition gave no task index; the dispatcher cannot record the run.",
+        );
+        }
         const instanceId =
           attempt === 0 ? conversationId : `${conversationId}-t${attempt}`;
         // The shared background dispatcher (agents/definitions/dispatch.ts)
@@ -280,8 +296,13 @@ export class ConversationTitler implements ConversationTitlingPort {
         // property the `nativeModuleIdentity` vite plugin exists to keep,
         // after the Windows double-bundle bug. The receipt's submissionId is
         // not read: the run's own events carry it, and this orchestrator
-        // routes on the instance id, which it already knows.
-        await dispatchBackgroundAgent(TITLE_AGENT_ID, instanceId, message);
+        // routes on the instance id, which it already knows. The row the
+        // dispatcher records is how the rail shows this work; no parent
+        // conversation is named on it, because a title is not news to the
+        // conversation it names - the index already shows it.
+        await dispatchBackgroundAgent(TITLE_AGENT_ID, instanceId, message, {
+          tasks,
+        });
       });
   }
 
