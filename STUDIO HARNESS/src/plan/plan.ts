@@ -40,8 +40,16 @@ export const PLAN_STATUSES: readonly PlanStatus[] = [
  * The model's own result carries this, so it can tell "they did that one
  * already" from "I must have done that and forgotten" - the one channel by
  * which a person's tick reaches the model is the next plan write's answer.
+ *
+ * Since Stage 5 (S5.2) the dimension has a third value: a delegate that
+ * writes the plan is recorded as `agent:<agentName>` — `agent:plan` for the
+ * planning delegate — so a row says which writer kind touched it AND which
+ * agent, and the parent's own writes stay distinguishable from its
+ * delegates'. The stored column is this string verbatim; the store's
+ * read-side parser is the one place the vocabulary is enforced, and a row
+ * carrying anything else makes the whole plan `damaged`.
  */
-export type PlanWriter = "model" | "person";
+export type PlanWriter = "model" | "person" | `agent:${string}`;
 
 /** One item as the model writes it: an id it chose, the words, and a status. */
 export interface PlanItemWrite {

@@ -50,6 +50,7 @@ function stubClient(overrides: {
     listLibrary: () => Promise.resolve(ok(overrides.library ?? [])),
     tasks: () => refuse(),
     cancelTask: () => refuse(),
+    agents: () => refuse(),
     providerIcon: () => refuse(),
     listModels: () =>
       error ? Promise.resolve({ ok: false as const, error }) : Promise.resolve(ok(overrides.models ?? [modelFor(KNOWN_VENDOR.id, 'claude-opus-5')])),

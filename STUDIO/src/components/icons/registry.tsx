@@ -34,7 +34,7 @@ import {
   SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
   Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
-  Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus,
+  Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus, Bot,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -256,6 +256,10 @@ const REGISTRY = {
   connector: { mark: Cable },
   skill: { mark: WandSparkles },
   hook: { mark: Webhook },
+  // The agent roster's section mark: the delegate itself. Not `sparkles`
+  // (generation) and not `skill` (a skill's wand) — the agents pane is the
+  // one place that names the agents rather than one of their surfaces.
+  agents: { mark: Bot },
   browserUse: { mark: Globe },
   // The desktop, driven: a pointer mid-click. Not `themeSystem`'s monitor,
   // which means "follow the OS", and not `devices`, which is the same Studio

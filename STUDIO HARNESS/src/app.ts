@@ -452,6 +452,9 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
           return true;
         },
       },
+      // The read-only roster the Settings pane reads: the same registry the
+      // mount, the gate's filter, and the scope substitution resolve through.
+      agents: agentRegistry,
       browser: { stop: (conversationId) => runtime.stopBrowser(conversationId) },
       computer: { stop: (conversationId) => runtime.stopComputer(conversationId) },
       admission: admission.verifier,

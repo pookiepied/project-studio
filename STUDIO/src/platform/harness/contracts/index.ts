@@ -250,6 +250,18 @@ export {
 } from './tasks'
 
 export {
+  AGENT_EFFECTS,
+  AGENT_KINDS,
+  AGENT_MODES,
+  type AgentKind,
+  type AgentMode,
+  type AgentModelPolicyRecord,
+  type AgentRosterRecord,
+  parseAgentRecord,
+  parseAgentRoster,
+} from './agents'
+
+export {
   readChunkFacts,
   readConversationSnapshot,
   type ChunkFacts,

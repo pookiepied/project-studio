@@ -130,6 +130,10 @@ export {
   type MediaArtifactFile,
   type AgentTask,
   type AgentTaskStatus,
+  type AgentKind,
+  type AgentMode,
+  type AgentModelPolicyRecord,
+  type AgentRosterRecord,
 } from './contracts'
 
 export {

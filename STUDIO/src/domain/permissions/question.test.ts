@@ -19,6 +19,7 @@ function record(overrides: Partial<PendingApprovalRecord> = {}): PendingApproval
     capabilityTitle: 'Write file',
     resource: 'C:\\home\\conversations\\cnv_1\\workspace\\index.html',
     conversationId: 'conversation:cnv_1',
+    agentId: 'studio',
     scopes: [
       { id: 'this-file', label: 'Just this file', detail: 'index.html', pattern: null },
       {

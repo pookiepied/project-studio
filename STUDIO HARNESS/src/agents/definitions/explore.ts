@@ -22,11 +22,22 @@ import { validateAgentDefinition } from "./registry.js";
  * family (`ask_user_question`, `request_folder`, `plan`, `library_*`,
  * `studio_*`, `ocr`, `jobs`) — a delegate holds no conversation of its
  * own to park a question in, and the person watching the parent is not
- * shown the child's asks in v1. `maxEffects: ["read"]` is the ceiling
- * that makes the allowlist's read-only claim a three-layer agreement
+ * shown the child's asks in v1. `maxEffects: ["read", "network"]` is the
+ * ceiling that makes the allowlist's claims a three-layer agreement
  * rather than a hope: the model sees only readers (allowlist), the
- * kernel refuses any effect outside `["read"]` (ceiling), and the
- * sandbox holds the same boundary (containment).
+ * kernel refuses any write or run (ceiling), and the sandbox holds the
+ * same boundary (containment).
+ *
+ * `network` is in the ceiling and `write` is not, and that is the
+ * corrected reading of D11's "read-only": the web readers' whole effect
+ * is `network`, and a ceiling of `["read"]` alone made them visible
+ * tools that could never run — every fetch refused at the ceiling in
+ * every conversation, the delegate's model burning a turn to learn its
+ * own array lied to it. Reading the web is reading; the ceiling's job is
+ * the boundary nothing may cross, which is changing anything on or
+ * beyond this machine by writing or running. Authorization for the
+ * network calls still stops at the kernel under this agent's own id,
+ * exactly as it does for the conversation's.
  *
  * The module imports the definition, never the reverse: a definition
  * file that imported its agent module would be a cycle (the agent's
@@ -56,13 +67,13 @@ export const exploreDefinition = validateAgentDefinition({
   },
   skills: { ids: [] },
   permissions: {
-    maxEffects: ["read"],
     // A delegate never inherits an approval (ADR 0038's grant-isolation
     // property, #49): the child asks, under its own agent id, and the
     // honest default for that is `ask` — an explore run is not the thing
     // Full Auto should silently widen. `git`'s write options and the web
-    // readers' network effect both stop here first when the conversation
-    // would not.
+    // readers' network calls both stop at the kernel first when the
+    // conversation would not.
+    maxEffects: ["read", "network"],
     mode: "ask",
   },
   durability: { maxAttempts: 3, timeoutMs: 600_000 },

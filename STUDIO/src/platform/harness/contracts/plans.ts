@@ -30,8 +30,12 @@ export interface PlanItemRecord {
   readonly status: ArtifactStatus
   /** First-seen order. The panel renders in this order and nothing resorts it. */
   readonly position: number
-  /** Who last touched the item - the model's write or the person's tick. */
-  readonly updatedBy: 'model' | 'person'
+  /**
+   * Who last touched the item: the conversation agent's write, the person's
+   * tick, or a delegate's write named as `agent:<agentName>` (S5.2's writer
+   * dimension). The panel reads the kind and, for a delegate, the name.
+   */
+  readonly updatedBy: 'model' | 'person' | `agent:${string}`
   readonly updatedAt: number
 }
 
@@ -62,9 +66,19 @@ export function parsePlanItem(value: unknown): PlanItemRecord | null {
   const status = PLAN_STATUS.get(value['status'])
   const position = finiteNumber(value['position'])
   const updatedAt = finiteNumber(value['updatedAt'])
-  const updatedBy = value['updatedBy'] === 'model' || value['updatedBy'] === 'person'
-    ? value['updatedBy']
-    : null
+  // The writer dimension, parsed rather than trusted: `model` and `person`
+  // are exact, and a delegate's write arrives as `agent:<agentName>` — the
+  // same string the store stores, with the non-empty-name rule mirrored so
+  // a malformed value fails the row instead of rendering as a writer.
+  const rawWriter = value['updatedBy']
+  const updatedBy =
+    rawWriter === 'model' || rawWriter === 'person'
+      ? rawWriter
+      : typeof rawWriter === 'string' &&
+          rawWriter.startsWith('agent:') &&
+          rawWriter.slice('agent:'.length).trim() !== ''
+        ? (rawWriter as `agent:${string}`)
+        : null
   if (
     id === null ||
     itemText === null ||

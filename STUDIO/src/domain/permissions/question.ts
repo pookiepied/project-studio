@@ -22,6 +22,14 @@ export interface PermissionQuestion {
   readonly id: string
   /** When the kernel raised it. The queue is answered oldest first. */
   readonly createdAt: number
+  /**
+   * The agent whose call raised the question, when it was a delegate's -
+   * `general`, `explore` - and null for the conversation agent's own. A
+   * delegate asks under its own name (ADR 0058), so the prompt says who is
+   * asking and the person answering knows which agent a lasting grant will
+   * be keyed to.
+   */
+  readonly agentId: string | null
   /** The action sentence, in order, code parts set in the mono face. */
   readonly sentence: readonly QuestionTextPart[]
   /**
@@ -203,6 +211,23 @@ function sentenceFor(record: PendingApprovalRecord, hasProject: boolean): readon
   ]
 }
 
+/**
+ * The display name of the agent a question is attributed to, or null when it
+ * needs none: the conversation agent's own ask (its scope carries `studio`,
+ * and the card is Studio speaking) or a record without an agent at all. The
+ * known delegates are named by their definition's title; an unknown id is
+ * named by itself, the honest fallback for an agent this file has never met.
+ */
+export function agentAttribution(agentId: string | null): string | null {
+  if (agentId === null || agentId === 'studio') return null
+  const known: Record<string, string> = {
+    general: 'General',
+    explore: 'Explorer',
+    plan: 'Planner',
+  }
+  return `${known[agentId] ?? agentId} agent`
+}
+
 /** The wire row becomes the question the prompt renders. */
 export function questionFromRecord(
   record: PendingApprovalRecord,
@@ -211,6 +236,7 @@ export function questionFromRecord(
   return {
     id: record.id,
     createdAt: record.createdAt,
+    agentId: record.agentId,
     sentence: sentenceFor(record, options.hasProject ?? false),
     reason: record.source === 'policy' ? record.reason : null,
     lastingScopeId:

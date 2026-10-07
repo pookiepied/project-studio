@@ -46,8 +46,8 @@ up the next unshipped row without re-deriving the order.
 | S2 | Definitions, registry, `dispatchBackgroundAgent()`, TaskStore migration | ✅ **Done 2026-10-03** — `c9266055`; zero behavior change held (2,272 + 1,357 tests green); register #90 records the proofs |
 | S3 | **The Explore delegate** — the first real subagent | ✅ **Done 2026-10-03** — register row 96: definition, mount, the patch's one budgeted hunk, the gate's agent-aware policy, #49 closed end to end (store + scope + live run) |
 | S4 | Background agent tasks (routes, projection, signals, rail) | ✅ **Done 2026-10-03** — register row 97: D10 decided (ADR 0058's amendment), the dispatcher's row, the projector, the third ping source, the routes and cancel port, the rail's Tasks section and the transcript's delegation chip, purge semantics |
-| S5 | The broader roster (`general`, `plan`) + assignment | ⬜ Next |
-| S6 | Consolidation and the deferred decisions | ⬜ |
+| S5 | The broader roster (`general`, `plan`) + assignment | ✅ **Done 2026-10-07** — register row 98: the `general` and `plan` delegates live (the ask-based consent default consumed at the kernel; the MCP wildcard; the plan tool's `agent:<name>` writer dimension), skills assignment landed (definition ∩ selection chain, mounted through the delegate renders), `GET /api/agents` + the Settings roster pane, agent-attributed approval cards, and the two-delegate concurrency run |
+| S6 | Consolidation and the deferred decisions | ⬜ Next |
 
 Open register rows that touch this map: **#70** (load-dependent suite flake,
 assigned Stage 4b), **#13** (gateway contract, mooted by cancellation — close it
@@ -110,13 +110,16 @@ and signals already proven.
 
 ## S5 — The broader roster and assignment
 
+*Delivered 2026-10-07 — register row 98. What the gates became, in the
+delivered order:*
+
 | # | Row | Gate |
 |---|---|---|
-| S5.1 | `general` delegate — the `GeneralSubagent` equivalent, Studio-shaped: natives minus destructive, `write` allowed, `execute` asks; parent-adopted MCP ∩ its namespace allowlist | Its asks render under its own agent id (approval UX already carries `scope.agentId`); grant isolation asserted for it too |
-| S5.2 | `plan` delegate — read-only + the plan tool; the PlanItemStore writer dimension gains `agent` | Plan rows carry the agent; the person's ticks and the agent's writes merge without clobbering (the existing merge semantics, asserted with a second writer) |
-| S5.3 | Skills assignment per definition (the Phase 12 "agent assignment" question, answered): definition `skills.ids` ∩ the conversation's selection chain, mounted through the delegate's own render | Per-agent skill mounting test; the Settings roster shows the lists (read-only — the honest-list rule) |
-| S5.4 | Roster section of the system prompt covers all three delegates; approval UX polish (agent-attributed cards, grouped by agent) | Prompt byte-stability for an unchanged roster; STUDIO tests for the attributed cards |
-| S5.5 | Parallel tasks: one batch, two delegates, no interleaved grant writes or membership mutations | A concurrency test with two delegates running beside each other |
+| S5.1 | `general` delegate — the `GeneralSubagent` equivalent, Studio-shaped: natives minus destructive, `write` allowed, `execute` asks; parent-adopted MCP ∩ its namespace allowlist | **Delivered.** Its asks render under its own agent id — proven live: an Auto conversation's delegated write parks, the pending approval names `general`, and the answer writes the grant keyed to the delegate, not the conversation. The `mode: "ask"` field is now consumed: the delegate's own consent default resolves its default asks at the kernel, so a delegated task asks even where the conversation runs Auto. The D11 shorthand's concrete allowlist, the wildcard, and the explore ceiling correction are recorded in the plan's D11 note |
+| S5.2 | `plan` delegate — read-only + the plan tool; the PlanItemStore writer dimension gains `agent` | **Delivered.** `PlanWriter` gained `agent:<agentName>` — the merge closure resolves the acting agent from the same frame every other per-agent decision reads. Store tests assert the second writer beside the person's tick (merge-by-id, nothing clobbered); the live two-delegate run leaves rows recorded `agent:plan` |
+| S5.3 | Skills assignment per definition: definition `skills.ids` ∩ the conversation's selection chain, mounted through the delegate's own render | **Delivered.** The runtime's `delegateSkills` walks the conversation's chain once, narrowed to the definition's named ids on the registry's record vocabulary (packaged reference ids carry a content hash and match nothing). All three delegates ship empty lists in v1 — the honest answer — so the semantics are proven with a definition naming a bundled skill against the real selection chain; the Settings roster pane (`GET /api/agents` + AgentsPane) shows the lists read-only |
+| S5.4 | Roster section covers all three delegates; approval UX polish | **Delivered.** The static delegation section teaches matching the delegate to the work (reading / hands-on / planning) beside Flue's composed `## Available Agents` roster; approval cards carry the asking agent's name (`Permission — General agent`), the conversation agent's asks stay unattributed, and the waiting list groups by agent |
+| S5.5 | Parallel tasks: one batch, two delegates, no interleaved grant writes or membership mutations | **Delivered.** One assistant message, two `task` calls (explorer + planner) in one batch against the live built harness: both answers return, the parent transcript holds the two task results and nothing of either child's work, the plan rows carry `agent:plan`, and the grant table ends the run empty |
 
 ---
 
@@ -185,7 +188,7 @@ settings UI that edits definitions (Phase 18 product work at the earliest);
 **S3 (Explore, the slice that proves delegation works at all) → S4 (background
 tasks, the surface you watch settle) → S5 (the roster fills out) → S6 (fold the
 decisions and the docs).** Tracks land inside the stage windows named above; the
-map's next unshipped row at any moment is S5.1.
+map's next unshipped row at any moment is S6.1.
 
 *Status of this file:* maintained beside the plan until S6.3 folds the surviving
 content into the durable docs — then it is archived, banner-marked, per the

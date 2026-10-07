@@ -183,6 +183,39 @@ function hasTaskResult(context: Context): boolean {
   );
 }
 
+/**
+ * The plan read-back clause: the writer dimension the plan tool's result
+ * carries, quoted verbatim so the live test can assert the rows the
+ * planner wrote are recorded as the planner's. Empty string when no plan
+ * result is in the transcript.
+ */
+function planWriterClause(context: Context): string {
+  for (const message of context.messages.toReversed()) {
+    if (message.role === "toolResult" && message.toolName === "plan") {
+      // The result may arrive as a JSON string, a content-part array, or
+      // the parsed object itself — normalize to the report shape first.
+      const raw = message.content;
+      const text =
+        typeof raw === "string"
+          ? raw
+          : Array.isArray(raw)
+            ? raw
+                .filter((part) => part.type === "text")
+                .map((part) => part.text)
+                .join("")
+            : JSON.stringify(raw);
+      try {
+        const parsed = JSON.parse(text) as { items?: { updatedBy?: string }[] };
+        const writer = parsed.items?.[0]?.updatedBy;
+        return writer === undefined ? ", plan unrecorded" : `, plan writer ${writer}`;
+      } catch {
+        return ", plan unrecorded";
+      }
+    }
+  }
+  return "";
+}
+
 /** Whether the discovery has answered at least once, transcript-wide. */
 function hasDiscoverResult(context: Context): boolean {
   return context.messages.some(
@@ -489,6 +522,106 @@ export function stream(
         context.tools?.find((tool) => tool.name === name)?.name;
       const toolNames = (): string[] =>
         (context.tools ?? []).map((tool) => tool.name).sort();
+      // The two-delegate batch (S5.5): ONE assistant message, two `task`
+      // calls, the way a model hands independent work to two delegates at
+      // once. The children are the explorer and the planner, so the batch
+      // exercises the two read-shaped surfaces side by side — and the plan
+      // child writes plan rows under `agent:plan` while the explorer reads,
+      // which is the concurrency the live test asserts on.
+      if (
+        userText.includes("[delegate-two]") &&
+        !hasTaskResult(context) &&
+        (context.systemPrompt ?? "").includes("# Studio")
+      ) {
+        const calls = [
+          {
+            type: "toolCall" as const,
+            id: "delegate-two-explore-1",
+            name: "task",
+            arguments: {
+              agent: "explore",
+              prompt: "[task] find the workspace files [report] what you can see",
+            },
+          },
+          {
+            type: "toolCall" as const,
+            id: "delegate-two-plan-1",
+            name: "task",
+            arguments: {
+              agent: "plan",
+              prompt: "[planit] write the plan [report] the plan",
+            },
+          },
+        ];
+        const message = createMessage(model, calls);
+        message.stopReason = "toolUse";
+        for (const [at, call] of calls.entries()) {
+          events.push({ type: "toolcall_start", contentIndex: at, partial: initial });
+          events.push({
+            type: "toolcall_end",
+            contentIndex: at,
+            toolCall: call,
+            partial: message,
+          });
+        }
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+      if (userText.includes("[delegate-two]") && hasTaskResult(context)) {
+        // The closing, after both children answered: quote each answer so
+        // the test can assert both returned, and nothing of either child's
+        // intermediate work crossed back.
+        const answers = context.messages
+          .filter((message) => message.role === "toolResult" && message.toolName === "task")
+          .map((message) =>
+            typeof message.content === "string"
+              ? message.content
+              : (message.content ?? [])
+                  .filter((part) => part.type === "text")
+                  .map((part) => part.text)
+                  .join(""),
+          );
+        const text = `Delegated twice. ${answers.join(" || ")}`;
+        const partial = createMessage(model, [{ type: "text", text: "" }]);
+        events.push({ type: "text_start", contentIndex: 0, partial });
+        partial.content = [{ type: "text", text }];
+        events.push({ type: "text_delta", contentIndex: 0, delta: text, partial });
+        events.push({
+          type: "text_end",
+          contentIndex: 0,
+          content: text,
+          partial: createMessage(model, [{ type: "text", text }]),
+        });
+        events.push({ type: "done", reason: "stop", message: createMessage(model, [{ type: "text", text }]) });
+        return;
+      }
+      // The general-delegate scenario (S5.1): the parent hands real work to
+      // the hands-on delegate. The child attempts a write — a tool its
+      // array DOES hold — and the run parks on the approval the delegate's
+      // own consent default raises, answered over the approvals API. The
+      // child marker differs from the explorer's so the two delegations
+      // stay separately scriptable.
+      if (
+        userText.includes("[delegate-general]") &&
+        !hasTaskResult(context) &&
+        (context.systemPrompt ?? "").includes("# Studio")
+      ) {
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "delegate-general-1",
+          name: "task",
+          arguments: {
+            agent: "general",
+            prompt: "[gwrite] create general-made.txt [report] what happened",
+          },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
       if (userText.includes("[delegate]") && !hasTaskResult(context)) {
         // The write-refusal variant: a parent message carrying [try-write]
         // delegates a task whose prompt carries the marker too, and the
@@ -515,11 +648,19 @@ export function stream(
         events.push({ type: "done", reason: "toolUse", message });
         return;
       }
-      if (userText.includes("[delegate]") && hasTaskResult(context)) {
+      if (
+        (userText.includes("[delegate]") || userText.includes("[delegate-general]")) &&
+        hasTaskResult(context)
+      ) {
         // The parent's closing, after the task answered: quote the child's
         // final message from the tool result so the return path is asserted
         // end to end — what the parent's model receives is the child's
-        // answer, and the child's intermediate steps never appear.
+        // answer, and the child's intermediate steps never appear. The
+        // general variant is spelled out beside the explorer marker because
+        // "[delegate-general]" does not CONTAIN "[delegate]" — the bracket
+        // closes the token — a subtlety the first run of this scenario
+        // learned the hard way: the closing never matched and the run
+        // answered with the fallthrough echo.
         const taskResult = context.messages.toReversed().find(
           (message) => message.role === "toolResult" && message.toolName === "task",
         );
@@ -530,7 +671,8 @@ export function stream(
                 .filter((part) => part.type === "text")
                 .map((part) => part.text)
                 .join("") || "(no task result)";
-        const text = `Delegated. The explorer answered: ${childAnswer}`;
+        const who = userText.includes("[delegate-general]") ? "general" : "explorer";
+        const text = `Delegated. The ${who} answered: ${childAnswer}`;
         const partial = createMessage(model, [{ type: "text", text: "" }]);
         events.push({ type: "text_start", contentIndex: 0, partial });
         partial.content = [{ type: "text", text }];
@@ -572,6 +714,47 @@ export function stream(
         events.push({ type: "done", reason: "toolUse", message });
         return;
       }
+      // The general delegate's working step (S5.1): attempt the write its
+      // allowlist holds. The kernel's verdict is the delegate's own consent
+      // default (`mode: "ask"`), so the run parks on an approval that names
+      // `general` — the live test answers it and asserts the attribution.
+      if (userText.includes("[gwrite]") && !hasAnyToolResult(context)) {
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "general-write-1",
+          name: "write",
+          arguments: { path: "general-made.txt", content: "written by the general delegate" },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+      // The planner delegate's working step (S5.2): write the plan rows the
+      // person watches. The plan tool declares read and nothing else, so no
+      // approval is raised; the rows it leaves record `agent:plan`, and the
+      // read-back in the report carries that to the test.
+      if (userText.includes("[planit]") && !hasAnyToolResult(context)) {
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "plan-write-1",
+          name: "plan",
+          arguments: {
+            items: [
+              { id: "step-one", text: "Find the workspace files", status: "done" },
+              { id: "step-two", text: "Report the plan", status: "pending" },
+            ],
+          },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
       if (userText.includes("[report]")) {
         // The child's own report. Reading `context.tools` here is reading
         // what the gate's per-acting-agent filter handed the delegate's
@@ -582,22 +765,42 @@ export function stream(
         const seesWrite = toolNameOf("write");
         const seesShell = toolNameOf("shell");
         const seesDiscover = toolNameOf("discover");
+        const seesPlan = toolNameOf("plan");
         const roster = (context.systemPrompt ?? "").includes("**explore**")
           ? "named"
           : "absent";
+        // Which delegate this session IS, read from its own instructions —
+        // the only place a child's identity is stated.
+        const prompt = context.systemPrompt ?? "";
+        const self = prompt.includes("# General")
+          ? ", agent general"
+          : prompt.includes("# Planner")
+            ? ", agent planner"
+            : "";
         // A write attempt that was refused names the refusal, read back
         // from the last tool result — the [try-write] scenario's whole
-        // answer. Anything else is the plain visibility report.
+        // answer. A write that RAN is the general scenario's half: the
+        // tool's own headline names the file it created.
         const writeRefused = lastToolResultIncludes(context, "not found")
           ? ", write refused as unknown"
           : "";
+        const writeRan = lastToolResultIncludes(context, "Created general-made.txt")
+          ? ", write ran"
+          : "";
+        // The plan read-back: the tool result carries the writer dimension
+        // the store recorded, and the report quotes it verbatim.
+        const planReport = seesPlan === undefined ? "" : planWriterClause(context);
         const text =
           `Delegate sees ${toolNames().length} tools` +
           (seesTask === undefined ? ", no task" : ", task present") +
           (seesWrite === undefined ? ", no write" : ", WRITE VISIBLE") +
           (seesShell === undefined ? ", no shell" : ", SHELL VISIBLE") +
           (seesDiscover === undefined ? ", no discover" : ", DISCOVER VISIBLE") +
+          (seesPlan === undefined ? ", no plan" : ", plan present") +
+          self +
           writeRefused +
+          writeRan +
+          planReport +
           `, roster ${roster}.`;
         const partial = createMessage(model, [{ type: "text", text: "" }]);
         events.push({ type: "text_start", contentIndex: 0, partial });

@@ -3,6 +3,7 @@ import type {
   CapabilityEffect,
   ExecutionScope,
 } from "../contracts/capabilities.js";
+import type { ExecutionMode } from "../permissions/mode.js";
 import type { StudioAgentDefinition } from "../contracts/agents.js";
 
 /**
@@ -15,11 +16,12 @@ import type { StudioAgentDefinition } from "../contracts/agents.js";
  * ∩ the conversation's gate, and the ceiling is checked at call time
  * beside the kernel's own verdict.
  *
- * Why a module and not inline in the sandbox factory: three readers ask
+ * Why a module and not inline in the sandbox factory: four readers ask
  * the same question (the `tools()` filter, the scope substitution, the
- * effects ceiling), and the resolution logic — execution context →
- * acting agent → definition → policy — is one derivation that must not
- * fork. Every reader imports it from here.
+ * effects ceiling, and since Stage 5 the consent default the kernel
+ * resolves a delegate's default asks under), and the resolution logic —
+ * execution context → acting agent → definition → policy — is one
+ * derivation that must not fork. Every reader imports it from here.
  */
 
 /** What the acting-agent resolution answers for one assembly or call. */
@@ -32,6 +34,16 @@ export interface ActingAgentPolicy {
   readonly allowedMcpNamespaces: ReadonlySet<string> | undefined;
   /** The ceiling on effects a delegate's calls may earn; undefined means no ceiling beyond the kernel's. */
   readonly maxEffects: readonly CapabilityEffect[] | undefined;
+  /**
+   * The delegate's own consent default — what a default `ask` does under
+   * this agent when no grant and no rule has spoken — or undefined for the
+   * conversation agent, whose posture (the conversation's settled mode)
+   * already speaks. Consumed by the kernel's posture composition in the
+   * runtime: a delegate's calls resolve the definition's mode, so a
+   * delegated task asks before it changes or runs something even when the
+   * parent conversation runs in Auto.
+   */
+  readonly mode: ExecutionMode | undefined;
 }
 
 /** The conversation agent's policy: it composes its surface from live state. */
@@ -40,6 +52,7 @@ const CONVERSATION_POLICY: ActingAgentPolicy = {
   allowedNatives: undefined,
   allowedMcpNamespaces: undefined,
   maxEffects: undefined,
+  mode: undefined,
 };
 
 /**
@@ -75,6 +88,7 @@ export function actingAgentPolicy(
       allowedNatives: new Set<string>(),
       allowedMcpNamespaces: new Set<string>(),
       maxEffects: ["read"],
+      mode: "ask",
     };
   }
   const tools = found.definition.tools;
@@ -91,6 +105,7 @@ export function actingAgentPolicy(
     allowedNatives: new Set(tools.natives),
     allowedMcpNamespaces: new Set(tools.mcpNamespaces),
     maxEffects: permissions.maxEffects,
+    mode: permissions.mode,
   };
 }
 
@@ -99,14 +114,25 @@ export function actingAgentPolicy(
  *
  * Native tools filter by name against the allowlist. MCP tools filter by
  * namespace: a delegate's MCP surface is its definition's static
- * namespace allowlist (resolved at spawn in a later stage — v1 delegates
- * hold none), and a namespace outside it is invisible even when the
- * conversation's gate holds it. The conversation agent sees everything
- * the gate lists, unchanged.
+ * namespace allowlist ∩ the namespaces the conversation actually holds in
+ * this assembly — the enablement chain and the adopted set decide what
+ * the gate lists, so an allowlisted namespace with nothing adopted yields
+ * nothing, and an adopted namespace the allowlist withholds stays
+ * invisible. The conversation agent sees everything the gate lists,
+ * unchanged.
+ *
+ * The allowlist's one metacharacter is the bare star, and it exists
+ * because MCP namespaces are `mcp:<server id>` with the server id
+ * user-minted: a static definition cannot name a person's servers, and
+ * one that did would behave differently on every machine. `"*"` says
+ * "the namespaces this conversation has adopted, and nothing more" — the
+ * star widens nothing the person did not switch on, which is the D11
+ * row's "parent's adopted, allowlisted" in one field. Any other value
+ * matches literally.
  *
  * `discover` is withheld from every delegate by name, allowlist or no
  * allowlist: adoption mutates the conversation's adopted set, and a
- * delegate adopting a tool would write into the parent's set — the
+ * delegate adopting a tool would write into the parent's array — the
  * two-writer bug ADR 0029 exists to prevent (D4's recorded decision).
  */
 export function visibleToAgent(
@@ -118,7 +144,10 @@ export function visibleToAgent(
     if (descriptor.id.name === "discover") return false;
     return policy.allowedNatives?.has(descriptor.id.name) ?? false;
   }
-  return policy.allowedMcpNamespaces?.has(descriptor.id.namespace) ?? false;
+  if (policy.allowedMcpNamespaces === undefined) return false;
+  return (
+    policy.allowedMcpNamespaces.has("*") || policy.allowedMcpNamespaces.has(descriptor.id.namespace)
+  );
 }
 
 /**

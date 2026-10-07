@@ -80,6 +80,13 @@ export interface PendingApprovalRecord {
   readonly resource: string | null
   /** The conversation whose run raised the question, bare: `cnv_x`, not `conversation:cnv_x`. */
   readonly conversationId: string | null
+  /**
+   * The agent whose call raised the question - `general`, `explore` - or null
+   * when it was the conversation agent's own. S5.4's attribution: a delegate
+   * asks under its own name (ADR 0058), so the card can say who is asking,
+   * and a person answering knows which agent the grant will be keyed to.
+   */
+  readonly agentId: string | null
   /** The scope ladder, narrowest first, exactly as the kernel offered it. */
   readonly scopes: readonly ApprovalScopeOption[]
   readonly source: DecisionSourceWire
@@ -114,6 +121,9 @@ export function parsePendingApproval(value: unknown): PendingApprovalRecord | nu
 
   const resource = nullableTextOrAbsent(request['resource'])
   const conversationId = nullableTextOrAbsent(scope['conversationId'])
+  // The conversation agent's frames carry no acting agent; `studio` itself
+  // never arrives here, so present means a delegate. A non-string is absent.
+  const agentId = nullableTextOrAbsent(scope['agentId'])
 
   const scopes = listOf(parseApprovalScope, request['scopes'])
   const source = oneOf<DecisionSourceWire>(['policy', 'grant', 'default'], decision['source'])
@@ -123,7 +133,8 @@ export function parsePendingApproval(value: unknown): PendingApprovalRecord | nu
     source === null ||
     reason === null ||
     !resource.ok ||
-    !conversationId.ok
+    !conversationId.ok ||
+    !agentId.ok
   ) {
     return null
   }
@@ -136,6 +147,7 @@ export function parsePendingApproval(value: unknown): PendingApprovalRecord | nu
     capabilityTitle,
     resource: resource.value,
     conversationId: conversationId.value,
+    agentId: agentId.value,
     scopes,
     source,
     reason,

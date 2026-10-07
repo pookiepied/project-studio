@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { agentRegistry } from "../../src/agents/definitions/index.js";
-import { EXPLORE_AGENT_ID, STUDIO_AGENT_ID } from "../../src/contracts/agents.js";
+import { EXPLORE_AGENT_ID, GENERAL_AGENT_ID, PLAN_AGENT_ID, STUDIO_AGENT_ID } from "../../src/contracts/agents.js";
 import { delegateMount } from "../../src/agents/studio.js";
 import { Explore } from "../../src/agents/explore.js";
+import { General } from "../../src/agents/general.js";
+import { Plan } from "../../src/agents/plan.js";
 import {
   actingAgentPolicy,
   effectsWithinCeiling,
@@ -42,7 +44,7 @@ function conversationScope(): ExecutionScope {
 }
 
 describe("the acting-agent policy", () => {
-  it("answers the conversation agent with no allowlist, no ceiling", () => {
+  it("answers the conversation agent with no allowlist, no ceiling, no mode override", () => {
     const policy = actingAgentPolicy(undefined, agentRegistry);
     expect(policy.subagentName).toBeUndefined();
     // The conversation agent composes its surface from live state; the
@@ -50,6 +52,9 @@ describe("the acting-agent policy", () => {
     // through.
     expect(policy.allowedNatives).toBeUndefined();
     expect(policy.maxEffects).toBeUndefined();
+    // Its default asks resolve under the conversation's own posture — the
+    // definition-level mode exists for delegates only.
+    expect(policy.mode).toBeUndefined();
   });
 
   it("resolves the explore delegate's allowlist from the registry", () => {
@@ -63,7 +68,44 @@ describe("the acting-agent policy", () => {
       "read",
       "web_search",
     ]);
+    // The corrected D11 reading (Stage 5): read-only on the machine, with
+    // the web readers' network effect in scope — a visible tool that could
+    // never run was the old ceiling's own lie.
+    expect(policy.maxEffects).toEqual(["read", "network"]);
+    // The delegate's own consent default, carried for the kernel's posture.
+    expect(policy.mode).toBe("ask");
+  });
+
+  it("resolves the general delegate's allowlist: the working set, no destructive pair", () => {
+    const policy = actingAgentPolicy(GENERAL_AGENT_ID, agentRegistry);
+    expect(policy.subagentName).toBe(GENERAL_AGENT_ID);
+    expect([...(policy.allowedNatives ?? [])].sort()).toEqual([
+      "edit",
+      "fetch",
+      "git",
+      "glob",
+      "grep",
+      "read",
+      "shell",
+      "web_search",
+      "write",
+    ]);
+    // The whole vocabulary: general's story is ask-based, not
+    // refusal-based — the destructive pair is withheld by the allowlist,
+    // and everything reachable stops at the kernel under its own id.
+    expect(policy.maxEffects).toEqual(["read", "write", "execute", "network"]);
+    expect(policy.mode).toBe("ask");
+    // The wildcard: "the namespaces this conversation has adopted".
+    expect(policy.allowedMcpNamespaces?.has("*")).toBe(true);
+  });
+
+  it("resolves the plan delegate's allowlist: readers plus the plan tool", () => {
+    const policy = actingAgentPolicy(PLAN_AGENT_ID, agentRegistry);
+    expect(policy.subagentName).toBe(PLAN_AGENT_ID);
+    expect([...(policy.allowedNatives ?? [])].sort()).toEqual(["glob", "grep", "plan", "read"]);
     expect(policy.maxEffects).toEqual(["read"]);
+    // No MCP at all — the strict list, not the star.
+    expect(policy.allowedMcpNamespaces?.size).toBe(0);
   });
 
   it("treats an unregistered name as a delegate allowed nothing", () => {
@@ -113,6 +155,7 @@ describe("the acting-agent policy", () => {
       allowedNatives: new Set(["discover"]),
       allowedMcpNamespaces: new Set<string>(),
       maxEffects: ["read"],
+      mode: "ask",
     };
     expect(visibleToAgent(nativeDescriptor("discover", ["read"]), policy)).toBe(false);
   });
@@ -128,6 +171,27 @@ describe("the acting-agent policy", () => {
       provenance: { origin: "mcp", sourceId: "mcp:some-server", author: "third-party" },
     };
     expect(visibleToAgent(mcpTool, policy)).toBe(false);
+  });
+
+  it("shows the star allowlist every adopted namespace, and an empty list none", () => {
+    // The general delegate's wildcard: server ids are user-minted, so a
+    // static definition cannot name them — `*` says "what this conversation
+    // has adopted". The conversation's own enablement chain decides what
+    // the gate lists at all; this test pins the delegate-side half of the
+    // intersection against a namespace that reaches the gate.
+    const general = actingAgentPolicy(GENERAL_AGENT_ID, agentRegistry);
+    const mcpTool: CapabilityDescriptor = {
+      id: { namespace: "mcp:some-server", name: "tool" },
+      title: "MCP tool",
+      description: "",
+      effects: ["read"],
+      idempotent: true,
+      provenance: { origin: "mcp", sourceId: "mcp:some-server", author: "third-party" },
+    };
+    expect(visibleToAgent(mcpTool, general)).toBe(true);
+    // The plan delegate names `[]`: nothing MCP is its to see, even adopted.
+    const planner = actingAgentPolicy(PLAN_AGENT_ID, agentRegistry);
+    expect(visibleToAgent(mcpTool, planner)).toBe(false);
   });
 
   it("leaves the conversation agent's scope untouched", () => {
@@ -165,7 +229,10 @@ describe("the acting-agent policy", () => {
     expect(effectsWithinCeiling(nativeDescriptor("write", ["write"]), policy)).toBe(false);
     expect(effectsWithinCeiling(nativeDescriptor("shell", ["execute"]), policy)).toBe(false);
     expect(effectsWithinCeiling(nativeDescriptor("mixed", ["read", "write"]), policy)).toBe(false);
-    expect(effectsWithinCeiling(nativeDescriptor("web_search", ["network"]), policy)).toBe(false);
+    // The web readers are the corrected reading: network reads are within
+    // the explorer's ceiling, writes and runs are not.
+    expect(effectsWithinCeiling(nativeDescriptor("web_search", ["network"]), policy)).toBe(true);
+    expect(effectsWithinCeiling(nativeDescriptor("fetch", ["network"]), policy)).toBe(true);
   });
 
   it("imposes no ceiling on the conversation agent", () => {
@@ -191,6 +258,26 @@ describe("the delegate mount", () => {
     expect(mount.agent).toBe(Explore);
     expect("model" in mount).toBe(false);
     expect("thinkingLevel" in mount).toBe(false);
+  });
+
+  it("mounts the general and plan definitions with no model override", () => {
+    // The Stage 5 delegates inherit the parent's model like the explorer
+    // does: the roster's one rule is that no delegate silently downgrades
+    // the model the person chose for the conversation.
+    for (const [agentName, agentFunction] of [
+      [GENERAL_AGENT_ID, General],
+      [PLAN_AGENT_ID, Plan],
+    ] as const) {
+      const entry = agentRegistry.byKind("delegate").find(
+        (candidate) => candidate.definition.identity.agentName === agentName,
+      );
+      expect(entry).toBeDefined();
+      const mount = delegateMount(entry!);
+      expect(mount.name).toBe(agentName);
+      expect(mount.agent).toBe(agentFunction);
+      expect("model" in mount).toBe(false);
+      expect("thinkingLevel" in mount).toBe(false);
+    }
   });
 
   it("mounts a pinned model policy as the override fields", () => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   executionModeFromWire,
   executionModeToWire,
+  parseAgentRoster,
   parseAgentTask,
   parseAgentTasks,
   parseBackgroundJob,
@@ -813,6 +814,13 @@ describe('parsePendingApprovals', () => {
       source: 'default',
       reason: 'native/write has not been approved yet.',
     })
+    // The scope's agent rides along for the attribution (S5.4): the
+    // conversation agent's own `studio` and a delegate's name alike.
+    expect(parsed?.[0]?.agentId).toBe('studio')
+    const delegateAsk = parsePendingApprovals([
+      { ...APPROVAL, request: { ...APPROVAL.request, scope: { ...APPROVAL.request.scope, agentId: 'general' } } },
+    ])
+    expect(delegateAsk?.[0]?.agentId).toBe('general')
   })
 
   it('carries a resource that is absent, not empty', () => {
@@ -930,6 +938,50 @@ describe('reading agent tasks', () => {
     expect(read?.settledAt).toBe(99)
     expect(read?.resultSummary).toBe('Titled.')
     expect(parseAgentTask(null)).toBeNull()
+  })
+})
+
+describe('reading the agent roster', () => {
+  const delegate = {
+    agentName: 'general',
+    title: 'General',
+    description: 'Hands-on work.',
+    kind: 'delegate',
+    model: { inherit: true },
+    tools: { natives: ['read', 'write'], mcpNamespaces: ['*'] },
+    skills: { ids: [] },
+    permissions: { maxEffects: ['read', 'write'], mode: 'ask' },
+    durability: { maxAttempts: 3, timeoutMs: 600000 },
+  }
+  const conversation = {
+    agentName: 'studio',
+    title: 'Studio',
+    description: 'The continuing agent.',
+    kind: 'conversation',
+    model: { inherit: true },
+    durability: { maxAttempts: 3, timeoutMs: 3600000 },
+  }
+
+  it('keeps a delegate row with its policy and a conversation row without one', () => {
+    const roster = parseAgentRoster([delegate, conversation])
+    expect(roster).toHaveLength(2)
+    const general = roster[0]
+    expect(general?.tools?.mcpNamespaces).toEqual(['*'])
+    expect(general?.permissions?.mode).toBe('ask')
+    // The honest absence: a conversation row carries no static policy.
+    expect(roster[1]?.tools).toBeUndefined()
+    expect(roster[1]?.skills).toBeUndefined()
+    expect(roster[1]?.permissions).toBeUndefined()
+  })
+
+  it('drops a row whose policy does not match its kind', () => {
+    // A conversation row carrying a tool list would be a second source for
+    // an answer the conversation agent composes live; a delegate missing
+    // its permissions is a policy the pane cannot state. Both refuse.
+    expect(parseAgentRoster([{ ...conversation, tools: delegate.tools }])).toEqual([])
+    expect(parseAgentRoster([{ ...delegate, permissions: undefined }])).toEqual([])
+    expect(parseAgentRoster([{ ...delegate, kind: 'hibernating' }])).toEqual([])
+    expect(parseAgentRoster(null)).toEqual([])
   })
 })
 

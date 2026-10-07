@@ -14,6 +14,7 @@ import type {
   PlanSnapshot,
   BackgroundJob,
   AgentTask,
+  AgentRosterRecord,
   MediaJob,
   MediaArtifactFile,
   ProviderConnection,
@@ -130,6 +131,14 @@ export interface BoundClient {
   readonly tasks: {
     list: () => Promise<HarnessResult<readonly AgentTask[]>>
     cancel: (taskId: string) => Promise<HarnessResult<boolean>>
+  }
+  /**
+   * The harness's agent roster, read-only. Definitions are code on the
+   * harness side; this surface exists so the Settings pane can show what
+   * actually runs, not so anything can edit it.
+   */
+  readonly agents: {
+    list: () => Promise<HarnessResult<readonly AgentRosterRecord[]>>
   }
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
   readonly browser: {

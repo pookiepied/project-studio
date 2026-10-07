@@ -95,7 +95,7 @@ import {
   taskEndedLine,
   taskRunningLine,
 } from "../agents/task-projector.js";
-import { isSettledTaskStatus } from "../contracts/agents.js";
+import { isSettledTaskStatus, type StudioAgentDefinition } from "../contracts/agents.js";
 import { MediaService } from "../gateway/media/service.js";
 import type { MediaJobs } from "../gateway/media/jobs.js";
 import type { MediaAdapters } from "../gateway/media/adapters/types.js";
@@ -560,6 +560,25 @@ export interface AgentHost {
    */
   conversationSkills?(conversationId: string): readonly SkillReference[];
   /**
+   * The skills one delegate mounts, for its render (S5.3): the definition's
+   * named skills ∩ the selection chain of the conversation the task runs in.
+   *
+   * The intersection is the whole policy — a definition naming a skill does
+   * not arm it; the person must have switched it on for the conversation
+   * through the same chain the conversation agent's own skills ride — and
+   * the definition names only bundled skills (the registry refuses a user
+   * machine's skills at load). A conversation id of undefined — a frame
+   * without the parent's instance link — answers empty: a delegate that
+   * cannot say which conversation it is in mounts nothing.
+   *
+   * Optional for the same reason as `conversationSkills`: a test double that
+   * predates the delegates still satisfies the host.
+   */
+  delegateSkills?(
+    conversationId: string | undefined,
+    definition: StudioAgentDefinition,
+  ): readonly SkillReference[];
+  /**
    * Copies one delivery's attached images into the conversation's own
    * `attachments/` directory, so the run's file tools can read them.
    *
@@ -1016,9 +1035,46 @@ export class StudioRuntime implements AgentHost {
    * which is the nearer of the two.
    */
   conversationSkills(conversationId: string): readonly SkillReference[] {
+    return this.#activeSkillReferences(conversationId);
+  }
+
+  /**
+   * The skills one delegate mounts: its definition's named ids ∩ this
+   * conversation's selection chain (the AgentHost contract's words, S5.3).
+   *
+   * The chain read is the conversation's own walk — the same warnings, the
+   * same workspace-shadow rule, the same never-fail-the-run drops — narrowed
+   * to the definition's list, matched on the registry's record ids before
+   * anything is packaged (a packaged reference's id carries a content hash,
+   * which is not the vocabulary a definition names). A definition that names
+   * nothing answers before the chain is read, which keeps a v1 delegate's
+   * render at zero lookups. An unknown conversation (no frame link) answers
+   * empty for the same reason the contract names: nothing mounted is the
+   * honest answer when the caller cannot say where it stands.
+   */
+  delegateSkills(
+    conversationId: string | undefined,
+    definition: StudioAgentDefinition,
+  ): readonly SkillReference[] {
+    const named = definition.skills?.ids ?? [];
+    if (conversationId === undefined || named.length === 0) return [];
+    return this.#activeSkillReferences(conversationId, new Set(named));
+  }
+
+  /**
+   * The conversation's switched-on skills, packaged for `useSkill`, narrowed
+   * to `only` when given. One walk for both callers so the two answers can
+   * never disagree about enablement, shadowing, or a folder that stopped
+   * parsing.
+   */
+  #activeSkillReferences(
+    conversationId: string,
+    only?: ReadonlySet<string>,
+  ): readonly SkillReference[] {
     const workspace = this.conversationProjectFolders(conversationId)[0];
     const references: SkillReference[] = [];
     for (const entry of this.#inventory.active("skill", this.#enablementContext(conversationId))) {
+      if (only !== undefined && !only.has(entry.id)) continue;
       if (workspace !== undefined && existsSync(join(workspace, ".agents", "skills", entry.id))) {
         this.#logger?.warn(
           `The skill "${entry.id}" is switched on and also in the project's .agents/skills folder; the project's copy is the one mounted.`,
@@ -1787,6 +1843,26 @@ export class StudioRuntime implements AgentHost {
     // mode a decision resolves under belongs to exactly the conversation the
     // call came from. No process-wide value is consulted anywhere.
     const mode = (): ExecutionMode => this.#conversationMode(options.conversationId);
+    // The mode a default `ask` resolves under, per acting agent. The
+    // conversation's calls ride `mode()` — the person's own choice for the
+    // conversation. A delegate's calls ride its definition's `mode` instead
+    // (the contract's "the delegate's own consent default"): a delegated
+    // task asks before it changes or runs something even in an Auto
+    // conversation, because the person handed off work, not attention — and
+    // the ask arrives under the delegate's own agent id, so answering it
+    // grants the delegate, not the conversation (S5.1). Read per ask rather
+    // than per submission: the same kernel decides the parent's and the
+    // child's calls, and the frame is current whenever a decision is being
+    // made. `requiresUndo` above deliberately stays on the conversation's
+    // mode — the undo guarantee is the conversation's, and a delegate write
+    // approved inside an Auto conversation still gets its restore point.
+    const postureMode = (): ExecutionMode => {
+      const acting = actingAgentPolicy(
+        currentExecutionContext()?.flueSubagentName,
+        agentRegistry,
+      );
+      return acting.mode ?? mode();
+    };
     // Per project, and only per project. The undo history is one shadow
     // repository per workspace root — `SnapshotStore` derives its `gitDir` from
     // that root and nothing else — so the state in front of it has to share the
@@ -1814,7 +1890,7 @@ export class StudioRuntime implements AgentHost {
       kernel: new PermissionKernel({
         grants: this.#grants,
         ...(this.#approver === undefined ? {} : { approver: this.#approver }),
-        posture: posture({ mode, trust: this.#trust }),
+        posture: posture({ mode: postureMode, trust: this.#trust }),
         reporter,
       }),
       sandbox,
@@ -1932,9 +2008,26 @@ export class StudioRuntime implements AgentHost {
         ? {}
         : {
             plan: {
-              // Writes through the tool are the model's, always; the person's
-              // tick path is the HTTP route, which names itself.
-              merge: (conversationId, items) => planStore.merge(conversationId, items, "model"),
+              // The writer is the agent acting when the tool runs, read
+              // from the same frame every other per-agent decision reads:
+              // the conversation's writes record as `model`, a delegate's
+              // as `agent:<name>` (S5.2) — so a plan row says which kind of
+              // writer touched it and which agent, and the person's ticks
+              // stay distinguishable from every writer above them. The
+              // person's tick path is the HTTP route, which names itself.
+              merge: (conversationId, items) => {
+                const acting = actingAgentPolicy(
+                  currentExecutionContext()?.flueSubagentName,
+                  agentRegistry,
+                );
+                return planStore.merge(
+                  conversationId,
+                  items,
+                  acting.subagentName === undefined
+                    ? "model"
+                    : (`agent:${acting.subagentName}` as const),
+                );
+              },
             },
           }),
     });

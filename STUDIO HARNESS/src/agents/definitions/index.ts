@@ -1,6 +1,8 @@
 import { Describe } from "../describe.js";
 import { Explore } from "../explore.js";
+import { General } from "../general.js";
 import { Improve } from "../improve.js";
+import { Plan } from "../plan.js";
 import { Studio } from "../studio.js";
 import { Title } from "../title.js";
 
@@ -10,6 +12,8 @@ import { titleDefinition } from "./title.js";
 import { improveDefinition } from "./improve.js";
 import { describeDefinition } from "./describe.js";
 import { exploreDefinition } from "./explore.js";
+import { generalDefinition } from "./general.js";
+import { planDefinition } from "./plan.js";
 
 /**
  * The harness's agent registry: every agent the runtime mounts or the
@@ -36,12 +40,16 @@ export const agentRegistry = new AgentRegistry([
   { definition: titleDefinition, agent: Title },
   { definition: improveDefinition, agent: Improve },
   { definition: describeDefinition, agent: Describe },
-  // The one delegate of Stage 3. Resolving by name here is what the
-  // `useSubagent` mount in `agents/studio.ts` reads (the mount needs the
-  // function object, and this is the cycle-free site that holds it beside
-  // the definition), and what the tool-policy filter at the gate resolves
-  // the acting agent's allowlist through.
+  // The delegates. Resolving by name here is what the `useSubagent` mount
+  // in `agents/studio.ts` reads (the mount needs the function object, and
+  // this is the cycle-free site that holds it beside the definition), and
+  // what the tool-policy filter at the gate resolves the acting agent's
+  // allowlist through. The roster loop in the parent's render names every
+  // entry with `kind: "delegate"` — a new delegate is a definition file and
+  // one entry here, and nothing in the mount changes.
   { definition: exploreDefinition, agent: Explore },
+  { definition: generalDefinition, agent: General },
+  { definition: planDefinition, agent: Plan },
 ]);
 
 export { AgentRegistry, type RegisteredAgent };

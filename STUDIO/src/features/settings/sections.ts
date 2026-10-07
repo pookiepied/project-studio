@@ -102,6 +102,9 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
       // approvals are the one thing here a person can take back.
       { id: 'permissions', name: 'Permissions', icon: Icons.permissions },
       { id: 'skills', name: 'Skills', icon: Icons.skill },
+      // The agents the harness has, read-only: the definitions live in the
+      // harness's code, so this pane is a window onto them, not a form.
+      { id: 'agents', name: 'Agents', icon: Icons.agents },
       // Under Agent beside skills: a command is a prompt the person keeps,
       // and what it drives is the agent, not the program.
       { id: 'commands', name: 'Commands', icon: Icons.command },

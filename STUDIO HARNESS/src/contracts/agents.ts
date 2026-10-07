@@ -71,6 +71,25 @@ export const DESCRIBE_AGENT_ID = "describe";
 export const EXPLORE_AGENT_ID = "explore";
 
 /**
+ * The hands-on delegate of the Stage 5 roster (ADR 0058, D11): the
+ * `GeneralSubagent` equivalent, Studio-shaped. Named beside the other ids for
+ * the same reason they are — the id is a pinned literal that definitions,
+ * scopes, and grants key on, and the `agents/general.ts` module's
+ * `General.agentName` is asserted equal to it.
+ */
+export const GENERAL_AGENT_ID = "general";
+
+/**
+ * The planning delegate of the Stage 5 roster (ADR 0058, D11): read-only
+ * research plus the plan tool, producing and updating the list the person
+ * ticks. Its module is `agents/plan.ts`; the name is also the native plan
+ * tool's name, which is a collision in spelling only — the roster speaks
+ * agent names, the tool array speaks capability ids, and neither resolves
+ * through the other.
+ */
+export const PLAN_AGENT_ID = "plan";
+
+/**
  * The turn settings a submission may carry beside its message.
  *
  * A submission body cannot carry these through to the run: Flue parses every

@@ -43,6 +43,7 @@ All routes are behind `src/transport/http/middleware/admission.ts:34` `createAdm
 | `/api/tasks` | GET | `agent:run` (`src/transport/http/routes/tasks.ts`) | `?agentName&parentConversationId` (conjunction) | `AgentTaskRecord[]` newest first (`src/agents/definitions/task-store.ts`) | `401`, `403` | — | `TaskStore` (Stage 4) |
 | `/api/tasks/:id` | GET | `agent:run` | — | `AgentTaskRecord` | `401`, `403`, `404` | — | `TaskStore` (Stage 4) |
 | `/api/tasks/:id/cancel` | POST | `agent:run` | — | `{cancelled:boolean}` — `false` for an already-settled row, refused at the route before the abort port | `401`, `403`, `404` | — | `TaskStore` + the cancel port (`init().abort()` → Flue instance abort; the settlement reaches the row through the projector) |
+| `/api/agents` | GET | `agent:run` (`src/transport/http/routes/agents.ts`) | — | roster rows sorted by name: identity, kind, model policy, durability — plus tools/skills/permissions for `delegate` rows only (the honest-list rule: a conversation row's surface is composed live, a background row's does not exist) | `401`, `403` | — | `AgentRegistry.list()` (Stage 5; the read-only window the Settings Agents pane reads) |
 
 **Headers:** `Authorization: Bearer <cred>`, `X-Project-Studio-Request-Id: <StudioUuid>` (for `ExecutionContext`), `Content-Type: application/json`, `Location`, `Stream-Next-Offset` (Flue). No `Idempotency-Key` — removed with the patches under #12.
 

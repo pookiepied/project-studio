@@ -20,7 +20,7 @@ describe('the settings taxonomy', () => {
     expect(members.get('account')).toEqual(['account', 'library', 'personalization'])
     expect(members.get('providers')).toEqual(['models', 'media', 'tools'])
     expect(members.get('extensions')).toEqual(['mcp', 'connectors', 'browser-use'])
-    expect(members.get('agent')).toEqual(['permissions', 'skills', 'commands', 'hooks'])
+    expect(members.get('agent')).toEqual(['permissions', 'skills', 'agents', 'commands', 'hooks'])
     expect(members.get('coding')).toEqual(['git', 'worktrees', 'environments'])
     expect(members.get('archived')).toEqual(['archive'])
   })

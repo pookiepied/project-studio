@@ -90,6 +90,12 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
           client.cancelTask(taskId),
         ),
     },
+    agents: {
+      list: () =>
+        call('The harness is not running, so there is no agent roster to read.', (client) =>
+          client.agents(),
+        ),
+    },
     browser: {
       stop: (conversationId) =>
         call('The harness is not running, so there is no browser to stop.', (client) =>

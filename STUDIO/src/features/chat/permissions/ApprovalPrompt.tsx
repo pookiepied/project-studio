@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Button, Segmented } from '@/components/primitives'
 import { CardShell } from '@/features/chat/questions/CardShell'
 import type { PermissionQuestion, QuestionTextPart } from '@/domain/permissions/question'
+import { agentAttribution } from '@/domain/permissions/question'
 import type { ApprovalAnswer, GrantDuration } from '@/platform/harness'
 
 /**
@@ -70,6 +71,11 @@ export function ApprovalPrompt({
 }) {
   const question = questions[0]
   const waiting = questions.slice(1)
+  // S5.4's attribution: a delegate asks under its own name, so the header
+  // says which agent is asking - the same fact the grant will be keyed to.
+  // The conversation agent's own asks stay unattributed, which is its own
+  // honest label: nothing here is someone else's name to borrow.
+  const attribution = agentAttribution(question.agentId)
 
   // The narrowest grant first: a person pressing Enter at the default answers
   // with the smallest thing on offer.
@@ -94,7 +100,7 @@ export function ApprovalPrompt({
 
   return (
     <CardShell
-      header="Permission"
+      header={attribution === null ? 'Permission' : `Permission — ${attribution}`}
       sentence={question.sentence.map(renderPart)}
       detail={question.reason}
       // No deadline is not a missing argument here; it is the whole rule.
@@ -151,10 +157,18 @@ export function ApprovalPrompt({
           {waiting.length > 0 ? (
             <p className="max-w-[60ch] text-caption text-muted-foreground">
               Also waiting, one at a time:{' '}
-              {waiting.map((item, at) => (
-                <span key={item.id}>
+              {groupByAgent(waiting).map((group, at) => (
+                <span key={group.agentId ?? 'conversation'}>
                   {at > 0 ? ', ' : ''}
-                  {item.sentence.map(renderPart)}
+                  {attribution === null && group.agentId !== null
+                    ? `the ${group.label.toLowerCase()} asks to `
+                    : ''}
+                  {group.items.map((item, itemAt) => (
+                    <span key={item.id}>
+                      {itemAt > 0 ? ' and ' : ''}
+                      {item.sentence.map(renderPart)}
+                    </span>
+                  ))}
                 </span>
               ))}
             </p>
@@ -163,6 +177,36 @@ export function ApprovalPrompt({
       }
     />
   )
+}
+
+/**
+ * The waiting list, grouped by the agent each question belongs to (S5.4).
+ *
+ * The queue is still answered oldest first - grouping changes only how the
+ * footnote reads, never the order the run will consume them. Within a
+ * group the original order stands; the groups themselves appear in the
+ * order each agent's first question arrived, so the display stays
+ * traceable to the queue it renders.
+ */
+function groupByAgent(questions: readonly PermissionQuestion[]): {
+  agentId: string | null
+  label: string
+  items: readonly PermissionQuestion[]
+}[] {
+  const groups: { agentId: string | null; label: string; items: PermissionQuestion[] }[] = []
+  for (const question of questions) {
+    const found = groups.find((group) => group.agentId === question.agentId)
+    if (found !== undefined) {
+      found.items.push(question)
+      continue
+    }
+    groups.push({
+      agentId: question.agentId,
+      label: agentAttribution(question.agentId) ?? 'conversation agent',
+      items: [question],
+    })
+  }
+  return groups
 }
 
 /**

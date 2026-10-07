@@ -510,12 +510,49 @@ Definitions are data; the runtime is one runtime; the door is one door. Adding a
 | Agent | Kind | Tools | MCP | Skills | Permissions | Purpose |
 |---|---|---|---|---|---|---|
 | `studio` | conversation | all natives + adopted MCP + discover | per selection chain | per selection chain | per conversation mode; full effects | the continuing product agent (today's) |
-| `explore` | delegate | `read`, `glob`, `grep`, `git`, `web_search`, `fetch` | none (v1) | none (v1) | read-only by allowlist **and** `maxEffects: ["read"]`; mode `ask` | context-heavy research without flooding the parent |
-| `general` | delegate | natives minus destructive (`delete`, `move` out) + parent-adopted MCP allowlist | parent's adopted, allowlisted | allowlisted | own asks; `write` allowed, `execute` asks | the `GeneralSubagent` equivalent, Studio-shaped |
-| `plan` | delegate | `read`, `glob`, `grep`, `plan` | none | none | read-only + plan writes | produces/updates the plan for the person to tick |
+| `explore` | delegate | `read`, `glob`, `grep`, `git`, `web_search`, `fetch` | none (v1) | none (v1) | read-only on the machine by allowlist **and** `maxEffects: ["read", "network"]`; mode `ask` | context-heavy research without flooding the parent |
+| `general` | delegate | `read`, `write`, `edit`, `glob`, `grep`, `git`, `shell`, `web_search`, `fetch` | `*` — the conversation's adopted namespaces | none (v1) | everything reachable by ceiling; mode `ask` — its default asks ask under its own id | the `GeneralSubagent` equivalent, Studio-shaped |
+| `plan` | delegate | `read`, `glob`, `grep`, `plan` | none | none | read-only by allowlist and ceiling (`["read"]`); mode `ask` | produces/updates the plan for the person to tick |
 | `title` / `describe` / `improve` | background | none | none | none | no sandbox, no tools | existing, unchanged behavior |
 
 The Explore agent is the Stage 3 vertical slice: read-only is the easiest permission story to prove (allowlist ∩ `maxEffects` ∩ kernel = three layers saying the same thing), and it is the delegate whose absence the parent's context pays for most.
+
+**Amended 2026-10-07, at Stage 5** — three corrections Stage 5's implementation
+forced, each a case where the one-line table above could not carry the full
+decision:
+
+1. **`explore`'s ceiling gained `network`.** The Stage 3 table named
+   `web_search`/`fetch` under a `["read"]` ceiling — the two readers were
+   visible tools that could never run, refused at the ceiling in every
+   conversation regardless of grants. Reading the web is reading; the
+   ceiling's job is the boundary nothing may cross (writing, running), and
+   authorization for the network calls still stops at the kernel under the
+   delegate's own id.
+2. **`general`'s MCP allowlist is the wildcard `*`.** MCP namespaces are
+   `mcp:<server id>` with the id user-minted; a static definition cannot
+   name a person's servers and one that did would behave differently per
+   machine. `*` means "the namespaces this conversation has adopted, and
+   nothing more" — the gate still holds the enablement chain and the
+   adopted set, so the star widens nothing the person did not switch on.
+3. **`general`'s tools column is the concrete list.** "Natives minus
+   destructive" answers one question; the allowlist answers two. Beyond
+   the destructive pair (`delete`, `move`), the delegate also withholds
+   the conversation-keyed mutators (`discover` by D4's name-rule,
+   `request_folder`, `jobs` — all three write into parent-owned sets the
+   child cannot see or clean) and the interactive family
+   (`ask_user_question`, `plan`, `library_*`, `studio_*`, `ocr`) — the ask
+   tool parks a run on a question the approval UX does not attribute, the
+   plan tool is the planner's whole job, and the rest write
+   person-curated or billed state. Naming one later is an allowlist line
+   away, with its own reasoning at that moment.
+
+And one consumption the table implied but nothing had wired: a delegate's
+`mode` is its **own consent default** — since Stage 5 the kernel resolves a
+delegate's default asks under the definition's mode, so `general` asks
+before it changes or runs anything even when the parent conversation runs
+Auto. The person handed off work, not attention; the asks render under the
+delegate's agent id, and an answered one grants the delegate, not the
+conversation.
 
 ---
 
@@ -668,12 +705,35 @@ on the record:
 
 ### Stage 5 — The broader roster and assignment
 
-1. `general` and `plan` delegates per D11; the roster section of the system prompt covers all three.
-2. Skills assignment: per-definition skill lists resolved through the selection chain; the Settings roster shows them (the Phase 12 "agent assignment" question, answered).
-3. MCP allowlists per delegate (parent-adopted ∩ definition) for `general`.
-4. Approval UX polish: agent-attributed cards; the approval list groups by agent.
+**Delivered 2026-10-07** — register row 98, with the D11 amendments recorded
+above (the explore ceiling, the MCP wildcard, the concrete allowlist, and the
+mode consumption).
 
-**Tests**: per-agent skill mounting; `general`'s write path asks under its own agent id; `plan` writes rows the person can tick (the PlanItemStore writer dimension gains `agent`); parallel tasks (one batch, two delegates) do not interleave grant writes or membership.
+1. `general` and `plan` delegates per D11; the roster section of the system prompt covers all three — delivered. The registry holds seven agents, three of them delegates; the parent's mount loop named them from the day it was written. The delegation section teaches matching the delegate to the work beside Flue's composed roster.
+2. Skills assignment: per-definition skill lists resolved through the selection chain; the Settings roster shows them — delivered as the mechanism (`delegateSkills`, one chain walk narrowed to the definition's named ids on the registry's record vocabulary), with all three delegates shipping empty lists in v1: no bundled skill is a natural delegate assignment yet, and the honest empty list is the answer the honest-list rule wants. The semantics are proven against the real chain and a real bundled skill.
+3. MCP allowlists per delegate (parent-adopted ∩ definition) for `general` — delivered via the `*` wildcard (D11 amendment 2); the intersection is enforced by the gate against what the conversation actually holds.
+4. Approval UX polish: agent-attributed cards; the approval list groups by agent — delivered. A delegate's ask renders `Permission — <Title> agent`; `studio`'s asks stay unattributed; the waiting footnote groups by agent without reordering the queue.
+
+One mechanism the plan under-specified and Stage 5 wired: **the delegate's
+own consent default**. `permissions.mode` existed on every delegate
+definition since Stage 2 and nothing consumed it; the kernel resolved every
+default ask under the conversation's posture. Since Stage 5 the runtime's
+posture composition reads the acting agent — a delegate's default asks
+resolve under its definition's mode, which is what makes `general`'s story
+true in an Auto conversation, and the live test proves the whole chain:
+Auto conversation → delegated write → ask attributed to `general` →
+answered → grant keyed `agentId: "general"`.
+
+**Tests** (all green in the delivered gate): per-agent skill mounting
+(`delegate-skills.test.ts`, real runtime, real bundled skill, real selection
+rows); `general`'s write path asking under its own agent id
+(`delegation.test.ts`, live); the plan delegate writing rows the person can
+tick, recorded `agent:plan` (store tests with the second writer; live in the
+two-delegate run); parallel tasks — one batch, two delegates — with both
+answers returned, the parent transcript clean of either child's work, and
+the grant table untouched; the roster route's admission shapes and the
+honest-list rule (`agents-routes.test.ts`); the STUDIO parsers, the
+attribution tests, and the settings taxonomy.
 
 ### Stage 6 — Consolidation and the deferred decisions
 

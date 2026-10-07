@@ -100,4 +100,16 @@ describe("the prompt's account of the tools", () => {
     expect(STUDIO_SYSTEM_PROMPT).toContain("Available Agents");
     expect(STUDIO_SYSTEM_PROMPT).not.toContain("declares no");
   });
+
+  it("tells the parent's model when each kind of delegate work belongs", () => {
+    // S5.4's roster half, on the static side: the delegation section
+    // teaches matching the delegate to the work — reading, hands-on,
+    // planning — because with three delegates on the roster, "delegate the
+    // reading-heavy work" would steer every task to one of them. The
+    // per-agent WHO is still Flue's composed roster; this pins the WHAT.
+    const section = STUDIO_SYSTEM_PROMPT.slice(STUDIO_SYSTEM_PROMPT.indexOf("## Delegation"));
+    expect(section).toContain("the explorer");
+    expect(section).toContain("general");
+    expect(section).toContain("the planner");
+  });
 });

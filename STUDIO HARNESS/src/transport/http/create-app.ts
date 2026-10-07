@@ -31,6 +31,8 @@ import { createConversationRoutes } from "./routes/conversations.js";
 import type { TaskStore } from "../../agents/definitions/task-store.js";
 import type { TaskControlPort } from "./routes/tasks.js";
 import { createTaskRoutes } from "./routes/tasks.js";
+import type { RegisteredAgent } from "../../agents/definitions/registry.js";
+import { createAgentRoutes } from "./routes/agents.js";
 import type { CompactionReadiness } from "../../conversations/compaction.js";
 import type { ConversationSnapshots } from "../../snapshots/store.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
@@ -156,6 +158,13 @@ export interface CreateHttpAppOptions {
    */
   readonly tasks?: TaskStore;
   readonly taskControl?: TaskControlPort;
+  /**
+   * The agent registry, for the read-only roster route (S5.3). Optional the
+   * way `tasks` is: absent means no roster route exists, and production must
+   * not be that composition — the Settings pane would name agents nobody
+   * can verify.
+   */
+  readonly agents?: { list(): readonly RegisteredAgent[] };
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
   readonly browser?: { stop(conversationId: string): Promise<boolean> };
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
@@ -261,6 +270,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   }
   if (options.tasks !== undefined && options.taskControl !== undefined) {
     app.route("/api/tasks", createTaskRoutes(options.tasks, options.taskControl));
+  }
+  if (options.agents !== undefined) {
+    app.route("/api/agents", createAgentRoutes(options.agents));
   }
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));

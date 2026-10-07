@@ -147,11 +147,12 @@ export class PlanItemStore {
   /**
    * One conversation's plan, in position order.
    *
-   * A row that cannot be trusted - a status outside the five, a writer that is
-   * neither model nor person, a value that is not what its column declares -
-   * makes the whole plan `damaged` rather than crashing the reader or showing
-   * an empty list. An empty plan and an unreadable plan are different facts,
-   * and a person acting on the wrong one loses work.
+   * A row that cannot be trusted - a status outside the five, a writer
+   * outside the vocabulary (model, person, `agent:<name>`), a value that is
+   * not what its column declares - makes the whole plan `damaged` rather
+   * than crashing the reader or showing an empty list. An empty plan and an
+   * unreadable plan are different facts, and a person acting on the wrong
+   * one loses work.
    */
   list(conversationId: string): PlanView {
     const rows = this.#db
@@ -196,10 +197,22 @@ const STATUS_BY_TEXT: ReadonlyMap<string, PlanStatus> = new Map(
   PLAN_STATUSES.map((status) => [status, status]),
 );
 
-const WRITER_BY_TEXT: ReadonlyMap<string, PlanWriter> = new Map([
-  ["model", "model"],
-  ["person", "person"],
-]);
+/**
+ * The read-side parser for the writer dimension — the one place the
+ * vocabulary is enforced. `model` and `person` are exact; a delegate's
+ * write is stored as `agent:<agentName>` and parses only when the name is
+ * non-empty, so a truncated or malformed value cannot masquerade as a
+ * writer. Anything else is a row the plan cannot vouch for (`damaged`),
+ * not a writer to guess at.
+ */
+function parseWriter(value: string): PlanWriter | undefined {
+  if (value === "model" || value === "person") return value;
+  if (value.startsWith("agent:")) {
+    const agentName = value.slice("agent:".length);
+    return agentName.trim() === "" ? undefined : (value as `agent:${string}`);
+  }
+  return undefined;
+}
 
 function isStatus(value: unknown): value is PlanStatus {
   return typeof value === "string" && STATUS_BY_TEXT.has(value);
@@ -233,7 +246,7 @@ function assertWritable(write: PlanItemWrite): void {
 
 function readRow(row: Row): StoredPlanItem | undefined {
   const status = STATUS_BY_TEXT.get(row.status);
-  const writer = WRITER_BY_TEXT.get(row.updated_by);
+  const writer = parseWriter(row.updated_by);
   if (
     status === undefined ||
     writer === undefined ||

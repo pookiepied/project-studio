@@ -112,6 +112,48 @@ describe("the plan store", () => {
     expect(one?.updatedBy).toBe("person");
   });
 
+  it("records a delegate's write as agent:<name>, and the person's tick survives it", () => {
+    // S5.2's second writer, asserted with the two sides beside each other:
+    // the planning delegate writes rows that name it, the person ticks one,
+    // and the delegate's next write — composed before it could know — does
+    // not clobber the tick. The merge semantics are the store's own; what
+    // is new is that a THIRD writer vocabulary exists and rows can say
+    // which agent wrote them, not merely that a model did.
+    const store = new PlanItemStore(db);
+    store.merge(CONVERSATION, [item("one", "pending"), item("two", "pending")], "agent:plan");
+    expect(store.update(CONVERSATION, "two", "done", "person")).toBe(true);
+
+    const view = store.merge(CONVERSATION, [item("one", "running")], "agent:plan");
+    expect(view.damaged).toBe(false);
+    const one = view.items.find((entry) => entry.id === "one");
+    const two = view.items.find((entry) => entry.id === "two");
+    expect(one?.status).toBe("running");
+    expect(one?.updatedBy).toBe("agent:plan");
+    expect(two?.status).toBe("done");
+    expect(two?.updatedBy).toBe("person");
+  });
+
+  it("reads a writer outside the vocabulary as damaged, names and all", () => {
+    // The parser is the read-side wall: "agent:" with no name, or a writer
+    // that is neither kind, is a row the plan cannot vouch for — not a
+    // writer to guess at and not a row to render.
+    const store = new PlanItemStore(db);
+    store.merge(CONVERSATION, [item("one", "pending")], "agent:plan");
+    db.prepare("UPDATE plan_item SET updated_by = ? WHERE conversation_id = ? AND id = ?").run(
+      "agent:",
+      CONVERSATION,
+      "one",
+    );
+    expect(store.list(CONVERSATION).damaged).toBe(true);
+
+    db.prepare("UPDATE plan_item SET updated_by = ? WHERE conversation_id = ? AND id = ?").run(
+      "ghost",
+      CONVERSATION,
+      "one",
+    );
+    expect(store.list(CONVERSATION).damaged).toBe(true);
+  });
+
   it("survives a restart: a second store over the same database reads it whole", () => {
     const directory = mkdtempSync(join(tmpdir(), "studio-plan-"));
     workspaces.push(directory);

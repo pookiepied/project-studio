@@ -403,3 +403,162 @@ describe.sequential("the Explore delegate, end to end", () => {
     60_000,
   );
 });
+
+describe.sequential("the broader roster, end to end", () => {
+  it(
+    "asks the general delegate's write under its own agent id, even in Auto",
+    async () => {
+      // S5.1's gate, live: the conversation runs in Auto (the submission
+      // carries `permissionMode: "auto"`), so the PARENT's own default
+      // asks would proceed — but the delegate's consent default is its
+      // definition's `mode: "ask"`, so the child's write parks anyway,
+      // and the pending approval names `general` in its scope. Answering
+      // it grants the delegate, not the conversation: the grant row is
+      // keyed `agentId: "general"`, which is the isolation property the
+      // store-level suite asserts, seen here from the side a person
+      // would.
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+      const authorization = { authorization: `Bearer ${running.token}` };
+
+      // The raw submission, because the Auto consent rides the body's
+      // turn settings — the middleware settles it before the run reads
+      // anything, which is exactly the proof this test needs.
+      const admitted = await fetch(`${running.baseUrl}/agents/studio/delegate-general-1`, {
+        method: "POST",
+        headers: { ...authorization, "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "user",
+          body: "[delegate-general] create the file",
+          permissionMode: "auto",
+        }),
+      });
+      expect([200, 202]).toContain(admitted.status);
+      const receipt = (await admitted.json()) as { submissionId?: string };
+      expect(typeof receipt.submissionId).toBe("string");
+
+      // The ask arrives: the delegate's write parks, and the pending
+      // approval carries the delegate's identity — not the conversation
+      // agent's, whatever mode the conversation runs.
+      let pending:
+        | {
+            id: string
+            request: { scope: { agentId?: string }; capability?: { id?: { name?: string } } }
+          }
+        | undefined
+      await waitUntil(
+        async () => {
+          const response = await fetch(`${running.baseUrl}/api/permissions/pending`, {
+            headers: authorization,
+          });
+          const records = (await response.json()) as NonNullable<typeof pending>[];
+          pending = records[0];
+          return pending !== undefined;
+        },
+        30_000,
+        () => "the general delegate's write never raised an approval",
+      );
+      expect(pending?.request.scope.agentId).toBe("general");
+      expect(pending?.request.capability?.id?.name).toBe("write");
+
+      // Answered: the run resumes, the child's write proceeds, and the
+      // child reports the write ran.
+      const answered = await fetch(
+        `${running.baseUrl}/api/permissions/pending/${pending?.id}`,
+        {
+          method: "POST",
+          headers: { ...authorization, "content-type": "application/json" },
+          body: JSON.stringify({ verdict: "allow", duration: "conversation" }),
+        },
+      );
+      expect(answered.status).toBe(204);
+
+      const result = await client.wait({
+        threadId: "delegate-general-1",
+        submissionId: receipt.submissionId ?? "",
+        streamUrl: "",
+        offset: "0",
+      });
+      expect(result.text).toContain("Delegated. The general answered:");
+      expect(result.text).toContain("write ran");
+
+      // The grant the answer wrote is the delegate's own: a standing
+      // `studio` grant was not what authorized this, and this grant does
+      // not authorize `studio` either.
+      const grants = await fetch(
+        `${running.baseUrl}/api/permissions/grants?agentId=general`,
+        { headers: authorization },
+      );
+      const rows = (await grants.json()) as { agentId: string; capabilityKey: string }[];
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((row) => row.agentId === "general")).toBe(true);
+    },
+    90_000,
+  );
+
+  it(
+    "runs two delegates beside each other and keeps the writes honest",
+    async () => {
+      // S5.5's gate: one batch, two delegates. The scripted parent hands
+      // the explorer and the planner work in ONE assistant message, so
+      // two child sessions run inside the same sandbox beside each
+      // other. The assertions are the consistency the concurrency owes:
+      // both answers return, the parent transcript holds the two task
+      // results and nothing of either child's intermediate work, the
+      // plan rows the planner wrote carry `agent:plan` (the S5.2 writer
+      // dimension, live), and the batch wrote no grant rows at all — a
+      // read-shaped delegation has nothing to approve, and nothing in
+      // the two sessions may have interleaved one in.
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+      const authorization = { authorization: `Bearer ${running.token}` };
+
+      const run = await client.send("delegate-two-1", "[delegate-two] run both");
+      const result = await client.wait(run);
+      expect(result.text).toContain("Delegated twice.");
+      // The explorer's visibility report and the planner's read-back,
+      // both from inside their own sessions:
+      expect(result.text).toContain("agent planner");
+      expect(result.text).toContain("plan writer agent:plan");
+      expect(result.text).toContain("Delegate sees ");
+
+      const history = await client.history("delegate-two-1");
+      const parts = history.messages.flatMap((message) => message.parts);
+      expect(
+        parts.filter(
+          (part) =>
+            part.type === "dynamic-tool" &&
+            part.toolName === "task" &&
+            part.state === "output-available",
+        ),
+      ).toHaveLength(2);
+      // Neither child's tool use is in the parent transcript.
+      expect(
+        parts.some((part) => part.type === "dynamic-tool" && part.toolName === "glob"),
+      ).toBe(false);
+      expect(
+        parts.some((part) => part.type === "dynamic-tool" && part.toolName === "plan"),
+      ).toBe(false);
+
+      // The plan rows outlive the run, carrying the writer that made them.
+      const plans = await fetch(`${running.baseUrl}/api/plans/delegate-two-1`, {
+        headers: authorization,
+      });
+      const plan = (await plans.json()) as {
+        damaged: boolean;
+        items: { id: string; updatedBy: string }[];
+      };
+      expect(plan.damaged).toBe(false);
+      expect(plan.items.length).toBeGreaterThan(0);
+      expect(plan.items.every((item) => item.updatedBy === "agent:plan")).toBe(true);
+
+      // And nothing was granted: the batch never asked, so the grant
+      // table is untouched by either session.
+      const grants = await fetch(`${running.baseUrl}/api/permissions/grants`, {
+        headers: authorization,
+      });
+      expect(await grants.json()).toEqual([]);
+    },
+    90_000,
+  );
+});

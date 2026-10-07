@@ -28,6 +28,7 @@ afterEach(() => {
 const approvalQuestion: PermissionQuestion = {
   id: 'approval_1',
   createdAt: 1_000,
+  agentId: null,
   sentence: [{ kind: 'text', text: 'Write ' }, { kind: 'code', text: 'src/app.ts' }, { kind: 'text', text: " in this conversation's workspace." }],
   reason: null,
   lastingScopeId: null,

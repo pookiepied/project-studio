@@ -58,6 +58,7 @@ function record(conversationId: string, id = 'ask_1'): PendingApprovalRecord {
     capabilityName: 'write',
     capabilityTitle: 'Write file',
     resource: 'src/app.ts',
+    agentId: 'studio',
     conversationId,
     scopes: [{ id: 'once', label: 'Just once', detail: 'This call only', pattern: null }],
     source: 'policy',
