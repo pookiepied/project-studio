@@ -4,6 +4,7 @@ import { useConversation } from '@/features/chat/connection/useConversation'
 import type { ConversationContent } from '@/features/chat/connection/useConversation'
 import type { SeamFailure, TurnImageWire, TurnSettingsWire } from '@/platform/harness'
 import { firstAdmission } from '@/features/chat/connection/first-attach'
+import { queuedMessages, forgetQueued } from './queued-messages'
 import {
   applyChunks,
   emptyProjection,
@@ -73,6 +74,7 @@ export function useConversationTranscript(conversationId: string): {
   items: readonly TranscriptItem[]
   /** Words this window sent that the log has not echoed back yet. */
   pending: PendingSubmission | null
+  queued?: readonly PendingSubmission[]
   phase: ReturnType<typeof useConversation>['phase']
   offset: string | null
   resume: () => void
@@ -86,6 +88,7 @@ export function useConversationTranscript(conversationId: string): {
   dismissRefusal: () => void
 } {
   const [projection, setProjection] = useState(() => openingProjection(conversationId))
+  const [queued, setQueued] = useState(() => queuedMessages(conversationId))
   // Which id the state above currently describes. The effect below re-seeds on
   // a change of conversation, and without this it would also re-seed on the
   // mount that just built the same thing — a second render of identical
@@ -93,13 +96,28 @@ export function useConversationTranscript(conversationId: string): {
   const seededFor = useRef(conversationId)
 
   const onContent = useCallback((content: ConversationContent) => {
+    const consumed = new Set<string>()
+    if (content.kind === 'snapshot') {
+      for (const message of content.snapshot.messages) {
+        if (message.submissionId !== null) consumed.add(message.submissionId)
+      }
+      for (const item of content.snapshot.settlements) consumed.add(item.submissionId)
+    } else {
+      for (const chunk of content.chunks) {
+        if ((chunk.type === 'message-started' || chunk.type === 'submission-settled') && chunk.submissionId !== null) {
+          consumed.add(chunk.submissionId)
+        }
+      }
+    }
+    forgetQueued(conversationId, consumed)
+    setQueued(queuedMessages(conversationId))
     const arrivedAt = arrivalTimeOf(content, Date.now)
     setProjection((current) =>
       content.kind === 'snapshot'
         ? reseeded(current, content.snapshot)
         : applyChunks(current, content.chunks, arrivedAt),
     )
-  }, [])
+  }, [conversationId])
 
   const conversation = useConversation(conversationId, { onContent })
 
@@ -110,26 +128,30 @@ export function useConversationTranscript(conversationId: string): {
     if (seededFor.current === conversationId) return
     seededFor.current = conversationId
     setProjection(openingProjection(conversationId))
+    setQueued(queuedMessages(conversationId))
   }, [conversationId])
 
   return {
     items: projection.items,
     pending: projection.pending,
+    queued,
     phase: conversation.phase,
     offset: conversation.offset,
     resume: conversation.resume,
     submit: async (message, settings, images) => {
       const sent = await conversation.submit(message, settings, images)
+      if (seededFor.current !== conversationId) return { ok: sent.ok }
       // Held only once the harness says it has the words. A submission that
       // was refused leaves the composer holding them (Task 32), and drawing
       // them in the transcript as well would show the same message in two
       // places, one of which is a claim that it was sent.
-      if (sent.ok) {
+      if (sent.ok && settings.deliveryMode !== 'queue') {
         const admitted = sent.value.submissionId
         setProjection((current) =>
           withPendingSubmission(current, { submissionId: admitted, text: message }),
         )
       }
+      setQueued(queuedMessages(conversationId))
       return { ok: sent.ok }
     },
     abort: async () => {

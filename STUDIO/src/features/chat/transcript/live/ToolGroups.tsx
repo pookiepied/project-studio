@@ -7,6 +7,8 @@ import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { familyOf, REPORT_FAMILIES, type ReportFamily } from './reportFamily'
 import { netOf } from './groupNet'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
+import { parseSearchOutcome, parseSearchQuery, type SearchOutcome, type SearchQuery } from './searchOutcome'
+import { SearchQueryLine, SearchResults } from './SearchResults'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
 import { RollingCount } from './RollingCount'
@@ -374,7 +376,14 @@ function GroupCallRow({
       chevron="hover"
       flush={diff !== null}
     >
-      <CallWorkingOut call={call} diff={diff} file={file} outcome={outcome} />
+      <CallWorkingOut
+        call={call}
+        diff={diff}
+        file={file}
+        outcome={outcome}
+        searched={searchOutcomeOf(call)}
+        searchQuery={searchQueryOf(call)}
+      />
     </DisclosureRow>
   )
 }
@@ -402,6 +411,11 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       ? anchorToRegion(rawDiff, outcome.region)
       : rawDiff
   const answered = answeredOf(call)
+  const searched = searchOutcomeOf(call)
+  // A search names its aim from its input whether the answer has arrived or
+  // not: the query line stands in for the raw input slab while the call runs,
+  // and beside the raw answer when the answer fell back to raw.
+  const searchQuery = searched === null ? searchQueryOf(call) : null
   const running = call.errorText === null && !answered
   const verb =
     action === undefined ? call.toolName : running ? action.running : action.done
@@ -491,10 +505,20 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       // A diff arrives as its own framed card, so the body stands flush: the
       // rule would draw a second edge a hand's width from the card's, and
       // the indent would park the diff off the boundary every other response
-      // element shares. Loose working-out keeps the rule.
-      flush={diff !== null && file !== null}
+      // element shares. A search's result list stands flush too, carrying its
+      // own nesting step instead -- the rule beside a list reads as an
+      // outliner, and the list says whose it is by alignment and by echoing
+      // the chip's pattern. Everything else keeps the rule.
+      flush={(diff !== null && file !== null) || searched !== null}
     >
-      <CallWorkingOut call={call} diff={diff} file={file} outcome={outcome} />
+      <CallWorkingOut
+        call={call}
+        diff={diff}
+        file={file}
+        outcome={outcome}
+        searched={searched}
+        searchQuery={searchQuery}
+      />
     </DisclosureRow>
   )
 }
@@ -503,7 +527,9 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
  * What opens under a chip: the call's working-out, in the shape its own kind
  * names. A file-writing call shows the diff it described and the harness's
  * own sentence; a question call shows each question and the exact answer
- * it was given; everything else shows the raw input and answer, pretty-
+ * it was given; a search shows its answer as a result list -- the files,
+ * the lines, the matched words -- and its aim as one line while the answer
+ * is still out; everything else shows the raw input and answer, pretty-
  * printed but untouched. A read lands here only when it failed -- the error
  * is its working-out -- because an answered read is a statement, not a
  * disclosure.
@@ -513,19 +539,27 @@ function CallWorkingOut({
   diff,
   file,
   outcome,
+  searched,
+  searchQuery,
 }: {
   call: ToolCallView
   diff: LineDiff | null
   file: string | null
   outcome: FileToolOutcome | null
+  searched: SearchOutcome | null
+  searchQuery: SearchQuery | null
 }) {
   const diffed = diff !== null && file !== null
   return (
     <div className="flex flex-col gap-1">
-      {diffed ? (
+      {searched !== null ? (
+        <SearchResults outcome={searched} />
+      ) : diffed ? (
         <FileDiff path={file} diff={diff} />
       ) : call.toolName === 'ask_user_question' ? (
         <AskWorkingOut call={call} />
+      ) : searchQuery !== null ? (
+        <SearchQueryLine query={searchQuery} />
       ) : (
         <div className="font-mono text-code text-muted-foreground">
           <Detail label="in" value={call.input} />
@@ -536,7 +570,9 @@ function CallWorkingOut({
           {call.errorText}
         </pre>
       ) : call.output !== null && call.output.present ? (
-        diffed && outcome !== null ? (
+        // A parsed search said everything on the list: the sentence for an
+        // empty one, the files and lines otherwise. Nothing stands under it.
+        searched !== null ? null : diffed && outcome !== null ? (
           // The harness's sentence -- "Edited snake/script.js", or write's
           // "Created directory snake, which did not exist." -- and nothing
           // more. An edit's answer used to continue into a numbered echo of
@@ -740,6 +776,25 @@ function outcomeOf(call: ToolCallView): FileToolOutcome | null {
   if (call.output === null || !call.output.present) return null
   const value: unknown = call.output.value
   return typeof value === 'string' ? parseFileToolOutcome(value) : null
+}
+
+/**
+ * The call's parsed search answer, or null. Null for anything but a grep or
+ * glob, for an answer that is not the harness's prose, and for prose the
+ * parser cannot read -- all of which keep today's raw rendering.
+ */
+function searchOutcomeOf(call: ToolCallView): SearchOutcome | null {
+  if (call.output === null || !call.output.present) return null
+  const value: unknown = call.output.value
+  if (typeof value !== 'string') return null
+  const input: unknown = call.input !== null && call.input.present ? call.input.value : null
+  return parseSearchOutcome(call.toolName, input, value)
+}
+
+/** The call's aim, for a search -- null for anything else or a patternless input. */
+function searchQueryOf(call: ToolCallView): SearchQuery | null {
+  if (call.input === null || !call.input.present) return null
+  return parseSearchQuery(call.toolName, call.input.value)
 }
 
 /**

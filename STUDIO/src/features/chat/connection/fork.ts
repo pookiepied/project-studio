@@ -3,15 +3,7 @@ import { useCallback, useState } from 'react'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { newId } from '@/lib/id'
-import {
-  createConversationClient,
-  createHarnessClient,
-  resolveHarnessAddress,
-  turnSettingsToWire,
-  type ConversationMessageFacts,
-} from '@/platform/harness'
-import { startConversation } from '@/features/chat/connection/first-turn'
-import { effectiveTurnSettings } from '@/domain/turn/settings'
+import { createHarnessClient, resolveHarnessAddress } from '@/platform/harness'
 import type { Conversation } from '@/domain/conversation/types'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 
@@ -20,180 +12,79 @@ import type { TranscriptItem } from '@/features/chat/transcript/projection'
  *
  * ---- What a fork is here ---------------------------------------------------
  *
- * A fork is a new, ordinary conversation whose first message carries the
- * source conversation's words up to a point, followed by whatever the person
- * types next. Flue - the runtime that owns every transcript - has no branch
- * API (measured against its whole surface: ids are caller-chosen, streams
- * start empty, context is always rebuilt from the journal, and the agent's
- * first turn begins from nothing), so the fork is built from public seams
- * only: the words are read from the projection or from a history snapshot,
- * rendered as text, and admitted as the new conversation's first turn through
- * the same path every first turn takes.
+ * A fork is a new, independent conversation duplicated from the source at
+ * the moment of forking. The id is minted once, up front, and everything
+ * addresses it: the harness duplicates the source's index row, transcript,
+ * scoped rows (grants, extension decisions, plans, folder grants, document
+ * rows, context figure) and filesystem tree (`workspace`, `scratch`,
+ * `attachments`, `artifacts`) under it through
+ * `POST /api/conversations/:id/fork`. The fork opens on the source's exact
+ * words - the same turns, the same tool runs, the same state - and nothing
+ * runs: no turn is admitted, no model is called.
  *
- * The cost is stated where it is accepted: the inherited context is a text
- * rendering, not the model's own context - tool calls become a line noting
- * they happened, thinking is dropped, and long histories are a long first
- * message. What the fork buys is the whole conversation graph being ordinary
- * conversations: renamable, archivable, detachable, purgeable, with no
- * private lineage anywhere.
+ * The previous path rendered the transcript to text and sent it as the
+ * fork's first message: one synthetic turn, the model answering the whole
+ * history at once. That is gone. The transcript travels in the journal now,
+ * so the client reads nothing and sends nothing.
  *
  * ---- What forking is not ---------------------------------------------------
  *
- * Not a copy. The source keeps its own record, its own stream, its own title;
- * the fork is named for what it is - the source's title, plus " (Fork)" -
- * and the name is written through the rename path, so it sticks the way a
- * person's own rename would.
+ * Not a second conversation by accident. The old path minted two ids - one
+ * inside `startConversation` for the seed turn, another for the sidebar row
+ * - so right-clicking Fork created two conversations. One mint here, and
+ * the row the harness returns is adopted locally under the same id.
+ *
+ * Not a branch of the model state. Pending questions and background tasks
+ * stay with the source: a question is live state for a run, and a task's
+ * stream belongs to the conversation that dispatched it. A fork refused for
+ * either reason is a menu that simply closed, with the reason attached.
  */
 
-export interface SeedTurn {
-  readonly role: 'user' | 'assistant'
-  readonly text: string
-}
-
-/** The source title, as the fork's seed names it. */
-function sourceName(title: string | null): string {
-  const named = title?.trim()
-  return named === undefined || named === '' ? 'this conversation' : `"${named}"`
-}
-
-/**
- * The inherited words, as one message. Tool runs become a single line - their
- * inputs and outputs are the model's business, not the transcript's - and
- * thinking is left out entirely: it was the writing, not what was said.
- */
-export function renderSeed(sourceTitle: string | null, turns: readonly SeedTurn[]): string {
-  const body = turns
-    .map((turn) => `${turn.role === 'user' ? 'User' : 'Assistant'}: ${turn.text.trim()}`)
-    .join('\n\n')
-  return [
-    `The transcript below is the history of ${sourceName(sourceTitle)}, carried over as context. Continue naturally from where it ends.`,
-    '',
-    '--- transcript ---',
-    body,
-    '--- end ---',
-  ].join('\n')
-}
-
-/**
- * The turns up to and including the named assistant message, taken from the
- * live projection - the same words on screen, no second read. "Branch from
- * here" means from this answer onward, so the answer itself is in.
- */
-export function turnsUpTo(
-  items: readonly TranscriptItem[],
-  assistantMessageId: string,
-): SeedTurn[] {
-  const turns: SeedTurn[] = []
-  for (const item of items) {
-    if (item.kind === 'user') {
-      if (item.text.trim() !== '') turns.push({ role: 'user', text: item.text })
-      continue
-    }
-    if (item.kind !== 'assistant') continue
-    const written = item.segments
-      .filter((segment) => segment.kind === 'text')
-      .map((segment) => segment.text)
-      .join('\n\n')
-    if (written.trim() !== '') turns.push({ role: 'assistant', text: written })
-    if (item.id === assistantMessageId) break
-  }
-  return turns
-}
-
-function turnsOfMessages(messages: readonly ConversationMessageFacts[]): SeedTurn[] {
-  const turns: SeedTurn[] = []
-  for (const message of messages) {
-    // 2.0's runtime advisories (abort markers and the like) arrive as
-    // `system` messages. They are not words anybody said, so a fork's
-    // inherited transcript does not carry them either.
-    if (message.role === 'system') continue
-    const written = message.parts
-      .filter((part) => part.kind === 'text')
-      .map((part) => part.text)
-      .join('\n\n')
-    if (written.trim() === '') continue
-    turns.push({ role: message.role, text: written })
-  }
-  return turns
-}
-
-/**
- * One cold read of a conversation's words, for a fork fired from the sidebar
- * where nothing is loaded. The client's own cold start reads history first
- * and delivers it as a snapshot; this takes exactly that delivery, stops the
- * read, and answers with the words or `null` when the harness has no stream
- * under the name.
- */
-async function readTurns(conversationId: string): Promise<SeedTurn[] | null> {
-  const address = await resolveHarnessAddress()
-  if (address === null) return null
-  const client = createConversationClient({ conversationId })
-  return new Promise((resolve) => {
-    const handle = client.attach({
-      onEvent: (delivery) => {
-        if (delivery.kind === 'snapshot') {
-          void handle.cancel()
-          resolve(turnsOfMessages(delivery.snapshot.messages))
-        } else if (delivery.kind === 'absent') {
-          resolve(null)
-        }
-      },
-    })
-    void handle.settled.then((settlement) => {
-      if (settlement.outcome !== 'ended' && settlement.outcome !== 'absent') resolve(null)
-    })
-  })
-}
-
-/** What a fork got to: the new conversation, only when the harness took the seed. */
+/** What a fork got to: the new conversation, only when the harness took it. */
 export type ForkOutcome =
   | { readonly ok: true; readonly conversationId: string }
   | { readonly ok: false; readonly note: string }
 
-const FORK_SUFFIX = ' (Fork)'
-
 export function useForkConversation() {
   const [busy, setBusy] = useState(false)
-  const { beginConversation, settings } = useWorkspace()
+  const { adoptConversation } = useWorkspace()
   const { openChat } = useNavigation()
 
   const fork = useCallback(
     async (input: {
       readonly source: Conversation
-      readonly turns: SeedTurn[] | null
+      readonly upToSubmissionId?: string
     }): Promise<ForkOutcome> => {
-      if (input.turns === null || input.turns.length === 0) {
-        return { ok: false, note: 'There is nothing said yet to fork.' }
-      }
       setBusy(true)
       try {
-        const title = `${input.source.title ?? 'Untitled'}${FORK_SUFFIX}`
-        const seed = renderSeed(input.source.title, input.turns)
+        // The one id for this fork: the harness duplicates everything under
+        // it. A second mint anywhere in this path is a second conversation.
         const conversationId = newId('cnv')
-        // The fork speaks with the settings its source was holding - the same
-        // model, reasoning and permission mode the words were written under -
-        // not whatever the window's picker happens to show right now.
-        const effective = effectiveTurnSettings(input.source, settings)
-        const outcome = await startConversation({
-          text: seed,
-          settings: turnSettingsToWire(effective),
-        })
-        if (!outcome.ok) {
-          return { ok: false, note: outcome.error.message }
-        }
-        // The name is written through the rename path, so it is a manual
-        // title: the harness derives nothing over it later, and a reload
-        // agrees with the sidebar.
         const address = await resolveHarnessAddress()
-        if (address !== null) {
-          await createHarnessClient(address).updateConversation(conversationId, { title })
+        if (address === null) {
+          return { ok: false, note: 'The harness is not running, so the conversation cannot be forked.' }
         }
-        beginConversation({
+        const forked = await createHarnessClient(address).forkConversation(
+          input.source.id,
+          conversationId,
+          input.upToSubmissionId,
+        )
+        if (!forked.ok) {
+          return { ok: false, note: forked.error.message }
+        }
+        // The row already exists server-side with the fork's title; this
+        // adopts it locally and converges on reload. The fork's settings
+        // are the source's own - the same model, reasoning and permission
+        // mode the words were written under, already on the row.
+        adoptConversation({
           id: conversationId,
-          firstMessage: seed,
           projectId: input.source.projectId,
-          settings: effective,
-          title,
+          settings: {
+            modelId: input.source.modelId,
+            reasoningLevel: input.source.reasoningLevel,
+            permission: input.source.permissionMode,
+          },
+          title: forked.value.title ?? input.source.title ?? 'Untitled',
         })
         openChat(conversationId)
         return { ok: true, conversationId }
@@ -201,20 +92,30 @@ export function useForkConversation() {
         setBusy(false)
       }
     },
-    [beginConversation, openChat, settings],
+    [adoptConversation, openChat],
   )
 
-  /** Fork everything: the words are read here, once, from the harness. */
+  /** Fork everything: the harness copies the whole transcript. */
   const forkWhole = useCallback(
-    async (source: Conversation): Promise<ForkOutcome> =>
-      fork({ source, turns: await readTurns(source.id) }),
+    async (source: Conversation): Promise<ForkOutcome> => fork({ source }),
     [fork],
   )
 
-  /** Branch from one answer: the words are already on screen. */
+  /**
+   * Branch from one answer: the fork is cut after the submission that
+   * wrote it. A message with no submission behind it - nothing the model
+   * ran for - carries no cut point, so the branch takes the whole
+   * conversation instead of refusing.
+   */
   const branchFrom = useCallback(
-    async (source: Conversation, items: readonly TranscriptItem[], messageId: string) =>
-      fork({ source, turns: turnsUpTo(items, messageId) }),
+    async (source: Conversation, items: readonly TranscriptItem[], messageId: string) => {
+      const message = items.find((item) => item.id === messageId)
+      const upToSubmissionId =
+        message !== undefined && 'submissionId' in message
+          ? (message.submissionId ?? undefined)
+          : undefined
+      return fork({ source, upToSubmissionId })
+    },
     [fork],
   )
 

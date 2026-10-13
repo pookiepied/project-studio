@@ -1,23 +1,15 @@
-diff --git a/dist/builtin-providers-DW08g5fh.mjs b/dist/builtin-providers-DW08g5fh.mjs
-index 33bee38..7cbc802 100644
---- a/dist/builtin-providers-DW08g5fh.mjs
-+++ b/dist/builtin-providers-DW08g5fh.mjs
-@@ -1,12 +1,12 @@
- import { f as createCallHandle, r as createCwdSandbox, u as abortErrorFor } from "./sandbox-DAJ0daML.mjs";
- import { f as getPreparedToolAdapter } from "./result-DfjetCf9.mjs";
--import { A as SubmissionConflictError, C as SessionNotFoundError, J as createConversationIdentity, N as SubmissionTimeoutError, W as normalizeLogAttributes, X as generateAttemptId, it as generateOwnerId, k as SubmissionAbortedError, ut as isKeyDerivedSubmissionId, y as RuntimeUnavailableError, z as classifyError } from "./errors-CsDcT_C4.mjs";
-+import { A as SubmissionConflictError, C as SessionNotFoundError, J as createConversationIdentity, N as SubmissionTimeoutError, S as SessionBusyError, W as normalizeLogAttributes, X as generateAttemptId, it as generateOwnerId, k as SubmissionAbortedError, ut as isKeyDerivedSubmissionId, y as RuntimeUnavailableError, z as classifyError } from "./errors-CsDcT_C4.mjs";
- import { L as agentStreamPath, dt as createActionScopeName, f as configureFlueRuntime, ft as createSessionStorageKey, g as resetFlueRuntimeForTests, h as getFlueRuntime, l as resolveAgentDurability, o as getRegisteredFlueAgents, pt as createTaskSessionName, s as registerFlueAgents, ut as assertPublicSessionName, vt as createAgentOutputChannel } from "./dispatch-nU3cIlT-.mjs";
- import { c as setProvider, r as hasProvider, s as resolveModel } from "./providers-B1VyW-aH.mjs";
- import { t as createHookStateBuffer } from "./use-persistent-state-DUUiJyWP.mjs";
- import { n as dispatchGlobalEvent, t as createCoordinatorEventEmitter } from "./events-BhCLb2HD.mjs";
- import { n as createMcpConnectionCache, t as createMcpConnection } from "./mcp-zuSf52GJ.mjs";
--import { C as renderAgentFunctionWithStructure, D as SUBMISSION_SESSION_NAME, E as SUBMISSION_HARNESS_NAME, R as LEASE_DURATION_MS, S as assertRenderStructureInvariance, T as skillCatalogEntries, _ as submissionSyntheticRequest, a as admitInstanceContact, b as createPublicSession, c as createDispatchAgentSubmissionInput, d as isInstanceContactRejection, f as materializeSubmissionAttachments, g as settleUnclaimableSubmission, h as serializeSubmissionError, l as ensureInstanceIdentity, m as reconcileInterruptedSubmission, o as adoptKeyedSubmissionReplay, p as processSubmission, s as createDirectAgentSubmissionInput, t as InMemoryConversationStreamStore, u as finalizePendingSettlement, v as unreadySubmissionDeadline, w as discoverSessionContext, x as digestInstructions, y as Session } from "./conversation-stream-store-CXwRWonS.mjs";
-+import { projectStudioSessionHandler as createAgentSubmissionSessionHandler, C as renderAgentFunctionWithStructure, D as SUBMISSION_SESSION_NAME, E as SUBMISSION_HARNESS_NAME, R as LEASE_DURATION_MS, S as assertRenderStructureInvariance, T as skillCatalogEntries, _ as submissionSyntheticRequest, a as admitInstanceContact, b as createPublicSession, c as createDispatchAgentSubmissionInput, d as isInstanceContactRejection, f as materializeSubmissionAttachments, g as settleUnclaimableSubmission, h as serializeSubmissionError, l as ensureInstanceIdentity, m as reconcileInterruptedSubmission, o as adoptKeyedSubmissionReplay, p as processSubmission, s as createDirectAgentSubmissionInput, t as InMemoryConversationStreamStore, u as finalizePendingSettlement, v as unreadySubmissionDeadline, w as discoverSessionContext, x as digestInstructions, y as Session } from "./conversation-stream-store-CXwRWonS.mjs";
- import { i as InMemoryAttachmentStore } from "./format-version-Bmc1L_3t.mjs";
- import { r as ConversationRecordWriter } from "./sql-agent-execution-store-RrAtlpSL.mjs";
- import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-@@ -238,7 +238,19 @@ var Harness = class Harness {
+diff --git a/dist/builtin-providers-C5FpT9g1.mjs b/dist/builtin-providers-C5FpT9g1.mjs
+index 63c9b95ea0a8333a7109fce9084ad4068711506d..36f309544930b89f9dbd6f362829d27ee95288c2 100644
+--- a/dist/builtin-providers-C5FpT9g1.mjs
++++ b/dist/builtin-providers-C5FpT9g1.mjs
+@@ -1,4 +1,6 @@
+ import { d as abortErrorFor, p as createCallHandle, r as createCwdSandbox } from "./sandbox-CR3o1Qmd.mjs";
++import { C as SessionBusyError } from "./errors-BcRwz-UD.mjs";
++import { projectStudioSessionHandler as createAgentSubmissionSessionHandler } from "./conversation-stream-store-CXrgv-b0.mjs";
+ import { f as getPreparedToolAdapter } from "./result-e-IUH4HT.mjs";
+ import { A as SubmissionAbortedError, B as classifyError, G as normalizeLogAttributes, P as SubmissionTimeoutError, Y as createConversationIdentity, Z as generateAttemptId, at as generateOwnerId, b as RuntimeUnavailableError, dt as isKeyDerivedSubmissionId, j as SubmissionConflictError, w as SessionNotFoundError } from "./errors-BcRwz-UD.mjs";
+ import { dt as createActionScopeName, et as agentStreamPath, f as configureFlueRuntime, ft as createSessionStorageKey, g as resetFlueRuntimeForTests, h as getFlueRuntime, l as resolveAgentDurability, o as getRegisteredFlueAgents, pt as createTaskSessionName, s as registerFlueAgents, ut as assertPublicSessionName, vt as createAgentOutputChannel } from "./dispatch-t-UmrrMW.mjs";
+@@ -242,7 +244,19 @@ var Harness = class Harness {
  			executionContext: {
  				...this.executionContext,
  				harness: harnessScope,
@@ -38,7 +30,7 @@ index 33bee38..7cbc802 100644
  			}
  		});
  		await session.initializeCanonicalContext();
-@@ -698,6 +710,12 @@ function createNodeAgentCoordinator(options) {
+@@ -707,6 +721,12 @@ function createNodeAgentCoordinator(options) {
  	/** Unique identifier for this coordinator instance. Used as the owner
  	*  for lease-based submission ownership. */
  	const ownerId = generateOwnerId();
@@ -51,7 +43,7 @@ index 33bee38..7cbc802 100644
  	/** Heartbeat interval handle; started with the claim loop. */
  	let heartbeatInterval = null;
  	/** Periodic lease-scan wake timer; wakes the claim loop so expired
-@@ -881,6 +899,8 @@ function createNodeAgentCoordinator(options) {
+@@ -890,6 +910,8 @@ function createNodeAgentCoordinator(options) {
  		let progressed = false;
  		for (const submission of runnable) {
  			if (activeSubmissions.has(submission.submissionId)) continue;
@@ -60,7 +52,7 @@ index 33bee38..7cbc802 100644
  			const claimed = await submissions.claimSubmission({
  				submissionId: submission.submissionId,
  				attemptId: generateAttemptId(),
-@@ -1317,6 +1337,69 @@ function createNodeAgentCoordinator(options) {
+@@ -1326,6 +1348,77 @@ function createNodeAgentCoordinator(options) {
  				activityLease?.release();
  			}
  		},
@@ -127,23 +119,32 @@ index 33bee38..7cbc802 100644
 +				wake();
 +			}
 +		},
++		async manageQueuedInstance(agentName, instanceId, submissionId, action) {
++			const sessionKey = createSessionStorageKey(agentName, instanceId, SUBMISSION_HARNESS_NAME, SUBMISSION_SESSION_NAME);
++			const result = await submissions.manageQueuedSubmission(sessionKey, submissionId, action);
++			ensureClaimLoop();
++			wake();
++			if (action === "remove" || action === "edit") await reconcileRunningSubmissions();
++			return result;
++		},
  		async abortInstance(agentName, instanceId) {
  			const sessionKey = createSessionStorageKey(agentName, instanceId, SUBMISSION_HARNESS_NAME, SUBMISSION_SESSION_NAME);
  			const affected = await submissions.requestSessionAbort(sessionKey);
-@@ -1588,6 +1671,8 @@ async function assembleNodeAgentRuntime(options) {
+@@ -1597,6 +1690,9 @@ async function assembleNodeAgentRuntime(options) {
  		activityGate,
  		createAgentAdmission: (agentName, instanceId) => coordinator.createAdmission(agentName, instanceId),
  		abortAgentInstance: (agentName, instanceId) => coordinator.abortInstance(agentName, instanceId),
 +		// [project-studio patch] The manual-compaction door, see compactInstance.
 +		compactAgentInstance: (agentName, instanceId) => coordinator.compactInstance(agentName, instanceId),
++		manageQueuedAgentInstance: (...args) => coordinator.manageQueuedInstance(...args),
  		conversationStreamStore,
  		attachmentStore
  	};
-diff --git a/dist/conversation-stream-store-CXwRWonS.mjs b/dist/conversation-stream-store-CXwRWonS.mjs
-index 3fa342b..9a576d5 100644
---- a/dist/conversation-stream-store-CXwRWonS.mjs
-+++ b/dist/conversation-stream-store-CXwRWonS.mjs
-@@ -423,14 +423,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
+diff --git a/dist/conversation-stream-store-CXrgv-b0.mjs b/dist/conversation-stream-store-CXrgv-b0.mjs
+index 28be2fc98bba07dfc9628da831dbbe6a029ba970..03c06c17efdff580070dcb5fdc97bd65faa8a3a2 100644
+--- a/dist/conversation-stream-store-CXrgv-b0.mjs
++++ b/dist/conversation-stream-store-CXrgv-b0.mjs
+@@ -442,14 +442,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
  			parts.push(`- **${agent.name}**${desc}`);
  		}
  	} else pushSection("## Available Agents", "", "None. No subagents are currently declared, so the `task` tool has no valid `agent` value — do not call it unless an agent is introduced later in the conversation.");
@@ -185,7 +186,7 @@ index 3fa342b..9a576d5 100644
  		if (env.directoryListing && env.directoryListing.length > 0) parts.push("", "Directory structure:", env.directoryListing.join("\n"));
  	}
  	return parts.join("\n");
-@@ -3999,20 +4019,77 @@ var Session = class {
+@@ -4146,20 +4166,77 @@ var Session = class {
  		}
  	}
  	async waitForTransientModelRetry(assistant, attempt) {
@@ -266,7 +267,7 @@ index 3fa342b..9a576d5 100644
  			delayMs,
  			error: assistant.errorMessage
  		});
-@@ -4083,6 +4160,8 @@ var Session = class {
+@@ -4230,6 +4307,8 @@ var Session = class {
  				estimatedTokens
  			});
  			terminalPending = true;
@@ -275,7 +276,7 @@ index 3fa342b..9a576d5 100644
  			const result = await compact(preparation, summarizationModel, this.compactionAbortController.signal, {
  				start: (purpose, model, context, options) => {
  					const handle = { turnId: generateTurnId() };
-@@ -4102,7 +4181,7 @@ var Session = class {
+@@ -4249,7 +4328,7 @@ var Session = class {
  					this.emitTurn(handle.turnId, purpose, response, request.info, error);
  					this.modelRequests.delete(handle.turnId);
  				}
@@ -284,26 +285,46 @@ index 3fa342b..9a576d5 100644
  			if (this.compactionAbortController.signal.aborted) {
  				const abortError = abortErrorFor(this.compactionAbortController.signal);
  				this.emit({
-@@ -5816,4 +5895,4 @@ var SqliteConversationStreamStore = class {
+@@ -5017,6 +5096,7 @@ async function materializeSubmissionAttachments(input, conversationId, attachmen
+ 		});
  	}
- };
- //#endregion
--export { isSubmissionPayload as A, renderAgentFunctionWithStructure as C, SUBMISSION_SESSION_NAME as D, SUBMISSION_HARNESS_NAME as E, sameSubmissionChunks as F, DURABILITY_DEFAULT_MAX_ATTEMPTS as I, DURABILITY_DEFAULT_TIMEOUT_MS as L, hydratePersistedSubmissionAttachments as M, matchesPersistedSubmissionAttachments as N, admitSubmissionWithBackend as O, prepareSubmissionAttachments as P, LEASE_DURATION_MS as R, assertRenderStructureInvariance as S, skillCatalogEntries as T, submissionSyntheticRequest as _, admitInstanceContact as a, createPublicSession as b, createDispatchAgentSubmissionInput as c, isInstanceContactRejection as d, materializeSubmissionAttachments as f, settleUnclaimableSubmission as g, serializeSubmissionError as h, ensureSqlConversationStreamTables as i, parseAcceptedAt as j, clampLimit as k, ensureInstanceIdentity as l, reconcileInterruptedSubmission as m, SqliteConversationStreamStore as n, adoptKeyedSubmissionReplay as o, processSubmission as p, StreamListenerRegistry as r, createDirectAgentSubmissionInput as s, InMemoryConversationStreamStore as t, finalizePendingSettlement as u, unreadySubmissionDeadline as v, discoverSessionContext as w, digestInstructions as x, Session as y };
-+export { createAgentSubmissionSessionHandler as projectStudioSessionHandler, isSubmissionPayload as A, renderAgentFunctionWithStructure as C, SUBMISSION_SESSION_NAME as D, SUBMISSION_HARNESS_NAME as E, sameSubmissionChunks as F, DURABILITY_DEFAULT_MAX_ATTEMPTS as I, DURABILITY_DEFAULT_TIMEOUT_MS as L, hydratePersistedSubmissionAttachments as M, matchesPersistedSubmissionAttachments as N, admitSubmissionWithBackend as O, prepareSubmissionAttachments as P, LEASE_DURATION_MS as R, assertRenderStructureInvariance as S, skillCatalogEntries as T, submissionSyntheticRequest as _, admitInstanceContact as a, createPublicSession as b, createDispatchAgentSubmissionInput as c, isInstanceContactRejection as d, materializeSubmissionAttachments as f, settleUnclaimableSubmission as g, serializeSubmissionError as h, ensureSqlConversationStreamTables as i, parseAcceptedAt as j, clampLimit as k, ensureInstanceIdentity as l, reconcileInterruptedSubmission as m, SqliteConversationStreamStore as n, adoptKeyedSubmissionReplay as o, processSubmission as p, StreamListenerRegistry as r, createDirectAgentSubmissionInput as s, InMemoryConversationStreamStore as t, finalizePendingSettlement as u, unreadySubmissionDeadline as v, discoverSessionContext as w, digestInstructions as x, Session as y };
-diff --git a/dist/dispatch-nU3cIlT-.mjs b/dist/dispatch-nU3cIlT-.mjs
-index c661b21..48db55b 100644
---- a/dist/dispatch-nU3cIlT-.mjs
-+++ b/dist/dispatch-nU3cIlT-.mjs
+ }
++export { createAgentSubmissionSessionHandler as projectStudioSessionHandler };
+ function createAgentSubmissionSessionHandler(agent, input, execute) {
+ 	return async (ctx) => {
+ 		return execute(await openAgentSubmissionSession(ctx, agent, input));
+@@ -5161,7 +5241,16 @@ async function processSubmission(opts) {
+ 		maxAttempts: submission.maxAttempts
+ 	});
+ 	const joinSource = {
+-		claim: () => submissions.claimJoinableSubmissions(attempt, input.agent),
++		claim: async () => {
++			const claimed = await submissions.claimJoinableSubmissions(attempt, input.agent);
++			const steering = [];
++			for (const submission of claimed) {
++				if (submission.input.message.deliveryMode === "queue") {
++					await submissions.revertJoiningSubmission(attempt, submission.submissionId);
++				} else steering.push(submission);
++			}
++			return steering;
++		},
+ 		finalize: (submissionId) => submissions.finalizeJoinedSubmission(attempt, submissionId),
+ 		revert: (submissionId) => submissions.revertJoiningSubmission(attempt, submissionId),
+ 		listUnresolved: () => submissions.listJoinedSubmissions(attempt.submissionId)
+diff --git a/dist/dispatch-t-UmrrMW.mjs b/dist/dispatch-t-UmrrMW.mjs
+index 7274a8ed2f7a693bcf089743c29c847f079037c2..ec2475b3024e9312b12c32369fc56e0fe1c3a2a3 100644
+--- a/dist/dispatch-t-UmrrMW.mjs
++++ b/dist/dispatch-t-UmrrMW.mjs
 @@ -1,7 +1,7 @@
- import { B as configureErrorRendering, D as StreamOffsetGoneError, E as StreamNotFoundError, G as parseJsonBody, Q as generateEntryId, Y as deriveKeyedSubmissionId, a as AttachmentNotAvailableError, at as generateRecordId, c as ConversationRecordInvariantError, dt as extractTraceCarrier, m as MethodNotAllowedError, o as AttachmentNotFoundError, ot as generateSubmissionId, p as InvalidRequestError, q as toHttpResponse, v as RouteNotFoundError } from "./errors-CsDcT_C4.mjs";
- import { n as getRuntimeModels } from "./providers-B1VyW-aH.mjs";
+ import { $ as generateEntryId, D as StreamNotFoundError, J as toHttpResponse, K as parseJsonBody, O as StreamOffsetGoneError, V as configureErrorRendering, X as deriveKeyedSubmissionId, a as AttachmentNotAvailableError, c as ConversationRecordInvariantError, f as HistoryCursorNotFoundError, ft as extractTraceCarrier, h as MethodNotAllowedError, m as InvalidRequestError, o as AttachmentNotFoundError, ot as generateRecordId, st as generateSubmissionId, y as RouteNotFoundError } from "./errors-BcRwz-UD.mjs";
+ import { n as getRuntimeModels } from "./providers-DfEK_EsA.mjs";
  import { n as isValibotSchema } from "./schema-DIDpvZZa.mjs";
 -import { isContextOverflow } from "@earendil-works/pi-ai";
 +import { isContextOverflow, isRetryableAssistantError } from "@earendil-works/pi-ai";
  import * as v from "valibot";
  import { Hono } from "hono";
  //#region src/conversation-records.ts
-@@ -1398,7 +1398,7 @@ function prepareCompaction(messages, settings, previousCompaction) {
+@@ -2007,7 +2007,7 @@ function prepareCompaction(messages, settings, previousCompaction) {
  * generateSummary and generateTurnPrefixSummary; those two only differ in the
  * prompt they build, the purpose label, and the error-message prefix.
  */
@@ -312,7 +333,7 @@ index c661b21..48db55b 100644
  	const summarizationMessages = [{
  		role: "user",
  		content: [{
-@@ -1411,9 +1411,12 @@ async function runSummarizationCall(purpose, promptText, maxTokens, model, signa
+@@ -2020,9 +2020,12 @@ async function runSummarizationCall(purpose, promptText, maxTokens, model, signa
  		maxTokens,
  		signal
  	};
@@ -327,7 +348,7 @@ index c661b21..48db55b 100644
  		messages: summarizationMessages
  	};
  	const handle = observer.start(purpose, model, context, completionOptions);
-@@ -1431,19 +1434,20 @@ async function runSummarizationCall(purpose, promptText, maxTokens, model, signa
+@@ -2040,19 +2043,20 @@ async function runSummarizationCall(purpose, promptText, maxTokens, model, signa
  		usage: response.usage
  	};
  }
@@ -354,7 +375,7 @@ index c661b21..48db55b 100644
  	const { messagesToSummarize, turnPrefixMessages, isSplitTurn, tokensBefore, previousSummary, fileOps, settings } = preparation;
  	let summary;
  	let aggregateUsage;
-@@ -1453,15 +1457,15 @@ async function compact(preparation, model, signal, observer) {
+@@ -2062,15 +2066,15 @@ async function compact(preparation, model, signal, observer) {
  		aggregateUsage = aggregateUsage ? addUsage(aggregateUsage, normalized) : normalized;
  	};
  	if (isSplitTurn && turnPrefixMessages.length > 0) {
@@ -373,51 +394,26 @@ index c661b21..48db55b 100644
  		addCallUsage(historyResult.usage);
  		summary = historyResult.text;
  	}
-@@ -1705,7 +1709,30 @@ function findTrailingPartialToolBatch(following) {
+@@ -2314,7 +2318,10 @@ function findTrailingPartialToolBatch(following) {
  function isRetryableModelError(message) {
  	if (message.stopReason !== "error" || !message.errorMessage) return false;
  	if (message.errorMessage.includes("(retryable_interruption)")) return true;
--	return /overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|network.?error|connection.?(?:reset|refused|lost)|socket hang up|fetch failed|timed? out|timeout|terminated|provider finish_reason:\s*error(?![-\w])/i.test(message.errorMessage);
-+	// [project-studio patch] Delegate the HEURISTIC half of this classifier to
-+	// @earendil-works/pi-ai's isRetryableAssistantError instead of the inline
-+	// regex this bundle shipped. The shipped pattern was too narrow (it missed,
-+	// among others, OpenRouter's "Provider returned error" wrapper, so real
-+	// transient failures were never retried) and had no non-retryable guard
-+	// (OpenAI returns insufficient_quota as HTTP 429, so billing exhaustion
-+	// burned the full retry budget before reaching the person). Pi's version
-+	// checks its quota/billing exclusions FIRST, so a sentence matching both
-+	// lists is not retried; its retryable list is otherwise a superset. The
-+	// policy therefore tracks pi-ai's semver range instead of a copied regex
-+	// that rots.
-+	//
-+	// The two lines ABOVE are upstream's and are deliberately left in front of
-+	// the delegation. `stopReason`/`errorMessage` is the same precondition pi
-+	// applies. The `(retryable_interruption)` marker is new in 2.0.3 and is
-+	// Flue's own PROOF that a throw site was a transient interruption; proof
-+	// outranks a text heuristic, and a quota refusal never carries the marker,
-+	// so checking it first neither weakens the billing guard nor loses the
-+	// behaviour the marker exists to provide.
-+	//
-+	// If an upgrade renames this hash and the patch fails to apply, re-derive
-+	// it from this comment -- do not restore the narrower regex, and do not
-+	// drop the marker check while doing it.
+-	return /overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|network.?error|connection.?(?:reset|refused|lost|error)|socket hang up|fetch failed|timed? out|timeout|terminated|provider finish_reason:\s*error(?![-\w])/i.test(message.errorMessage);
++	// [project-studio patch] Pi excludes quota/billing refusals before testing
++	// transient errors. Keep Flue's proven interruption marker above this
++	// heuristic, and share the classifier with the provider adapter.
 +	return isRetryableAssistantError(message);
  }
- function isCompletedAssistantResponse(message) {
- 	return message.stopReason === "stop" || message.stopReason === "length";
-@@ -1796,20 +1823,72 @@ function projectConversationUi(conversation, streamOffset) {
+ function isToolBatchAssistant(message) {
+ 	return message.stopReason === "toolUse" || (message.stopReason === "length" || message.stopReason === "stop") && message.content.some((block) => block.type === "toolCall");
+@@ -2424,22 +2431,44 @@ function supersededAssistantErrorEntryIds(conversation) {
+ function projectConversationUi(conversation, streamOffset) {
  	const messages = [];
  	const byId = /* @__PURE__ */ new Map();
+-	const supersededErrors = supersededAssistantErrorEntryIds(conversation);
  	const responseBySubmission = /* @__PURE__ */ new Map();
-+	// [project-studio patch] The compaction records on the active path, in
-+	// the UI's own terms: which projected message each one follows, so a
-+	// client can place "conversation compacted" where it happened. Upstream
-+	// skips the record here and resets the client with a snapshot that
-+	// carries no trace of it, so the one durable fact about a compaction -
-+	// that it happened, and what it kept - never reaches a UI. The entries
-+	// before the cut stay projected; `firstKeptEntryId` says where the
-+	// model's memory now begins. Anchor on `projectConversationUi` and the
-+	// `messages` walk, never on a bundle filename or a line number.
++	// [project-studio patch] Compaction markers belong beside the retained UI
++	// history, even though the model's context begins at firstKeptEntryId.
 +	const compactions = [];
  	for (const entry of getActiveConversationPath(conversation)) {
 +		if (entry.type === "compaction") {
@@ -435,33 +431,12 @@ index c661b21..48db55b 100644
 +			continue;
 +		}
  		if (entry.type !== "message") continue;
- 		const projected = projectCompletedMessage(entry);
+-		const projected = projectCompletedMessage(entry, supersededErrors.has(entry.id));
++		const projected = projectCompletedMessage(entry);
  		if (projected) {
  			if (projected.role === "assistant" && projected.submissionId) {
-+				// [project-studio patch] A FAILED attempt is its own message, not
-+				// a continuation of the response that replaced it.
-+				//
-+				// 2.0.3 introduced the one-message-per-response shape: every
-+				// assistant step of a submission folds into the first step's
-+				// bubble, which is right for a tool loop -- those steps really
-+				// are one answer arriving in pieces. It is wrong for a transient
-+				// retry. There, each step is a whole attempt that FAILED and was
-+				// thrown away, and folding it into the surviving answer erases
-+				// it: the person is shown one clean response with no sign that
-+				// three model calls were spent, and `submission-retrying` on the
-+				// updates channel becomes the only witness. Under Phase 2 the
-+				// retry was invisible in BOTH channels at once, which is what
-+				// made a retrying turn indistinguishable from a hung one.
-+				//
-+				// An errored step therefore keeps its own message and does not
-+				// become (or stay) the open response, so the next attempt starts
-+				// a fresh one. Response metadata and anchored data parts stay
-+				// with the non-errored response, which is the only step that has
-+				// any. A submission with no failures folds exactly as upstream
-+				// folds it -- this branch never runs.
-+				//
-+				// Anchor on `projectConversationUi` and the `responseBySubmission`
-+				// merge, never on a bundle filename or a line number.
++				// [project-studio patch] Failed attempts remain separate witnesses
++				// of retries; a successful tool loop still forms one response.
 +				const failedAttempt = entry.message.role === "assistant" && entry.message.stopReason === "error";
  				const open = responseBySubmission.get(projected.submissionId);
 -				if (open) {
@@ -482,7 +457,7 @@ index c661b21..48db55b 100644
  			}
  			messages.push(projected);
  			byId.set(projected.id, projected);
-@@ -1856,7 +1935,8 @@ function projectConversationUi(conversation, streamOffset) {
+@@ -2486,7 +2515,8 @@ function projectConversationUi(conversation, streamOffset) {
  	return {
  		conversationId: conversation.conversationId,
  		streamOffset,
@@ -492,7 +467,7 @@ index c661b21..48db55b 100644
  	};
  }
  /**
-@@ -2034,6 +2114,9 @@ function projectAgentConversationSnapshot(state) {
+@@ -2668,6 +2698,9 @@ function projectAgentConversationSnapshot(state) {
  		conversationId: conversation.conversationId,
  		offset: ui.streamOffset,
  		messages: ui.messages,
@@ -502,7 +477,7 @@ index c661b21..48db55b 100644
  		settlements: projectSettlements(state, conversation.conversationId)
  	};
  }
-@@ -2208,6 +2291,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
+@@ -2886,6 +2919,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
  			if (assistant?.type !== "message" || assistant.message.role !== "assistant") return [];
  			return assistant.message.content.flatMap((block) => block.type === "toolCall" ? encodeToolResultEntry(conversation, record.assistantMessageId, block.id, conversationId) : []);
  		}
@@ -532,7 +507,7 @@ index c661b21..48db55b 100644
  		case "submission_settled": {
  			const answeredBy = typeof record.attemptId === "string" ? assistantSubmissionByAttempt(state).get(record.attemptId) : void 0;
  			return [{
-@@ -2897,10 +3003,25 @@ function assertThinkingLevel(value, label) {
+@@ -3182,10 +3238,25 @@ function assertThinkingLevel(value, label) {
  function assertCompaction(definition, label) {
  	if (definition === void 0 || definition === false) return;
  	if (typeof definition !== "object" || definition === null || Array.isArray(definition)) throw new Error(`[flue] ${label} compaction must be a configuration object or \`false\`.`);
@@ -559,7 +534,15 @@ index c661b21..48db55b 100644
  }
  function assertDurability(definition, label) {
  	if (definition === void 0) return;
-@@ -3441,6 +3562,25 @@ async function getAgentInstance(agent, id) {
+@@ -3226,6 +3297,7 @@ const DeliveredAttachmentSchema = v.variant("type", [DeliveredImageAttachmentSch
+ const DeliveredUserMessageSchema = v.object({
+ 	kind: v.literal("user"),
+ 	body: v.string(),
++	deliveryMode: v.optional(v.picklist(["queue", "steer"])),
+ 	attachments: v.optional(v.array(DeliveredAttachmentSchema))
+ });
+ const DeliveredSignalMessageSchema = v.object({
+@@ -3921,6 +3993,32 @@ async function getAgentInstance(agent, id) {
  	return readInstanceInfoFromStream(rt.conversationStreamStore, name, id);
  }
  /**
@@ -581,14 +564,21 @@ index c661b21..48db55b 100644
 +	return rt.compactAgentInstance(name, id);
 +}
 +globalThis.__projectStudioCompactAgentInstance = compactAgentInstance;
++globalThis.__projectStudioManageQueuedAgentInstance = async (agent, id, submissionId, action) => {
++	const rt = runtimeConfig;
++	if (!rt || rt.target !== "node" || !isAgentFunction(agent)) throw new Error("Queue control requires a configured Node agent.");
++	const name = getRegisteredAgentIdentity(agent);
++	if (!name || typeof id !== "string" || !id.trim()) throw new Error("Invalid queue target.");
++	return rt.manageQueuedAgentInstance(name, id, submissionId, action);
++};
 +/**
  * Node lookup: the root `conversation_created` record is the first record of
  * the instance's stream, so existence and uid come from stream meta plus the
  * first batch.
-diff --git a/dist/observation-IWUJUvRg.d.mts b/dist/observation-IWUJUvRg.d.mts
-index 03d9815..db0d55b 100644
---- a/dist/observation-IWUJUvRg.d.mts
-+++ b/dist/observation-IWUJUvRg.d.mts
+diff --git a/dist/observation-CCQRUQQq.d.mts b/dist/observation-CCQRUQQq.d.mts
+index 3bb3d2fbb1be44c40f6621b53b430a692e886e8d..8688f98600f320900c3ef040989010538fb46307 100644
+--- a/dist/observation-CCQRUQQq.d.mts
++++ b/dist/observation-CCQRUQQq.d.mts
 @@ -59,6 +59,10 @@ interface FlueExecutionContext {
    turnId?: string;
    taskId?: string;
@@ -600,11 +590,64 @@ index 03d9815..db0d55b 100644
  }
  type FlueExecutionInterceptor = <T>(operation: FlueExecutionOperation, ctx: FlueExecutionContext, next: () => Promise<T>) => Promise<T>;
  //#endregion
-diff --git a/dist/types-CVx9SjIx.d.mts b/dist/types-CVx9SjIx.d.mts
-index 0c9ab24..897f015 100644
---- a/dist/types-CVx9SjIx.d.mts
-+++ b/dist/types-CVx9SjIx.d.mts
-@@ -520,6 +520,19 @@ interface CompactionConfig {
+diff --git a/dist/sql-agent-execution-store-LqbFqydc.mjs b/dist/sql-agent-execution-store-LqbFqydc.mjs
+index 9fdf8f303561d680212644471b225f044955186a..2a253b241bba2442adf7c8ce3f8f1c62e10ef4ba 100644
+--- a/dist/sql-agent-execution-store-LqbFqydc.mjs
++++ b/dist/sql-agent-execution-store-LqbFqydc.mjs
+@@ -1,3 +1,4 @@
++import { m as InvalidRequestError } from "./errors-BcRwz-UD.mjs";
+ import { X as getConversationFoldHost, Z as writeFoldCheckpoint, at as conversationScopeKey, st as reduceConversationRecords } from "./dispatch-t-UmrrMW.mjs";
+ import { N as hydratePersistedSubmissionAttachments, R as DURABILITY_DEFAULT_TIMEOUT_MS, c as createDispatchAgentSubmissionInput, j as isSubmissionPayload, k as admitSubmissionWithBackend, z as LEASE_DURATION_MS } from "./conversation-stream-store-CXrgv-b0.mjs";
+ import { r as migrateFlueSqlSchema } from "./format-version-CbfgskCy.mjs";
+@@ -357,6 +358,24 @@ var AgentSubmissionStoreImpl = class {
+ 		this.sql = sql;
+ 		this.transactionSync = transactionSync;
+ 	}
++	async manageQueuedSubmission(sessionKey, submissionId, action) {
++		return this.transactionSync(() => {
++			const rows = this.sql.exec(`SELECT ${submissionColumns} FROM flue_agent_submissions WHERE session_key = ? AND status = 'queued' AND abort_requested_at IS NULL ORDER BY sequence`, sessionKey).toArray();
++			const queued = rows.map((row) => this.parseSubmission(row)).filter((item) => item.input.message.deliveryMode === "queue");
++			if (action === "list") return queued.map((item) => ({ submissionId: item.submissionId, text: item.input.message.body, images: [] }));
++			const item = queued.find((item) => item.submissionId === submissionId);
++			if (!item) return false;
++			if (action === "steer") {
++				const row = this.readSubmissionRow(submissionId);
++				const payload = JSON.parse(row.payload);
++				payload.message.deliveryMode = "steer";
++				this.sql.exec(`UPDATE flue_agent_submissions SET payload = ? WHERE submission_id = ? AND status = 'queued'`, JSON.stringify(payload), submissionId);
++			} else if (action === "remove" || action === "edit") {
++				this.sql.exec(`UPDATE flue_agent_submissions SET abort_requested_at = ? WHERE submission_id = ? AND status = 'queued'`, Date.now(), submissionId);
++			} else throw new Error("Unknown queue action.");
++			return action === "edit" ? { submissionId: item.submissionId, text: item.input.message.body, images: item.input.message.attachments ?? [] } : true;
++		});
++	}
+ 	async getSubmission(submissionId) {
+ 		const row = this.readSubmissionRow(submissionId);
+ 		return row ? this.parseSubmission(row) : null;
+@@ -584,6 +603,7 @@ var AgentSubmissionStoreImpl = class {
+ 					break;
+ 				}
+ 				if (submission.input.agent !== agentName) break;
++				if (submission.input.message.deliveryMode === "queue") continue;
+ 				this.sql.exec(`UPDATE flue_agent_submissions
+ 					 SET status = 'joining', joined_into = ?
+ 					 WHERE submission_id = ? AND status = 'queued'`, host.submissionId, submission.submissionId);
+@@ -642,6 +662,10 @@ var AgentSubmissionStoreImpl = class {
+ 			const chunkStore = createSqlSubmissionChunkStore(this.sql);
+ 			const admission = admitSubmissionWithBackend(input, {
+ 				insertIfAbsent: (row) => {
++					if (!this.readSubmissionRow(row.submissionId) && input.message.deliveryMode === "queue") {
++						const count = this.sql.exec(`SELECT COUNT(*) AS count FROM flue_agent_submissions WHERE session_key = ? AND status IN ('queued', 'joining') AND abort_requested_at IS NULL AND json_extract(payload, '$.message.deliveryMode') = 'queue'`, row.sessionKey).toArray()[0].count;
++						if (count >= 3) throw new InvalidRequestError({ reason: "The queue is full. Edit, delete, or steer a queued message first." });
++					}
+ 					this.sql.exec(`INSERT OR IGNORE INTO flue_agent_submissions
+ 						 (submission_id, session_key, kind, payload, status, accepted_at)
+ 						 VALUES (?, ?, ?, ?, 'queued', ?)`, row.submissionId, row.sessionKey, row.kind, row.payload, row.acceptedAt);
+diff --git a/dist/types-B1PuLhZt.d.mts b/dist/types-B1PuLhZt.d.mts
+index 8c2299c8ee6225d171cb9fccb53454d5a18b1441..acfbcc5fbc66e0d5cd36ca086d1c02d37b4ea5ed 100644
+--- a/dist/types-B1PuLhZt.d.mts
++++ b/dist/types-B1PuLhZt.d.mts
+@@ -588,6 +588,19 @@ interface CompactionConfig {
     * short-context session). Format: `'provider-id/model-id'`.
     */
    model?: string;
@@ -624,7 +667,7 @@ index 0c9ab24..897f015 100644
  }
  interface DurabilityConfig {
    /**
-@@ -581,9 +594,9 @@ interface SubagentDefinition {
+@@ -649,9 +662,9 @@ interface SubagentDefinition {
    /** The delegate's agent function — it defines the delegate's whole world. */
    agent: AgentFunction;
    /** Model specifier override. Inherits the parent's model when omitted. */

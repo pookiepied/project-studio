@@ -5,6 +5,8 @@ import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
 import { uploadDocuments } from '@/features/chat/connection/documents'
 import { Composer } from '@/features/chat/composer'
+import { QueuedMessages } from '@/features/chat/composer/QueuedMessages'
+import { useQueuedMessages } from '@/features/chat/connection/useQueuedMessages'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
 import { useForkConversation } from '@/features/chat/connection/fork'
 import { useAutoScroll } from '@/features/chat/transcript'
@@ -82,6 +84,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
+  const queue = useQueuedMessages(conversation.id, isTurnRunning(live.phase))
   // Built once per gallery visit: the list is fixed, and a fresh array each
   // render would re-key the memoized rows for nothing.
   const [shown] = useState(() => (gallery ? galleryItems() : null))
@@ -304,7 +307,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
    * picker displays, so what is on screen is what is sent.
    */
   const sendTurn = useCallback(
-    async (text: string, images: readonly TurnImageWire[], documents: readonly File[]) => {
+    async (text: string, images: readonly TurnImageWire[], documents: readonly File[], deliveryMode?: 'queue' | 'steer') => {
       const effective = effectiveTurnSettings(conversation, settings)
       const refused = visionRefusal(effective.modelId, images.length, catalog.models)
       if (refused !== null) {
@@ -324,9 +327,13 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           setAttachRefusal(uploaded.error)
           return { ok: false }
         }
-        const sent = await live.submit(text, turnSettingsToWire(effective), images)
+        const sent = await live.submit(text, {
+          ...turnSettingsToWire(effective),
+          ...(deliveryMode === undefined ? {} : { deliveryMode }),
+        }, images)
         if (!sent.ok) await uploaded.takeBack()
         if (sent.ok) {
+          void queue.refresh()
           touch(conversation.id)
           // Sending is a return to the end. A message written from halfway
           // up the history belongs at the bottom, and the reply it earns
@@ -639,17 +646,24 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
               <AnsweredElsewhere sentence={questions.answeredElsewhere} />
             ) : null}
 
+            {queue.error ? <p role="alert" className="mb-2 text-sm text-muted-foreground">{queue.error}</p> : null}
+            <QueuedMessages messages={queue.messages} disabled={queue.changing} onAction={(message, action) => { void queue.change(message, action) }} />
             <Composer
               conversationId={conversation.id}
-              // While a question holds the run, the field must not invite a new
-              // message: the turn is stopped, and what the page is waiting for
-              // is the answer above, not more words.
+              queueFull={queue.messages.length >= 3}
+              restoredMessage={queue.restoredMessage}
+              // A queued follow-up does not answer the tool's question. Keep
+              // that distinction visible while the answer holds the run.
               placeholder={
                 approvals.questions.length > 0 || questions.rows.length > 0
-                  ? 'Waiting for your answer above'
-                  : 'Reply'
+                  ? 'Answer above, or queue a follow-up'
+                  : isTurnRunning(live.phase)
+                    ? 'Add a correction or change direction'
+                    : 'Reply'
               }
+              allowSteering={live.pending === null && approvals.questions.length === 0 && questions.rows.length === 0}
               onSend={sendTurn}
+              onQueue={(text, images, documents) => sendTurn(text, images, documents, 'queue')}
               // Admitted counts. A turn the harness has taken but not yet
               // started producing is still a turn: the words are gone, the
               // stop control is the only thing that can call it back, and on

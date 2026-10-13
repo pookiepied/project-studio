@@ -201,7 +201,9 @@ export class ProviderManagementService implements ProviderAdministration {
     }
 
     // The detailed run also records what the provider's own list named, so
-    // the catalog can mark what the provider no longer offers. What reaches
+    // the catalog can mark what the provider no longer offers, and adopts
+    // what a self-hosted endpoint serves but has no row for yet, so a custom
+    // provider is add, probe, pick with no hand-entering. What reaches
     // the wire is the plain result: the screen wants the count, not the ids.
     const detailed = await probeProviderConnectionDetailed(connection, apiKey);
     if (detailed.ok && detailed.servedIds !== undefined) {
@@ -210,6 +212,12 @@ export class ProviderManagementService implements ProviderAdministration {
       } catch {
         // Learning is an enhancement to the answer, never a condition of it:
         // a probe that could not persist its list still reports what it saw.
+      }
+      try {
+        await this.#catalog.adoptServedModels(id, detailed.servedIds);
+      } catch {
+        // Adoption is learning too: a probe that could not add rows still
+        // reports what it saw.
       }
     }
     return detailed;

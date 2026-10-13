@@ -46,6 +46,7 @@ import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
 import { Studio } from "./agents/studio.js";
 import { agentRegistry } from "./agents/definitions/index.js";
 import { compactConversation, compactionReadiness } from "./conversations/compaction.js";
+import { manageQueuedMessages } from "./conversations/queued-messages.js";
 import { CommandRegistry } from "./extend/commands/registry.js";
 import { ImageDescriber } from "./library/describer.js";
 import { LibraryStore } from "./library/store.js";
@@ -422,6 +423,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       // Manual compaction: the cool-down reads the same tracker the meter
       // reads and the same window the render hands Flue, so the button, the
       // refusal and the threshold all stand on one set of numbers.
+      queuedMessages: (id, submissionId, action) => manageQueuedMessages(Studio, id, submissionId, action),
       compaction: {
         readiness: (conversationId) =>
           compactionReadiness(

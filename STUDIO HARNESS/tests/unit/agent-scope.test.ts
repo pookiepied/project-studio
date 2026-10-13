@@ -178,8 +178,8 @@ describe("the studio agent's identity and model contracts", () => {
     // authority over what is written. Both halves are read from the module's
     // shape, the same way the call-shape assertions above are.
     expect(STUDIO_SOURCE).toContain("useDelivery()");
-    expect(STUDIO_SOURCE).toContain(
-      "runtime.persistDeliveredAttachments?.(id, delivery.attachments);",
+    expect(STUDIO_SOURCE).toMatch(
+      /const attachmentCopies = delivery\.kind === "user" && delivery\.attachments !== undefined\s*\? runtime\.persistDeliveredAttachments\?\.\(id, delivery\.attachments\)\s*: undefined;/,
     );
   });
 

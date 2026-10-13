@@ -149,20 +149,31 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
 
     if (connection.catalogProvider === undefined) {
       // A self-hosted endpoint: the runtime builds a provider for it, and its
-      // declared models are exactly the hand-entered rows.
+      // declared models are exactly the hand-entered rows. Each row carries
+      // its own limits (or none, when the user stated none) so models of
+      // wildly different sizes on one endpoint are not all measured by the
+      // first row's numbers; the connection-level pair below remains as the
+      // fallback for rows that state nothing.
       if (!loadable.has(protocol) || connection.baseUrl === undefined) continue;
       // Typed: an untyped `new Map()` is `Map<any, any>`, and the `any`
       // travelled out of this fallback into every field read off the models
       // below.
-      const models = manuals.get(connection.id) ?? new Map<string, ProviderModel>();
-      const contextWindow = firstNumber([...models.values()].map((m) => m.capability.contextWindow));
-      const maxTokens = firstNumber([...models.values()].map((m) => m.capability.maxOutputTokens));
+      const rows = [...(manuals.get(connection.id) ?? new Map<string, ProviderModel>()).values()];
+      const contextWindow = firstNumber(rows.map((m) => m.capability.contextWindow));
+      const maxTokens = firstNumber(rows.map((m) => m.capability.maxOutputTokens));
       custom.push({
         id: connection.id,
         name: connection.displayName,
         baseUrl: connection.baseUrl,
         api: protocol,
-        models: [...models.keys()],
+        models: rows.map((m) => ({
+          id: m.modelId,
+          contextWindow:
+            typeof m.capability.contextWindow === "number" ? m.capability.contextWindow : undefined,
+          maxTokens:
+            typeof m.capability.maxOutputTokens === "number" ? m.capability.maxOutputTokens : undefined,
+          reasoningLevels: m.reasoningLevels ?? [],
+        })),
         contextWindow,
         maxTokens,
       });

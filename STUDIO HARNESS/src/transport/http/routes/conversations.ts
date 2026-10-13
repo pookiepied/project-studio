@@ -17,6 +17,7 @@ import {
   purgeConversations,
   sweepOrphanConversationTrees,
 } from "../../../conversations/purge.js";
+import { forkConversation } from "../../../conversations/fork.js";
 import type { ConversationStore } from "../../../conversations/store.js";
 import { ConversationDocumentStore, type ConversationDocument } from "../../../conversations/documents.js";
 import type { ConversationUsage } from "../../../conversations/context-usage.js";
@@ -30,6 +31,7 @@ import { TaskStore } from "../../../agents/definitions/task-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
 
 export interface ConversationRoutesOptions {
+  readonly queuedMessages?: (conversationId: string, submissionId: string | null, action: "list" | "steer" | "remove" | "edit") => Promise<unknown>;
   /** The index of conversations that exist, and the one owner of its rows. */
   readonly conversations: ConversationStore;
   /** The application database, for the conversation-scoped purge writes. */
@@ -47,6 +49,11 @@ export interface ConversationRoutesOptions {
      * cascade it in SQL and asks here instead.
      */
     forget?(conversationId: string): void;
+    /**
+     * Carries a conversation's figure to its fork, for the same ownership
+     * reason: the fork cannot insert into a table it does not own.
+     */
+    duplicate?(sourceId: string, targetId: string): void;
   };
   /**
    * Compacting a conversation by hand, and whether it may be done now. The
@@ -127,6 +134,11 @@ async function body(context: { req: { json(): Promise<unknown> } }): Promise<unk
 
 const purgeBodySchema = v.object({ ids: v.array(v.pipe(v.string(), v.minLength(1))) });
 
+const forkBodySchema = v.object({
+  id: v.pipe(v.string(), v.minLength(1)),
+  upToSubmissionId: v.optional(v.pipe(v.string(), v.minLength(1))),
+});
+
 const documentUploadSchema = v.object({
   fileName: v.pipe(v.string(), v.minLength(1)),
   mimeType: v.pipe(v.string(), v.minLength(1)),
@@ -161,6 +173,18 @@ export function createConversationRoutes(
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.PROJECT));
   const store = options.conversations;
+  routes.get("/:id/queue", async (context) => {
+    if (store.get(context.req.param("id")) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
+    return context.json(await options.queuedMessages?.(context.req.param("id"), null, "list") ?? []);
+  });
+  routes.post("/:id/queue/:submissionId/:action", async (context) => {
+    const action = context.req.param("action");
+    if (action !== "steer" && action !== "remove" && action !== "edit") throw invalidBody("Unknown queue action.");
+    const changed = await options.queuedMessages?.(context.req.param("id"), context.req.param("submissionId"), action);
+    if (changed === false || changed === undefined) return context.json({ error: { code: "queue_changed", message: "This message has already started or left the queue." } }, 409);
+    if (action === "edit") return context.json(changed);
+    return context.body(null, 204);
+  });
   const grants = new PermissionGrantStore(options.database);
   const selection = new ExtensionSelectionStore(options.database);
   const plans = new PlanItemStore(options.database);
@@ -347,6 +371,43 @@ export function createConversationRoutes(
     try {
       const input = parseBody(conversationCreateSchema, await body(context));
       return context.json(store.record(input), 201);
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  // A true fork of one conversation under a caller-chosen id: its index row,
+  // its transcript, its scoped rows and its tree, duplicated server-side as
+  // one id. The id arrives minted because ids are caller-chosen (ADR 0045)
+  // and one fork is one id everywhere - the row, the copies and the reads
+  // that follow. An optional submission id turns the fork into a branch cut
+  // after that submission's last batch. Unknown source answers 404; an id
+  // that exists, a turn in flight or a running task answers 409 with the
+  // reason, and nothing is duplicated at all in those cases.
+  routes.post("/:id/fork", async (context) => {
+    try {
+      const parsed = parseBody(forkBodySchema, await body(context));
+      const outcome = forkConversation(
+        {
+          conversations: store,
+          grants,
+          selection,
+          plans,
+          folders,
+          documents,
+          tasks,
+          ...(options.contextUsage === undefined
+            ? {}
+            : { usage: options.contextUsage }),
+          flueJournalPath: resolveFlueJournalPath(),
+        },
+        context.req.param("id"),
+        parsed.id,
+        parsed.upToSubmissionId === undefined
+          ? {}
+          : { upToSubmissionId: parsed.upToSubmissionId },
+      );
+      return context.json(outcome.conversation, 201);
     } catch (error) {
       return context.json(failure(error), statusOf(error));
     }

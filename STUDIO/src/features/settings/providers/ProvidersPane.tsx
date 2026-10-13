@@ -245,7 +245,12 @@ function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind:
     if (vendor !== undefined) return libraryServes(vendor, purpose.slots)
     const own = kindModels.filter((model) => model.connectionId === record.id)
     if (own.length === 0) return true
-    return own.some((model) => purpose.slots.some((slot) => model.capability[slot] === 'supported'))
+    // Only a proven "unsupported" hides the row. An "unknown" model - every
+    // probe-adopted row on a custom endpoint - stays visible, the same way
+    // the model picker (`domain/models/catalog.ts`) and the vision gate keep
+    // unknowns: unstated is not disproven, and a row that vanishes the
+    // moment its endpoint lists models is worse than one not yet described.
+    return own.some((model) => purpose.slots.some((slot) => model.capability[slot] !== 'unsupported'))
   })
   const noun = NOUN_BY_KIND[kind]
   // What a row says it does here. Under a media category that is the slots

@@ -152,6 +152,35 @@ export function useConversationWrites(
     [clientRef, liveRef, load, setRemoteConversations, trackTitle],
   )
 
+  const adoptConversation = useCallback<ConversationWrites['adoptConversation']>(
+    (input) => {
+      // The harness created this row - a fork - so there is no receipt to
+      // record and nothing to POST. The row appears at once with the fork's
+      // title, and the re-read replaces it with the stored record.
+      setRemoteConversations((current) => {
+        // A second record under one fork would be two sidebar rows pointing
+        // at the same stream.
+        if (current.some((conversation) => conversation.id === input.id)) return current
+        return [
+          {
+            id: input.id,
+            title: input.title,
+            projectId: input.projectId,
+            updatedAt: Date.now(),
+            pinned: false,
+            archived: false,
+            modelId: input.settings.modelId,
+            reasoningLevel: input.settings.reasoningLevel,
+            permissionMode: input.settings.permission,
+          },
+          ...current,
+        ]
+      })
+      if (liveRef.current) void load()
+    },
+    [liveRef, load, setRemoteConversations],
+  )
+
   const touch = useCallback(
     (conversationId: string) => {
       void mutateIndex(
@@ -303,6 +332,7 @@ export function useConversationWrites(
       setConversationSettings,
       setConversationPermission,
       beginConversation,
+      adoptConversation,
       touch,
       rename,
       setProject,
@@ -318,6 +348,7 @@ export function useConversationWrites(
       setConversationSettings,
       setConversationPermission,
       beginConversation,
+      adoptConversation,
       touch,
       rename,
       setProject,

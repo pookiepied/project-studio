@@ -209,6 +209,25 @@ export interface ConversationWrites {
   }) => void
   /** Stamps recency after an admitted later turn. */
   touch: (conversationId: string) => void
+  /**
+   * Records a fork the harness already created.
+   *
+   * Unlike `beginConversation` there is no receipt and no POST: the row,
+   * the transcript and the title already exist server-side under the id.
+   * The local row appears at once with the fork's title and is replaced by
+   * the stored record when the re-read lands. No title tracking - the fork
+   * is named and manual from birth, so no rename is coming.
+   */
+  adoptConversation: (input: {
+    readonly id: string
+    readonly projectId: string | null
+    readonly settings: {
+      readonly modelId: string | null
+      readonly reasoningLevel: ReasoningChoice | null
+      readonly permission: PermissionMode
+    }
+    readonly title: string
+  }) => void
   rename: (conversationId: string, title: string) => void
   setProject: (conversationId: string, projectId: string | null) => void
   togglePin: (conversationId: string) => void

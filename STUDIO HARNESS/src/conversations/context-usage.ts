@@ -212,6 +212,31 @@ export class ContextUsageTracker {
       .run(conversationId);
   }
 
+  /**
+   * Carries one conversation's figure to its fork, memory and table both.
+   *
+   * A fork opens on the same transcript, so its window is the same window
+   * until its next turn measures otherwise. A fresh object, never the held
+   * reference: the two conversations measure independently from here, and a
+   * shared reference would let one turn's record rewrite the other's
+   * memory. Nothing measured means nothing carried - an unmeasured fork is
+   * unmeasured, not zeroed.
+   */
+  duplicateConversation(sourceId: string, targetId: string): void {
+    const held = this.#latest.get(sourceId) ?? this.#load(sourceId);
+    if (held === undefined) return;
+    const carried: ConversationUsage = {
+      input: held.input,
+      cacheRead: held.cacheRead,
+      cacheWrite: held.cacheWrite,
+      output: held.output,
+      observedAt: held.observedAt,
+      estimated: held.estimated,
+    };
+    this.#latest.set(targetId, carried);
+    if (this.#db !== undefined) this.#save(targetId, carried);
+  }
+
   #load(conversationId: string): ConversationUsage | undefined {
     if (this.#db === undefined) return undefined;
     const row = this.#db

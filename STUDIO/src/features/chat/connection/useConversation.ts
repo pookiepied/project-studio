@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { queuedMessages, rememberQueued, forgetQueued } from './queued-messages'
 import {
   createConversationClient,
   type ChunkFacts,
@@ -199,11 +200,14 @@ function atOrBefore(a: ChunkPosition, b: ChunkPosition): boolean {
  * past the resume point; `submission-retrying` says the turn is paused on a
  * scheduled retry — it can only be believed while no later chunk shows
  * generation resumed, so any start, delta, or settlement after it clears it;
- * `submission-settled` closes the stream. Anything else moves neither needle.
+ * `submission-settled` ends that submission; the conversation remains busy
+ * until all admitted inputs have settled.
  */
 function reduceChunks(
   chunks: readonly ChunkFacts[],
   applied: ChunkPosition | null,
+  outstanding: Set<string>,
+  settledIds: Set<string>,
 ): {
   applied: ChunkPosition | null
   streaming: string | null
@@ -220,6 +224,9 @@ function reduceChunks(
       continue
     }
     if (chunk.position !== null) applied = chunk.position
+    if (chunk.type === 'message-started' && chunk.submissionId !== null) {
+      outstanding.add(chunk.submissionId)
+    }
     if (chunk.type === 'submission-retrying') {
       // A half-read signal is not a state: all three numbers must have come
       // off the wire before anything waits on them.
@@ -237,6 +244,11 @@ function reduceChunks(
       if (streaming === null) streaming = ''
       retrying = null
     } else if (chunk.type === 'submission-settled' && chunk.outcome !== null) {
+      if (chunk.submissionId !== null) {
+        outstanding.delete(chunk.submissionId)
+        settledIds.add(chunk.submissionId)
+      }
+      else if (outstanding.size <= 1) outstanding.clear()
       settled = chunk.outcome
       retrying = null
       // The provider's sentence, parsed since Task 26 put it on the facts.
@@ -327,6 +339,8 @@ export function useConversation(
   const generationRef = useRef(0)
   const upToDateRef = useRef(false)
   const appliedRef = useRef<ChunkPosition | null>(null)
+  const outstandingRef = useRef(new Set<string>())
+  const settledIdsRef = useRef(new Set<string>())
 
   // Liveness of the current read: one timer, re-armed by every attach and
   // every delivery. A firing timer is the whole test - no delivery of any
@@ -399,6 +413,18 @@ export function useConversation(
                 // The phase stays `attaching` — the updates connection that
                 // follows still has to catch up before anything is live.
                 onContent?.({ kind: 'snapshot', snapshot: delivery.snapshot })
+                {
+                  const settled = new Set(delivery.snapshot.settlements.map((item) => item.submissionId))
+                  settledIdsRef.current = settled
+                  for (const id of outstandingRef.current) {
+                    if (settled.has(id)) outstandingRef.current.delete(id)
+                  }
+                  for (const message of delivery.snapshot.messages) {
+                    if (message.submissionId !== null && !settled.has(message.submissionId)) {
+                      outstandingRef.current.add(message.submissionId)
+                    }
+                  }
+                }
                 return
               case 'up-to-date':
                 upToDateRef.current = true
@@ -412,7 +438,11 @@ export function useConversation(
                 // read a submission just opened, and demoting `submitted` to
                 // `live` here is exactly how the stop control would blink
                 // out a frame after it appeared.
-                setPhase((current) => (isTurnRunning(current) ? current : { status: 'live' }))
+                setPhase((current) => {
+                  if (isTurnRunning(current)) return current
+                  const next = outstandingRef.current.values().next().value
+                  return next === undefined ? { status: 'live' } : { status: 'submitted', submissionId: next }
+                })
                 return
               case 'chunks': {
                 onContent?.({
@@ -420,9 +450,15 @@ export function useConversation(
                   replaying: delivery.replaying,
                   chunks: delivery.chunks,
                 })
-                const result = reduceChunks(delivery.chunks, appliedRef.current)
+                const result = reduceChunks(delivery.chunks, appliedRef.current, outstandingRef.current, settledIdsRef.current)
+                for (const chunk of delivery.chunks) {
+                  if (chunk.type === 'conversation-reset' && chunk.snapshot !== null) {
+                    const settled = new Set(chunk.snapshot.settlements.map((item) => item.submissionId))
+                    for (const id of settled) outstandingRef.current.delete(id)
+                  }
+                }
                 appliedRef.current = result.applied
-                if (result.settled !== null) {
+                if (result.settled !== null && outstandingRef.current.size === 0) {
                   setPhase(
                     result.settled === 'completed'
                       ? { status: 'idle' }
@@ -510,6 +546,11 @@ export function useConversation(
     // status invoke — measured at ~280ms on the desktop, which is a stop
     // control blinking out of the home page and back into this one.
     const opening = firstAdmission(conversationId)
+    settledIdsRef.current = new Set()
+    outstandingRef.current = new Set([
+      ...queuedMessages(conversationId).map((item) => item.submissionId),
+      ...(opening === null ? [] : [opening.submissionId]),
+    ])
     setPhase(
       opening === null
         ? { status: 'attaching' }
@@ -599,6 +640,7 @@ export function useConversation(
           },
         }
       }
+      const continueReading = isTurnRunning(phaseRef.current)
       const sent = await client.submitTurn(message, settings, images)
       if (!sent.ok) {
         // The no-harness diagnosis belongs to the phase machine, which says
@@ -609,31 +651,33 @@ export function useConversation(
         }
         return sent
       }
-      // A send that got through retires whatever the last refusal said.
-      if (liveRef.current) setRefused(null)
-      // The receipt names where this turn's events begin, so the read starts
-      // THERE - never by re-reading history, and never by trusting whatever
-      // read happens to be attached. Two states make the old shape miss the
-      // turn entirely: a fresh conversation's mount attach settled `absent`
-      // (the stream did not exist until this admission created it), and a
-      // long-lived read can go deaf without Rust noticing, because a channel
-      // whose webview side vanished keeps accepting sends. Attaching from the
-      // receipt's offset replaces either with a read that begins exactly at
-      // this turn, and the position discipline downstream makes any overlap
-      // with what an older read already delivered safe to apply twice.
-      attach({ from: sent.value.offset, announce: false })
+      if (settings.deliveryMode === 'queue') {
+        rememberQueued(conversationId, { submissionId: sent.value.submissionId, text: message })
+      }
+      if (clientRef.current !== client || !liveRef.current) {
+        return { ok: true as const, value: { submissionId: sent.value.submissionId } }
+      }
+      setRefused(null)
+      const continuing = isTurnRunning(phaseRef.current)
+      const alreadySettled = settledIdsRef.current.has(sent.value.submissionId)
+      if (alreadySettled) forgetQueued(conversationId, new Set([sent.value.submissionId]))
+      if (!alreadySettled) outstandingRef.current.add(sent.value.submissionId)
+      // Every receipt refreshes the reader. An idle conversation starts from
+      // admission; a busy one resumes its last read position, because the new
+      // receipt's offset could skip results produced during the POST.
+      attach(continueReading ? { announce: false } : { from: sent.value.offset, announce: false })
       // Said before this call answers, so the page is never between two
       // truths: the composer drops its own in-flight lock the moment the
       // receipt reaches it, and if nothing had taken the lock over by then
       // the stop control would blink out and back when the first token
       // finally arrived. Setting it here means the phase is already
       // `submitted` in the render the composer's own release lands in.
-      if (liveRef.current) {
+      if (!continuing && !alreadySettled) {
         setPhase({ status: 'submitted', submissionId: sent.value.submissionId })
       }
       return { ok: true as const, value: { submissionId: sent.value.submissionId } }
     },
-    [attach],
+    [attach, conversationId],
   )
 
   const dismissRefusal = useCallback(() => {

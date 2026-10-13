@@ -169,6 +169,23 @@ describe("provider probe", () => {
     expect(target.requests[0]?.headers.authorization).toBe(`Bearer ${SECRET}`);
   });
 
+  it("adopts a self-hosted endpoint's listed models on probe", async () => {
+    const target = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ data: [{ id: "a" }, { id: "b" }] }));
+    });
+
+    await store.add({
+      ...languageDraft(`http://127.0.0.1:${target.port}/v1`, SECRET),
+      serves: { language: "openai-completions" },
+    });
+    const probe = await service.probeConnection("mock-provider", AUTH);
+
+    expect(probe.ok).toBe(true);
+    const models = await service.listModels({ connectionId: "mock-provider" });
+    expect(models.map((model) => model.modelId).sort()).toEqual(["a", "b"]);
+  });
+
   it("never places the API key in any field of the result", async () => {
     const ok = await serve((_request, response) => {
       response.writeHead(200, { "content-type": "application/json" });

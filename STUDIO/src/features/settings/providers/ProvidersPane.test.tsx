@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ProvidersPane } from './ProvidersPane'
 import { CAPABILITY, KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from './harness.fixtures'
-import type { ModelCapability, ProviderModel } from '@/platform/harness'
+import type { ModelCapability, ProviderConnection, ProviderModel } from '@/platform/harness'
 
 /**
  * The pane, from the env vars down to the request body.
@@ -215,6 +215,57 @@ describe('the list', () => {
     expect(screen.getByText('Key stored')).toBeTruthy()
     expect(screen.getByText('No key')).toBeTruthy()
     expect(screen.getByText('Disabled')).toBeTruthy()
+  })
+
+  it('keeps a self-hosted connection whose models are all undescribed', async () => {
+    // Probe adoption lists what the endpoint serves with every capability
+    // unknown. "Unknown" is not "unsupported": the row must stay on the
+    // Models page, or adopting models hides the provider they came from.
+    const proxy: ProviderConnection = {
+      id: 'free-proxy',
+      displayName: 'Free Proxy',
+      serves: { language: 'openai-completions' },
+      source: 'local',
+      baseUrl: 'http://127.0.0.1:8790/v1',
+      enabled: true,
+      credential: 'absent',
+    }
+    const undescribedCapability: ModelCapability = {
+      textGeneration: 'unknown',
+      streaming: 'unknown',
+      reasoning: 'unknown',
+      toolCalling: 'unknown',
+      vision: 'unknown',
+      embeddings: 'unknown',
+      reranking: 'unknown',
+      imageGeneration: 'unknown',
+      imageEditing: 'unknown',
+      videoGeneration: 'unknown',
+      speechGeneration: 'unknown',
+      transcription: 'unknown',
+      documentReading: 'unknown',
+      webSearch: 'unknown',
+      webFetch: 'unknown',
+      contextWindow: 'unknown',
+      maxOutputTokens: 'unknown',
+    }
+    const undescribed: ProviderModel = {
+      ...modelFor('free-proxy', 'big-pickle'),
+      capability: undescribedCapability,
+      origin: 'manual',
+    }
+    harnessConfigured()
+    stubFetch((url, _method) => {
+      if (url.includes('/models')) return jsonResponse([undescribed])
+      if (url.includes('/library')) return jsonResponse([])
+      if (url.includes('/defaults')) return jsonResponse({})
+      if (url.includes('/pairing/state')) return new Response(null, { status: 404 })
+      return jsonResponse([proxy])
+    })
+    render(<ProvidersPane kind="language" />)
+
+    await screen.findByText('Free Proxy')
+    expect(screen.getByText('1 of 1 models offered')).toBeTruthy()
   })
 
   it('marks each row with the vendor it actually names', async () => {

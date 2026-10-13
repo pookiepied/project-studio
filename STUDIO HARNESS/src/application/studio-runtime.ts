@@ -65,6 +65,7 @@ import type { Logger } from "../observability/logger.js";
 import type { QuestionBroker } from "./question-broker.js";
 import {
   copyDeliveredAttachments,
+  type AttachmentCopy,
   type DeliveredAttachmentImage,
 } from "../conversations/attachments.js";
 import { ConversationDocumentStore, type DocumentAnnouncement } from "../conversations/documents.js";
@@ -584,15 +585,15 @@ export interface AgentHost {
    *
    * Called from the render, because that is where the delivery is in hand:
    * the hook (`useDelivery`) is the model's own access to what it was sent,
-   * and this is the harness's. Nothing returns - the note the render composes
-   * names the directory, not the files, so there is no answer to carry.
+   * and this is the harness's. Returns resolved files in delivery order for
+   * a transcript announcement, or nothing when copying failed.
    * Optional so a test double that predates attachment copies still satisfies
    * the host, like every member here.
    */
   persistDeliveredAttachments?(
     conversationId: string,
     attachments: readonly DeliveredAttachmentImage[],
-  ): void;
+  ): readonly AttachmentCopy[] | void;
 }
 
 /**
@@ -1468,9 +1469,9 @@ export class StudioRuntime implements AgentHost {
   persistDeliveredAttachments(
     conversationId: string,
     attachments: readonly DeliveredAttachmentImage[],
-  ): void {
+  ): readonly AttachmentCopy[] | undefined {
     try {
-      copyDeliveredAttachments(conversationId, attachments);
+      return copyDeliveredAttachments(conversationId, attachments);
     } catch (error) {
       this.#logger?.warn(
         `The pictures on this message could not be copied into the conversation's ` +

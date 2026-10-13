@@ -56,6 +56,22 @@ function applyOpenRouterDefaultReasoning(models: MutableModels): void {
 
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
+/**
+ * Assumed limits for a user-declared model that states none.
+ *
+ * Pi derives each request's output budget from the model's record
+ * (`clampMaxTokensToContext`: with a non-positive context window the budget
+ * collapses to a single token), so a record must never carry 0 for "we do
+ * not know". These assumptions apply only at this boundary: the catalog
+ * keeps recording unknown honestly, and anything the user states — per
+ * model or per connection — wins over them. An assumption that overshoots
+ * a small local model surfaces as the server's own length or context
+ * error, which names the real problem; a 0 surfaced as a one-token reply
+ * naming nothing.
+ */
+export const ASSUMED_CUSTOM_CONTEXT_WINDOW = 128_000;
+export const ASSUMED_CUSTOM_MAX_TOKENS = 8_192;
+
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
 /**
@@ -120,19 +136,20 @@ function customProviderAuth(config: CustomProviderConfig): ApiKeyAuth {
 function customProviderModels(
   config: CustomProviderConfig,
 ): readonly Model<Api>[] {
-  return config.models.map((id) => ({
-    id,
-    name: id,
+  return config.models.map((entry) => ({
+    id: entry.id,
+    name: entry.id,
     api: config.api,
     provider: config.id,
     baseUrl: config.baseUrl,
-    // Unknown for a user-declared endpoint. Claiming reasoning or vision here
-    // would advertise capabilities the harness cannot verify.
-    reasoning: false,
+    // The model's own declaration decides. An undeclared model stays
+    // non-reasoning rather than advertising a capability nobody verified.
+    reasoning: entry.reasoningLevels.length > 0,
     input: ["text"],
     cost: ZERO_COST,
-    contextWindow: config.contextWindow ?? 0,
-    maxTokens: config.maxTokens ?? 0,
+    contextWindow:
+      entry.contextWindow ?? config.contextWindow ?? ASSUMED_CUSTOM_CONTEXT_WINDOW,
+    maxTokens: entry.maxTokens ?? config.maxTokens ?? ASSUMED_CUSTOM_MAX_TOKENS,
   }));
 }
 
@@ -256,6 +273,21 @@ function createModelsCollection(options: {
 }): MutableModels {
   const models = builtinModels({ credentials: options.credentials });
 
+  // Pi 1.x renamed Azure's provider, but stored selections and keychain
+  // entries still name the old id. An alias keeps both usable without
+  // rewriting user data; a custom provider below can still replace it.
+  const azure = models.getProvider("azure");
+  if (azure !== undefined) {
+    models.setProvider({
+      id: "azure-openai-responses",
+      name: azure.name,
+      auth: azure.auth,
+      getModels: () => azure.getModels().map((model) => ({ ...model, provider: "azure-openai-responses" })),
+      stream: azure.stream.bind(azure),
+      streamSimple: azure.streamSimple.bind(azure),
+    });
+  }
+
   for (const custom of options.customProviders) {
     const load = API_LOADERS[custom.api];
     if (!load) continue;
@@ -291,8 +323,8 @@ function createModelsCollection(options: {
       reasoning: model.reasoningLevels.length > 0,
       input: ["text"],
       cost: ZERO_COST,
-      contextWindow: model.contextWindow ?? 0,
-      maxTokens: model.maxTokens ?? 0,
+      contextWindow: model.contextWindow ?? ASSUMED_CUSTOM_CONTEXT_WINDOW,
+      maxTokens: model.maxTokens ?? ASSUMED_CUSTOM_MAX_TOKENS,
     }));
 
     models.setProvider(

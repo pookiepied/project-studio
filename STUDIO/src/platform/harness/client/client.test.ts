@@ -844,3 +844,49 @@ describe('browseFolders', () => {
     expect(result.error.kind).toBe('malformed-response')
   })
 })
+
+describe('forking a conversation', () => {
+  const RECORD = {
+    id: 'cnv_fork',
+    title: 'Reeds (Fork)',
+    projectId: null,
+    titleManual: true,
+    pinned: false,
+    archived: false,
+    modelId: null,
+    reasoningLevel: null,
+    permissionMode: 'ask',
+    createdAt: 1,
+    lastTurnAt: 1,
+  } as const
+
+  it('duplicates under the caller-chosen id with one request', async () => {
+    const stub = stubFetch(() => jsonResponse(RECORD, 201))
+    const result = await clientWith(stub.fetch).forkConversation('cnv_source', 'cnv_fork')
+
+    expect(stub.calls).toHaveLength(1)
+    expect(stub.calls[0]?.method).toBe('POST')
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/conversations/cnv_source/fork`)
+    expect(stub.calls[0]?.body).toBe(JSON.stringify({ id: 'cnv_fork' }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.title).toBe('Reeds (Fork)')
+  })
+
+  it('refuses a body that is not a record rather than returning it', async () => {
+    const stub = stubFetch(() => jsonResponse({ id: 'cnv_fork' }))
+
+    const result = await clientWith(stub.fetch).forkConversation('cnv_source', 'cnv_fork')
+
+    expect(result.ok).toBe(false)
+  })
+
+  it('carries the branch point when forking from one answer', async () => {
+    const stub = stubFetch(() => jsonResponse(RECORD, 201))
+    const result = await clientWith(stub.fetch).forkConversation('cnv_source', 'cnv_fork', 'sub_1')
+
+    expect(stub.calls).toHaveLength(1)
+    expect(stub.calls[0]?.body).toBe(JSON.stringify({ id: 'cnv_fork', upToSubmissionId: 'sub_1' }))
+    expect(result.ok).toBe(true)
+  })
+})

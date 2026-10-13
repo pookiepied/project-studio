@@ -123,6 +123,7 @@ export interface CreateHttpAppOptions {
   readonly plans?: PlanItemStore;
   /** The conversation index: rows, never transcript content. */
   readonly conversations: ConversationStore;
+  readonly queuedMessages?: (conversationId: string, submissionId: string | null, action: "list" | "steer" | "remove" | "edit") => Promise<unknown>;
   /**
    * The measured context usage per conversation, when something is watching
    * the runtime for it. `createConversationRoutes` reads it through

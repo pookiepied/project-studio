@@ -240,6 +240,28 @@ export class ExtensionSelectionStore {
     return Number(result.changes);
   }
 
+  /**
+   * Carries one conversation's scoped extension decisions to a fork.
+   *
+   * An explicit off travels exactly like an on: at a narrow scope an off is
+   * what overrides a wider on, and dropping it would silently switch the
+   * fork's extensions back on. Called only from `conversations/fork.ts`,
+   * after the fork's index row.
+   */
+  duplicateConversation(sourceId: string, targetId: string): number {
+    const result = this.#db
+      .prepare(
+        `INSERT INTO extension_scope
+           (kind, extension_id, scope_kind, scope_id, enabled, decided_at)
+         SELECT kind, extension_id, scope_kind, ?, enabled, decided_at
+           FROM extension_scope
+          WHERE scope_kind = 'conversation' AND scope_id = ?`,
+      )
+      .run(targetId, sourceId);
+
+    return Number(result.changes);
+  }
+
   /** Narrowest first, skipping whichever scopes this context does not have. */
   #chain(context: ResolutionContext): readonly Scope[] {
     const scopes: Scope[] = [];

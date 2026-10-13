@@ -1,6 +1,6 @@
 import * as v from "valibot";
 
-import { ProviderConfigurationError, type ReasoningLevel } from "../../../contracts/models.js";
+import { ProviderConfigurationError, reasoningLevelSchema, type ReasoningLevel } from "../../../contracts/models.js";
 import { DEFAULT_CUSTOM_API, supportedCustomApis } from "./apis.js";
 import { assertValidProviderId } from "./credential-bridge.js";
 
@@ -11,14 +11,32 @@ import { assertValidProviderId } from "./credential-bridge.js";
  * Studio, LiteLLM, vLLM, corporate proxies, and most new hosted services all
  * speak the OpenAI wire format, so they need configuration rather than code.
  */
+/**
+ * One model on a user-declared provider.
+ *
+ * Limits stay `undefined` when nobody stated them: the catalog records
+ * unknown honestly, and the runtime substitutes documented assumptions only
+ * at the Pi boundary (see `ASSUMED_CUSTOM_*` in runtime.ts). Collapsing
+ * unknown to 0 here once produced one-token replies that read as the
+ * provider being dead.
+ */
+export interface CustomProviderModel {
+  readonly id: string;
+  readonly contextWindow: number | undefined;
+  readonly maxTokens: number | undefined;
+  /** Declared reasoning levels; empty when the model cannot reason or nobody said so. */
+  readonly reasoningLevels: readonly ReasoningLevel[];
+}
+
 export interface CustomProviderConfig {
   readonly id: string;
   readonly name: string;
   readonly baseUrl: string;
   /** Pi wire protocol. Defaults to the OpenAI-compatible one. */
   readonly api: string;
-  /** Model ids to expose. Local servers cannot always be enumerated. */
-  readonly models: readonly string[];
+  /** Models to expose. Local servers cannot always be enumerated. */
+  readonly models: readonly CustomProviderModel[];
+  /** Connection-level defaults, used when a model entry states no limits of its own. */
   readonly contextWindow: number | undefined;
   readonly maxTokens: number | undefined;
 }
@@ -68,12 +86,22 @@ export interface LocalModelConfig {
 
 const DEFAULT_API = DEFAULT_CUSTOM_API;
 
+const customProviderModelSchema = v.union([
+  v.pipe(v.string(), v.minLength(1)),
+  v.object({
+    id: v.pipe(v.string(), v.minLength(1)),
+    contextWindow: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+    maxTokens: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+    reasoningLevels: v.optional(v.array(reasoningLevelSchema)),
+  }),
+]);
+
 const customProviderSchema = v.object({
   id: v.pipe(v.string(), v.minLength(1)),
   name: v.optional(v.pipe(v.string(), v.minLength(1))),
   baseUrl: v.pipe(v.string(), v.minLength(1)),
   api: v.optional(v.pipe(v.string(), v.minLength(1))),
-  models: v.optional(v.array(v.pipe(v.string(), v.minLength(1)))),
+  models: v.optional(v.array(customProviderModelSchema)),
   contextWindow: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
   maxTokens: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 });
@@ -231,12 +259,19 @@ function readCustomProviders(): readonly CustomProviderConfig[] {
   return result.output.map((entry) => normalizeCustomProvider(entry));
 }
 
+interface CustomProviderModelInput {
+  readonly id: string;
+  readonly contextWindow?: number | undefined;
+  readonly maxTokens?: number | undefined;
+  readonly reasoningLevels?: readonly ReasoningLevel[] | undefined;
+}
+
 interface CustomProviderInput {
   readonly id: string;
   readonly name?: string | undefined;
   readonly baseUrl: string;
   readonly api?: string | undefined;
-  readonly models?: readonly string[] | undefined;
+  readonly models?: readonly (string | CustomProviderModelInput)[] | undefined;
   readonly contextWindow?: number | undefined;
   readonly maxTokens?: number | undefined;
 }
@@ -275,9 +310,28 @@ function normalizeCustomProvider(
     name: entry.name ?? entry.id,
     baseUrl: entry.baseUrl.replace(/\/+$/, ""),
     api,
-    models: entry.models ?? [],
+    models: (entry.models ?? []).map(normalizeCustomProviderModel),
     contextWindow: entry.contextWindow,
     maxTokens: entry.maxTokens,
+  };
+}
+
+/**
+ * One model entry in either accepted shape: a bare id, or an object carrying
+ * that model's own limits. A bare id states nothing, so its limits stay
+ * `undefined` rather than becoming 0 (see `CustomProviderModel`).
+ */
+function normalizeCustomProviderModel(
+  entry: string | CustomProviderModelInput,
+): CustomProviderModel {
+  if (typeof entry === "string") {
+    return { id: entry, contextWindow: undefined, maxTokens: undefined, reasoningLevels: [] };
+  }
+  return {
+    id: entry.id,
+    contextWindow: entry.contextWindow,
+    maxTokens: entry.maxTokens,
+    reasoningLevels: entry.reasoningLevels ?? [],
   };
 }
 

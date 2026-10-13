@@ -1,10 +1,11 @@
 packages:
   - .
 
-# Moved here from the `pnpm` field in package.json, which pnpm 11 no longer
-# reads. Same override, same version range; only its home changed.
+# Pin one Pi release across the runtime and host, so provider and agent
+# collections share model, credential and transcript contracts.
 overrides:
-  '@earendil-works/pi-ai': ^0.84.0
+  '@earendil-works/pi-ai': 1.2.0
+  '@earendil-works/pi-agent-core': 1.2.0
 
 allowBuilds:
   '@google/genai': false
@@ -16,19 +17,21 @@ allowBuilds:
   sharp: false
   workerd: true
 
+minimumReleaseAgeExclude:
+  - '@earendil-works/pi-ai@1.2.0'
+  - '@earendil-works/pi-telemetry@1.2.0'
+  - '@earendil-works/pi-agent-core@1.2.0'
+
 # The @flue/runtime and @flue/sdk idempotency patches were removed under
 # meta-task #12. The @flue/cli patch died with the Flue 2.0 pins (Phases 2
 # and 3): its three behaviours - the fd admission bootstrap, the loopback
 # bind and the readiness frame - are ordinary code in src/server.ts now, and
 # its build/dev roles moved to `vite build` + @flue/vite.
 #
-# @flue/runtime@2.0.3 - five hunks, one rule: a retry budget may only be
-#   lengthened once the retry is visible, and invisible retry must stay
-#   short. Phase 8 re-derived the runtime patch against the 2.0.3 bundles
-#   (the beta.9 hunks were anchored to beta.9 bundle content and failed the
-#   install loudly, by design). The entry lives here, where the beta.9
-#   entries lived; pnpm fails the whole install if a hunk stops applying,
-#   which is the point.
+# @flue/runtime@2.3.0 - a retry budget may only be lengthened once the retry
+#   is visible, and invisible retry must stay short. Rebased from the 2.0.3
+#   patch onto the 2.3.0 bundles and Pi 1.2.0. pnpm fails the whole install
+#   if a hunk stops applying, which is the point.
 #
 #   1. conversation-stream-store-*.mjs, waitForTransientModelRetry - each
 #      scheduled transient retry appends a `submission_retry_scheduled`
@@ -60,7 +63,8 @@ allowBuilds:
 #      into the response that replaced it. Without this a retry is
 #      invisible in BOTH channels at once: no `submission-retrying` chunk
 #      and no failed attempt to look at, which is what made a retrying turn
-#      indistinguishable from a hung one.
+#      indistinguishable from a hung one. The 2.3.0 patch retains Studio's
+#      separate failed attempts rather than hiding superseded model content.
 #
 #   4. dispatch-*.mjs, encodeRecord - projects `submission_retry_scheduled`
 #      into a `submission-retrying` chunk. Unknown record types project to
@@ -125,6 +129,13 @@ allowBuilds:
 #      exactOptionalPropertyTypes discipline the host compiles under; the
 #      runtime never writes undefined, only omits.
 #
+#   10. sql-agent-execution-store-*.mjs and dispatch-*.mjs - deliveryMode
+#       separates queued follow-ups from steering. The SQL owner skips queue
+#       rows before claiming joins and caps them at three during admission.
+#       Promotion, cancellation and edit withdrawal are atomic and apply
+#       only while a row remains queued. tests/integration/stop.test.ts pins
+#       separate delivery, image restoration and refusal after a run starts.
+#
 #   How to re-derive at the next upgrade: every hunk carries its own recipe
 #   in a `[project-studio patch]` comment, and every recipe says to anchor
 #   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of
@@ -136,5 +147,5 @@ allowBuilds:
 #   pin all of it end to end; they ran red for the whole 2.0.3 window and
 #   came back green the day this patch landed.
 patchedDependencies:
-  '@earendil-works/pi-ai@0.84.4': patches/@earendil-works__pi-ai@0.84.4.patch
-  '@flue/runtime@2.0.3': patches/@flue__runtime@2.0.3.patch
+  '@earendil-works/pi-ai@1.2.0': patches/@earendil-works__pi-ai@1.2.0.patch
+  '@flue/runtime@2.3.0': patches/@flue__runtime@2.3.0.patch

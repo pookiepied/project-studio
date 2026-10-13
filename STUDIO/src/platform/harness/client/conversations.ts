@@ -25,6 +25,7 @@ import {
 import { MCP_PATH } from './mcp'
 import { SKILLS_PATH } from './skills'
 import type { HarnessResult, Requester } from './request'
+import { parseQueuedMessage, parseQueuedMessages, type QueuedMessage } from './queued-messages'
 
 /**
  * `/api/conversations`: the index rows, their destruction, and the three
@@ -35,8 +36,24 @@ import type { HarnessResult, Requester } from './request'
 const CONVERSATIONS_PATH = '/api/conversations'
 
 export interface ConversationIndexClient {
+  queuedMessages(id: string): Promise<HarnessResult<readonly QueuedMessage[]>>
+  changeQueuedMessage(id: string, submissionId: string, action: 'steer' | 'remove'): Promise<HarnessResult<void>>
+  editQueuedMessage(id: string, submissionId: string): Promise<HarnessResult<QueuedMessage>>
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
+  /**
+   * Duplicates one conversation under a caller-chosen id: its index row,
+   * its transcript, its scoped rows and its tree, server-side as one id.
+   * Nothing runs - no turn is admitted, no model is called; the fork opens
+   * on the source's words. An optional submission id turns the fork into a
+   * branch cut after that submission's last batch. A turn in flight or a
+   * running task refuses with the reason.
+   */
+  forkConversation(
+    sourceId: string,
+    targetId: string,
+    upToSubmissionId?: string,
+  ): Promise<HarnessResult<ConversationRecord>>
   updateConversation(
     id: string,
     patch: ConversationPatch,
@@ -179,6 +196,28 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
       if (patch.permissionMode !== undefined) body.permissionMode = patch.permissionMode
       if (patch.lastTurnAt !== undefined) body.lastTurnAt = patch.lastTurnAt
       return json('PATCH', conversationPath(id), body, parseConversationRecord)
+    },
+
+    queuedMessages(id) {
+      return json('GET', `${conversationPath(id)}/queue`, undefined, parseQueuedMessages)
+    },
+    changeQueuedMessage(id, submissionId, action) {
+      return empty('POST', `${conversationPath(id)}/queue/${encodeURIComponent(submissionId)}/${action}`)
+    },
+    editQueuedMessage(id, submissionId) {
+      return json('POST', `${conversationPath(id)}/queue/${encodeURIComponent(submissionId)}/edit`, undefined, parseQueuedMessage)
+    },
+
+    forkConversation(sourceId, targetId, upToSubmissionId) {
+      // One id, minted once by the caller: the row, the transcript copy,
+      // the scoped copies and the tree all address the target, and the
+      // reads that follow open it where the source was.
+      return json(
+        'POST',
+        conversationPath(sourceId, '/fork'),
+        upToSubmissionId === undefined ? { id: targetId } : { id: targetId, upToSubmissionId },
+        parseConversationRecord,
+      )
     },
 
     deleteConversation(id) {

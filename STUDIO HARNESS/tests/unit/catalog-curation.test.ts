@@ -85,7 +85,7 @@ describe("the library under the curation", () => {
   it("offers the curated vendors and none of the disabled ones", async () => {
     const ids = (await listLibraryProviders()).map((entry) => entry.id);
     for (const id of CURATED_LANGUAGE) expect(ids).toContain(id);
-    for (const id of ["ant-ling", "cloudflare-ai-gateway", "azure-openai-responses", "huggingface", "kimi-coding", "qwen-token-plan", "xiaomi", "zai-coding-cn", "minimax-cn", "moonshotai-cn"]) {
+    for (const id of ["ant-ling", "cloudflare-ai-gateway", "azure", "meta", "radius", "typesafe", "huggingface", "kimi-coding", "qwen-token-plan", "xiaomi", "zai-coding-cn", "minimax-cn", "moonshotai-cn"]) {
       expect(ids).not.toContain(id);
     }
   });

@@ -448,3 +448,46 @@ describe("provider model catalog", () => {
     expect(byId.get("gemini-3.1-flash-tts-preview")?.available).toBe(true);
   });
 });
+
+describe("served-model adoption", () => {
+  const PROXY: ProviderConnectionDraft = {
+    id: "proxy",
+    displayName: "Proxy",
+    serves: { language: "openai-completions" },
+    source: "local",
+    baseUrl: "http://127.0.0.1:8790/v1",
+    enabled: true,
+  };
+
+  it("adopts served ids on a self-hosted connection as manual models", async () => {
+    await connections.add(PROXY);
+
+    const adopted = await catalog.adoptServedModels("proxy", ["a", "b"]);
+
+    expect(adopted.map((model) => model.modelId).sort()).toEqual(["a", "b"]);
+    const models = await catalog.listModels({ connectionId: "proxy" });
+    expect(models.map((model) => model.modelId).sort()).toEqual(["a", "b"]);
+    // Adopted rows state nothing: unknown stays unknown, never 0.
+    expect(models[0]?.capability.contextWindow).toBe("unknown");
+    expect(models[0]?.capability.maxOutputTokens).toBe("unknown");
+  });
+
+  it("leaves existing rows untouched on re-adoption", async () => {
+    await connections.add(PROXY);
+    await catalog.addManualModel("proxy", { modelId: "a", displayName: "Custom A" });
+
+    const adopted = await catalog.adoptServedModels("proxy", ["a", "b"]);
+
+    expect(adopted.map((model) => model.modelId)).toEqual(["b"]);
+    const models = await catalog.listModels({ connectionId: "proxy" });
+    expect(models.find((model) => model.modelId === "a")?.displayName).toBe("Custom A");
+  });
+
+  it("adopts nothing for catalog-backed connections", async () => {
+    await connections.add(OPENAI);
+
+    await expect(catalog.adoptServedModels("work-openai", ["whatever"])).resolves.toEqual([]);
+    const models = await catalog.listModels({ connectionId: "work-openai" });
+    expect(models.some((model) => model.modelId === "whatever")).toBe(false);
+  });
+});

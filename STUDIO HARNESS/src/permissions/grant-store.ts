@@ -351,6 +351,51 @@ export class PermissionGrantStore implements PermissionGrantsView {
     return Number(result.changes);
   }
 
+  /**
+   * Carries one conversation's scoped grants to a fork, under new ids.
+   *
+   * Both live and revoked rows travel: a revoked row is the record that an
+   * approval was given and taken back, and a fork that forgot it would ask
+   * again for something the person already answered. New ids keep the fork's
+   * rows revokable without touching the source's, and the granted moment is
+   * kept rather than restamped - the approval happened when it happened.
+   * Called only from `conversations/fork.ts`, after the fork's index row.
+   */
+  duplicateConversation(sourceId: string, targetId: string): number {
+    const rows = this.#db
+      .prepare(
+        `SELECT ${COLUMNS}, verdict, revoked_at FROM permission_grant WHERE conversation_id = ?`,
+      )
+      .all(sourceId) as unknown as (GrantRow & {
+      verdict: string;
+      revoked_at: number | null;
+    })[];
+    let copied = 0;
+    for (const row of rows) {
+      this.#db
+        .prepare(
+          `INSERT INTO permission_grant
+             (id, capability_key, agent_id, conversation_id, project_id,
+               resource_pattern, definition_hash, verdict, granted_at, revoked_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          createStudioUuid(),
+          row.capability_key,
+          row.agent_id,
+          targetId,
+          row.project_id,
+          row.resource_pattern,
+          row.definition_hash,
+          row.verdict,
+          row.granted_at,
+          row.revoked_at,
+        );
+      copied += 1;
+    }
+    return copied;
+  }
+
   #findExact(grant: GrantRow): GrantRow | undefined {
     const row = this.#db
       .prepare(

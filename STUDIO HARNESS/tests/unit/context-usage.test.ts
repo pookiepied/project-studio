@@ -236,4 +236,25 @@ describe("the measured context across a restart", () => {
     const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
     expect(after.get("cnv_1")).toBeUndefined();
   });
+
+  it("carries the figure to a fork, memory and store both", () => {
+    // A fork opens on the same transcript, so its window is the same
+    // window until its next turn measures otherwise.
+    const db = database();
+    const usage = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    usage.record(turn("cnv_1", { input: 40_000, output: 100 }));
+    usage.duplicateConversation("cnv_1", "cnv_fork");
+
+    expect(usage.get("cnv_fork")).toMatchObject({ input: 40_000, output: 100 });
+    const after = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    expect(after.get("cnv_fork")).toMatchObject({ input: 40_000, output: 100 });
+  });
+
+  it("carries nothing when nothing was measured", () => {
+    const db = database();
+    const usage = new ContextUsageTracker({ subscribe: () => () => {}, database: db });
+    usage.duplicateConversation("cnv_never", "cnv_fork");
+
+    expect(usage.get("cnv_fork")).toBeUndefined();
+  });
 });

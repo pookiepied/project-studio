@@ -29,13 +29,21 @@ export function languageCatalogProviders(): readonly BuiltinProvider[] {
 }
 
 export function isLanguageCatalogProvider(providerId: string): boolean {
-  return getBuiltinProviders().some((provider) => provider === providerId);
+  return getBuiltinProviders().some((provider) => provider === currentProviderId(providerId));
+}
+
+/** Existing connection rows keep their provider id when Pi renames it. */
+function currentProviderId(providerId: string): string {
+  return providerId === "azure-openai-responses" ? "azure" : providerId;
 }
 
 /** Every model one provider serves, in the package's own order. */
 export function languageCatalogModels(providerId: string): readonly PiLanguageModel[] {
-  const known = getBuiltinProviders().find((provider) => provider === providerId);
-  return known === undefined ? [] : getBuiltinModels(known);
+  const currentId = currentProviderId(providerId);
+  const known = getBuiltinProviders().find((provider) => provider === currentId);
+  if (known === undefined) return [];
+  const models = getBuiltinModels(known);
+  return currentId === providerId ? models : models.map((model) => ({ ...model, provider: providerId }));
 }
 
 /**
