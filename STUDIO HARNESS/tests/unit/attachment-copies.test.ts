@@ -65,11 +65,48 @@ describe("the copies a delivered message leaves", () => {
     expect(copyDeliveredAttachments("cnv_mapping", pictures)).toEqual(copies);
     const note = attachmentCopyNote(copies);
     const rows = note.split("\n").slice(4).map((line) => JSON.parse(line) as unknown);
-    expect(rows).toEqual(copies);
+    expect(rows).toEqual(copies.map((copy, index) => ({
+      ...copy,
+      fileName: ["same.png", "same-2.png", "same.png", "attachment-4.webp"][index],
+      read: { path: copy.path },
+    })));
     expect(note).toContain("not filesystem paths");
     for (const [index, copy] of copies.entries()) {
       expect(readFileSync(copy.path).toString("base64")).toBe(pictures[index]?.data);
     }
+  });
+
+  it("gives the read tool the saved filename and path rather than an internal attachment label", () => {
+    const copies = copyDeliveredAttachments("cnv_readable", [delivered([1, 2], "image 1.png")]);
+    const note = attachmentCopyNote(copies);
+    const row: unknown = JSON.parse(note.split("\n").at(-1) ?? "null");
+    expect(row).toMatchObject({
+      position: 1,
+      originalFilename: "image 1.png",
+      fileName: "image 1.png",
+      path: join(folderOf("cnv_readable"), "image 1.png"),
+      read: { path: join(folderOf("cnv_readable"), "image 1.png") },
+    });
+    expect(note).toContain("Call read with the read object");
+    expect(note).toContain("original upload bytes");
+    expect(note).toContain("not filesystem paths");
+    expect(note).not.toContain('"id":');
+  });
+
+  it("reports the actual saved name after sanitizing an upload name, with metadata kept as data", () => {
+    const copies = copyDeliveredAttachments("cnv_sanitized", [
+      delivered([3], 'folder/photo<>".PNG'),
+    ]);
+    const note = attachmentCopyNote(copies);
+    const row: unknown = JSON.parse(note.split("\n").at(-1) ?? "null");
+    expect(row).toMatchObject({
+      originalFilename: 'folder/photo<>".PNG',
+      fileName: "photo.png",
+      path: join(folderOf("cnv_sanitized"), "photo.png"),
+      read: { path: join(folderOf("cnv_sanitized"), "photo.png") },
+    });
+    expect(note.split("\n")).toHaveLength(5);
+    expect(readFileSync(copies[0]?.path ?? "")).toEqual(Buffer.from([3]));
   });
 
   it("writes a named picture under its own name, the bytes decoded, a data-URI prefix tolerated", () => {
