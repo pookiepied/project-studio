@@ -198,6 +198,26 @@ describe('inside Tauri', () => {
 
     await expect(request).rejects.toMatchObject({ name: 'AbortError' })
   })
+
+  it('does not cancel the desktop request when the UI stops waiting', async () => {
+    enterTauri()
+    let finish: (value: unknown) => void = () => { throw new Error('the request was not started') }
+    let completed = false
+    invoke.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = (value) => { completed = true; resolve(value) }
+    }))
+    const controller = new AbortController()
+    const request = harnessTransport('http://127.0.0.1:4319/api/conversations/cnv_1/compact', {
+      method: 'POST', signal: controller.signal,
+    })
+    controller.abort()
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' })
+    expect(completed).toBe(false)
+    finish({ status: 200, headers: [], body: '{"compacted":true}' })
+    await Promise.resolve()
+    expect(completed).toBe(true)
+    expect(invoke).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('the choice is made per call', () => {

@@ -223,7 +223,8 @@ export function TurnMenu() {
   // The one thing the strip still says about the window at rest, and only
   // when it has become worth saying. Below this the number is a figure nobody
   // needs; above it, it changes what you do next.
-  const percent = breakdown === null ? null : Math.round(breakdown.used * 100)
+  const percent = breakdown === null || breakdown.report.measured?.estimated === true
+    ? null : Math.round(breakdown.used * 100)
   const warn = percent !== null && percent >= 60
 
   return (

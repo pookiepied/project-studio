@@ -250,7 +250,9 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
     },
 
     compactConversation(id) {
-      return empty('POST', conversationPath(id, '/compact'))
+      // Compaction waits for the model's summary, like the media routes wait
+      // for generation. Leave headroom below the desktop seam's 165s limit.
+      return empty('POST', conversationPath(id, '/compact'), undefined, 150_000)
     },
 
     setConversationMcpServerEnabled(conversationId, serverId, enabled) {

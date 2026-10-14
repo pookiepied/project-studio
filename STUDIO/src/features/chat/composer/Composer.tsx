@@ -326,7 +326,30 @@ export function Composer({
   // its sentence here, in the place the picker's refusals take.
   const slash = useSlashCommands(text, conversationId)
   const [commandNote, setCommandNote] = useState<string | null>(null)
-  const pickSuggestion = (id: string) => {
+  const actionInFlight = useRef(false)
+  const runAction = (message: string) => {
+    if (sending || actionInFlight.current) return
+    actionInFlight.current = true
+    setSending(true)
+    setCommandNote(null)
+    setText('')
+    clearDraft(conversationId)
+    setMultiline(false)
+    void slash.resolve(message).then(
+      (outcome) => {
+        if (outcome.kind === 'done') setCommandNote(outcome.note)
+      },
+      () => setCommandNote('The command could not be completed. Check the conversation before trying again.'),
+    ).finally(() => {
+      actionInFlight.current = false
+      setSending(false)
+    })
+  }
+  const pickSuggestion = (id: string, execute = true) => {
+    if (execute && slash.isAction(`/${id}`)) {
+      runAction(`/${id}`)
+      return
+    }
     setText(`/${id} `)
     setCommandNote(null)
   }
@@ -349,7 +372,7 @@ export function Composer({
       if (event.key === 'Enter' && picked.argumentHint === '' && text.trim() === `/${picked.id}`) {
         return false
       }
-      pickSuggestion(picked.id)
+      pickSuggestion(picked.id, event.key === 'Enter')
       return true
     }
     if (event.key === 'Escape') {
@@ -427,6 +450,10 @@ export function Composer({
 
   const submit = (mode: 'queue' | 'steer' = 'queue') => {
     if (!canSend) return
+    if (slash.isAction(text)) {
+      runAction(text)
+      return
+    }
     if (turnRunning && mode === 'queue' && onQueue !== undefined && queueFull) return
     const outgoing = text
     const carried = images

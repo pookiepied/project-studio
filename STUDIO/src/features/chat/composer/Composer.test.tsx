@@ -480,7 +480,7 @@ describe('the slash, from the field', () => {
    * Studio's listener would. A listing status other than 200 is how the
    * tests below make the harness useless without making it absent.
    */
-  function serveHarness(listingStatus = 200): Call[] {
+  function serveHarness(listingStatus = 200, compactReply?: () => Promise<Response>): Call[] {
     const calls: Call[] = []
     vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
     vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
@@ -500,7 +500,7 @@ describe('the slash, from the field', () => {
       if (/\/api\/commands\/[a-z0-9-]+\/expand$/.test(url)) {
         return jsonResponse({ text: 'Explain the projection layer in plain words, please.' })
       }
-      if (url.endsWith('/compact')) return new Response(null, { status: 200 })
+      if (url.endsWith('/compact')) return compactReply?.() ?? new Response(null, { status: 200 })
       return new Response(null, { status: 404 })
     }
     vi.stubGlobal('fetch', fetch)
@@ -634,6 +634,49 @@ describe('the slash, from the field', () => {
     // follow — so dismissing is not losing; the words are the next
     // keystrokes.
     expect(field()).toBe('/explain ')
+  })
+
+  for (const trigger of ['click', 'enter', 'send'] as const) {
+    it(`starts compaction on ${trigger}, clears the command during the request, and keeps a new draft`, async () => {
+      let finish: (response: Response) => void = () => { throw new Error('no compaction request') }
+      const calls = serveHarness(200, () => new Promise<Response>((resolve) => { finish = resolve }))
+      const onSend = vi.fn(async () => ({ ok: true }))
+      renderComposer(onSend)
+      type(trigger === 'send' ? '/compact' : '/comp')
+      await waitFor(() => expect(screen.getByRole('option', { name: /compact/ })).toBeTruthy())
+      if (trigger === 'click') fireEvent.mouseDown(screen.getByRole('option', { name: /compact/ }))
+      else if (trigger === 'enter') fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      else fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+      await waitFor(() => expect(calls.filter((call) => call.url.endsWith('/compact'))).toHaveLength(1))
+      expect(field()).toBe('')
+      expect(onSend).not.toHaveBeenCalled()
+      type('my next message')
+      finish(new Response(null, { status: 200 }))
+      await waitFor(() => expect(liveWork.markCompacting).toHaveBeenCalledWith('cnv_1', false))
+      expect(field()).toBe('my next message')
+      expect(onSend).not.toHaveBeenCalled()
+    })
+  }
+
+  it('completes an action name with Tab without executing it', async () => {
+    const calls = serveHarness()
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    type('/comp')
+    await waitFor(() => expect(screen.getByRole('option', { name: /compact/ })).toBeTruthy())
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' })
+    expect(field()).toBe('/compact ')
+    expect(calls.some((call) => call.url.endsWith('/compact'))).toBe(false)
+  })
+
+  it('recognizes typed /compact before the command listing arrives, even when that listing fails', async () => {
+    const calls = serveHarness(500)
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+    type('/compact')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(field()).toBe('')
+    await waitFor(() => expect(calls.some((call) => call.url.endsWith('/compact'))).toBe(true))
+    expect(onSend).not.toHaveBeenCalled()
   })
 
   it('runs /compact where it stands: marks the conversation, asks the harness, and sends nothing', async () => {

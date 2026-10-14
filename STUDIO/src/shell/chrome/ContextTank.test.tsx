@@ -38,6 +38,22 @@ function tank(
 }
 
 describe('the context tank', () => {
+  it('waits for measured usage after compaction rather than displaying the provisional figure', () => {
+    tank({ fresh: 22_000, cached: 0, reply: 0, estimated: true }, 0)
+    expect(screen.getByText('Awaiting next turn')).toBeTruthy()
+    expect(screen.getByText(/Usage will be measured on the next turn/)).toBeTruthy()
+    expect(screen.queryByText(/22k/)).toBeNull()
+    expect(screen.queryByText('Free')).toBeNull()
+    expect(screen.queryByRole('meter')).toBeNull()
+  })
+
+  it('returns to measured figures once the next turn reports usage', () => {
+    tank({ fresh: 16_000, cached: 0, reply: 0 }, 0)
+    expect(screen.queryByText('Awaiting next turn')).toBeNull()
+    expect(screen.getAllByText('16k')).toHaveLength(2)
+    expect(screen.getByRole('meter').getAttribute('aria-valuenow')).toBe('8')
+  })
+
   it('states the fill against the window, in units a person reads', () => {
     tank({ fresh: 10_000, cached: 30_000, reply: 2_000 }, 0)
 

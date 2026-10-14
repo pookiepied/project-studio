@@ -76,7 +76,7 @@ export interface Requester {
     budgetMs?: number,
   ) => Promise<HarnessResult<T>>
   /** A request whose success carries nothing: the harness replies 204. */
-  readonly empty: (method: string, path: string, body?: unknown) => Promise<HarnessResult<void>>
+  readonly empty: (method: string, path: string, body?: unknown, budgetMs?: number) => Promise<HarnessResult<void>>
 }
 
 export function createRequester(options: HarnessClientOptions): Requester {
@@ -176,8 +176,8 @@ export function createRequester(options: HarnessClientOptions): Requester {
     return { ok: true, value: parsed }
   }
 
-  async function empty(method: string, path: string, body?: unknown): Promise<HarnessResult<void>> {
-    const sent = await call(method, path, body)
+  async function empty(method: string, path: string, body?: unknown, budgetMs?: number): Promise<HarnessResult<void>> {
+    const sent = await call(method, path, body, budgetMs)
     if (!sent.ok) return sent
     const response = sent.value
     return response.ok ? { ok: true, value: undefined } : failed(await failureFor(response))

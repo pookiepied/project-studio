@@ -27,6 +27,9 @@ export function useCompactNow(): {
         const address = await resolveHarnessAddress()
         if (address === null) return 'No harness is configured.'
         const result = await createHarnessClient(address).compactConversation(conversationId)
+        if (!result.ok && result.error.kind === 'not-reachable' && result.error.timedOut) {
+          return 'Compaction is taking longer than expected. It may still be running; check the conversation before trying again.'
+        }
         return result.ok ? null : result.error.message
       } finally {
         markCompacting(conversationId, false)

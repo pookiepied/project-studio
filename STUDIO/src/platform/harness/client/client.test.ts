@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createHarnessClient, type HarnessClient, type HarnessResult } from './index'
 import type { ProviderConnection } from '../contracts'
@@ -298,6 +298,61 @@ describe('failures', () => {
     if (result.error.kind !== 'not-reachable') return
     expect(result.error.timedOut).toBe(false)
     expect(result.error.message).toContain(BASE_URL)
+  })
+
+  it('waits for a slow compaction beyond the ordinary request deadline', async () => {
+    vi.useFakeTimers()
+    try {
+      let signal: AbortSignal | null = null
+      const fetch: typeof globalThis.fetch = (input, init) => {
+        const url = input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
+        if (url.endsWith('/connections')) return Promise.resolve(jsonResponse([CONNECTION]))
+        signal = init?.signal ?? null
+        return new Promise((resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+          setTimeout(() => resolve(new Response(null, { status: 200 })), 20_000)
+        })
+      }
+      const client = clientWith(fetch)
+      const pending = client.compactConversation('cnv_1')
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(signal).toHaveProperty('aborted', false)
+      expect((await client.listConnections()).ok).toBe(true)
+      await vi.advanceTimersByTimeAsync(7_000)
+      expect(await pending).toEqual({ ok: true, value: undefined })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the ordinary 12-second deadline for provider probes', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetch: typeof globalThis.fetch = (_input, init) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+      })
+      const pending = clientWith(fetch).probeConnection('work-openai')
+      await vi.advanceTimersByTimeAsync(12_000)
+      expect(await pending).toMatchObject({ ok: false, error: { kind: 'not-reachable', timedOut: true } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('preserves a real compaction route failure instead of treating every failure as slow work', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'No such conversation.', code: 'storage.not_found' }, 404))
+    expect(await clientWith(stub.fetch).compactConversation('missing')).toMatchObject({
+      ok: false,
+      error: { kind: 'harness-error', status: 404, message: 'No such conversation.' },
+    })
+  })
+
+  it('reports an actual connection refusal during compaction without waiting for the long deadline', async () => {
+    const fetch: typeof globalThis.fetch = async () => { throw new TypeError('connection refused') }
+    expect(await clientWith(fetch).compactConversation('cnv_1')).toMatchObject({
+      ok: false,
+      error: { kind: 'not-reachable', timedOut: false, message: expect.stringContaining('connection refused') },
+    })
   })
 
   it('maps a request that outlives the timeout to not-reachable, flagged', async () => {

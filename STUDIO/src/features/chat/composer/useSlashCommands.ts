@@ -27,6 +27,10 @@ export type SlashOutcome =
   /** An action ran (or was refused); the field clears and the note, if any, shows. */
   | { readonly kind: 'done'; readonly note: string | null }
 
+// The built-in action must never become a chat message just because the
+// command listing has not arrived yet. User prompt commands still need it.
+const COMPACT_SLASH = /^\/compact(?:\s+[\s\S]*)?$/i
+
 export function useSlashCommands(text: string, conversationId: string | null) {
   const [commands, setCommands] = useState<readonly CommandRecord[] | null>(null)
   const loading = useRef(false)
@@ -61,15 +65,15 @@ export function useSlashCommands(text: string, conversationId: string | null) {
   /** What sending the field's text does. */
   const resolve = useCallback(
     async (message: string): Promise<SlashOutcome> => {
+      if (COMPACT_SLASH.test(message.trim())) {
+        if (conversationId === null) {
+          return { kind: 'done', note: 'Nothing to compact yet: start a conversation first.' }
+        }
+        return { kind: 'done', note: await compactNow(conversationId) }
+      }
       const slash = readSlash(message, commands ?? [])
       if (slash === null) return { kind: 'words' }
       if (slash.command.kind === 'action') {
-        if (slash.command.id === 'compact') {
-          if (conversationId === null) {
-            return { kind: 'done', note: 'Nothing to compact yet: start a conversation first.' }
-          }
-          return { kind: 'done', note: await compactNow(conversationId) }
-        }
         return { kind: 'done', note: `"/${slash.command.id}" is not something this window can run.` }
       }
       const harness = await connect()
@@ -83,7 +87,12 @@ export function useSlashCommands(text: string, conversationId: string | null) {
 
   /** Whether the text names a command at all - synchronously, for the send path. */
   const isCommand = useCallback(
-    (message: string) => readSlash(message, commands ?? []) !== null,
+    (message: string) => COMPACT_SLASH.test(message.trim()) || readSlash(message, commands ?? []) !== null,
+    [commands],
+  )
+
+  const isAction = useCallback(
+    (message: string) => COMPACT_SLASH.test(message.trim()) || readSlash(message, commands ?? [])?.command.kind === 'action',
     [commands],
   )
 
@@ -93,6 +102,7 @@ export function useSlashCommands(text: string, conversationId: string | null) {
     selected,
     setSelected,
     isCommand,
+    isAction,
     resolve,
   }
 }

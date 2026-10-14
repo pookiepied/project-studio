@@ -42,9 +42,9 @@ import { cn } from "@/lib/cn";
  *
  * After a compaction nothing has measured the shortened conversation yet, so
  * the harness writes a provisional figure - the summary, the kept tail and a
- * fixed allowance - and marks it as such. The bar draws it as one band that
- * says what it is, the percentage wears a tilde, and the first measured turn
- * replaces it.
+ * fixed allowance - and marks it as such. Until a turn measures the shortened
+ * context, the menu says it is awaiting that measurement rather than drawing
+ * a provisional count as if it described the actual window.
  */
 
 interface Band {
@@ -122,6 +122,20 @@ export function ContextTank({
   const percent = Math.round(breakdown.used * 100);
   const estimated = breakdown.report.measured?.estimated === true;
 
+  if (estimated) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-2 text-caption">
+          <span className="text-muted-foreground">Context</span>
+          <span className="text-foreground">Awaiting next turn</span>
+        </div>
+        <p className="text-micro text-muted-foreground/80">
+          Compacted. Usage will be measured on the next turn.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
@@ -178,6 +192,14 @@ export function ContextDetails({
 }) {
   const bands = bandsOf(breakdown);
   const measured = breakdown.report.measured;
+
+  if (measured?.estimated === true) {
+    return (
+      <p className="pt-1 text-micro text-muted-foreground/80">
+        The shortened context has not been measured yet. Send a message to update its usage.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 pt-1">
