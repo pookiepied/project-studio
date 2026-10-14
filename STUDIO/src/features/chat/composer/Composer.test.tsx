@@ -232,6 +232,97 @@ describe('the images a turn carries', () => {
     fireEvent.change(input)
   }
 
+  it('rejects identical image bytes in a batch and on a later pick, including renamed copies', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+    type('check this file')
+    pickImages()
+    changeFiles(pickerInput(), [
+      new File([pngBytes], 'first.png', { type: 'image/png' }),
+      new File([pngBytes], 'renamed.png', { type: 'image/png' }),
+    ])
+    await waitFor(() => expect(screen.getByText(/renamed.png \u2014 Already attached to this message/)).toBeTruthy())
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+    changeFiles(pickerInput(), [new File([pngBytes], 'again.png', { type: 'image/png' })])
+    await waitFor(() => expect(screen.getByText(/again.png \u2014 Already attached to this message/)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalled())
+    expect(onSend).toHaveBeenCalledWith('check this file', [expect.objectContaining({ filename: 'first.png' })], [])
+  })
+
+  it('rejects duplicate documents but retains different contents with the same name', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+    type('')
+    pickImages()
+    const original = new File(['abc'], 'same.txt')
+    const different = new File(['xyz'], 'same.txt')
+    changeFiles(pickerInput(), [original, new File(['abc'], 'copy.txt'), different])
+    await waitFor(() => expect(screen.getByText(/copy.txt \u2014 Already attached to this message/)).toBeTruthy())
+    expect(screen.getAllByRole('button', { name: 'Remove same.txt' })).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('', [], [original, different]))
+  })
+
+  it('waits for pending duplicate checks before sending, so a late copy cannot land in the next draft', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+    type('read this')
+    pickImages()
+    const original = new File(['abc'], 'original.txt')
+    changeFiles(pickerInput(), [original])
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Remove original.txt' })).toBeTruthy())
+    let finish: (bytes: ArrayBuffer) => void = () => { throw new Error('no pending file read') }
+    const copy = new File(['abc'], 'copy.txt')
+    const read = vi.spyOn(copy, 'arrayBuffer').mockImplementation(() => new Promise<ArrayBuffer>((resolve) => { finish = resolve }))
+    changeFiles(pickerInput(), [copy])
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    expect(onSend).not.toHaveBeenCalled()
+    finish(new Uint8Array([97, 98, 99]).buffer)
+    await waitFor(() => expect(screen.getByText(/copy.txt \u2014 Already attached/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('read this', [], [original]))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove original.txt' })).toBeNull())
+    expect(screen.queryByRole('button', { name: 'Remove copy.txt' })).toBeNull()
+  })
+
+  it('allows an image again after removing it or sending the draft', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+    pickImages()
+    const photo = new File([pngBytes], 'photo.png', { type: 'image/png' })
+    changeFiles(pickerInput(), [photo])
+    await waitFor(() => expect(screen.getByAltText('photo.png')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo.png' }))
+    changeFiles(pickerInput(), [photo])
+    await waitFor(() => expect(screen.getByAltText('photo.png')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(screen.queryByAltText('photo.png')).toBeNull())
+    changeFiles(pickerInput(), [photo])
+    await waitFor(() => expect(screen.getByAltText('photo.png')).toBeTruthy())
+    expect(screen.queryByText(/Already attached/)).toBeNull()
+  })
+
+  it('does not let a duplicate use a slot in a mixed selection at the image limit', async () => {
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    pickImages()
+    const pictures = Array.from({ length: 5 }, (_, index) =>
+      new File([pngBytes, new Uint8Array([index])], `${index}.png`, { type: 'image/png' }))
+    const first = pictures[0]
+    if (first === undefined) throw new Error('no first image')
+    changeFiles(pickerInput(), [first, first, ...pictures.slice(1)])
+    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(5))
+    expect(screen.getByText(/0.png \u2014 Already attached/)).toBeTruthy()
+    expect(screen.queryByText(/at most/)).toBeNull()
+    changeFiles(pickerInput(), [first])
+    await waitFor(() => expect(screen.getByText(/0.png \u2014 Already attached/)).toBeTruthy())
+    expect(screen.queryByText(/at most/)).toBeNull()
+  })
+
   it('carries a picked image with the words, and strips it once the receipt lands', async () => {
     const onSend = vi.fn(async () => ({ ok: true }))
     renderComposer(onSend)
@@ -316,6 +407,17 @@ describe('the images a turn carries', () => {
  */
 describe('paste and drop', () => {
   const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 6, 7, 8])
+
+  it('rejects a rapid duplicate arriving through paste and drop while the first file is reading', async () => {
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    const textbox = screen.getByRole('textbox')
+    const composer = document.querySelector('[data-composer-frame]')
+    if (composer === null) throw new Error('no composer')
+    fireEvent.paste(textbox, { clipboardData: { files: [new File([pngBytes], 'pasted.png', { type: 'image/png' })] } })
+    fireEvent.drop(composer, { dataTransfer: { files: [new File([pngBytes], 'dropped.png', { type: 'image/png' })], types: ['Files'] } })
+    await waitFor(() => expect(screen.getByText(/dropped.png \u2014 Already attached/)).toBeTruthy())
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+  })
 
   it('turns a pasted screenshot into a pending image', async () => {
     const onSend = vi.fn(async () => ({ ok: true }))

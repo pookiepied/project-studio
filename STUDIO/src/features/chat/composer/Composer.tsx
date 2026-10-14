@@ -5,7 +5,6 @@ import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { WorkingRing } from '@/components/state'
 import {
-  MAX_IMAGES_PER_TURN,
   pickImageFiles,
   readImageFile,
   type ImageRejection,
@@ -14,6 +13,7 @@ import { AddMenu } from '@/features/chat/composer/AddMenu'
 import { PendingImages } from '@/features/chat/composer/PendingImages'
 import { PendingDocuments } from '@/features/chat/composer/PendingDocuments'
 import { DOCUMENT_ACCEPT, documentMimeOf, pickDocumentFiles } from '@/domain/attachments/documents'
+import { DUPLICATE_ATTACHMENT_NOTE, matchingDocument } from '@/domain/attachments/duplicates'
 import { base64OfBytes } from '@/lib/base64'
 import { KeepDialog } from '@/features/library/KeepDialog'
 import type { KeepCandidate } from '@/features/library/client'
@@ -191,20 +191,31 @@ export function Composer({
    * strip still holds exactly what that receipt took, so images picked
    * during the round trip belong to the next message.
    */
-  const [images, setImages] = useState<readonly TurnImageWire[]>([])
+  const [images, setImagesState] = useState<readonly TurnImageWire[]>([])
   // The picture being offered to the library, while its dialog is open.
   // Keeping does not touch the message: the strip still carries the image.
   const [keeping, setKeeping] = useState<KeepCandidate | null>(null)
-  const imagesRef = useRef<readonly TurnImageWire[]>([])
-  imagesRef.current = images
+  const imagesRef = useRef<readonly TurnImageWire[]>(images)
+  const setImages = useCallback((next: readonly TurnImageWire[] | ((current: readonly TurnImageWire[]) => readonly TurnImageWire[])) => {
+    const resolved = typeof next === 'function' ? next(imagesRef.current) : next
+    imagesRef.current = resolved
+    setImagesState(resolved)
+  }, [])
   /**
    * The documents riding on this message, still as the files the picker
-   * gave: nothing is read until the send, when each is uploaded ahead of
-   * the words. The ref is the receipt check's twin, as for the images.
+   * gave: bytes are compared only against possible duplicates, and each is
+   * uploaded at send time. The ref is the receipt check's twin, as for images.
    */
-  const [documents, setDocuments] = useState<readonly File[]>([])
-  const documentsRef = useRef<readonly File[]>([])
-  documentsRef.current = documents
+  const [documents, setDocumentsState] = useState<readonly File[]>([])
+  const [pendingAttachments, setPendingAttachments] = useState(0)
+  // Serialize picks so two reads that overlap cannot both admit the same file.
+  const attachmentReads = useRef<Promise<void>>(Promise.resolve())
+  const documentsRef = useRef<readonly File[]>(documents)
+  const setDocuments = useCallback((next: readonly File[] | ((current: readonly File[]) => readonly File[])) => {
+    const resolved = typeof next === 'function' ? next(documentsRef.current) : next
+    documentsRef.current = resolved
+    setDocumentsState(resolved)
+  }, [])
   /** Pick-time rejections, held until the next pick or a successful send. */
   const [refusals, setRefusals] = useState<readonly ImageRejection[]>([])
   const picker = useRef<HTMLInputElement>(null)
@@ -248,7 +259,7 @@ export function Composer({
     setText((current) => current ? `${restoredMessage.text}\n\n${current}` : restoredMessage.text)
     setImages((current) => [...restoredMessage.images, ...current])
     field.current?.focus()
-  }, [restoredMessage, setText])
+  }, [restoredMessage, setText, setImages])
   // The frame itself, which the slash picker opens above — see
   // `SlashSuggestions` for why the panel is not part of this box.
   const frame = useRef<HTMLDivElement>(null)
@@ -386,7 +397,7 @@ export function Composer({
   // queue and steer, which have different delivery semantics in the harness.
   const busy = turnRunning || sending
   const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) &&
-    !sending && (!turnRunning || allowSteering || onQueue !== undefined)
+    !sending && pendingAttachments === 0 && (!turnRunning || allowSteering || onQueue !== undefined)
   const steering = turnRunning && allowSteering && canSend
   const dictating = dictation.stage !== 'idle'
 
@@ -396,35 +407,78 @@ export function Composer({
    * rejections line instead of silently dropping.
    */
   const addImages = useCallback((picked: readonly File[]) => {
-    const { accepted, rejections: judged } = pickImageFiles(picked, imagesRef.current.length)
-    void Promise.all(accepted.map(readImageFile)).then((outcomes) => {
-      const read: TurnImageWire[] = []
-      const held: ImageRejection[] = [...judged]
-      for (const outcome of outcomes) {
-        if ('type' in outcome) read.push(outcome)
-        else held.push(outcome)
+    setPendingAttachments((count) => count + 1)
+    attachmentReads.current = attachmentReads.current.then(async () => {
+      const refused: ImageRejection[] = []
+      for (const file of picked) {
+        const judged = pickImageFiles([file])
+        if (judged.accepted.length === 0) {
+          refused.push(...judged.rejections)
+          continue
+        }
+        const outcome = await readImageFile(file)
+        if (!('type' in outcome)) {
+          refused.push(outcome)
+          continue
+        }
+        const current = imagesRef.current
+        if (current.some((image) => image.data === outcome.data)) {
+          refused.push({ filename: file.name, reason: DUPLICATE_ATTACHMENT_NOTE })
+          continue
+        }
+        const room = pickImageFiles([file], current.length)
+        if (room.accepted.length === 0) {
+          refused.push(...room.rejections)
+          continue
+        }
+        const next = [...current, outcome]
+        setImages(next)
       }
-      setRefusals(held)
-      if (read.length === 0) return
-      setImages((current) => [...current, ...read].slice(0, MAX_IMAGES_PER_TURN))
-    })
-  }, [])
+      setRefusals((current) => [...current, ...refused])
+    }).finally(() => setPendingAttachments((count) => count - 1))
+  }, [setImages])
 
   const removeImage = useCallback((index: number) => {
     setImages((current) => current.filter((_, at) => at !== index))
-  }, [])
+  }, [setImages])
 
   /** Judges a haul of documents by name and size; the harness judges the bytes at the send. */
   const addDocuments = useCallback((picked: readonly File[]) => {
-    const { accepted, rejections: judged } = pickDocumentFiles(picked, documentsRef.current.length)
-    setRefusals((current) => [...current, ...judged])
-    if (accepted.length === 0) return
-    setDocuments((current) => [...current, ...accepted])
-  }, [])
+    setPendingAttachments((count) => count + 1)
+    attachmentReads.current = attachmentReads.current.then(async () => {
+      const refused: ImageRejection[] = []
+      for (const file of picked) {
+        const judged = pickDocumentFiles([file])
+        if (judged.accepted.length === 0) {
+          refused.push(...judged.rejections)
+          continue
+        }
+        try {
+          const duplicate = await matchingDocument(file, documentsRef.current)
+          if (duplicate !== null && documentsRef.current.includes(duplicate)) {
+            refused.push({ filename: file.name, reason: DUPLICATE_ATTACHMENT_NOTE })
+            continue
+          }
+        } catch {
+          refused.push({ filename: file.name, reason: 'Could not be read.' })
+          continue
+        }
+        const current = documentsRef.current
+        const room = pickDocumentFiles([file], current.length)
+        if (room.accepted.length === 0) {
+          refused.push(...room.rejections)
+          continue
+        }
+        const next = [...current, file]
+        setDocuments(next)
+      }
+      setRefusals((current) => [...current, ...refused])
+    }).finally(() => setPendingAttachments((count) => count - 1))
+  }, [setDocuments])
 
   const removeDocument = useCallback((index: number) => {
     setDocuments((current) => current.filter((_, at) => at !== index))
-  }, [])
+  }, [setDocuments])
 
   /**
    * Whatever the clipboard or a drag carries lands in a strip through the
@@ -923,7 +977,7 @@ export function Composer({
             </button>
           ) : null}
           <AnimatePresence initial={false} mode="popLayout">
-            {canSend || busy ? (
+            {canSend || busy || pendingAttachments > 0 ? (
               <motion.div
                 key="send"
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -948,6 +1002,7 @@ export function Composer({
                   label={steering ? 'Steer' : busy ? 'Stop' : 'Send'}
                   size="md"
                   tone="solid"
+                  disabled={pendingAttachments > 0 && !busy}
                   onClick={canSend ? () => submit() : halt}
                 >
                   {busy && !canSend ? (

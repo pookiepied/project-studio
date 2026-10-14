@@ -7,8 +7,8 @@ import { Icons } from '@/components/icons'
  * A chip, not a thumbnail: a document has no picture to show, and what a
  * person checks before sending is the name and the size - the wrong PDF is
  * noticed by its name. The file itself stays in memory until the send, when
- * it is uploaded ahead of the words; nothing is read before then, so a
- * fifty-megabyte pick costs nothing until it goes.
+ * it is uploaded ahead of the words. Before then, its bytes are read only
+ * when a file of the same size is already held and needs a duplicate check.
  */
 export function PendingDocuments({
   documents,
