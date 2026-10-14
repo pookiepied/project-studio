@@ -27,8 +27,8 @@
  */
 import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
-  CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
-  GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
+  CircleUser, Code, CodeXml, Command, Copy, CornerDownRight, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
+  GalleryVerticalEnd, GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
   RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Split,
   SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
@@ -244,6 +244,8 @@ const REGISTRY = {
   attach: { mark: Paperclip },
   dictate: { mark: Mic },
   send: { mark: ArrowUp, motion: LIFT },
+  steer: { mark: CornerDownRight },
+  queue: { mark: GalleryVerticalEnd },
   // `stop`, `play` and `pause` are not here either: they are the drawn
   // transport, the one solid family in the app, and Lucide has no filled mark
   // of any kind to take them from. See `drawn.tsx`, and `Icons` below.

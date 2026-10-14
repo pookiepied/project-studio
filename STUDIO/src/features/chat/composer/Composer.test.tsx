@@ -57,6 +57,7 @@ Element.prototype.scrollIntoView = () => undefined
 function renderComposer(
   onSend: (text: string, images: readonly TurnImageWire[]) => Promise<Receipt>,
   busy?: boolean,
+  controls?: { allowSteering: boolean; onQueue?: typeof onSend; onStop?: () => void; queueFull?: boolean; restoredMessage?: { submissionId: string; text: string; images: readonly TurnImageWire[] } },
 ) {
   return render(
     <VoiceModeProvider>
@@ -65,6 +66,7 @@ function renderComposer(
         placeholder="Reply"
         onSend={onSend}
         {...(busy === undefined ? {} : { busy })}
+        {...controls}
       />
     </VoiceModeProvider>,
   )
@@ -81,6 +83,55 @@ const field = (): string => {
 }
 
 describe('the field holds its words until the harness takes them', () => {
+  it('holds a draft when the queue is full, while still allowing steering', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    const onQueue = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend, true, { allowSteering: true, onQueue, queueFull: true })
+    type('keep this draft')
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    expect(onQueue).not.toHaveBeenCalled()
+    expect(field()).toBe('keep this draft')
+    expect(screen.getByRole('button', { name: 'Queue message' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Steer' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('keep this draft', [], []))
+  })
+
+  it('restores an edited queued message and sends the revised words through the queue', async () => {
+    const onQueue = vi.fn(async () => ({ ok: true }))
+    renderComposer(vi.fn(async () => ({ ok: true })), true, { allowSteering: true, onQueue, restoredMessage: { submissionId: 'sub_edit', text: 'old queued words', images: [] } })
+    expect(field()).toContain('old queued words')
+    type('revised queued words')
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith('revised queued words', [], []))
+    await waitFor(() => expect(field()).toBe(''))
+  })
+  it('queues on Enter and offers steering and stopping separately during a run', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    const onQueue = vi.fn(async () => ({ ok: true }))
+    const onStop = vi.fn()
+    renderComposer(onSend, true, { allowSteering: true, onQueue, onStop })
+    type('next task')
+    expect(screen.getByRole('button', { name: 'Queue message' })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    await waitFor(() => expect(field()).toBe(''))
+    expect(onQueue).toHaveBeenCalledWith('next task', [], [])
+    expect(onSend).not.toHaveBeenCalled()
+    type('change direction')
+    fireEvent.click(screen.getByRole('button', { name: 'Steer' }))
+    await waitFor(() => expect(field()).toBe(''))
+    expect(onSend).toHaveBeenCalledWith('change direction', [], [])
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    expect(onStop).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a refused queued message in the composer', async () => {
+    const onQueue = vi.fn(async () => ({ ok: false }))
+    renderComposer(vi.fn(async () => ({ ok: true })), true, { allowSteering: true, onQueue })
+    type('keep this correction')
+    fireEvent.click(screen.getByRole('button', { name: 'Queue message' }))
+    await waitFor(() => expect(onQueue).toHaveBeenCalledTimes(1))
+    expect(field()).toBe('keep this correction')
+  })
   it('keeps the typed text when the harness refuses the send', async () => {
     // The Part C failure: an optimistic clear turned a refused POST into a
     // silent swallow. The refusal is answered somewhere visible; the words

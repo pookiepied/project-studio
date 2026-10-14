@@ -1,6 +1,8 @@
 import {
   createAssistantMessageEventStream,
   createProvider,
+  getCurrentSystemPrompt,
+  getCurrentTools,
   type Api,
   type AssistantMessage,
   type AssistantMessageEventStream,
@@ -9,6 +11,7 @@ import {
   type ModelCost,
   type ProviderStreams,
   type SimpleStreamOptions,
+  type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { setProvider } from "@flue/runtime";
 
@@ -993,6 +996,15 @@ export function stream(
   return events;
 }
 
+/** Pi now carries prompt and tool changes in transcript system messages. */
+function scriptedContext(context: TranscriptContext): Context {
+  return {
+    messages: context.messages,
+    systemPrompt: getCurrentSystemPrompt(context.messages),
+    tools: getCurrentTools(context.messages),
+  };
+}
+
 export class TestModelProviderAdapter implements ModelProviderAdapter {
   readonly source = "test" as const;
   readonly operational = true;
@@ -1010,8 +1022,8 @@ export class TestModelProviderAdapter implements ModelProviderAdapter {
    */
   register(): void {
     const scripted: ProviderStreams = {
-      stream: (model, context, options) => stream(model, context, options),
-      streamSimple: (model, context, options) => stream(model, context, options),
+      stream: (model, context, options) => stream(model, scriptedContext(context), options),
+      streamSimple: (model, context, options) => stream(model, scriptedContext(context), options),
     };
     const provider = createProvider({
       id: TEST_PROVIDER,

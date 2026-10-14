@@ -76,8 +76,17 @@ export async function startConversation(request: {
   readonly documents?: readonly File[]
   /** Defaults to asking the supervisor, exactly as a conversation view does. */
   readonly contactFor?: (conversationId: string) => ContactHarness
+  /**
+   * The conversation to admit the turn under. Defaults to a fresh id, which
+   * is what a first send from Home or a project page wants. A fork passes
+   * the id the harness already duplicated everything under, so the seed is
+   * admitted to the fork rather than minting a second conversation - the
+   * defect the old fork path had, where the seed's id and the sidebar row's
+   * id were two different mints.
+   */
+  readonly conversationId?: string
 }): Promise<FirstTurnOutcome> {
-  const conversationId = newId('cnv')
+  const conversationId = request.conversationId ?? newId('cnv')
   const contact = (request.contactFor ?? defaultContactFor)(conversationId)
   const found = await contact()
   if (found.kind !== 'ready') return { ok: false, error: NOT_RUNNING }

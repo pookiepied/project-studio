@@ -319,6 +319,52 @@ export class ModelCatalog {
   }
 
   /**
+   * Adopts a self-hosted connection's own listing as selectable models.
+   *
+   * Probing learns the ids an endpoint serves, but learning alone leaves a
+   * custom provider empty: every id still needs hand-entering before it can
+   * be picked or set as default. Adoption closes that gap — ids the probe
+   * named that have no row yet gain one (origin manual, capabilities
+   * unknown), so adding any OpenAI-compatible endpoint is add, probe, pick.
+   * Ids that already have rows are untouched, so edits, renames, and
+   * overrides survive every probe. A row the user deleted returns on the
+   * next probe: the endpoint still serves it, and keeping an adopted row out
+   * of the picker belongs to hiding, not to absence.
+   */
+  async adoptServedModels(
+    connectionId: string,
+    servedIds: readonly string[],
+  ): Promise<readonly ProviderModel[]> {
+    const connection = await this.#connections.get(connectionId);
+    if (
+      connection === undefined ||
+      connection.catalogProvider !== undefined ||
+      connection.serves.language === undefined ||
+      !connection.enabled
+    ) {
+      return [];
+    }
+    const existing = new Set(
+      (await this.listModels({ connectionId })).map((model) => model.modelId),
+    );
+    const adopted: ProviderModel[] = [];
+    for (const modelId of servedIds) {
+      if (existing.has(modelId)) continue;
+      try {
+        adopted.push(
+          await this.addManualModel(connectionId, { modelId, displayName: modelId }),
+        );
+        existing.add(modelId);
+      } catch {
+        // One unadoptable id (a duplicate that landed between the check and
+        // the write, a stored row that fails validation) must not cost the
+        // rest of the listing.
+      }
+    }
+    return adopted;
+  }
+
+  /**
    * The model references the catalog currently serves, as the run names them:
    * `<catalogProvider ?? connectionId>/<modelId>` per row.
    *

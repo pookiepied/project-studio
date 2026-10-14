@@ -1097,3 +1097,175 @@ describe('the count ticking in place', () => {
     expect(view.container.textContent).toBe('7')
   })
 })
+
+/**
+ * The search result: a list, not slabs. A grep's content answer opens onto
+ * the files with their hits on real line numbers and the matched words
+ * marked; a file list opens onto the paths; a count onto the rows and the
+ * total; an empty search onto its one quiet sentence. The raw input and
+ * answer stand behind none of them -- the aim is in the summary, the answer
+ * is the list -- except where the parser cannot read the answer, which keeps
+ * today's slabs rather than a misparse. And it is deliberately no card: the
+ * framed code panel is the file tools' shape, and a search wearing it reads
+ * as another code block beside Read, Write and Edit.
+ */
+describe('the search result', () => {
+  const CONTENT =
+    'snake/script.js\n' +
+    '   197: const grow = easeOut(foodSpawnAt);\n' +
+    '   198- // the spawn timestamp\n' +
+    '   199: foodSpawnAt = now;\n' +
+    '\n' +
+    '[showing 3 of 9 lines; raise limit or use offset for more]'
+
+  function grepCall(overrides: Partial<ToolCallView> = {}): ToolCallView {
+    return call({
+      toolName: 'grep',
+      toolCallId: 'call-search',
+      input: present({ pattern: 'foodSpawnAt', path: 'snake', outputMode: 'content' }),
+      output: present(CONTENT),
+      ...overrides,
+    })
+  }
+
+  it('groups the hits by file, on their line numbers, with the words marked', () => {
+    const { container } = render(
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'grep', calls: [grepCall()] })} />,
+    )
+    fireEvent.click(screen.getByText('Searched'))
+    expect(screen.getByText('script.js')).toBeTruthy()
+    expect(screen.getByText('197')).toBeTruthy()
+    expect(screen.getByText('199')).toBeTruthy()
+    expect(screen.getByText('// the spawn timestamp')).toBeTruthy()
+    // Two landings of the pattern, each marked with the selection wash.
+    const marks = container.querySelectorAll('[class*="bg-selected"]')
+    expect(marks).toHaveLength(2)
+    expect(marks[0]?.textContent).toBe('foodSpawnAt')
+    // The head counts what is on the list; the note travels verbatim.
+    expect(container.textContent).toContain('2 matches · 1 file')
+    expect(
+      screen.getByText('showing 3 of 9 lines; raise limit or use offset for more'),
+    ).toBeTruthy()
+    // No card: the framed panel belongs to the file tools.
+    expect(container.querySelector('[class*="bg-code-surface"]')).toBeNull()
+    // The slabs are gone: no raw input, no raw answer.
+    expect(screen.queryByText(/in:/)).toBeNull()
+    expect(screen.queryByText(/out:/)).toBeNull()
+  })
+
+  it('shows a file list as paths, not slabs', () => {
+    const { container } = render(
+      <ToolGroups
+        conversationId="conv"
+        groups={groupsOf({
+          toolName: 'glob',
+          calls: [
+            call({
+              toolName: 'glob',
+              toolCallId: 'call-glob',
+              input: present({ pattern: '*.ts', path: 'src' }),
+              output: present('src/z.ts\nsrc/a.ts\n'),
+            }),
+          ],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Searched'))
+    expect(screen.getByText('z.ts')).toBeTruthy()
+    expect(screen.getByText('a.ts')).toBeTruthy()
+    expect(container.textContent).toContain('2 files')
+    expect(screen.queryByText(/in:/)).toBeNull()
+    expect(screen.queryByText(/out:/)).toBeNull()
+  })
+
+  it('shows a count as rows with a total', () => {
+    const { container } = render(
+      <ToolGroups
+        conversationId="conv"
+        groups={groupsOf({
+          toolName: 'grep',
+          calls: [
+            grepCall({
+              input: present({ pattern: 'foodSpawnAt', outputMode: 'count' }),
+              output: present('snake/a.ts: 3\nsnake/b.ts: 12\n'),
+            }),
+          ],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Searched'))
+    expect(screen.getByText('a.ts')).toBeTruthy()
+    expect(screen.getByText('b.ts')).toBeTruthy()
+    expect(container.textContent).toContain('15 matches · 2 files')
+    expect(screen.queryByText(/in:/)).toBeNull()
+    expect(screen.queryByText(/out:/)).toBeNull()
+  })
+
+  it('reads an empty search as one quiet line, no card', () => {
+    const { container } = render(
+      <ToolGroups
+        conversationId="conv"
+        groups={groupsOf({
+          toolName: 'grep',
+          calls: [grepCall({ output: present('No matches.') })],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Searched'))
+    expect(screen.getByText('No matches.')).toBeTruthy()
+    expect(container.querySelector('[class*="bg-code-surface"]')).toBeNull()
+    expect(screen.queryByText(/in:/)).toBeNull()
+    expect(screen.queryByText(/out:/)).toBeNull()
+  })
+
+  it('names the aim while the answer is still out, not the raw input', () => {
+    render(
+      <ToolGroups
+        conversationId="conv"
+        groups={groupsOf({
+          toolName: 'grep',
+          calls: [
+            grepCall({
+              input: present({ pattern: 'foodSpawnAt', outputMode: 'content' }),
+              output: null,
+            }),
+          ],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Searching'))
+    // Twice: the chip's subject, and the aim line the expansion opens onto.
+    expect(screen.getAllByText('foodSpawnAt')).toHaveLength(2)
+    expect(screen.queryByText(/in:/)).toBeNull()
+  })
+
+  it('keeps the raw answer for one the parser cannot read, under the named aim', () => {
+    // The aim is known exactly -- it came from the input -- so only the
+    // answer falls back to its slab, and `in:` stays gone.
+    render(
+      <ToolGroups
+        conversationId="conv"
+        groups={groupsOf({
+          toolName: 'grep',
+          calls: [grepCall({ output: present('weird\n\nbroken') })],
+        })}
+      />,
+    )
+    fireEvent.click(screen.getByText('Searched'))
+    expect(screen.queryByText(/in:/)).toBeNull()
+    expect(screen.getByText(/out:/)).toBeTruthy()
+  })
+
+  it('opens the list flush, on its own nesting step instead of the rule', () => {
+    // No card and no ruled indent: the list stands at the content boundary
+    // and says whose it is by alignment -- one nesting step -- and by
+    // echoing the chip's pattern in its summary.
+    const view = render(
+      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'grep', calls: [grepCall()] })} />,
+    )
+    fireEvent.click(screen.getByText('Searched'))
+    const body = view.container.querySelector('[class*="mt-1.5"]')
+    expect(body?.className).not.toContain('border-l-2')
+    expect(view.container.querySelector('[class*="pl-5"]')).not.toBeNull()
+  })
+})

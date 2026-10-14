@@ -1,8 +1,8 @@
 diff --git a/dist/api/anthropic-messages.js b/dist/api/anthropic-messages.js
-index d04d7a9f59f3700a7e3bacb02aa68256215bee27..f518559a2867677ea7ed06bb08f30d5f6787ff31 100644
+index d0a5b0f1bcd77e4afff2c92b068a6e3150dcdd86..77c54188260619c6ec2efb84504d1af7316e4164 100644
 --- a/dist/api/anthropic-messages.js
 +++ b/dist/api/anthropic-messages.js
-@@ -1068,8 +1068,13 @@ function mapStopReason(reason, stopDetails) {
+@@ -1344,8 +1344,13 @@ function mapStopReason(reason, stopDetails) {
          case "sensitive": // Content flagged by safety filters (not yet in SDK types)
              return { stopReason: "error", errorMessage: "Provider stopped with: sensitive" };
          default:
@@ -20,11 +20,11 @@ index d04d7a9f59f3700a7e3bacb02aa68256215bee27..f518559a2867677ea7ed06bb08f30d5f
  //# sourceMappingURL=anthropic-messages.js.map
 \ No newline at end of file
 diff --git a/dist/api/google-shared.js b/dist/api/google-shared.js
-index 4214c050965c3bdb3564b623d54130d2f8608b1f..5f678bbc750b5c428e796620acdba059241d80b2 100644
+index 478c2c387b3a9c781c04a2268677c62a26093d42..37583afd7de139e1a2e174d88f8299ff1500bb11 100644
 --- a/dist/api/google-shared.js
 +++ b/dist/api/google-shared.js
-@@ -352,10 +352,14 @@ export function mapStopReason(reason) {
-         case FinishReason.UNEXPECTED_TOOL_CALL:
+@@ -403,10 +403,10 @@ export function mapStopReason(reason) {
+         case FinishReason.TOO_MANY_TOOL_CALLS:
          case FinishReason.NO_IMAGE:
              return "error";
 -        default: {
@@ -32,21 +32,17 @@ index 4214c050965c3bdb3564b623d54130d2f8608b1f..5f678bbc750b5c428e796620acdba059
 -            throw new Error(`Unhandled stop reason: ${_exhaustive}`);
 -        }
 +        default:
-+            // [project-studio patch] A finish reason from a remote API is an
-+            // open set: Google adds values whenever they like, and the pinned
-+            // SDK enum trails them. MALFORMED_RESPONSE arrived that way and
-+            // threw mid-stream, killing the turn instead of ending it. Every
-+            // other non-stop reason here already answers "error"; so does an
-+            // unknown one now.
++            // [project-studio patch] Remote finish reasons are an open set.
++            // A new provider value should end as an error, not throw.
 +            return "error";
      }
  }
  /**
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index c35771dcc9b2173d0b459d13c6d86e622de45e9a..f0b87760a4bf1a4bcc2f8f5d9bd4677b01c4a992 100644
+index f413fe5f2a1abcac39c38bbd4a77b38c349a5918..bb24d900968b9380995c3751b010e75b95bdb89f 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
-@@ -677,10 +677,11 @@ function mapStopReason(status, incompleteReason) {
+@@ -695,10 +695,10 @@ function mapStopReason(status, incompleteReason) {
          case "in_progress":
          case "queued":
              return { stopReason: "stop" };
@@ -55,9 +51,8 @@ index c35771dcc9b2173d0b459d13c6d86e622de45e9a..f0b87760a4bf1a4bcc2f8f5d9bd4677b
 -            throw new Error(`Unhandled stop reason: ${_exhaustive}`);
 -        }
 +        default:
-+            // [project-studio patch] Same open-set reasoning as the Google and
-+            // Anthropic mappers: an unrecognized response status ends the turn
-+            // as a provider error, not as an exception thrown mid-stream.
++            // [project-studio patch] Unknown provider statuses are errors,
++            // rather than exceptions that discard the streamed response.
 +            return { stopReason: "error" };
      }
  }

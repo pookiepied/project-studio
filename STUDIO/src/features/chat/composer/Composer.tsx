@@ -124,6 +124,10 @@ export function Composer({
   placeholder,
   onSend,
   busy: turnRunning = false,
+  allowSteering = false,
+  onQueue,
+  queueFull = false,
+  restoredMessage,
   onStop,
 }: {
   conversationId: string | null
@@ -144,6 +148,10 @@ export function Composer({
   ) => Promise<{ readonly ok: boolean }>
   /** The harness has a turn of ours: admitted, not yet settled. */
   busy?: boolean
+  allowSteering?: boolean
+  queueFull?: boolean
+  restoredMessage?: { readonly submissionId: string; readonly text: string; readonly images: readonly TurnImageWire[] } | null
+  onQueue?: (text: string, images: readonly TurnImageWire[], documents: readonly File[]) => Promise<{ readonly ok: boolean }>
   /** Aborts the harness run. */
   onStop?: () => void
 }) {
@@ -232,6 +240,15 @@ export function Composer({
   // while the first was still being judged.
   const [sending, setSending] = useState(false)
   const field = useRef<ComposerFieldHandle>(null)
+  const restoredId = useRef<string | null>(null)
+  useEffect(() => {
+    if (!restoredMessage || restoredId.current === restoredMessage.submissionId) return
+    restoredId.current = restoredMessage.submissionId
+    // Keep any draft already being written while restoring the edited input.
+    setText((current) => current ? `${restoredMessage.text}\n\n${current}` : restoredMessage.text)
+    setImages((current) => [...restoredMessage.images, ...current])
+    field.current?.focus()
+  }, [restoredMessage, setText])
   // The frame itself, which the slash picker opens above — see
   // `SlashSuggestions` for why the panel is not part of this box.
   const frame = useRef<HTMLDivElement>(null)
@@ -342,12 +359,12 @@ export function Composer({
     return false
   }
 
-  // OR, never a fallback. The page passes a boolean for the whole POST round
-  // trip — `false`, because the turn has not started streaming yet — so
-  // `turnRunning` alone would leave the field open for the length of the
-  // round trip, and the in-flight lock is what closes it.
+  // Admission still locks duplicate sends. A running response instead offers
+  // queue and steer, which have different delivery semantics in the harness.
   const busy = turnRunning || sending
-  const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) && !busy
+  const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) &&
+    !sending && (!turnRunning || allowSteering || onQueue !== undefined)
+  const steering = turnRunning && allowSteering && canSend
   const dictating = dictation.stage !== 'idle'
 
   /**
@@ -408,8 +425,9 @@ export function Composer({
     [addImages, addDocuments],
   )
 
-  const submit = () => {
+  const submit = (mode: 'queue' | 'steer' = 'queue') => {
     if (!canSend) return
+    if (turnRunning && mode === 'queue' && onQueue !== undefined && queueFull) return
     const outgoing = text
     const carried = images
     const papers = documents
@@ -418,8 +436,9 @@ export function Composer({
     // Words go straight out. A command is resolved first: an action runs
     // here and the field clears; a prompt command sends its expansion in
     // place of the words.
+    const deliver = turnRunning && mode === 'queue' && onQueue !== undefined ? onQueue : onSend
     const dispatched = !slash.isCommand(outgoing)
-      ? onSend(outgoing, carried, papers)
+      ? deliver(outgoing, carried, papers)
       : slash.resolve(outgoing).then((outcome) => {
           if (outcome.kind === 'done') {
             setSending(false)
@@ -431,7 +450,7 @@ export function Composer({
             }
             return null
           }
-          return onSend(outcome.kind === 'prompt' ? outcome.text : outgoing, carried, papers)
+          return deliver(outcome.kind === 'prompt' ? outcome.text : outgoing, carried, papers)
         })
     void dispatched.then(
       (receipt) => {
@@ -862,6 +881,20 @@ export function Composer({
               flow, the leaving face fades where it stood and the row never
               changes width. */}
           {!dictating && (
+          <>
+          {turnRunning && canSend ? (
+            <IconButton label="Stop" size="md" onClick={halt}>
+              <TurnRing />
+              <Icons.stop size="md" />
+            </IconButton>
+          ) : null}
+          {steering && onQueue !== undefined ? (
+            <button type="button" onClick={() => submit('steer')}
+              title="Apply at the next safe step"
+              className="rounded-full px-3 py-2 text-sm text-muted-foreground hover:bg-tint hover:text-foreground">
+              Steer
+            </button>
+          ) : null}
           <AnimatePresence initial={false} mode="popLayout">
             {canSend || busy ? (
               <motion.div
@@ -871,13 +904,26 @@ export function Composer({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: DURATION.fast, ease: EASE_OUT }}
               >
+                {turnRunning && canSend && onQueue !== undefined ? (
+                  <button
+                    type="button"
+                    aria-label="Queue message"
+                    title={queueFull ? 'Queue full (3/3). Edit, delete, or steer a message first.' : 'Send after the current response finishes'}
+                    disabled={queueFull}
+                    onClick={() => submit()}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-2 text-sm text-primary-foreground hover:opacity-85 disabled:opacity-40 [&_.studio-icon]:text-primary-foreground"
+                  >
+                    Queue
+                    <Icons.send size="md" />
+                  </button>
+                ) : (
                 <IconButton
-                  label={busy ? 'Stop' : 'Send'}
+                  label={steering ? 'Steer' : busy ? 'Stop' : 'Send'}
                   size="md"
                   tone="solid"
-                  onClick={busy ? halt : submit}
+                  onClick={canSend ? () => submit() : halt}
                 >
-                  {busy ? (
+                  {busy && !canSend ? (
                     <>
                       <TurnRing />
                       {/* `size="md"`, like every other mark in this row. It
@@ -896,6 +942,7 @@ export function Composer({
                     <Icons.send size="md" />
                   )}
                 </IconButton>
+                )}
               </motion.div>
             ) : (
               <motion.div
@@ -926,6 +973,7 @@ export function Composer({
               </motion.div>
             )}
           </AnimatePresence>
+          </>
           )}
         </motion.div>
       </div>

@@ -252,6 +252,58 @@ export class ConversationStore {
   }
 
   /**
+   * Inserts the index row for a forked conversation.
+   *
+   * Unlike `record`, which derives the title once from the first message,
+   * a fork arrives already named: the title is explicit and manual from
+   * birth, so the automatic titler never rewrites it and a reload agrees
+   * with the sidebar. Pinned and archived start cleared - the fork is a new
+   * conversation, not the source's flags. Called only from
+   * `conversations/fork.ts`, after the source was read and before anything
+   * scoped to the new id is copied.
+   */
+  insertForked(input: {
+    readonly id: string;
+    readonly title: string;
+    readonly projectId: string | null;
+    readonly modelId: string | null;
+    readonly reasoningLevel: ReasoningChoice | null;
+    readonly permissionMode: ExecutionMode;
+    readonly createdAt: number;
+  }): ConversationRecord {
+    if (this.get(input.id) !== undefined) {
+      throw new StorageError("conflict", {
+        message: `Conversation "${input.id}" already exists.`,
+      });
+    }
+    try {
+      this.#db.transaction(() => {
+        this.#db
+          .prepare(
+            `INSERT INTO conversation (
+               id, title, title_manual, project_id, pinned, archived,
+               model_id, reasoning_level, permission_mode, created_at, last_turn_at
+             )
+             VALUES (?, ?, 1, ?, 0, 0, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            input.id,
+            input.title,
+            input.projectId,
+            input.modelId,
+            input.reasoningLevel,
+            input.permissionMode,
+            input.createdAt,
+            input.createdAt,
+          );
+      });
+    } catch (error) {
+      throw storageErrorFrom(error, "conflict");
+    }
+    return this.get(input.id) as ConversationRecord;
+  }
+
+  /**
    * Advances when a conversation last had a turn.
    *
    * Sent with every admission receipt after the first, for the same reason

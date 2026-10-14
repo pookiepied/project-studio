@@ -14,6 +14,7 @@ import {
 } from "../platform/paths.js";
 import { environmentBlock, environmentFacts } from "../context/environment.js";
 import { compactionConfigFor } from "../conversations/compaction-policy.js";
+import { attachmentCopyNote } from "../conversations/attachments.js";
 import { STUDIO_SYSTEM_PROMPT } from "../context/system-prompt.js";
 import {
   DEFAULT_MODEL_PROVIDER,
@@ -266,9 +267,9 @@ export function Studio({ id }: AgentProps) {
   // runs after this and reads no delivery. A `signal` carries no attachments,
   // and an older test double without the host member copies nothing.
   const delivery = useDelivery();
-  if (delivery.kind === "user" && delivery.attachments !== undefined) {
-    runtime.persistDeliveredAttachments?.(id, delivery.attachments);
-  }
+  const attachmentCopies = delivery.kind === "user" && delivery.attachments !== undefined
+    ? runtime.persistDeliveredAttachments?.(id, delivery.attachments)
+    : undefined;
   // The documents the person attached with this message. They cannot ride
   // the message - the engine carries pictures and nothing else - so the
   // composer uploaded them ahead of the words, and this is where the model
@@ -283,6 +284,16 @@ export function Studio({ id }: AgentProps) {
     // A finished job's own signal wakes the same seam; a document waits for
     // the person's words, not for a background job's.
     if (delivery.kind !== "user") return;
+    if ((delivery.attachments?.length ?? 0) > 0) {
+      append({
+        kind: "signal",
+        type: "image_attachments",
+        tagName: "attached_images",
+        body: attachmentCopies !== undefined && attachmentCopies.length > 0
+          ? attachmentCopyNote(attachmentCopies)
+          : "The images on this user message were delivered inline, but their filesystem copies are unavailable. Attachment IDs are transcript labels, not paths; do not guess a path from an ID.",
+      });
+    }
     const announcement = runtime.announceDocuments?.(id);
     if (announcement === undefined) return;
     append({

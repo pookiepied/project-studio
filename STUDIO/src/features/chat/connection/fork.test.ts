@@ -1,78 +1,165 @@
-import { describe, expect, it } from 'vitest'
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
 
-import { renderSeed, turnsUpTo, type SeedTurn } from './fork'
+import { useForkConversation } from './fork'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
+import type { Conversation } from '@/domain/conversation/types'
 
 /**
- * The seed is the whole fork mechanism - Flue has no branch API, so the words
- * carried over ARE the inherited context. These pin the two halves: how much
- * of a conversation "up to here" is, and what the carried words look like when
- * they land in the new conversation's first message.
+ * A fork duplicates the conversation server-side and opens it - no turn is
+ * admitted, no model is called. These pin that the duplication, the local
+ * adoption and the navigation all address one minted id, and that a refusal
+ * admits nothing anywhere.
  */
 
-function user(id: string, text: string): TranscriptItem {
+function user(id: string, submissionId: string | null): TranscriptItem {
   return {
     kind: 'user',
     id,
-    submissionId: null,
-    text,
+    submissionId,
+    text: 'What eats reeds?',
     attachments: [],
     documents: [],
     timestamp: null,
   }
 }
 
-function assistant(id: string, text: string): TranscriptItem {
+function assistant(id: string, submissionId: string | null): TranscriptItem {
   return {
     kind: 'assistant',
     id,
-    submissionId: null,
+    submissionId,
     model: null,
-    segments: [{ kind: 'text', id: `run-${id}`, text }],
+    segments: [{ kind: 'text', id: `run-${id}`, text: 'Many grazers do.' }],
     end: { state: 'complete' },
     usage: null,
   }
 }
 
 const conversation: readonly TranscriptItem[] = [
-  user('u1', 'What eats reeds?'),
-  assistant('a1', 'Many grazers do. Deer, for instance.'),
-  user('u2', 'And in the water?'),
-  assistant('a2', 'Beavers and moose both feed on them.'),
+  user('u1', 'sub_1'),
+  assistant('a1', 'sub_1'),
+  user('u2', 'sub_2'),
+  assistant('a2', 'sub_2'),
 ]
 
-describe('turnsUpTo', () => {
-  it('carries everything up to and including the named answer', () => {
-    const turns = turnsUpTo(conversation, 'a1')
-    expect(turns.map((turn) => turn.role)).toEqual(['user', 'assistant'])
-    expect(turns[1]?.text).toBe('Many grazers do. Deer, for instance.')
+const { adoptConversation, openChat, forkConversation } = vi.hoisted(() => ({
+  adoptConversation: vi.fn(),
+  openChat: vi.fn(),
+  forkConversation: vi.fn(),
+}))
+
+vi.mock('@/stores/workspace', () => ({
+  useWorkspace: () => ({ adoptConversation }),
+}))
+
+vi.mock('@/stores/navigation', () => ({
+  useNavigation: () => ({ openChat }),
+}))
+
+vi.mock('@/platform/harness', () => ({
+  resolveHarnessAddress: () => Promise.resolve('http://127.0.0.1:9'),
+  createHarnessClient: () => ({ forkConversation }),
+}))
+
+const SOURCE: Conversation = {
+  id: 'cnv_source',
+  title: 'Reeds',
+  projectId: null,
+  updatedAt: 1,
+  pinned: false,
+  archived: false,
+  modelId: null,
+  reasoningLevel: null,
+  permissionMode: 'ask',
+}
+
+describe('forking as one conversation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
-  it('carries the whole conversation when the named answer is the last one', () => {
-    expect(turnsUpTo(conversation, 'a2')).toHaveLength(4)
+  it('forks whole with a single id from duplication through navigation', async () => {
+    forkConversation.mockResolvedValue({
+      ok: true,
+      value: { id: 'cnv_fork', title: 'Reeds (Fork)' },
+    })
+
+    const { result } = renderHook(() => useForkConversation())
+    let outcome: unknown
+    await act(async () => {
+      outcome = await result.current.forkWhole(SOURCE)
+    })
+
+    expect(outcome).toEqual({ ok: true, conversationId: expect.any(String) })
+    const target = (outcome as { conversationId: string }).conversationId
+    expect(target).toMatch(/^cnv_/)
+    expect(forkConversation).toHaveBeenCalledTimes(1)
+    expect(forkConversation).toHaveBeenCalledWith('cnv_source', target, undefined)
+    expect(adoptConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ id: target, title: 'Reeds (Fork)' }),
+    )
+    expect(openChat).toHaveBeenCalledWith(target)
   })
 
-  it('stops after the named answer even when more follows', () => {
-    const turns = turnsUpTo([...conversation, user('u3', 'one more')], 'a1')
-    expect(turns).toHaveLength(2)
+  it('branches at the submission behind the named answer', async () => {
+    forkConversation.mockResolvedValue({
+      ok: true,
+      value: { id: 'cnv_fork', title: 'Reeds (Fork)' },
+    })
+
+    const { result } = renderHook(() => useForkConversation())
+    let outcome: unknown
+    await act(async () => {
+      outcome = await result.current.branchFrom(SOURCE, conversation, 'a1')
+    })
+
+    expect(outcome).toEqual({ ok: true, conversationId: expect.any(String) })
+    const target = (outcome as { conversationId: string }).conversationId
+    expect(forkConversation).toHaveBeenCalledWith('cnv_source', target, 'sub_1')
+    expect(adoptConversation).toHaveBeenCalledWith(expect.objectContaining({ id: target }))
+    expect(openChat).toHaveBeenCalledWith(target)
   })
-})
 
-describe('renderSeed', () => {
-  const turns: readonly SeedTurn[] = [
-    { role: 'user', text: 'What eats reeds?' },
-    { role: 'assistant', text: 'Deer, for instance.' },
-  ]
+  it('branches whole when the named message carries no submission', async () => {
+    forkConversation.mockResolvedValue({
+      ok: true,
+      value: { id: 'cnv_fork', title: 'Reeds (Fork)' },
+    })
 
-  it('names the source and keeps the roles legible to a model', () => {
-    const seed = renderSeed('Reeds', turns)
-    expect(seed).toContain('"Reeds"')
-    expect(seed).toContain('User: What eats reeds?')
-    expect(seed).toContain('Assistant: Deer, for instance.')
-    expect(seed).toContain('--- transcript ---')
+    const { result } = renderHook(() => useForkConversation())
+    await act(async () => {
+      await result.current.branchFrom(
+        SOURCE,
+        [{ kind: 'compaction', id: 'c1', summary: 'reeds', tokensBefore: 9, timestamp: null }],
+        'c1',
+      )
+    })
+
+    expect(forkConversation).toHaveBeenCalledWith(
+      'cnv_source',
+      expect.any(String),
+      undefined,
+    )
   })
 
-  it('survives an untitled source', () => {
-    expect(renderSeed(null, turns)).toContain('this conversation')
+  it('admits nothing when the harness refuses the duplication', async () => {
+    forkConversation.mockResolvedValue({
+      ok: false,
+      error: { kind: 'harness-error', message: 'a turn is in flight', status: 409, timedOut: false },
+    })
+
+    const { result } = renderHook(() => useForkConversation())
+    let outcome: unknown
+    await act(async () => {
+      outcome = await result.current.forkWhole(SOURCE)
+    })
+
+    expect(outcome).toEqual({ ok: false, note: 'a turn is in flight' })
+    expect(adoptConversation).not.toHaveBeenCalled()
+    expect(openChat).not.toHaveBeenCalled()
   })
 })

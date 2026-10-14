@@ -206,6 +206,7 @@ interface SubmittedTurn {
  * what is sent.
  */
 export interface TurnSettingsWire {
+  readonly deliveryMode?: 'queue' | 'steer'
   readonly modelId: string | null
   readonly reasoningLevel: string | null
   readonly permissionMode?: ExecutionModeWire
@@ -529,6 +530,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
       const sent = await request('POST', agentsPath(), JSON.stringify({
         kind: 'user',
         body: message,
+        ...(wire.deliveryMode === undefined ? {} : { deliveryMode: wire.deliveryMode }),
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),
         reasoningLevel: wire.reasoningLevel,
         ...(wire.permissionMode === undefined ? {} : { permissionMode: wire.permissionMode }),

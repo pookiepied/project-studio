@@ -123,8 +123,11 @@ describe("studio_image", () => {
     const budget = new ImageBudget();
     for (let n = 0; n < 20; n += 1) budget.record("conv-1", 10);
     build(standInService(), { acceptsImages: true, budget });
-    const result = (await image({ prompt: "x" })) as { content: { type: string }[] };
-    expect(result.content.map((block) => block.type)).toEqual(["text"]);
+    const result = (await image({ prompt: "x" })) as { content: { type: string; text?: string }[] };
+    expect(result.content.every((block) => block.type === "text")).toBe(true);
+    expect(result.content.map((block) => block.text).join("\n")).toContain("not a provider-reported error");
+    expect(result.content.map((block) => block.text).join("\n")).toContain("0 remaining");
+    expect(budget.spentOn("conv-1").images).toBe(20);
   });
 
   it("reads input images from the workspace and makes the call an edit", async () => {

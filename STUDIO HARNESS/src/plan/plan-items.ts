@@ -181,6 +181,28 @@ export class PlanItemStore {
         .run(conversationId).changes,
     );
   }
+
+  /**
+   * Carries one conversation's plan to a fork, item for item.
+   *
+   * Positions travel unchanged, so the fork's panel reads exactly as the
+   * source's did: first-seen order is the stable order, and renumbering
+   * would reorder a plan nobody asked to reorder. Called only from
+   * `conversations/fork.ts`, after the fork's index row.
+   */
+  duplicateConversation(sourceId: string, targetId: string): number {
+    const result = this.#db
+      .prepare(
+        `INSERT INTO plan_item
+           (conversation_id, id, text, status, position, updated_by, updated_at)
+         SELECT ?, id, text, status, position, updated_by, updated_at
+           FROM plan_item
+          WHERE conversation_id = ?`,
+      )
+      .run(targetId, sourceId);
+
+    return Number(result.changes);
+  }
 }
 
 interface Row {

@@ -643,7 +643,8 @@ export function createReadTool(
 
         return {
           content: [
-            { type: "text", text: `Attached: ${input.path} (${mimeType}).` },
+            { type: "text", text: `Attached: ${input.path} (${mimeType}).` +
+              (options.imageBudget === undefined ? "" : `\n${options.imageBudget.statusMessage(context.scope.conversationId)}`) },
             { type: "image", data: bytes.toString("base64"), mimeType },
           ],
         };

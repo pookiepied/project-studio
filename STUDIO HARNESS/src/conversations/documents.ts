@@ -234,6 +234,64 @@ export class ConversationDocumentStore {
   }
 
   /**
+   * Carries one conversation's document rows to a fork.
+   *
+   * The files themselves travel with the conversation tree copy that
+   * `conversations/fork.ts` performs first, so this only rewrites the rows:
+   * new ids, the fork's conversation id, paths under the fork's attachments
+   * directory, and `announced_at` cleared. Clearing the announcement is what
+   * makes the fork honest: the announcement names a path, and the source's
+   * paths do not exist in the fork. The fork's next turn announces the
+   * documents where they actually are. Rows whose file did not survive the
+   * tree copy are left behind rather than pointing at nothing.
+   * Called only from `conversations/fork.ts`, after the tree copy.
+   */
+  duplicateConversation(
+    sourceId: string,
+    targetId: string,
+    targetDirectory: string,
+  ): number {
+    const rows = this.#db
+      .prepare("SELECT * FROM conversation_document WHERE conversation_id = ? ORDER BY created_at, rowid")
+      .all(sourceId) as Record<string, unknown>[];
+    let copied = 0;
+    for (const row of rows) {
+      const document = documentOf(row);
+      const path = join(targetDirectory, document.fileName);
+      let present: boolean;
+      try {
+        readFileSync(path);
+        present = true;
+      } catch {
+        present = false;
+      }
+      if (!present) continue;
+      const id = `doc_${createStudioUuid()}`;
+      this.#db
+        .prepare(
+          `INSERT INTO conversation_document
+             (id, conversation_id, file_name, path, mime_type, byte_length, page_count, unit, empty_pages, inline_text, created_at, announced_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        )
+        .run(
+          id,
+          targetId,
+          document.fileName,
+          path,
+          document.mimeType,
+          document.byteLength,
+          document.pageCount,
+          document.unit,
+          JSON.stringify(document.emptyPages),
+          document.inlineText,
+          document.createdAt,
+        );
+      copied += 1;
+    }
+    return copied;
+  }
+
+  /**
    * The announcement for everything attached since the last one, and the
    * marking of it as announced - one call, because the two are one fact:
    * a document is announced when its words have reached the response.

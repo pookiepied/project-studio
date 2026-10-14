@@ -91,6 +91,16 @@ export class ImageBudget {
     return this.#spent.get(conversationId) ?? { images: 0, bytes: 0 };
   }
 
+  /** Local tool output allowance, not a provider-context image counter. */
+  statusMessage(conversationId: string): string {
+    const spent = this.spentOn(conversationId);
+    return `Studio tool-image budget (since harness start): ${spent.images}/${MAX_IMAGES_PER_CONVERSATION} images used; ` +
+      `${Math.max(0, MAX_IMAGES_PER_CONVERSATION - spent.images)} remaining; ` +
+      `${spent.bytes}/${MAX_CONVERSATION_IMAGE_BYTES} raw bytes used. ` +
+      `Per-image limit: ${MAX_IMAGE_BYTES} bytes. Inline uploads are not counted here; ` +
+      "provider request limits are separate and their remaining allowance is unknown. Re-reading an image spends another slot.";
+  }
+
   /** Whether one more image of `bytes` fits, without recording it. */
   check(conversationId: string, bytes: number): BudgetRefusal {
     if (bytes > MAX_IMAGE_BYTES) return { kind: "too-large", bytes };
@@ -131,23 +141,24 @@ function kb(bytes: number): number {
  * retried verbatim.
  */
 export function refusalMessage(path: string, refusal: NonNullable<BudgetRefusal>): string {
+  const source = "Studio tool-image budget refused this output (not a provider-reported error). ";
   if (refusal.kind === "too-large") {
     return (
-      `This image is ${kb(refusal.bytes)} KB, and the limit for one image is ` +
-      `${kb(MAX_IMAGE_BYTES)} KB - past that the provider refuses the request. ` +
+      source + `This image is ${kb(refusal.bytes)} KB, and the limit for one image is ` +
+      `${kb(MAX_IMAGE_BYTES)} KB. ` +
       "Resize it, or ask the user to."
     );
   }
   if (refusal.kind === "too-many") {
     return (
-      `This conversation has already taken in ${refusal.spent.images} images, which is ` +
+      source + `This conversation has already taken in ${refusal.spent.images} images through Studio tools since harness start, which is ` +
       `the limit. Past ${MAX_IMAGES_PER_CONVERSATION} the provider applies a stricter size ` +
       `rule to every image in the request, including the earlier ones. ${path} cannot be ` +
       "added. Start a new conversation for further pictures, or describe this one instead."
     );
   }
   return (
-    `This conversation is already carrying ${kb(refusal.spent.bytes)} KB of images, and the ` +
+    source + `This conversation is already carrying ${kb(refusal.spent.bytes)} KB of tool images counted since harness start, and the ` +
     `limit is ${kb(MAX_CONVERSATION_IMAGE_BYTES)} KB - every turn resends all of them, so ` +
     `they count together. ${path} would take it over. Start a new conversation for further ` +
     "pictures, or describe this one instead."

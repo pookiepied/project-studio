@@ -77,6 +77,9 @@ describe("the image budget", () => {
     await read("a.png");
 
     expect(budget.spentOn("cnv_1").images).toBe(2);
+    expect(budget.statusMessage("cnv_1")).toContain("18 remaining");
+    expect(budget.statusMessage("cnv_1")).toContain("Inline uploads are not counted");
+    expect(budget.statusMessage("cnv_1")).toContain("remaining allowance is unknown");
   });
 
   it("does not charge for a picture it refused", async () => {

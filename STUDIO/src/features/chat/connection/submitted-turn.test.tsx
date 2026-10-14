@@ -57,6 +57,7 @@ function turnScript(): TurnScript {
   const resolvers = new Map<string, () => void>()
   const streamOffsets: string[] = []
   let historyReads = 0
+  let sends = 0
   const invoke: ServiceInvoke = async (command, args) => {
     const recorded: RecordedCall = { command, args: args ?? {} }
     calls.push(recorded)
@@ -79,10 +80,11 @@ function turnScript(): TurnScript {
         }
       }
       if (method === 'POST' && !path.endsWith('/abort')) {
+        sends += 1
         return {
           status: 200,
           headers: [],
-          body: JSON.stringify({ submissionId: 'sub_turn', offset: '9_4' }),
+          body: JSON.stringify({ submissionId: sends === 1 ? 'sub_turn' : 'sub_steer', offset: sends === 1 ? '9_4' : '12_0' }),
         }
       }
       throw new Error(`unexpected fetch in this script: ${String(method)} ${path}`)
@@ -170,6 +172,55 @@ beforeEach(() => {
 })
 
 describe('what the receipt licenses the page to say', () => {
+  it('does not revive a response that settled before its steering receipt arrived', async () => {
+    const script = turnScript()
+    const channels = recordingChannels()
+    const invoke: ServiceInvoke = async (command, args) => {
+      const response = await script.invoke(command, args)
+      const init = args?.['init']
+      if (command === 'service_fetch' && isRecord(init) && typeof init['body'] === 'string' && init['body'].includes('"deliveryMode":"steer"')) {
+        channels.feeds.at(-1)?.(dataFrame('15_0', [
+          { type: 'submission-settled', submissionId: 'sub_turn', outcome: 'completed', position: { batch: 15, index: 0 } },
+          { type: 'submission-settled', submissionId: 'sub_steer', outcome: 'completed', position: { batch: 15, index: 1 } },
+        ]))
+      }
+      return response
+    }
+    const rendered = mount({ script: { ...script, invoke }, channels })
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
+    await act(async () => { await rendered.result.current.submit('first task', SETTINGS) })
+    await waitFor(() => expect(channels.feeds).toHaveLength(2))
+    await act(async () => { await rendered.result.current.submit('correction', { ...SETTINGS, deliveryMode: 'steer' }) })
+    expect(rendered.result.current.phase.status).toBe('idle')
+    await waitFor(() => expect(channels.feeds).toHaveLength(3))
+    act(() => channels.feeds[2]?.({ kind: 'up-to-date', offset: '15_0' }))
+    expect(rendered.result.current.phase.status).toBe('live')
+  })
+  it('keeps reading from the active offset and waits for both overlapping submissions', async () => {
+    const script = turnScript()
+    const channels = recordingChannels()
+    const rendered = mount({ script, channels })
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
+    await act(async () => { await rendered.result.current.submit('first task', SETTINGS) })
+    await waitFor(() => expect(channels.feeds).toHaveLength(2))
+    act(() => channels.feeds[1]?.(dataFrame('10_0', [{
+      type: 'message-started', messageId: 'assistant', role: 'assistant', submissionId: 'sub_turn',
+      position: { batch: 10, index: 0 },
+    }])))
+    await act(async () => { await rendered.result.current.submit('correction', { ...SETTINGS, deliveryMode: 'steer' }) })
+    await waitFor(() => expect(channels.feeds).toHaveLength(3))
+    expect(script.streamOffsets()).toEqual(['4_2', '9_4', '10_0'])
+    act(() => channels.feeds[2]?.(dataFrame('13_0', [{
+      type: 'submission-settled', submissionId: 'sub_turn', outcome: 'completed',
+      position: { batch: 13, index: 0 },
+    }])))
+    expect(rendered.result.current.phase.status).toBe('streaming')
+    act(() => channels.feeds[2]?.(dataFrame('14_0', [{
+      type: 'submission-settled', submissionId: 'sub_steer', outcome: 'completed',
+      position: { batch: 14, index: 0 },
+    }])))
+    expect(rendered.result.current.phase.status).toBe('idle')
+  })
   it('is already submitted by the time the send answers', async () => {
     // The composer drops its own in-flight lock the instant this promise
     // resolves. If the phase were set a tick later, the stop control would

@@ -14,9 +14,11 @@ import { StorageError, storageErrorFrom } from "./errors.js";
  * (`storage/flue-journal.ts`) is deliberately read-only for exactly that
  * reason, and this module exists because Task 53 decided to reach past it
  * anyway - narrowly, and on purpose. Deleting a conversation must destroy its
- * transcript, and there is no other way to do it. Everything that touches
- * `flue.db` with a write lives in this file so the exception stays countable:
- * one module, only DELETE statements, only rows keyed to one conversation id.
+ * transcript, and there is no other way to do it. Writes to `flue.db` live
+ * in exactly two modules: this one, which holds only DELETE statements for
+ * one conversation id, and `storage/flue-journal-copy.ts`, which holds only
+ * the fork's INSERTs under the same serialization discipline - so the
+ * exception stays countable.
  *
  * ---- How the write is serialized against Flue's own -----------------------
  *

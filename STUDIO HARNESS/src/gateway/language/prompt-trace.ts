@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from "nod
 import { join } from "node:path";
 
 import { logsDirectory } from "../../platform/paths.js";
-import type { Context, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { getCurrentSystemPrompt, getCurrentTools, normalizeContext, type Context, type SimpleStreamOptions } from "@earendil-works/pi-ai";
 
 /**
  * What the prompt is made of, measured at the last point we own it.
@@ -129,23 +129,21 @@ export function tracePrompt(
   if (!enabled()) return;
 
   try {
-    // An array in every observed case, but keyed objects are a shape Pi has
-    // used, so both are read. The name comes off the tool itself rather than
-    // from the key: an array's key is its index, which is what the first
-    // version of this reported and is useless for deciding what to trim.
-    const entries = Array.isArray(context.tools)
-      ? context.tools
-      : Object.values(context.tools ?? {});
+    // Pi's provider context carries system and tool changes in the transcript.
+    // Replay them before measuring, and keep system entries out of the message
+    // subtotal so the same prompt/tool declaration is not counted twice.
+    const transcript = normalizeContext(context);
+    const entries = getCurrentTools(transcript.messages);
     const tools = entries.map((tool, index) => ({
       name: nameOf(tool) ?? `#${index}`,
       chars: JSON.stringify(tool).length,
     }));
-    const messages = (context.messages ?? []).map((message) => ({
+    const messages = transcript.messages.filter((message) => message.role !== "system").map((message) => ({
       role: message.role,
       chars: JSON.stringify(message).length,
     }));
 
-    const systemChars = (context.systemPrompt ?? "").length;
+    const systemChars = getCurrentSystemPrompt(transcript.messages).length;
     const toolChars = tools.reduce((total, tool) => total + tool.chars, 0);
     const messageChars = messages.reduce((total, message) => total + message.chars, 0);
 

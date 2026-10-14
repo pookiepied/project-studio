@@ -45,6 +45,9 @@ function stubClient(overrides: {
   const refuse = <T,>(): Promise<HarnessResult<T>> => Promise.resolve({ ok: false, error: failure() })
   const error = overrides.fail
   return {
+    queuedMessages: () => refuse(),
+    changeQueuedMessage: () => refuse(),
+    editQueuedMessage: () => refuse(),
     listConnections: () =>
       error ? Promise.resolve({ ok: false as const, error }) : Promise.resolve(ok(overrides.connections ?? [KNOWN_VENDOR])),
     listLibrary: () => Promise.resolve(ok(overrides.library ?? [])),
@@ -97,6 +100,7 @@ function stubClient(overrides: {
     listConversations: () => refuse(),
     createConversation: () => refuse(),
     updateConversation: () => refuse(),
+    forkConversation: () => refuse(),
     deleteConversation: () => refuse(),
     purgeConversations: () => refuse(),
     listOrphanTrees: () => refuse(),

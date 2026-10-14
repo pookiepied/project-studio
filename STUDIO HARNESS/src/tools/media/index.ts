@@ -10,7 +10,7 @@ import type { MediaJobStatus } from "../../gateway/media/jobs.js";
 import type { MediaService } from "../../gateway/media/service.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
-import type { ImageBudget } from "../filesystem/image-budget.js";
+import { refusalMessage, type ImageBudget } from "../filesystem/image-budget.js";
 import { defineStudioTool, type ToolContext, type ToolDefinition } from "../types.js";
 
 /**
@@ -370,10 +370,16 @@ function createImageTool(
       if (acceptsImages !== false) {
         for (const output of finished.outputs) {
           const refusal = registration.imageBudget?.check(conversationId, output.byteLength) ?? null;
-          if (refusal !== null) continue;
+          if (refusal !== null) {
+            content.push({ type: "text", text: refusalMessage(output.path, refusal) });
+            continue;
+          }
           const bytes = await readFile(output.path);
           registration.imageBudget?.record(conversationId, bytes.length);
           content.push({ type: "image", data: bytes.toString("base64"), mimeType: output.mimeType });
+        }
+        if (registration.imageBudget !== undefined) {
+          content.push({ type: "text", text: registration.imageBudget.statusMessage(conversationId) });
         }
       }
       return { content };

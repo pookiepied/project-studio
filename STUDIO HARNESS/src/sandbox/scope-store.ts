@@ -266,5 +266,32 @@ export class SandboxScopeStore {
       throw storageErrorFrom(error);
     }
   }
+
+  /**
+   * Carries one conversation's folder grants to a fork.
+   *
+   * A conversation row belongs to the conversation alone - the project id on
+   * it is the empty string by construction - so the copy is exact except for
+   * the conversation id. The granted moment travels rather than restamping:
+   * the decision happened when it happened. Called only from
+   * `conversations/fork.ts`, after the fork's index row.
+   */
+  duplicateConversation(sourceId: string, targetId: string): number {
+    if (sourceId === "" || targetId === "") return 0;
+    try {
+      const result = this.#db
+        .prepare(
+          `INSERT INTO sandbox_scope
+             (project_id, conversation_id, path, mode, source, granted_at)
+           SELECT project_id, ?, path, mode, source, granted_at
+             FROM sandbox_scope
+            WHERE conversation_id = ?`,
+        )
+        .run(targetId, sourceId);
+      return Number(result.changes);
+    } catch (error) {
+      throw storageErrorFrom(error);
+    }
+  }
 }
 
