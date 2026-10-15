@@ -883,7 +883,7 @@ describe('the edit answer echo', () => {
     expect(screen.getByText('204')).toBeTruthy()
   })
 
-  it('anchors a child of a run on the echo, as it anchors a chip', () => {
+  it('anchors each repeated edit on its own echo', () => {
     // The same edit the chip anchors above, travelling inside a run: the
     // gutters must not depend on which row shape is showing the call.
     const run = runOf(
@@ -896,12 +896,10 @@ describe('the edit answer echo', () => {
       snakeEdit(),
     )
     const view = render(<ToolGroups conversationId="conv" groups={[run]} />)
-    fireEvent.click(screen.getByText('Edited'))
-    // Opening the run shows the children; the second child is the snake
-    // edit, and its card only exists once the child itself is opened.
+    // Each edit opens its own result directly, with no intervening file group.
     const buttons = view.container.querySelectorAll('button[aria-expanded]')
-    if (buttons.length < 3) throw new Error(`expected the run and two children, got ${buttons.length}`)
-    fireEvent.click(buttons[2] ?? view.container)
+    expect(buttons).toHaveLength(2)
+    fireEvent.click(buttons[1] ?? view.container)
     expect(screen.getAllByText('200').length).toBeGreaterThan(0)
     expect(screen.getByText('204')).toBeTruthy()
   })
@@ -946,7 +944,7 @@ describe('the edit answer echo', () => {
  * anchors prove one and the summed churn when they do not -- named in the
  * tooltip either way.
  */
-describe('the file run', () => {
+describe('repeated file calls stay flat', () => {
   function editCall(
     id: string,
     oldString: string,
@@ -961,7 +959,7 @@ describe('the file run', () => {
     })
   }
 
-  it('renders the run as one row, counted, with the net as the stat', () => {
+  it('renders every edit directly rather than combining their line counts', () => {
     // Three edits that each rework the last one's line: the churn would read
     // +3 -3, the net is the truth, +2 -0.
     const run = runOf(
@@ -971,38 +969,37 @@ describe('the file run', () => {
       editCall('e3', 'mid2', 'final'),
     )
     const { container } = render(<ToolGroups conversationId="conv" groups={[run]} />)
-    expect(screen.getByText('Edited')).toBeTruthy()
-    expect(screen.getByText('3 edits')).toBeTruthy()
-    const stat = screen.getByTitle('net lines changed')
-    expect(stat.textContent).toBe('+2 -0')
-    // One row: one disclosure button for the whole run.
-    expect(container.querySelectorAll('button[aria-expanded]')).toHaveLength(1)
+    expect(screen.getAllByText('Edited')).toHaveLength(3)
+    expect(screen.queryByText('3 edits')).toBeNull()
+    expect(screen.queryByTitle('net lines changed')).toBeNull()
+    expect(container.querySelectorAll('button[aria-expanded]')).toHaveLength(3)
   })
 
-  it('names the churn as churn when the anchors do not chain', () => {
+  it('keeps unrelated edit counts on their individual rows', () => {
     const run = runOf(
       'snake/script.js',
       editCall('e1', 'one', '1'),
       editCall('e2', 'unrelated', '2'),
     )
-    render(<ToolGroups conversationId="conv" groups={[run]} />)
-    const stat = screen.getByTitle('lines touched')
-    // Two edits, two sides: the churn counts both directions.
-    expect(stat.textContent).toBe('+2 -2')
+    const { container } = render(<ToolGroups conversationId="conv" groups={[run]} />)
+    expect(screen.queryByTitle('lines touched')).toBeNull()
+    expect([...container.querySelectorAll('span.font-mono')].map((span) => span.textContent)).toEqual(['+1 -1', '+1 -1'])
+    expect(screen.getAllByText('-1')).toHaveLength(2)
   })
 
-  it('expands to the net card and one child per call, each with its own count', () => {
+  it('opens an individual diff without a nested group or net card', () => {
     const run = runOf(
       'snake/script.js',
       editCall('e1', 'start', 'start\nmid'),
       editCall('e2', 'mid', 'mid\nend'),
     )
     const { container } = render(<ToolGroups conversationId="conv" groups={[run]} />)
-    fireEvent.click(screen.getByText('Edited'))
-    expect(screen.getByText(/net -- the file as the run's first call found it/)).toBeTruthy()
-    // The group button plus one button per child.
+    fireEvent.click(screen.getAllByText('Edited')[0])
+    expect(screen.queryByText(/net -- the file as the run's first call found it/)).toBeNull()
     const buttons = container.querySelectorAll('button[aria-expanded]')
-    expect(buttons).toHaveLength(3)
+    expect(buttons).toHaveLength(2)
+    expect(buttons[0]?.getAttribute('aria-expanded')).toBe('true')
+    expect(buttons[1]?.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('keeps a failed call as a child with a word instead of a count', () => {
@@ -1012,8 +1009,9 @@ describe('the file run', () => {
       editCall('e2', 'zzz', 'yy', { errorText: 'anchor not found' }),
     )
     render(<ToolGroups conversationId="conv" groups={[run]} />)
-    fireEvent.click(screen.getByText('Edited'))
     expect(screen.getByText('Failed')).toBeTruthy()
+    fireEvent.click(screen.getAllByText('Edited')[1])
+    expect(screen.getByText('anchor not found')).toBeTruthy()
   })
 
   it('keeps a single mutating call a chip, never a run of one', () => {
@@ -1026,7 +1024,7 @@ describe('the file run', () => {
     expect(container.querySelector('[title="net lines changed"]')).toBeNull()
   })
 
-  it('closes the run when a single mutating call lands on another file', () => {
+  it('does not auto-expand earlier calls when another file is edited', () => {
     const run = runOf('snake/script.js', editCall('e1', 'a', 'a\nb'), editCall('e2', 'b', 'b\nc'))
     // One edit to another file is a chip, but it still happened after the
     // run: the log moved on, and a closed run must not sit there expanded
@@ -1044,11 +1042,11 @@ describe('the file run', () => {
     expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('is open while receiving, closed by the next run, and the hand wins over both', () => {
+  it('keeps expansion under reader control as more calls arrive', () => {
     const run = runOf('snake/script.js', editCall('e1', 'a', 'a\nb'), editCall('e2', 'b', 'b\nc'))
     const view = render(<ToolGroups conversationId="conv" groups={[run]} live />)
-    // The segment's last file run is the one receiving: open, children in view.
-    expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
+    // Flat calls start collapsed; arrival never opens a nested file group.
+    expect(view.container.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
     // A different file's mutation lands after it: the run closes by itself.
     const interruption = runOf(
       'other.ts',

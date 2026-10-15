@@ -1,4 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
+import { activityItems } from './activityItems'
 import { EarlierBoundary, useTranscriptWindow } from '@/features/chat/transcript/paging'
 import { AssistantTurn } from '@/features/chat/transcript/live/AssistantTurn'
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
@@ -108,7 +109,7 @@ export function LiveTranscript({
   // arrived. Measured on a real turn, that is the reasoning row appearing,
   // sitting still for nine seconds, dropping 24px, and returning. Nothing was
   // wrong with what any component drew; the space was reserved by the list.
-  const drawn = visible.filter((item) => !drawsNothing(item, lastAssistantId, generating))
+  const drawn = activityItems(visible.filter((item) => !drawsNothing(item, lastAssistantId, generating)))
 
   return (
     <div className="flex flex-col gap-6">
@@ -126,11 +127,16 @@ export function LiveTranscript({
             key={item.id}
             item={item}
             conversationId={conversationId}
+            branchMessageId={item.tailMessageId ?? item.id}
+            activityLive={generating && retrying === null
+              && inFlightSubmission !== null && item.submissionId === inFlightSubmission
+              && (item.tailMessageId ?? item.id) === lastAssistantId
+              && item.end.state !== 'failed' && item.end.state !== 'aborted'}
             live={
               generating &&
               retrying === null &&
               isMessageBeingWritten(item, {
-                newest: item.id === lastAssistantId,
+                newest: (item.tailMessageId ?? item.id) === lastAssistantId,
                 turnRunning: generating,
               })
             }

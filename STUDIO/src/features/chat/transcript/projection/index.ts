@@ -10,14 +10,9 @@
  *
  * ---- Grouping is structural, never inferred -------------------------------
  *
- * The unit is ONE ASSISTANT MESSAGE'S tool calls, arranged into rows: a row
- * per maximal same-file run of mutating calls, a row per call otherwise --
- * both halves are facts already in the log (the message id, the tool name,
- * and the path in the call's own input). No semantic labels exist here and
- * none may be added: a label the model did not emit is a guess wearing a
- * fact's clothes. A run's row renders once and mutates as its calls arrive,
- * which is why the row's id is derived, not minted -- a replay's walk must
- * build the same ids the live turn grew.
+ * Each call keeps its own row in arrival order. The renderer can collapse
+ * activity between written messages without moving calls across text or
+ * thinking. Derived row ids match live delivery and history replay.
  *
  * ---- Thinking blocks are segments, not a mutable block --------------------
  *

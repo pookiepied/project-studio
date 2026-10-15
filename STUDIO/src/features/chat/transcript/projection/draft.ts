@@ -1,13 +1,12 @@
 /**
  * The projection's own state between batches: the items, the last applied
  * position, and the indexes that let a later chunk find the message, the
- * tool call or the file run it continues. The draft is the mutable form the
+ * tool call it continues. The draft is the mutable form the
  * appliers write to and settle back into a projection.
  */
 
 import type { ChunkPosition } from '@/platform/harness'
 import type { PendingSubmission, TranscriptItem } from './shapes'
-import { readPathOf } from './rows'
 
 /**
  * Where the next delta of each kind would attach, per message. Bookkeeping,
@@ -33,22 +32,8 @@ export interface TranscriptProjection {
   readonly applied: ChunkPosition | null
   readonly openRuns: ReadonlyMap<string, OpenRun>
   readonly callSites: ReadonlyMap<string, CallSite>
-  /**
-   * The file run a message still has open: where its row lives and what file
-   * it holds. This is the walk's own memory, not rendering state -- a run
-   * stays open across written narration and a re-read of its own file, and
-   * closes the moment anything else happens.
-   */
-  readonly openFileRuns: ReadonlyMap<string, OpenFileRun>
   /** Sent, not yet echoed. Always newer than every item; see the type. */
   readonly pending: PendingSubmission | null
-}
-
-/** Where a message's open file run lives, and what it is a run of. */
-export interface OpenFileRun {
-  readonly segmentIndex: number
-  readonly groupIndex: number
-  readonly file: string
 }
 
 /**
@@ -63,7 +48,6 @@ export interface Draft {
   /** Assistant item index by message id. */
   assistants: Map<string, number>
   openRuns: Map<string, OpenRun>
-  openFileRuns: Map<string, OpenFileRun>
   callSites: Map<string, CallSite>
   pending: PendingSubmission | null
 }
@@ -74,7 +58,6 @@ export function draftOf(projection: TranscriptProjection): Draft {
     applied: projection.applied,
     assistants: assistantsOf(projection.items),
     openRuns: new Map(projection.openRuns),
-    openFileRuns: new Map(projection.openFileRuns),
     callSites: new Map(projection.callSites),
     pending: projection.pending,
   }
@@ -109,7 +92,6 @@ export function settle(draft: Draft): TranscriptProjection {
     items: draft.items,
     applied: draft.applied,
     openRuns: draft.openRuns,
-    openFileRuns: draft.openFileRuns,
     callSites: draft.callSites,
     pending,
   }
@@ -170,44 +152,5 @@ export function openRunsOf(items: readonly TranscriptItem[]): Map<string, OpenRu
     if (last === undefined || (last.kind !== 'text' && last.kind !== 'thinking')) continue
     runs.set(item.id, { kind: last.kind, index: item.segments.length - 1 })
   }
-  return runs
-}
-
-/**
- * Derives each message's open file run from the built shape, so a live call
- * that continues after a seed merges into the row history built.
- *
- * The rule is the walk's own, read back off the final segments: the last
- * mutating call's row is the open run, written text between keeps it, a
- * thinking segment closes it, and a transparent row keeps it only when it is
- * a read of the run's own file. The seed and the live walk must agree here,
- * and the replay tests pin that they do.
- */
-export function openFileRunsOf(items: readonly TranscriptItem[]): Map<string, OpenFileRun> {
-  const runs = new Map<string, OpenFileRun>()
-  items.forEach((item) => {
-    if (item.kind !== 'assistant') return
-    let open: OpenFileRun | null = null
-    item.segments.forEach((segment, segmentIndex) => {
-      if (segment.kind === 'thinking') {
-        open = null
-        return
-      }
-      if (segment.kind !== 'tools') return
-      segment.groups.forEach((group, groupIndex) => {
-        const call = group.calls[0]
-        if (call === undefined) return
-        if (group.file !== null) {
-          open = { segmentIndex, groupIndex, file: group.file }
-          return
-        }
-        if (open !== null) {
-          const path = readPathOf(call.toolName, call.input)
-          if (path === null || path !== open.file) open = null
-        }
-      })
-    })
-    if (open !== null) runs.set(item.id, open)
-  })
   return runs
 }

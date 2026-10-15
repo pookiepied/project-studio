@@ -11,7 +11,6 @@ import {
   callSitesOf,
   draftOf,
   echoed,
-  openFileRunsOf,
   openRunsOf,
   settle,
   type Draft,
@@ -27,7 +26,6 @@ export function emptyProjection(): TranscriptProjection {
     items: [],
     applied: null,
     openRuns: new Map(),
-    openFileRuns: new Map(),
     callSites: new Map(),
     pending: null,
   }
@@ -103,7 +101,6 @@ export function seededProjection(snapshot: ConversationSnapshotFacts): Transcrip
     items,
     applied: null,
     openRuns: openRunsOf(items),
-    openFileRuns: openFileRunsOf(items),
     callSites: callSitesOf(items),
     pending: null,
   }
@@ -199,7 +196,9 @@ export function applyChunk(draft: Draft, chunk: ChunkFacts, arrivedAt: number | 
       draft.items.push(appended)
       if (appended.kind === 'assistant') {
         draft.assistants.set(appended.id, draft.items.length - 1)
-        for (const site of callSitesOf([appended])) draft.callSites.set(site[0], site[1])
+        for (const [id, site] of callSitesOf([appended])) {
+          draft.callSites.set(id, { ...site, itemIndex: draft.items.length - 1 })
+        }
         const runs = openRunsOf([appended])
         const run = runs.get(appended.id)
         if (run !== undefined) draft.openRuns.set(appended.id, run)

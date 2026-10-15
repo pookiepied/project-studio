@@ -6,8 +6,8 @@
 
 import type { ConversationMessageFacts, Present } from '@/platform/harness'
 import type { Draft } from './draft'
-import type { ToolCallView, ToolGroupView, TranscriptItem } from './shapes'
-import { fileOf, pushCall, readPathOf } from './rows'
+import type { ToolCallView, TranscriptItem } from './shapes'
+import { pushCall } from './rows'
 
 export function emptyAssistant(message: ConversationMessageFacts): Extract<
   TranscriptItem,
@@ -66,12 +66,6 @@ export function appendDelta(
   if (found === null) return
   const { index: itemIndex, item } = found
 
-  // Written narration keeps a file run open -- the words describe the events
-  // around them, and "Edit 2 of 4" must not orphan "Edit 1 of 4". Thinking is
-  // the opposite kind of sentence: work the model went away and did, and the
-  // events on either side of it happened apart.
-  if (kind === 'thinking') draft.openFileRuns.delete(messageId)
-
   const segments = [...item.segments]
   const open = draft.openRuns.get(messageId)
   if (open !== undefined && open.kind === kind) {
@@ -113,14 +107,8 @@ export function appendDelta(
 /**
  * Adds one tool call at its place in the message's story.
  *
- * The shape of the rule, in order: a mutating call that continues the
- * message's open file run joins that run's row, wherever the row sits --
- * written narration may have landed since, and it renders after the events
- * it describes. Anything else -- a different file, a search, a read of some
- * other file, the model going away to think -- closed the run on arrival,
- * and this call takes a new row at the end of the story. A read of the run's
- * own file is the one tool that closes nothing: the verify-then-fix loop is
- * one act, and its row stands between the calls it sits between.
+ * Calls never move backwards into an earlier row. Presentation may collapse
+ * a stretch of work, but the underlying timeline keeps each call in place.
  */
 export function appendToolCall(
   draft: Draft,
@@ -134,45 +122,6 @@ export function appendToolCall(
   const { index: itemIndex, item } = found
 
   draft.openRuns.delete(messageId)
-
-  const open = draft.openFileRuns.get(messageId) ?? null
-  const file = fileOf(toolName, input)
-
-  // Continue the open run, across whatever narration landed on top of it.
-  if (file !== null && open !== null && file === open.file) {
-    const home = item.segments[open.segmentIndex]
-    if (home !== undefined && home.kind === 'tools') {
-      const group = home.groups[open.groupIndex]
-      if (group !== undefined) {
-        const merged: ToolGroupView = {
-          ...group,
-          calls: [...group.calls, { toolCallId, toolName, input, output: null, errorText: null }],
-        }
-        const groups = [...home.groups]
-        groups[open.groupIndex] = merged
-        const segments = [...item.segments]
-        segments[open.segmentIndex] = { ...home, groups }
-        draft.items[itemIndex] = { ...item, segments }
-        draft.callSites.set(toolCallId, {
-          itemIndex,
-          segmentIndex: open.segmentIndex,
-          groupIndex: open.groupIndex,
-          callIndex: merged.calls.length - 1,
-        })
-        return
-      }
-    }
-  }
-
-  // A non-mutating call keeps the run only when it is a read of the run's
-  // own file; anything else that happened closed it before this row opened.
-  if (file === null) {
-    const path = readPathOf(toolName, input)
-    const transparent = open !== null && path !== null && path === open.file
-    if (!transparent) draft.openFileRuns.delete(messageId)
-  } else {
-    draft.openFileRuns.delete(messageId)
-  }
 
   const segments = [...item.segments]
   let segmentIndex = segments.length - 1
@@ -198,15 +147,6 @@ export function appendToolCall(
     groupIndex: pushed.row,
     callIndex: pushed.call,
   })
-
-  const opened = pushed.rows[pushed.row]
-  if (opened !== undefined && opened.file !== null) {
-    draft.openFileRuns.set(messageId, {
-      segmentIndex,
-      groupIndex: pushed.row,
-      file: opened.file,
-    })
-  }
 }
 
 /** Delivers an answer to the call it belongs to, wherever that call landed. */

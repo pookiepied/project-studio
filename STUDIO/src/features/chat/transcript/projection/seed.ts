@@ -8,13 +8,12 @@ import { isRecord } from '@/lib/guards'
 import type { ConversationMessageFacts, ConversationSnapshotFacts } from '@/platform/harness'
 import type {
   AssistantSegment,
-  ToolGroupView,
   TranscriptItem,
   UserAttachmentView,
   UserDocumentView,
 } from './shapes'
 import { emptyAssistant } from './segments'
-import { fileOf, pushCall, readPathOf } from './rows'
+import { pushCall } from './rows'
 import { settleSubmissionFailure } from './settlement'
 
 /**
@@ -69,9 +68,6 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
     const segments: AssistantSegment[] = []
     let textRuns = 0
     let thinkingRuns = 0
-    // The live walk's memory, mirrored part for part: the file run this
-    // message still has open, and where its row lives.
-    let openFileRun: { segmentIndex: number; groupIndex: number; file: string } | null = null
 
     for (const part of message.parts) {
       if (part.kind === 'text') {
@@ -92,49 +88,9 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
           updatedAt: null,
         })
         thinkingRuns += 1
-        // Thinking is the one sentence that closes a file run: the events on
-        // either side of it happened apart, and the replay must say so.
-        openFileRun = null
       } else if (part.kind === 'tool') {
-        // The live walk's rules, mirrored exactly, so ids and shapes match a
-        // replay to the character: a mutating call continues the open run
-        // wherever its row sits -- written narration may have fallen since --
-        // and a read of the run's own file keeps it; everything else closed
-        // it on arrival and opens a row at the end of the story.
+        // History preserves the same call order as the live walk.
         const input = part.input ?? null
-        const file = fileOf(part.toolName, input)
-        if (file !== null && openFileRun !== null && file === openFileRun.file) {
-          const home = segments[openFileRun.segmentIndex]
-          if (home !== undefined && home.kind === 'tools') {
-            const group = home.groups[openFileRun.groupIndex]
-            if (group !== undefined) {
-              const merged: ToolGroupView = {
-                ...group,
-                calls: [
-                  ...group.calls,
-                  {
-                    toolCallId: part.toolCallId,
-                    toolName: part.toolName,
-                    input,
-                    output: part.output ?? null,
-                    errorText: part.errorText ?? null,
-                  },
-                ],
-              }
-              const groups = [...home.groups]
-              groups[openFileRun.groupIndex] = merged
-              segments[openFileRun.segmentIndex] = { ...home, groups }
-              continue
-            }
-          }
-        }
-        if (file === null) {
-          const path = readPathOf(part.toolName, input)
-          const transparent = openFileRun !== null && path !== null && path === openFileRun.file
-          if (!transparent) openFileRun = null
-        } else {
-          openFileRun = null
-        }
         const last = segments[segments.length - 1]
         const existing = last !== undefined && last.kind === 'tools' ? last : undefined
         const segment =
@@ -152,14 +108,6 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
           segments[segments.length - 1] = nextSegment
         } else {
           segments.push(nextSegment)
-        }
-        const opened = pushed.rows[pushed.row]
-        if (opened !== undefined && opened.file !== null) {
-          openFileRun = {
-            segmentIndex: segments.length - 1,
-            groupIndex: pushed.row,
-            file: opened.file,
-          }
         }
       }
     }

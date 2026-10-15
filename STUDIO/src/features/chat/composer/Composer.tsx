@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
-import { WorkingRing } from '@/components/state'
 import {
   pickImageFiles,
   readImageFile,
@@ -965,7 +964,6 @@ export function Composer({
           <>
           {turnRunning && canSend ? (
             <IconButton label="Stop" size="md" onClick={halt}>
-              <TurnRing />
               <Icons.stop size="md" />
             </IconButton>
           ) : null}
@@ -1007,7 +1005,6 @@ export function Composer({
                 >
                   {busy && !canSend ? (
                     <>
-                      <TurnRing />
                       {/* `size="md"`, like every other mark in this row. It
                           was written without one, so it fell back to the
                           text-relative step and painted 10.4px inside a 22px
@@ -1079,33 +1076,4 @@ export function Composer({
       />
     </div>
   )
-}
-
-/**
- * The turn is in flight: the ring travelling around the stop control.
- *
- * The button stays the stop button — that is the one thing it must remain
- * while a turn is running, and a spinner that replaced it would take away the
- * only way to call the turn back. The ring is drawn around it instead, so the
- * control's meaning is unchanged and the motion is the only thing added.
- *
- * It exists because the composer had no way of saying "sent, nothing back
- * yet". Measured on the real provider, that window is 2.7s on a small model
- * and 6 to 8s on a reasoning one, and for all of it the only sign anything
- * was happening lived in the transcript. A person who has just pressed send
- * is looking at the button they pressed.
- *
- * Outside the button, not inside it. Inside the rim the arc shares its
- * space with the mark, crowding a glyph that is centred to the pixel into
- * looking off-centre. Outside, it is unambiguously a halo: the button is
- * untouched, the mark has its whole circle back, and the moving part is
- * clearly separate from the thing you click. Nothing in the composer clips
- * it — the frame, the grid and the cell are all `overflow: visible`. The
- * box is the button plus 3px on every side, so the button's own rim sits at
- * r=10.24 in the ring's units and the ring's 10.9 clears it with a little
- * air. Hung on the IconButton, which is positioned for exactly this; not a
- * flex item, so it cannot shift the mark it travels around.
- */
-function TurnRing() {
-  return <WorkingRing className="absolute -inset-[3px]" />
 }

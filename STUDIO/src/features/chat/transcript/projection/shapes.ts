@@ -17,28 +17,14 @@ export interface ToolCallView {
 }
 
 /**
- * One rendered row of a tools segment.
- *
- * A row is either a RUN -- a maximal line of consecutive, file-mutating calls
- * against the same file, the unit a reader watches tick while the model
- * churns on one file -- or a single call standing alone. Read-only calls
- * never join a run and never break one (the retry pattern re-reads the file
- * mid-edit; one flaky edit must not fragment into three rows), but they do
- * stand between runs as rows of their own, so the wire's order stays
- * readable. A mutating call against a different file closes the run it
- * follows, and nothing merges across it -- the interruption happened, and
- * chronology is the value of the event log. A run for one file can therefore
- * appear several times in one segment, and that is correct.
- *
- * Grouping is per segment, and a segment is per message: text written
- * between tool calls starts a new segment, which starts fresh rows -- the
- * same rule the flat chips lived under.
+ * One chronological row of a tools segment. The projection emits one call
+ * per row; collapsing activity belongs to the renderer, never this log.
  */
 export interface ToolGroupView {
   /** Stable within the segment; a replay's walk produces the same ids. */
   readonly id: string
   readonly calls: readonly ToolCallView[]
-  /** The run's file, when this row is a same-file mutating run. */
+  /** The file a mutating call names. */
   readonly file: string | null
 }
 

@@ -8,8 +8,7 @@ import {
   failureRemedy,
 } from '@/domain/failures/failure-kind'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
-import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
-import { ToolGroups } from '@/features/chat/transcript/live/ToolGroups'
+import { ActivityBlock, activitySections } from './ActivityBlock'
 import type {
   AssistantSegment,
   MessageEnd,
@@ -46,6 +45,8 @@ export const AssistantTurn = memo(function AssistantTurn({
   live,
   conversationId,
   turnInFlight = false,
+  activityLive = live,
+  branchMessageId = item.id,
   onBranch,
 }: {
   item: Extract<TranscriptItem, { kind: 'assistant' }>
@@ -69,6 +70,10 @@ export const AssistantTurn = memo(function AssistantTurn({
    * its verbs.
    */
   turnInFlight?: boolean
+  /** Tools may still run after the provider closes its assistant message. */
+  activityLive?: boolean
+  /** The last underlying message when several provider messages share a view. */
+  branchMessageId?: string
   /** Forks the conversation with everything up to and including this answer. */
   onBranch?: (messageId: string) => void
 }) {
@@ -78,7 +83,8 @@ export const AssistantTurn = memo(function AssistantTurn({
   // replayed at a reattach, earlier runs of this same message — must be on
   // the page the moment it arrives; a transcript that retypes itself is
   // telling the reader a story about timing that never happened.
-  const lastIndex = item.segments.length - 1
+  const sections = activitySections(item.segments)
+  const lastIndex = sections.length - 1
   return (
     <div
       onPointerEnter={() => setHovered(true)}
@@ -89,13 +95,13 @@ export const AssistantTurn = memo(function AssistantTurn({
           artifact inside the words - arrives on the one entrance, and only
           while the turn is live; a replayed turn was already here. */}
       <Arriving live={live}>
-        {item.segments.map((segment, index) => (
-          <Segment
+        {sections.map((segment, index) => segment.kind === 'activity' ? (
+          <ActivityBlock key={segment.id} segments={segment.segments} active={activityLive && index === lastIndex} conversationId={conversationId} />
+        ) : (
+          <TextSegment
             key={segment.id}
             segment={segment}
             growing={live && index === lastIndex && segment.kind === 'text'}
-            live={live}
-            conversationId={conversationId}
           />
         ))}
       </Arriving>
@@ -118,7 +124,7 @@ export const AssistantTurn = memo(function AssistantTurn({
         actions={
           onBranch === undefined
             ? []
-            : [{ id: 'branch', label: 'Branch from here', icon: Icons.fork, run: () => onBranch(item.id) }]
+            : [{ id: 'branch', label: 'Branch from here', icon: Icons.fork, run: () => onBranch(branchMessageId) }]
         }
         after={written.trim() === '' ? null : <ReadAloud text={written} />}
       />
@@ -132,42 +138,6 @@ function writtenRuns(item: Extract<TranscriptItem, { kind: 'assistant' }>): stri
     .filter((segment) => segment.kind === 'text')
     .map((segment) => segment.text)
     .join('\n\n')
-}
-
-function Segment({
-  segment,
-  growing,
-  live,
-  conversationId,
-}: {
-  segment: AssistantSegment
-  growing: boolean
-  live: boolean
-  conversationId: string
-}) {
-  switch (segment.kind) {
-    case 'thinking':
-      // Collapsed by default, positioned where it occurred. The duration is
-      // the REASONING's own span — first of this run's deltas to last — and
-      // not the wait in front of it. The silence before a model produces
-      // anything is partly the provider's latency and partly hidden thinking
-      // nobody here can see, and counting it as reasoning was what made the
-      // number mean nothing. Nothing owns that silence now: the transcript
-      // draws no row until this run exists.
-      return (
-        <ThinkingBlock
-          text={segment.text}
-          span={{ since: segment.startedAt, until: segment.updatedAt }}
-          live={live}
-        />
-      )
-    case 'text':
-      return <TextSegment segment={segment} growing={growing} />
-    case 'tools':
-      return (
-        <ToolGroups groups={segment.groups} live={live} conversationId={conversationId} />
-      )
-  }
 }
 
 /**

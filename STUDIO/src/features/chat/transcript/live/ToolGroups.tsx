@@ -1,11 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 
-import { familyOf, REPORT_FAMILIES, type ReportFamily } from './reportFamily'
-import { netOf } from './groupNet'
+import { familyOf } from './reportFamily'
 import { anchorToRegion, parseFileToolOutcome, type FileToolOutcome } from './editOutcome'
 import { parseSearchOutcome, parseSearchQuery, type SearchOutcome, type SearchQuery } from './searchOutcome'
 import { SearchQueryLine, SearchResults } from './SearchResults'
@@ -22,36 +21,8 @@ import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/pro
 import { isRecord } from '@/lib/guards'
 
 /**
- * A turn's tool calls, one row per event the reader follows.
- *
- * Most rows are what they always were: one call, one chip -- the verb the
- * call performs, the file or command it acts on, the count its own input
- * carries. The exception is the file run: a maximal line of consecutive
- * same-file mutating calls is ONE row -- two or more of them, that is; a
- * single call is a single chip, and a run of one is the log wearing a group's
- * clothes for an event that needs none -- because four edits to one file are
- * one story, and four identical chips telling it in fragments is the log
- * wearing the reader down. A chip that receives a second same-file call
- * becomes a run in place, and the entrance the reader then sees is the run's,
- * which is the honest reading of it: an event that became a story. While the
- * run is still receiving -- it is the
- * segment's last run and the turn is being written now -- its row stays
- * expanded and its numbers tick in place: the count of edits climbs, the
- * diffstat moves, and when the run closes everything freezes, so the row
- * reads as the event it was.
- *
- * ---- Every word on a chip is a fact ---------------------------------------
- *
- * The verb is the tool's own name humanized and tensed by what the log
- * knows; a tool name the map has never heard of renders under its raw name
- * -- shown, not guessed at. The diffs are computed from the input the model
- * sent, by field name, never inferred. The header's diffstat is the run's
- * NET when the run's own inputs prove it (see `netOf`) and the calls'
- * summed churn when they do not -- the tooltip names which one it is.
- *
- * What no chip claims: what the call did to the file on disk (only the
- * harness would know, and it does not say), a line number the log does not
- * carry, an outcome the log has not reported.
+ * The flat call list inside an activity block. Even calls from one family
+ * stay at their original positions; individual result views are unchanged.
  */
 export function ToolGroups({
   groups,
@@ -60,89 +31,18 @@ export function ToolGroups({
 }: {
   groups: readonly ToolGroupView[]
   /**
-   * This turn is being written right now. Rows arriving with the turn enter
-   * on the house fade; a run still receiving keeps itself open and its
-   * numbers animate; a replayed turn is history -- nothing moves, and a call
-   * it left unanswered reads as "pending", which is all that is known.
+   * This activity is live. Historical unanswered calls read as pending.
    */
   live?: boolean
   /** The conversation the calls ran in, which keys their attachments. */
   conversationId: string
 }) {
-  // The segment's LAST file row is the question: nothing mutating has landed
-  // after it. Reads do not close a run -- the retry pattern re-reads the file
-  // mid-edit -- but any file row after a run closes it, a single-call row as
-  // much as a run, so the scan stops there. A closed row hands the receiving
-  // flag to nobody: a chip carries its own working state, and a run that the
-  // log has moved past is history, not an event in progress.
-  let receivingId: string | null = null
-  for (let index = groups.length - 1; index >= 0; index -= 1) {
-    const group = groups[index]
-    if (group === undefined) continue
-    if (group.file !== null) {
-      if (group.calls.length > 1) receivingId = group.id
-      break
-    }
-  }
-  // Three families lift out of the row-per-call rule, each into one object
-  // placed where its first call stood. The browser's calls are one story,
-  // not a row each (ADR 0049 §7): latest frame on top, every call a step
-  // beneath - and the computer's calls are the same story of the screen
-  // (ADR 0055 §7). The web's calls - a search, a page read - are one piece
-  // of research: three searches fired together are three dots on one card,
-  // not three disclosure rows of prose. Everything else keeps the ordinary
-  // rendering, in the wire's order, around them.
   const calls = groups.flatMap((group) => group.calls)
-  const familyCalls = new Map<ReportFamily, readonly ToolCallView[]>(
-    REPORT_FAMILIES.map((family) => [family, calls.filter((call) => family.action(call.toolName) !== null)]),
+  return (
+    <div className="my-1 flex min-w-0 flex-col gap-0.5">
+      {calls.map((call) => <CallRow key={call.toolCallId} call={call} live={live} conversationId={conversationId} />)}
+    </div>
   )
-  const webCalls = calls.filter((call) => webKind(call.toolName) !== null)
-
-  const rows: ReactNode[] = []
-  const reportPlaced = new Set<ReportFamily>()
-  let researchPlaced = false
-  for (const group of groups) {
-    if (group.file !== null && group.calls.length > 1) {
-      rows.push(
-        <FileRunRow
-          key={group.id}
-          group={group}
-          live={live}
-          receiving={live && group.id === receivingId}
-        />,
-      )
-      continue
-    }
-    for (const call of group.calls) {
-      const family = familyOf(call.toolName)
-      if (family !== null) {
-        if (!reportPlaced.has(family)) {
-          reportPlaced.add(family)
-          rows.push(
-            <BrowserReport
-              key={`${family.id}:${call.toolCallId}`}
-              calls={familyCalls.get(family) ?? []}
-              live={live}
-              conversationId={conversationId}
-              family={family}
-            />,
-          )
-        }
-        continue
-      }
-      if (webKind(call.toolName) !== null) {
-        if (!researchPlaced) {
-          researchPlaced = true
-          rows.push(
-            <WebResearchArtifact key={`research:${call.toolCallId}`} artifact={researchArtifact(webCalls)} />,
-          )
-        }
-        continue
-      }
-      rows.push(<CallRow key={call.toolCallId} call={call} live={live} conversationId={conversationId} />)
-    }
-  }
-  return <div className="my-1 flex flex-col gap-0.5">{rows}</div>
 }
 
 /**
@@ -151,6 +51,9 @@ export function ToolGroups({
  * working-out behind a disclosure.
  */
 function CallRow({ call, live, conversationId }: { call: ToolCallView; live: boolean; conversationId: string }) {
+  const family = familyOf(call.toolName)
+  if (family !== null) return <BrowserReport calls={[call]} live={live} conversationId={conversationId} family={family} />
+  if (webKind(call.toolName) !== null) return <WebResearchArtifact artifact={researchArtifact([call])} />
   const media = readMediaCall(call)
   if (media === null) return <ToolCallRow call={call} live={live} />
   return <MediaCallArtifact call={call} view={media} conversationId={conversationId} />
@@ -223,174 +126,11 @@ function answeredOf(call: ToolCallView): boolean {
   return call.output !== null && call.output.present
 }
 
-/* -------------------------------------------------------------------------- */
-/* The file run                                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * One same-file mutating run, as one row.
- *
- * The collapse rule has three masters, in order: a run still receiving is
- * open, so the ticking is actually visible; a closed run collapses, because
- * a finished event reads better shut; and the reader's own toggle always
- * wins, permanently -- an auto-state never overrides a hand.
- */
-function FileRunRow({
-  group,
-  live,
-  receiving,
-}: {
-  group: ToolGroupView
-  live: boolean
-  receiving: boolean
-}) {
-  const [userOpen, setUserOpen] = useState<boolean | null>(null)
-  const file = group.file
-  if (file === null) return null
-
-  const calls = group.calls
-  const diffs = calls.map((call) => (call.errorText !== null ? null : diffOf(call)))
-  let churned = { added: 0, removed: 0 }
-  for (const diff of diffs) {
-    if (diff !== null) churned = { added: churned.added + diff.added, removed: churned.removed + diff.removed }
-  }
-  // A failed call changed nothing, so it appears as a child and counts nowhere.
-  const net = netOf(calls)
-  const stat = net ?? churned
-  const running = live && calls.some((call) => call.errorText === null && !answeredOf(call))
-  const hasEdits = calls.some((call) => call.toolName === 'edit')
-  const hasWrites = calls.some((call) => call.toolName === 'write')
-  const action = hasEdits ? ACTIONS.edit : ACTIONS.write
-  const noun = hasEdits && hasWrites ? 'change' : hasEdits ? 'edit' : 'write'
-  const open = userOpen ?? receiving
-
-  return (
-    <DisclosureRow
-      leading={<action.mark />}
-      entering={live}
-      label={
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            className={cn(
-              'shrink-0',
-              running && 'studio-shimmer inline-block whitespace-nowrap',
-            )}
-          >
-            {running ? action.running : action.done}
-          </span>
-          <FileTypeMark path={file} />
-          <FileSubject path={file} />
-          <span className="shrink-0 text-muted-foreground">
-            {/* The count ticks with the run: RollingCount mounts at the fact
-                for history and climbs for a run being written now. */}
-            {calls.length} {noun}s
-          </span>
-          <span
-            className="shrink-0 font-mono"
-            title={net !== null ? 'net lines changed' : 'lines touched'}
-          >
-            <span className="text-diff-add">
-              +<RollingCount value={stat.added} live={running} />
-            </span>{' '}
-            <span className="text-diff-del">
-              -<RollingCount value={stat.removed} live={running} />
-            </span>
-          </span>
-        </span>
-      }
-      open={open}
-      onToggle={() => setUserOpen(!open)}
-      chevron="hover"
-      flush
-    >
-      <div className="flex flex-col gap-1">
-        {net !== null ? (
-          <div>
-            <p className="mb-1 text-caption text-muted-foreground">
-              net -- the file as the run's first call found it, and as its last left it
-            </p>
-            <FileDiff path={file} diff={net} />
-          </div>
-        ) : null}
-        {calls.map((call, index) => (
-          <GroupCallRow
-            key={call.toolCallId}
-            call={call}
-            file={file}
-            ordinal={index + 1}
-            live={live}
-          />
-        ))}
-      </div>
-    </DisclosureRow>
-  )
+export function activityLabel(call: ToolCallView): string {
+  const verb = ACTIONS[call.toolName]?.running ?? call.toolName
+  const subject = subjectOf(call)
+  return subject === null ? verb : `${verb} ${subject}`
 }
-
-/** One call of a run, expanded: its own diff and its own answer, as it happened. */
-function GroupCallRow({
-  call,
-  file,
-  ordinal,
-  live,
-}: {
-  call: ToolCallView
-  file: string
-  ordinal: number
-  live: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const failed = call.errorText !== null
-  const outcome = outcomeOf(call)
-  const rawDiff = failed ? null : diffOf(call)
-  // The same anchoring the chip applies: an edit's gutters carry the
-  // harness echo's line numbers only where the echo corroborates the rows.
-  // One fact, one rendering, wherever the call is shown.
-  const diff =
-    rawDiff !== null && outcome !== null && outcome.region.length > 0
-      ? anchorToRegion(rawDiff, outcome.region)
-      : rawDiff
-  const action = ACTIONS[call.toolName]
-  const verb = action === undefined ? call.toolName : answeredOf(call) || failed ? action.done : action.running
-
-  return (
-    <DisclosureRow
-      entering={live}
-      label={
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 tabular-nums text-muted-foreground/70">{ordinal}</span>
-          <span className={cn('shrink-0', failed && 'text-danger')}>
-            {/* A refused call is an event that happened: named, counted in
-                nothing, its working-out below. */}
-            {failed ? 'Failed' : verb}
-          </span>
-          {diff !== null ? (
-            <span className="shrink-0 font-mono">
-              <span className="text-diff-add">+{diff.added}</span>{' '}
-              <span className="text-diff-del">-{diff.removed}</span>
-            </span>
-          ) : null}
-        </span>
-      }
-      open={open}
-      onToggle={() => setOpen((value) => !value)}
-      chevron="hover"
-      flush={diff !== null}
-    >
-      <CallWorkingOut
-        call={call}
-        diff={diff}
-        file={file}
-        outcome={outcome}
-        searched={searchOutcomeOf(call)}
-        searchQuery={searchQueryOf(call)}
-      />
-    </DisclosureRow>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* A generation                                                                */
-/* -------------------------------------------------------------------------- */
 
 /* -------------------------------------------------------------------------- */
 /* The single call                                                             */

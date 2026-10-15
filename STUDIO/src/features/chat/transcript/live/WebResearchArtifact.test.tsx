@@ -87,7 +87,18 @@ describe('one search', () => {
 })
 
 describe('a burst of research', () => {
-  it('is one artifact with a heading per step, each in its own state', () => {
+  it('does not pull a later search ahead of an intervening command', () => {
+    const { container } = render(<ToolGroups conversationId="conv" groups={groups(
+      call({ toolCallId: 'first', input: present({ query: 'first search' }), output: present(searchAnswer(1)) }),
+      call({ toolCallId: 'middle', toolName: 'shell', input: present({ command: 'middle command' }), output: present('done') }),
+      call({ toolCallId: 'last', input: present({ query: 'last search' }), output: present(searchAnswer(1)) }),
+    )} />)
+    expect([...container.firstElementChild?.children ?? []].map((row) => row.textContent)).toEqual([
+      expect.stringContaining('first search'), expect.stringContaining('middle command'), expect.stringContaining('last search'),
+    ])
+  })
+
+  it('keeps each research call in its own position and state', () => {
     render(
       <ToolGroups
         conversationId="conv"
@@ -108,20 +119,20 @@ describe('a burst of research', () => {
     )
     // One card, titled by the first query and the count, working while the
     // second runs; the first query stands again as its own heading.
-    expect(screen.getByText('tauri rounded corners and 2 more')).toBeTruthy()
+    expect(screen.queryByText('tauri rounded corners and 2 more')).toBeNull()
     expect(screen.getByText('tauri rounded corners')).toBeTruthy()
     expect(screen.getByText('Searching')).toBeTruthy()
     // Every step is a heading: the finished search with its count, the
     // running one without, the page read by its title and host.
     expect(screen.getByText('dwm corner preference')).toBeTruthy()
-    expect(screen.getByText('2 sources')).toBeTruthy()
-    expect(screen.getByText('Read Window customization')).toBeTruthy()
+    expect(screen.getByText('2 sources for “tauri rounded corners”')).toBeTruthy()
+    expect(screen.getAllByText('Window customization')).toHaveLength(2)
     expect(screen.getByText('Decorations can be turned off.')).toBeTruthy()
     // The finished search's sources and the page: three links, no more.
     expect(screen.getAllByRole('link')).toHaveLength(3)
   })
 
-  it('sums the whole once every step has answered', () => {
+  it('retains each search result count rather than merging separate calls', () => {
     render(
       <ToolGroups
         conversationId="conv"
@@ -138,7 +149,9 @@ describe('a burst of research', () => {
         )}
       />,
     )
-    expect(screen.getByText('2 searches · 1 page read · 5 sources')).toBeTruthy()
+    expect(screen.getByText('2 sources for “tauri rounded corners”')).toBeTruthy()
+    expect(screen.getByText('3 sources for “second”')).toBeTruthy()
+    expect(screen.getAllByText('A page')).toHaveLength(2)
   })
 
   it('keeps the ordinary rows around it, in the wire order', () => {

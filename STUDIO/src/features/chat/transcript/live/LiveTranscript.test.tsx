@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { createRef } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ConversationPhase } from '@/features/chat/connection/useConversation'
@@ -119,6 +119,47 @@ function show(
 
 afterEach(() => {
   cleanup()
+})
+
+describe('activity across provider messages', () => {
+  it('keeps a tool running after its assistant message completes, but stops when the submission ends', () => {
+    const item: TranscriptItem = {
+      kind: 'assistant', id: 'one', submissionId: 'sub_1', model: null, usage: null, end: { state: 'complete' },
+      segments: [{ kind: 'tools', id: 'tools', groups: [{ id: 'call', file: null, calls: [
+        { toolCallId: 'call', toolName: 'shell', input: { present: true, value: { command: 'still running' } },
+          output: null, errorText: null },
+      ] }] }],
+    }
+    const view = show([item], STREAMING)
+    expect(screen.getByRole('button', { name: /Running still running/ })).toBeTruthy()
+    view.rerender(<LiveTranscript items={[item]} pending={null} phase={{ status: 'idle' }}
+      viewport={createRef<HTMLElement>()} conversationId="conv" />)
+    expect(screen.getByRole('button', { name: '1 command 1 unanswered' })).toBeTruthy()
+  })
+
+  it('keeps one block live and branches from the last underlying message', () => {
+    const branch = vi.fn()
+    const first: TranscriptItem = {
+      kind: 'assistant', id: 'one', submissionId: 'sub_1', model: null, usage: null, end: { state: 'complete' },
+      segments: [{ kind: 'tools', id: 'one-tools', groups: [{ id: 'one-call', file: null, calls: [
+        { toolCallId: 'one-call', toolName: 'shell', input: { present: true, value: { command: 'first' } },
+          output: { present: true, value: 'done' }, errorText: null },
+      ] }] }],
+    }
+    const second: TranscriptItem = {
+      kind: 'assistant', id: 'two', submissionId: 'sub_1', model: null, usage: null, end: { state: 'stopped' },
+      segments: [{ kind: 'tools', id: 'two-tools', groups: [{ id: 'two-call', file: null, calls: [
+        { toolCallId: 'two-call', toolName: 'shell', input: { present: true, value: { command: 'second' } },
+          output: null, errorText: null },
+      ] }] }],
+    }
+    render(<LiveTranscript items={[first, second]} pending={null} phase={STREAMING}
+      viewport={createRef<HTMLElement>()} conversationId="conv" onBranch={branch} />)
+    expect(screen.getAllByRole('button', { name: /Running second/ })).toHaveLength(1)
+    expect(screen.queryByText('Stopped before finishing')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Branch from here', hidden: true }))
+    expect(branch).toHaveBeenCalledWith('two')
+  })
 })
 
 /**

@@ -1181,7 +1181,22 @@ describe('the span a reasoning run is measured over', () => {
  * to it -- the retry pattern re-reads the file mid-edit -- and a different
  * file's mutation closes it for good.
  */
-describe('the file run', () => {
+describe('chronological tool rows', () => {
+  it('routes a late output to an appended assistant after earlier transcript items', () => {
+    const projection = applyChunks(emptyProjection(), chunksOf(
+      { type: 'message-appended', message: { id: 'user', role: 'user', submissionId: SUBMISSION,
+        parts: [{ type: 'text', text: 'Check it', state: 'done' }] }, position: at(1) },
+      { type: 'message-appended', message: { id: 'appended', role: 'assistant', submissionId: SUBMISSION,
+        parts: [{ type: 'dynamic-tool', toolCallId: 'late', toolName: 'shell', state: 'input-available',
+          input: { present: true, value: { command: 'test' } } }] }, position: at(2) },
+      { type: 'tool-output', toolCallId: 'late', output: 'finished', position: at(3) },
+    ))
+    const reply = projection.items[1]
+    const segment = reply?.kind === 'assistant' ? reply.segments[0] : null
+    expect(segment?.kind === 'tools' ? segment.groups[0]?.calls[0]?.output : null).toEqual({ present: true, value: 'finished' })
+    expect(projection.items[0]?.kind).toBe('user')
+  })
+
   function editChunk(id: string, path: string, batch: number): unknown {
     return {
       type: 'tool-input',
@@ -1219,16 +1234,16 @@ describe('the file run', () => {
     return segment
   }
 
-  it('runs consecutive same-file edits into one row', () => {
+  it('keeps consecutive same-file edits as separate chronological rows', () => {
     const tools = toolsOf(
       liveRun(editChunk('e1', 'a.ts', 2), editChunk('e2', 'a.ts', 3)),
     )
-    expect(tools.groups).toHaveLength(1)
+    expect(tools.groups).toHaveLength(2)
     expect(tools.groups[0]?.file).toBe('a.ts')
-    expect(tools.groups[0]?.calls.map((call) => call.toolCallId)).toEqual(['e1', 'e2'])
+    expect(tools.groups.flatMap((group) => group.calls.map((call) => call.toolCallId))).toEqual(['e1', 'e2'])
   })
 
-  it('keeps a read between two edits transparent to the run', () => {
+  it('keeps a read between two edits in its actual position', () => {
     const tools = toolsOf(
       liveRun(
         editChunk('e1', 'a.ts', 2),
@@ -1243,16 +1258,14 @@ describe('the file run', () => {
         editChunk('e2', 'a.ts', 4),
       ),
     )
-    // The read stands in wire order as its own row; the run it sat inside
-    // absorbs the second edit, because a re-read must not fragment it.
-    expect(tools.groups).toHaveLength(2)
+    expect(tools.groups).toHaveLength(3)
     expect(tools.groups[0]?.file).toBe('a.ts')
-    expect(tools.groups[0]?.calls.map((call) => call.toolCallId)).toEqual(['e1', 'e2'])
+    expect(tools.groups.flatMap((group) => group.calls.map((call) => call.toolCallId))).toEqual(['e1', 'r1', 'e2'])
     expect(tools.groups[1]?.file).toBeNull()
     expect(tools.groups[1]?.calls[0]?.toolCallId).toBe('r1')
   })
 
-  it('keeps written narration between two edits transparent to the run', () => {
+  it('keeps written narration between two edits as a boundary', () => {
     // The turn that falsified the old rule, from a real conversation: a
     // model narrates between its calls -- "Edit 2 of 4 -- bump the version"
     // -- and four same-file edits rendered as four chips, on exactly the
@@ -1284,14 +1297,14 @@ describe('the file run', () => {
     if (reply === undefined || reply.kind !== 'assistant') {
       throw new Error('expected an assistant item')
     }
-    // One tools segment holding the run, and the words in their own
-    // segment after the events they describe.
-    expect(reply.segments.map((segment) => segment.kind)).toEqual(['tools', 'text'])
+    expect(reply.segments.map((segment) => segment.kind)).toEqual(['tools', 'text', 'tools'])
     const tools = reply.segments[0]
     if (tools === undefined || tools.kind !== 'tools') throw new Error('expected tools')
     expect(tools.groups).toHaveLength(1)
     expect(tools.groups[0]?.file).toBe('a.ts')
-    expect(tools.groups[0]?.calls.map((call) => call.toolCallId)).toEqual(['e1', 'e2'])
+    expect(tools.groups[0]?.calls.map((call) => call.toolCallId)).toEqual(['e1'])
+    const after = reply.segments[2]
+    expect(after?.kind === 'tools' ? after.groups[0]?.calls.map((call) => call.toolCallId) : []).toEqual(['e2'])
   })
 
   it('replays a narrated run into the shape the live turn grew', () => {
@@ -1351,11 +1364,13 @@ describe('the file run', () => {
     if (reply === undefined || reply.kind !== 'assistant') {
       throw new Error('expected an assistant item')
     }
-    expect(reply.segments.map((segment) => segment.kind)).toEqual(['tools', 'text'])
+    expect(reply.segments.map((segment) => segment.kind)).toEqual(['tools', 'text', 'tools'])
     const tools = reply.segments[0]
     if (tools === undefined || tools.kind !== 'tools') throw new Error('expected tools')
     expect(tools.groups).toHaveLength(1)
-    expect(tools.groups[0]?.calls.map((call) => call.toolCallId)).toEqual(['e1', 'e2'])
+    expect(tools.groups[0]?.calls.map((call) => call.toolCallId)).toEqual(['e1'])
+    const after = reply.segments[2]
+    expect(after?.kind === 'tools' ? after.groups[0]?.calls.map((call) => call.toolCallId) : []).toEqual(['e2'])
   })
 
   it('breaks the run when the model goes away to think between edits', () => {
@@ -1444,7 +1459,7 @@ describe('the file run', () => {
     expect(tools.groups.map((group) => group.calls.length)).toEqual([1, 1, 1])
   })
 
-  it('lets a write join the run for its file', () => {
+  it('keeps a write and an edit to its file as separate calls', () => {
     const tools = toolsOf(
       liveRun(
         {
@@ -1458,12 +1473,12 @@ describe('the file run', () => {
         editChunk('e1', 'a.ts', 3),
       ),
     )
-    expect(tools.groups).toHaveLength(1)
+    expect(tools.groups).toHaveLength(2)
     expect(tools.groups[0]?.file).toBe('a.ts')
-    expect(tools.groups[0]?.calls.map((call) => call.toolName)).toEqual(['write', 'edit'])
+    expect(tools.groups.flatMap((group) => group.calls.map((call) => call.toolName))).toEqual(['write', 'edit'])
   })
 
-  it('routes each answer to its call inside a merged run', () => {
+  it('routes each answer to its individual chronological call', () => {
     const projection = liveRun(editChunk('e1', 'a.ts', 2), editChunk('e2', 'a.ts', 3))
     const answered = applyChunks(
       projection,
@@ -1473,7 +1488,7 @@ describe('the file run', () => {
       ),
     )
     const tools = toolsOf(answered)
-    expect(tools.groups[0]?.calls.map((call) => call.output)).toMatchObject([
+    expect(tools.groups.flatMap((group) => group.calls.map((call) => call.output))).toMatchObject([
       { present: true, value: 'first' },
       { present: true, value: 'second' },
     ])

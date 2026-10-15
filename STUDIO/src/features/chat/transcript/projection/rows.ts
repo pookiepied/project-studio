@@ -1,8 +1,5 @@
 /**
- * How one message's tool calls arrange into rows: a row per maximal
- * same-file run of mutating calls, a row per call otherwise. Both halves are
- * facts already in the log - the tool name and the path in the call's own
- * input - and no label the model did not emit is ever added.
+ * One row per call, preserving arrival order and the call's own file path.
  */
 
 import { isRecord } from '@/lib/guards'
@@ -18,12 +15,6 @@ export function fileOf(toolName: string, input: Present<unknown> | null): string
   return pathFrom(input)
 }
 
-/** The path a read names, or null -- the other half of the transparency question. */
-export function readPathOf(toolName: string, input: Present<unknown> | null): string | null {
-  if (toolName !== 'read') return null
-  return pathFrom(input)
-}
-
 export function pathFrom(input: Present<unknown> | null): string | null {
   if (input === null || !input.present) return null
   const value: unknown = input.value
@@ -36,10 +27,7 @@ export function pathFrom(input: Present<unknown> | null): string | null {
 }
 
 /**
- * Opens a new row for one call in a segment's list. Merging is not this
- * function's business any more: a call that continues a run merges into the
- * row the run's own memory points at, wherever that row sits; a call that
- * breaks one starts here, at the end of the story.
+ * Opens a row at the end, including repeated calls against the same file.
  */
 export function pushCall(
   rows: readonly ToolGroupView[],
