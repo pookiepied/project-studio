@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "Studio",
+        "dragDropEnabled": false,
         "width": 1040,
         "height": 720,
         "minWidth": 600,

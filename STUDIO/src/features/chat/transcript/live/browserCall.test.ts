@@ -30,6 +30,9 @@ const RESULT = {
 }
 
 describe('recognising one of our own browser calls', () => {
+  it('reads the tool suffix when the encoded server also contains the browser prefix', () => {
+    expect(browserAction('mcp__14_studio_browser__19_studio_browser_open')).toBe('open')
+  })
   it('reads the action out of the encoded model tool name', () => {
     // The wire name encodes the server id and the tool name together, and the
     // bare action is what the row actually needs.

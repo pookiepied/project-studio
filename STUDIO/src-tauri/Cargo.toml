@@ -147,7 +147,9 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # `Win32_System_DataExchange` and `Win32_System_Memory` are the clipboard read
 # behind the field menu's Paste (`clipboard.rs`): the webview's own
 # `readText` is refused by WebView2 whatever the permission handler answers.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory"] }
+# `Win32_System_SystemInformation` resolves the browser opener from the OS
+# system directory rather than trusting the workspace or PATH.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation"] }
 
 # The permission grant (`permissions.rs`): WebView2's PermissionRequested,
 # answered by Studio instead of by a stall or by Edge's own prompt. The

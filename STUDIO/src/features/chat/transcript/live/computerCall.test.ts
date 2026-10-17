@@ -30,6 +30,9 @@ const RESULT = {
 }
 
 describe('recognising one of our own computer calls', () => {
+  it('reads the tool suffix when the encoded server contains the computer prefix', () => {
+    expect(computerAction('mcp__15_studio_computer__20_studio_computer_open')).toBe('open')
+  })
   it('reads the action out of the encoded model tool name', () => {
     expect(computerAction('mcp__15_studio-computer__3_studio_computer_open')).toBe('open')
     expect(computerAction('mcp__15_studio-computer__9_studio_computer_read_ui')).toBe('read_ui')

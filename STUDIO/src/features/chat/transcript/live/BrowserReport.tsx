@@ -6,6 +6,8 @@ import { BrowserCard } from './BrowserCard'
 import type { BrowserStep } from './browserCall'
 import { BROWSER_FAMILY, type ReportFamily } from './reportFamily'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
+import { ToolResultPanel } from './ToolResultPanel'
+import { resultState } from './toolResult'
 
 /**
  * The browser's report, as a box in the transcript.
@@ -66,7 +68,7 @@ export function BrowserReport({
     live && calls.some((call) => call.errorText === null && !(call.output !== null && call.output.present))
 
   return (
-    <div className="my-1 flex flex-col gap-2 rounded-md border border-border p-2.5">
+    <div className="my-1 flex flex-col gap-2 rounded-lg bg-muted/60 p-2.5">
       <div className="flex min-w-0 items-center gap-1.5">
         <family.Mark size="sm" className="shrink-0 text-muted-foreground" />
         <span className="shrink-0 text-caption font-medium">{family.label}</span>
@@ -74,11 +76,7 @@ export function BrowserReport({
           <span className="studio-shimmer inline-block whitespace-nowrap text-caption text-muted-foreground">
             working
           </span>
-        ) : (
-          <span className="shrink-0 text-caption text-muted-foreground">
-            {steps.length === 1 ? '1 step' : `${steps.length} steps`}
-          </span>
-        )}
+        ) : null}
         {latestUrl !== null ? (
           // Not a link, as on every browser surface: the person is watching a
           // model browse, not being handed the page to browse themselves.
@@ -112,11 +110,11 @@ export function BrowserReport({
         <ol className="flex flex-col gap-0.5">
           {/* Newest last: the order it happened in, and the bottom of the
               list is where a reader looks for "now". */}
-          {steps.map((entry, index) => (
+          {steps.map((entry) => (
             <BrowserStepRow
               key={entry.step.id}
               entry={entry}
-              ordinal={index + 1}
+              live={live}
               conversationId={conversationId}
               family={family}
             />
@@ -138,17 +136,18 @@ export function BrowserReport({
  */
 function BrowserStepRow({
   entry,
-  ordinal,
+  live,
   conversationId,
   family,
 }: {
   entry: { readonly call: ToolCallView; readonly step: BrowserStep }
-  ordinal: number
+  live: boolean
   conversationId: string
   family: ReportFamily
 }) {
   const { call, step } = entry
   const [open, setOpen] = useState(false)
+  const failed = resultState(call, live) === 'failed'
   const view =
     call.output !== null && call.output.present
       ? family.read(call.toolName, call.output.value, call.errorText)
@@ -159,27 +158,21 @@ function BrowserStepRow({
         entering={false}
         label={
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 tabular-nums text-muted-foreground/70">{ordinal}</span>
-            <span className={step.failed ? 'shrink-0 text-danger' : 'shrink-0'}>
-              {step.failed ? 'Failed' : step.verb}
+            <span className={failed ? 'shrink-0 text-danger' : 'shrink-0'}>
+              {failed ? 'Failed' : step.verb}
             </span>
             {step.subject === null ? null : <span className="truncate">{step.subject}</span>}
           </span>
         }
         open={open}
         onToggle={() => setOpen((value) => !value)}
-        // A step with no full reading behind it — a call still running, or
-        // one that failed — is a line, not a control: a chevron that opens
-        // onto nothing is furniture.
-        disabled={view === null}
+        disabled={view === null && !failed}
         chevron="hover"
         flush
       >
-        {view === null ? null : (
-          <div className="pt-1">
-            <BrowserCard call={view} conversationId={conversationId} family={family} />
-          </div>
-        )}
+        <ToolResultPanel title={family.label} call={call} live={live}>
+          {view === null ? null : <BrowserCard call={view} conversationId={conversationId} family={family} />}
+        </ToolResultPanel>
       </DisclosureRow>
     </li>
   )

@@ -50,6 +50,15 @@ export interface ImageRejection {
   readonly reason: string
 }
 
+/** Some file managers omit MIME; the bytes are still verified before sending. */
+export function imageMimeOf(file: Pick<File, 'name' | 'type'>): ImageMimeType | null {
+  if (sniffable(file.type)) return file.type as ImageMimeType
+  if (file.type !== '') return null
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  return extension === 'png' ? 'image/png' : extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg'
+    : extension === 'webp' ? 'image/webp' : extension === 'gif' ? 'image/gif' : null
+}
+
 /**
  * Reads the file's own header, not the name it arrived with: an operating
  * system labels a file by extension, and the submission must be true to the
@@ -100,7 +109,7 @@ export function pickImageFiles(
   const rejections: ImageRejection[] = []
   const room = Math.max(0, MAX_IMAGES_PER_TURN - alreadyHeld)
   for (const file of files) {
-    const mime = sniffable(file.type) ? (file.type as ImageMimeType) : null
+    const mime = imageMimeOf(file)
     if (mime === null) {
       rejections.push({ filename: file.name, reason: 'Images only (PNG, JPEG, WebP, or GIF).' })
       continue

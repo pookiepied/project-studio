@@ -66,7 +66,7 @@ export function BrowserPanel({
             </span>
           )}
         </div>
-        <StopBrowser conversationId={entry.conversationId} family={family} />
+        {entry.recorded ? null : <StopBrowser conversationId={entry.conversationId} family={family} />}
       </div>
 
       <BrowserFrameView
@@ -74,6 +74,7 @@ export function BrowserPanel({
         step={selected}
         title={entry.title}
         family={family}
+        recorded={entry.recorded === true}
       />
 
       {entry.steps.length === 0 ? null : (
@@ -179,17 +180,19 @@ function BrowserFrameView({
   step,
   title,
   family,
+  recorded,
 }: {
   conversationId: string
   step: BrowserStep | null
   title: string | null
   family: ReportFamily
+  recorded: boolean
 }) {
   const frameUrl = useAttachmentFrame(conversationId, step?.frame ?? null)
   if (step === null) {
     return (
       <p className="text-caption text-muted-foreground">
-        {family.id === 'computer'
+        {recorded ? 'No screenshot was recorded for this website.' : family.id === 'computer'
           ? 'No picture of the screen yet.'
           : 'The browser has not sent a picture yet.'}
       </p>

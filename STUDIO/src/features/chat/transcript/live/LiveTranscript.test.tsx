@@ -134,7 +134,7 @@ describe('activity across provider messages', () => {
     expect(screen.getByRole('button', { name: /Running still running/ })).toBeTruthy()
     view.rerender(<LiveTranscript items={[item]} pending={null} phase={{ status: 'idle' }}
       viewport={createRef<HTMLElement>()} conversationId="conv" />)
-    expect(screen.getByRole('button', { name: '1 command 1 unanswered' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ran commands Unfinished' })).toBeTruthy()
   })
 
   it('keeps one block live and branches from the last underlying message', () => {

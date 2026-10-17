@@ -2,6 +2,7 @@ mod harness;
 mod diagnostics;
 mod identity;
 mod clipboard;
+mod external;
 mod permissions;
 mod remote;
 mod services;
@@ -357,6 +358,8 @@ async fn open_conversation_window(
   let url = format!("index.html?conversation={}", urlencoding(&conversation_id));
 
   let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+    // Match the main window: Windows file drops must reach the HTML composer.
+    .disable_drag_drop_handler()
     .title(title)
     .inner_size(720.0, 760.0)
     .min_inner_size(420.0, 420.0)
@@ -845,7 +848,8 @@ pub fn run() {
       remote_device_rename,
       remote_device_revoke,
       remote_device_revoke_all,
-      remote_addresses
+      remote_addresses,
+      external::open_external_url
       ];
       move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
         diagnostics::command_received(invoke.message.command());

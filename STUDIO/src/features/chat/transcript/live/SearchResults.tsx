@@ -26,9 +26,7 @@ import {
  * only where code is quoted. Context lines stand muted beside the hits they
  * surround, counted nowhere.
  *
- * The list is not capped: the harness pages the answer, and the page on
- * screen is the answer. Long lines scroll sideways inside the body rather
- * than pushing the column wide.
+ * Long result pages scroll inside a bounded body in both directions.
  */
 export function SearchResults({ outcome }: { outcome: SearchOutcome }) {
   // Destructured once: narrowing on the `outcome.body` path would not survive
@@ -53,7 +51,7 @@ export function SearchResults({ outcome }: { outcome: SearchOutcome }) {
           reading column. The track runs at its content width, as the diff
           card's does, so short results sit naturally and long ones scroll
           instead of growing the button's row past the window. */}
-      <div className="studio-scroll-frame min-w-0 overflow-x-auto">
+      <div role="region" aria-label="Search results" tabIndex={0} className="studio-scroll-frame max-h-80 min-w-0 overflow-auto overscroll-contain">
         <div className="w-max min-w-full font-mono text-code">
           {body.kind === 'content' ? (
             // Hairlines between file groups, nowhere else: siblings divide,

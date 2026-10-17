@@ -409,7 +409,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   useComputerIndicator(conversation.id, live.items, running, stopTurn)
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div data-attachment-drop-zone className="relative flex h-full flex-col">
       <div
         ref={viewport}
         onScroll={onScroll}

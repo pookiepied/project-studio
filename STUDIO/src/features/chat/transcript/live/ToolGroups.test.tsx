@@ -86,13 +86,13 @@ describe('the chip is the default', () => {
     expect(container.querySelectorAll('button[aria-expanded]')).toHaveLength(3)
   })
 
-  it('renders an unknown tool under its raw name', () => {
+  it('gives an unknown tool a readable name', () => {
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'mystery', calls: [call({ toolName: 'mystery' })] })}
       />,
     )
-    expect(screen.getByText('mystery')).toBeTruthy()
+    expect(screen.getByText('Mystery')).toBeTruthy()
   })
 
   it('gives the harness tools that arrived last a verb instead of their raw name', () => {
@@ -264,16 +264,14 @@ describe('expanding a call', () => {
     expect(screen.getByText('done')).toBeTruthy()
   })
 
-  it('falls back to the raw input for a call with no diff', () => {
-    // A read used to stand in here, but a read is a statement now; the
-    // property moved to the next tool whose input carries no diff.
+  it('falls back to the raw input for a tool without a dedicated presentation', () => {
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
-          toolName: 'move',
+          toolName: 'custom_move',
           calls: [
             call({
-              toolName: 'move',
+              toolName: 'custom_move',
               input: present({ from: 'a.ts', to: 'b/c.ts' }),
               output: present('Moved a.ts to b/c.ts'),
             }),
@@ -281,9 +279,9 @@ describe('expanding a call', () => {
         })}
       />,
     )
-    fireEvent.click(screen.getByText('Moved'))
-    expect(screen.getByText(/in:/)).toBeTruthy()
-    expect(screen.getByText(/out:/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Custom move'))
+    expect(screen.getByText('Request')).toBeTruthy()
+    expect(screen.getByText('Result')).toBeTruthy()
   })
 
   it('keeps the error beside the working-out', () => {
@@ -295,9 +293,7 @@ describe('expanding a call', () => {
     expect(screen.getByText('boom')).toBeTruthy()
   })
 
-  it('opens a diff flush, and loose working-out behind the rule', () => {
-    // The diff is its own framed card: a rule beside it would draw a second
-    // edge. The raw input of a call with no diff keeps the ruled body.
+  it('opens both diffs and other tool details without a left rule', () => {
     const diffed = render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({ toolName: 'edit', calls: [call({ output: present('done') })] })}
@@ -317,7 +313,7 @@ describe('expanding a call', () => {
     )
     fireEvent.click(plain.getByText('Searching'))
     const plainBody = plain.container.querySelector('[class*="mt-1.5"]')
-    expect(plainBody?.className).toContain('border-l-2')
+    expect(plainBody?.className).not.toContain('border-l-2')
   })
 })
 
@@ -646,7 +642,7 @@ describe('the answer', () => {
     expect(screen.queryByText(/out:/)).toBeNull()
   })
 
-  it('prints a structured answer as JSON', () => {
+  it('presents a structured answer as readable fields', () => {
     render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
@@ -662,7 +658,10 @@ describe('the answer', () => {
       />,
     )
     fireEvent.click(screen.getByText('Ran'))
-    expect(screen.getByText(/out:/).textContent).toContain('"branch"')
+    expect(screen.getByText('Branch')).toBeTruthy()
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.getByText('Clean')).toBeTruthy()
+    expect(screen.getByText('Yes')).toBeTruthy()
   })
 })
 
@@ -1251,7 +1250,7 @@ describe('the search result', () => {
     )
     fireEvent.click(screen.getByText('Searched'))
     expect(screen.queryByText(/in:/)).toBeNull()
-    expect(screen.getByText(/out:/)).toBeTruthy()
+    expect(screen.getByText('weird\n\nbroken', { exact: true, normalizer: (text) => text })).toBeTruthy()
   })
 
   it('opens the list flush, on its own nesting step instead of the rule', () => {

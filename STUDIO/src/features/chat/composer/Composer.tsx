@@ -6,6 +6,7 @@ import { IconButton } from '@/components/primitives'
 import {
   pickImageFiles,
   readImageFile,
+  imageMimeOf,
   type ImageRejection,
 } from '@/domain/attachments/images'
 import { AddMenu } from '@/features/chat/composer/AddMenu'
@@ -20,6 +21,7 @@ import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
+import { useFileDrop } from '@/features/chat/composer/useFileDrop'
 import { ImproveButton } from '@/features/chat/composer/ImproveButton'
 import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
 import { SlashSuggestions } from '@/features/chat/composer/SlashSuggestions'
@@ -491,8 +493,8 @@ export function Composer({
   const ingestFiles = useCallback(
     (files: readonly File[]) => {
       if (files.length === 0) return
-      const pictures = files.filter((file) => file.type.startsWith('image/'))
-      const papers = files.filter((file) => !file.type.startsWith('image/') && documentMimeOf(file.name) !== null)
+      const pictures = files.filter((file) => file.type.startsWith('image/') || imageMimeOf(file) !== null)
+      const papers = files.filter((file) => !pictures.includes(file) && documentMimeOf(file.name) !== null)
       const neither = files.filter((file) => !pictures.includes(file) && !papers.includes(file))
       setRefusals([])
       if (pictures.length > 0 || neither.length > 0) addImages([...pictures, ...neither])
@@ -500,6 +502,8 @@ export function Composer({
     },
     [addImages, addDocuments],
   )
+
+  const draggingFiles = useFileDrop(frame, ingestFiles)
 
   const submit = (mode: 'queue' | 'steer' = 'queue') => {
     if (!canSend) return
@@ -577,18 +581,6 @@ export function Composer({
         if (event.currentTarget.contains(event.relatedTarget)) return
         setFocused(false)
       }}
-      // A dropped file is an attachment, not a navigation. The dragover
-      // refusal is what makes the drop event fire at all; without it the
-      // webview would open the file over the app. A drop carrying no files
-      // (dragged words, a dragged selection) is left to the field's default,
-      // which inserts the text where the caret is.
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        const files = Array.from(event.dataTransfer.files)
-        if (files.length === 0) return
-        event.preventDefault()
-        ingestFiles(files)
-      }}
       // The radius is a real style with a CSS transition, not a Framer
       // `animate`. A Framer value is only applied once the animation loop
       // runs, so the resting shape of the most important control in the app
@@ -615,7 +607,7 @@ export function Composer({
         transitionTimingFunction: `cubic-bezier(${EASE_OUT.join(', ')})`,
       }}
       className={cn(
-        'bg-surface-raised',
+        'relative bg-surface-raised',
         // The field breathes on focus: a little taller, lifted a little further
         // off the page. Both are small enough to register without being watched
         // — the point is that the surface acknowledges the caret arriving, not
@@ -660,6 +652,9 @@ export function Composer({
         focused ? 'shadow-lifted' : 'shadow-raised',
       )}
     >
+      {draggingFiles ? <div role="status" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2 rounded-[inherit] border border-dashed border-foreground/30 bg-surface-raised/95 text-caption text-foreground">
+        <Icons.add />Drop files to attach
+      </div> : null}
       {/* The images this message carries, above the words: content of the
           message, in the message's frame. The rejections under them are the
           pick's honest remainder — a file the rules refused, named where the

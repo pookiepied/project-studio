@@ -247,7 +247,8 @@ polling or uploads from recording themselves. No arguments, clipboard data,
 URLs or pairing values enter these events. Arrival does not confirm completion
 or provide a parent join to an asynchronous command's transport operation.
 Service, stream and supervisor facts provide their separate actual lifecycles;
-window/clipboard/remote-management command outcomes are currently unsupported.
+window/clipboard/browser-opening/remote-management command outcomes are
+currently unsupported.
 
 ## Feature checklist
 

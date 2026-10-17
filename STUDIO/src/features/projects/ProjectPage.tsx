@@ -35,7 +35,7 @@ export function ProjectPage({ project }: { project: Project }) {
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   return (
-    <div className="h-full overflow-y-auto studio-scroll-inset">
+    <div data-attachment-drop-zone className="h-full overflow-y-auto studio-scroll-inset">
       <div
         className="mx-auto w-full"
         style={{

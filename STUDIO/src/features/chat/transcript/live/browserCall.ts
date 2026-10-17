@@ -20,7 +20,7 @@ import { isRecord } from '@/lib/guards'
 import type { BrowserFrame, BrowserStep } from '@/domain/browser/steps'
 
 /** The name the model calls, which encodes the server id and the tool name. */
-const BROWSER_TOOL = /studio_browser_([a-z_]+)/
+const BROWSER_TOOL = /studio_browser_([a-z_]+)$/
 
 export type { BrowserFrame, BrowserStep }
 

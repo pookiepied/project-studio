@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react'
+import { createContext, memo, useContext, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -140,6 +140,16 @@ function textOf(node: FenceNode): string {
   return text.replace(/\n$/, '')
 }
 
+const StreamingContext = createContext(false)
+
+function Fence({ node }: { node: FenceNode | undefined }) {
+  const streaming = useContext(StreamingContext)
+  const { fence, text } = fenceOf(node)
+  if (fence === 'artifact') return <ArtifactBlock source={text} />
+  if (fence === undefined || fence in TEXT_FENCES) return <TextBlock text={text} fence={fence ?? 'text'} />
+  return <CodeBlock code={text} fence={fence} streaming={streaming} />
+}
+
 const COMPONENTS: Components = {
   /**
    * This object is where the content hierarchy is decided. Everything a reply
@@ -170,20 +180,7 @@ const COMPONENTS: Components = {
    * the inline case it can actually tell apart.
    */
   pre({ node }) {
-    const { fence, text } = fenceOf(node)
-
-    // `artifact` is structured output the model produced — a search, an
-    // image, an issue — and is rendered as a thing rather than as its JSON.
-    if (fence === 'artifact') return <ArtifactBlock source={text} />
-
-    // Writing made for you -- named with one of the prose fences or, in the
-    // common case, named with nothing at all. A fence that does not claim a
-    // language is not claiming code either.
-    if (fence === undefined || fence in TEXT_FENCES) {
-      return <TextBlock text={text} fence={fence ?? 'text'} />
-    }
-
-    return <CodeBlock code={text} fence={fence} />
+    return <Fence node={node} />
   },
 
   /** Inline code, and nothing else -- every fence was routed at `pre`. */
@@ -229,13 +226,13 @@ const COMPONENTS: Components = {
   },
 }
 
-export const Markdown = memo(function Markdown({ text }: { text: string }): ReactNode {
+export const Markdown = memo(function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }): ReactNode {
   // The maths plugins join the pipeline only for a reply that carries a
   // formula, and only once they have arrived (`useMath`). The sanitiser
   // keeps its place between raw and katex either way.
   const math = useMath(text)
   return (
-    <ReactMarkdown
+    <StreamingContext.Provider value={streaming}><ReactMarkdown
       remarkPlugins={math === null ? [remarkGfm] : [remarkGfm, math.remark]}
       rehypePlugins={
         math === null
@@ -245,6 +242,6 @@ export const Markdown = memo(function Markdown({ text }: { text: string }): Reac
       components={COMPONENTS}
     >
       {text}
-    </ReactMarkdown>
+    </ReactMarkdown></StreamingContext.Provider>
   )
 })

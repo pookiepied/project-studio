@@ -47,8 +47,9 @@ export function RailTabs() {
                 ? entry.artifact.title
                 : entry.kind === 'jobs'
                   ? 'Background work'
+                  : entry.kind === 'changes' ? 'File changes'
                   : entry.kind === 'browser'
-                    ? familyById(entry.family).label
+                    ? entry.recorded ? entry.title ?? 'Web preview' : familyById(entry.family).label
                     : 'Plan'
             return (
               <div
@@ -72,6 +73,8 @@ export function RailTabs() {
                       <Icons.backgroundJobs />
                     ) : entry.kind === 'browser' ? (
                       <ReportMark family={entry.family} />
+                    ) : entry.kind === 'changes' ? (
+                      <Icons.edit />
                     ) : (
                       <Icons.plan />
                     )}

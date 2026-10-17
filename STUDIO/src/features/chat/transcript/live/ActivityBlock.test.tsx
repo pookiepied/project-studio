@@ -73,7 +73,7 @@ describe('the activity disclosure', () => {
     const { container } = render(<ActivityBlock conversationId="conv" active={false} segments={[
       tools('a', call('first'), call('second', 'edit'), call('third')),
     ]} />)
-    const block = screen.getByRole('button', { name: '2 commands \u00b7 1 edit' })
+    const block = screen.getByRole('button', { name: 'Ran commands, changed files' })
     expect(block.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(block)
     const buttons = [...container.querySelectorAll('button[aria-expanded]')]
@@ -90,18 +90,19 @@ describe('the activity disclosure', () => {
     view.rerender(<ActivityBlock conversationId="conv" active segments={[tools('a', call('first'), call('second', 'shell', false))]} />)
     expect(screen.getByRole('button', { name: /Running second/ }).getAttribute('aria-expanded')).toBe('true')
     view.rerender(<ActivityBlock conversationId="conv" active={false} segments={[tools('a', call('first'), call('second'))]} />)
-    expect(screen.getByRole('button', { name: '2 commands' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Ran commands' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   it('reports parallel work and counts failures even while collapsed', () => {
     render(<ActivityBlock conversationId="conv" active segments={[tools('a', call('one', 'read', false),
       call('two', 'shell', false), { ...call('three'), errorText: 'denied' })]} />)
-    expect(screen.getByRole('button', { name: /2 tools running.*3 tool calls.*1 failed/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Running two.*Some tools failed/ })).toBeTruthy()
+    expect(screen.queryByText(/\d+ tool calls/)).toBeNull()
   })
 
   it('never claims unfinished calls are running after stop or replay', () => {
     render(<ActivityBlock conversationId="conv" active={false} segments={[tools('a', call('one', 'shell', false))]} />)
-    expect(screen.getByRole('button', { name: '1 command 1 unanswered' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ran commands Unfinished' })).toBeTruthy()
     expect(screen.queryByText(/running/i)).toBeNull()
   })
 

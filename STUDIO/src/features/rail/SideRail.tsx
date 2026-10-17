@@ -8,6 +8,7 @@ import { BackgroundWorkPanel } from '@/features/jobs'
 import { BrowserPanel } from '@/features/rail/BrowserPanel'
 import { familyById } from '@/features/chat/transcript/live/reportFamily'
 import { PlanPanel } from '@/features/plans'
+import { ChangesPanel } from '@/features/changes/ChangesPanel'
 import { RailTabs } from '@/features/rail/RailTabs'
 import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, type RailEntry } from '@/stores/rail'
 import { cn } from '@/lib/cn'
@@ -26,7 +27,8 @@ const MIN_PAGE_WIDTH = 520
 function entryTitle(entry: RailEntry): string {
   if (entry.kind === 'artifact') return entry.artifact.title
   if (entry.kind === 'jobs') return 'Background work'
-  return entry.kind === 'browser' ? familyById(entry.family).label : 'Plan'
+  if (entry.kind === 'changes') return 'File changes'
+  return entry.kind === 'browser' ? entry.recorded ? 'Web preview' : familyById(entry.family).label : 'Plan'
 }
 
 
@@ -186,6 +188,8 @@ export function SideRail({
                       <BackgroundWorkPanel conversationId={active.conversationId} />
                     ) : active.kind === 'browser' ? (
                       <BrowserPanel entry={active} />
+                    ) : active.kind === 'changes' ? (
+                      <ChangesPanel changes={active.changes} conversationId={active.conversationId} />
                     ) : (
                       <PlanPanel conversationId={active.conversationId} />
                     )}

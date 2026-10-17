@@ -19,7 +19,7 @@ import type { BrowserStep } from '@/domain/browser/steps'
 import { frameOf, textOf, type BrowserCallView } from './browserCall'
 
 /** The name the model calls, which encodes the server id and the tool name. */
-const COMPUTER_TOOL = /studio_computer_([a-z_]+)/
+const COMPUTER_TOOL = /studio_computer_([a-z_]+)$/
 
 /** The bare action, or null when this is not one of ours. */
 export function computerAction(toolName: string): string | null {

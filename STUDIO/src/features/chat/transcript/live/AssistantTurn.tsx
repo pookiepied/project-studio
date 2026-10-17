@@ -10,6 +10,10 @@ import {
 } from '@/domain/failures/failure-kind'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import { ActivityBlock, activitySections } from './ActivityBlock'
+import { finalTextStart, workSummary } from './workSummary'
+import { WorkHistory } from './WorkHistory'
+import { WorkResults } from './WorkResults'
+import { callsIn } from './taskEvidence'
 import type {
   AssistantSegment,
   MessageEnd,
@@ -48,6 +52,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   turnInFlight = false,
   activityLive = live,
   branchMessageId = item.id,
+  finalTextStartId = finalTextStart(item.segments),
   onBranch,
 }: {
   item: Extract<TranscriptItem, { kind: 'assistant' }>
@@ -75,16 +80,19 @@ export const AssistantTurn = memo(function AssistantTurn({
   activityLive?: boolean
   /** The last underlying message when several provider messages share a view. */
   branchMessageId?: string
+  finalTextStartId?: string | null
   /** Forks the conversation with everything up to and including this answer. */
   onBranch?: (messageId: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const written = writtenRuns(item)
   // Only the final text run may pace its reveal. Everything else — history
   // replayed at a reattach, earlier runs of this same message — must be on
   // the page the moment it arrives; a transcript that retypes itself is
   // telling the reader a story about timing that never happened.
-  const sections = activitySections(item.segments)
+  const settled = !live && !turnInFlight && item.end.state === 'complete'
+  const summary = settled ? workSummary(item.segments, finalTextStartId) : null
+  const written = writtenRuns(summary === null ? item : { ...item, segments: summary.final })
+  const sections = activitySections(summary?.final ?? item.segments)
   const lastIndex = sections.length - 1
   return (
     <div
@@ -96,6 +104,11 @@ export const AssistantTurn = memo(function AssistantTurn({
           artifact inside the words - arrives on the one entrance, and only
           while the turn is live; a replayed turn was already here. */}
       <Arriving live={live}>
+        {summary !== null ? <WorkHistory title={summary.title}>
+          {activitySections(summary.activity).map((segment) => segment.kind === 'activity'
+            ? <ActivityBlock key={segment.id} segments={segment.segments} active={false} conversationId={conversationId} />
+            : <TextSegment key={segment.id} segment={segment} growing={false} observeDelivery={false} identity={{ conversationId, messageId: item.id, ...(item.submissionId === null ? {} : { submissionId: item.submissionId }) }} />)}
+        </WorkHistory> : null}
         {sections.map((segment, index) => segment.kind === 'activity' ? (
           <ActivityBlock key={segment.id} segments={segment.segments} active={activityLive && index === lastIndex} conversationId={conversationId} />
         ) : (
@@ -106,6 +119,7 @@ export const AssistantTurn = memo(function AssistantTurn({
             identity={{ conversationId, messageId: item.id, ...(item.submissionId === null ? {} : { submissionId: item.submissionId }) }}
           />
         ))}
+        {settled ? <WorkResults calls={summary?.calls ?? callsIn(item.segments)} conversationId={conversationId} resultId={item.submissionId ?? item.id} /> : null}
       </Arriving>
       {/* An ending is reported once there is one to report.
           `end` is `stopped` from `message-started` until `message-completed`
@@ -154,16 +168,19 @@ function TextSegment({
   segment,
   growing,
   identity,
+  observeDelivery = true,
 }: {
   segment: Extract<AssistantSegment, { kind: 'text' }>
   /** This run is the one the turn is currently writing. */
   growing: boolean
   identity: ClientObservationIdentity
+  observeDelivery?: boolean
 }) {
   const shown = useSmoothText(segment.text, growing)
   const revealing = shown.length < segment.text.length
   const displayed = useRef({ first: false, settled: false })
   useEffect(() => {
+    if (!observeDelivery) return
     // These are commits of the paced DOM text, not model timing or screen paint.
     const observed = { ...identity, blockId: segment.id }
     if (shown.length > 0 && !displayed.current.first) {
@@ -176,7 +193,7 @@ function TextSegment({
       recordClientObservation({ name: 'client.display', phase: 'end', identity: observed, outcome: 'completed',
         attributes: { stage: 'settled_dom_commit', characters: shown.length } })
     }
-  }, [shown.length, growing, revealing, segment.id, identity])
+  }, [shown.length, growing, revealing, segment.id, identity, observeDelivery])
 
   return (
     <Arrive className="studio-prose min-w-0">

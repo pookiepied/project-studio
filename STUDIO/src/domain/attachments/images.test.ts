@@ -72,6 +72,11 @@ describe('pickImageFiles judges before a byte is read', () => {
 })
 
 describe('readImageFile trusts the header over the label', () => {
+  it('admits an image with missing MIME for header verification, without accepting a conflicting MIME', () => {
+    const unknown = { name: 'picture.PNG', type: '', size: 12 } as File
+    expect(pickImageFiles([unknown]).accepted).toEqual([unknown])
+    expect(pickImageFiles([{ ...unknown, type: 'text/plain' }]).accepted).toHaveLength(0)
+  })
   /** Only the three members readImageFile consumes, so the test runs where the File global does not. */
   const fileLike = (name: string, bytes: Uint8Array): File =>
     ({ name, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteLength) }) as unknown as File

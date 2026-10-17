@@ -1,6 +1,7 @@
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
+import { finalTextStart } from './workSummary'
 
-export type ActivityItem = TranscriptItem & { readonly tailMessageId?: string }
+export type ActivityItem = TranscriptItem & { readonly tailMessageId?: string; readonly finalTextStartId?: string | null }
 
 // Retain memo boundaries for history when an unrelated live item changes.
 const joins = new WeakMap<ActivityItem, WeakMap<TranscriptItem, ActivityItem>>()
@@ -20,6 +21,7 @@ export function activityItems(items: readonly TranscriptItem[]): ActivityItem[] 
         segments: [...previous.segments, ...item.segments],
         end: item.end,
         tailMessageId: item.id,
+        finalTextStartId: finalTextStart(item.segments),
       }
       if (cached === undefined) {
         const next = joins.get(previous) ?? new WeakMap<TranscriptItem, ActivityItem>()

@@ -59,7 +59,7 @@ function countLines(code: string): number {
  * like two -- and this block is a working surface now, not a preview; the
  * horizontal scroller is the honest answer to a long line.
  */
-export function CodeBlock({ code, fence }: { code: string; fence: string }) {
+export function CodeBlock({ code, fence, streaming = false }: { code: string; fence: string; streaming?: boolean }) {
   // ```ts:src/utils/get-diff.ts — the language, then optionally where this came
   // from. A path makes a far better caption than a language name: "TypeScript"
   // is already obvious from the syntax colouring, while *which file* is the one
@@ -85,9 +85,9 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
           block a session draws waits a few frames for it. Until it lands the
           same code stands in the same place in plain text, gutter and all, so
           the only thing that changes when the chunk arrives is the colour. */}
-      <Deferred label="Syntax highlighting" fallback={<PlainCode code={code} />}>
+      {streaming ? <PlainCode code={code} /> : <Deferred label="Syntax highlighting" immediateFallback fallback={<PlainCode code={code} />}>
         <HighlightedCode code={code} language={resolveLanguage(language)} />
-      </Deferred>
+      </Deferred>}
     </BlockFrame>
   )
 }

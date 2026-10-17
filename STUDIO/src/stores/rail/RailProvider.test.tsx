@@ -30,6 +30,22 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe('the rail holding a plan', () => {
+  it('retains the newly opened result when all twelve standing entries are exempt', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+    for (let at = 0; at < 12; at += 1) {
+      act(() => result.current.openPlan(`standing-${at}`, `Plan ${at}`))
+    }
+    act(() => result.current.openChanges('conversation', 'turn', []))
+    expect(result.current.entries.find((entry) => entry.id === result.current.activeId)?.kind).toBe('changes')
+    act(() => result.current.openBrowserResult('conversation', 'turn', {
+      url: 'https://example.com/', title: 'Example', frame: null, steps: [],
+    }))
+    expect(result.current.entries.find((entry) => entry.id === result.current.activeId)?.kind).toBe('browser')
+    expect(result.current.entries.filter((entry) => entry.kind === 'plan')).toHaveLength(12)
+    expect(result.current.entries.some((entry) => entry.kind === 'changes')).toBe(false)
+    expect(result.current.entries).toHaveLength(13)
+  })
+
   it('opens the conversation plan once and focuses it on a second open', () => {
     const { result } = renderHook(() => useRail(), { wrapper })
 
@@ -181,6 +197,22 @@ function stepOf(id: string, overrides: Partial<BrowserStep> = {}): BrowserStep {
 }
 
 describe('the browser entry', () => {
+  it('opens saved previews once per turn and URL without replacing the live report', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+    const preview = { url: 'https://example.com/old', title: 'Old page', frame: stepOf('old').frame, steps: [stepOf('old')] }
+    const live = { family: 'browser' as const, url: 'https://example.com/new', title: 'New page', frame: null, steps: [] }
+    act(() => result.current.showBrowser('conv', 'Conversation', live))
+    act(() => result.current.openBrowserResult('conv', 'turn-one', preview))
+    act(() => result.current.openBrowserResult('conv', 'turn-one', preview))
+    expect(result.current.entries).toHaveLength(2)
+    const savedId = result.current.activeId
+    act(() => result.current.showBrowser('conv', 'Conversation', { ...live, title: 'Latest page' }))
+    expect(result.current.activeId).toBe(savedId)
+    expect(result.current.entries.find((entry) => entry.id === savedId)).toMatchObject({ title: 'Old page', recorded: true, frame: preview.frame })
+    expect(result.current.entries.find((entry) => entry.id === 'browser:conv')).toMatchObject({ title: 'Latest page', url: live.url })
+    act(() => result.current.openBrowserResult('conv', 'turn-two', preview))
+    expect(result.current.entries).toHaveLength(3)
+  })
   it('opens with the whole report and focuses nothing', () => {
     const { result } = renderHook(() => useRail(), { wrapper })
 

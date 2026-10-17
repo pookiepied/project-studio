@@ -47,6 +47,11 @@ afterEach(() => {
 })
 
 describe('BrowserPanel', () => {
+  it('keeps a recorded website preview separate from live browser controls', () => {
+    render(<BrowserPanel entry={{ ...entry(), recorded: true }} />)
+    expect(screen.queryByRole('button', { name: 'Stop browser' })).toBeNull()
+    expect(screen.getByText('No screenshot was recorded for this website.')).toBeTruthy()
+  })
   it('offers a Stop for the conversation, and says Stopped when one was running', async () => {
     stop.mockResolvedValue({ ok: true, value: true })
     render(<BrowserPanel entry={entry()} />)

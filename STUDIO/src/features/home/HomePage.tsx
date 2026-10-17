@@ -39,6 +39,7 @@ import { StartConversation } from '@/features/chat/composer'
 export function HomePage() {
   return (
     <div
+      data-attachment-drop-zone
       className="flex h-full flex-col items-center justify-center"
       style={{ paddingInline: SHELL.gutter, paddingBottom: SHELL.topStrip.height }}
     >

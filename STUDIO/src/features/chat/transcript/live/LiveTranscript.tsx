@@ -128,6 +128,7 @@ export function LiveTranscript({
             item={item}
             conversationId={conversationId}
             branchMessageId={item.tailMessageId ?? item.id}
+            {...(item.finalTextStartId === undefined ? {} : { finalTextStartId: item.finalTextStartId })}
             activityLive={generating && retrying === null
               && inFlightSubmission !== null && item.submissionId === inFlightSubmission
               && (item.tailMessageId ?? item.id) === lastAssistantId

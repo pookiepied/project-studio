@@ -34,6 +34,18 @@ afterEach(() => {
  * scroller instead of a fade, the language's own mark, the count, the copy.
  */
 describe('CodeBlock', () => {
+  it('renders growing code immediately and highlights only after the block settles', async () => {
+    const view = render(<Markdown text={'```ts\nconst value = 1\n```'} streaming />)
+    const pre = view.container.querySelector('pre')
+    expect(pre?.textContent).toContain('const value = 1')
+    expect(view.container.querySelector('.hljs-keyword')).toBeNull()
+    view.rerender(<Markdown text={'```ts\nconst value = 1\nconst next = 2\n```'} streaming />)
+    expect(view.container.querySelector('pre')).toBe(pre)
+    expect(pre?.textContent).toContain('const next = 2')
+    view.rerender(<Markdown text={'```ts\nconst value = 1\nconst next = 2\n```'} />)
+    expect(view.container.querySelector('pre')?.textContent).toContain('const next = 2')
+    await waitFor(() => expect(view.container.querySelector('.hljs-keyword')).not.toBeNull(), CHUNK)
+  })
   it('counts a closing newline as a terminator, not a fourth line', () => {
     // A fence's content usually ends in a break. Counting the split's parts
     // called every such block one line longer than it is.

@@ -16,6 +16,7 @@ import { CaptureMonitor } from '@/shell/CaptureMonitor'
 import { DetachedShell } from '@/shell/DetachedShell'
 import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
+import { useFileDropGuard } from '@/shell/useFileDropGuard'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
 import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
@@ -33,6 +34,7 @@ import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
  * opened, then throw.
  */
 export default function App({ initialAppearance }: { initialAppearance: Appearance }) {
+  useFileDropGuard()
   // Read once and never stored: the URL is fixed for the life of a window, so
   // this is a fact about which window this is, not state.
   const detached = detachedConversationId()

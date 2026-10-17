@@ -408,6 +408,29 @@ describe('the images a turn carries', () => {
 describe('paste and drop', () => {
   const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 6, 7, 8])
 
+  it('stages a mixed multi-file drop, including images without MIME, and sends every accepted attachment', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    const view = renderComposer(onSend)
+    const composer = view.container.querySelector('[data-composer-frame]')
+    if (!(composer instanceof HTMLElement)) throw new Error('No composer')
+    const other = new Uint8Array(pngBytes)
+    other[other.length - 1] = 42
+    const paper = new File(['Document context'], 'notes.txt', { type: 'text/plain' })
+    fireEvent.drop(composer, { dataTransfer: { types: ['Files'], files: [
+      new File([pngBytes], 'one.png', { type: 'image/png' }), new File([other], 'two.PNG'), paper,
+    ] } })
+    await waitFor(() => expect(screen.getByAltText('one.png')).toBeTruthy())
+    await waitFor(() => expect(screen.getByAltText('two.PNG')).toBeTruthy())
+    expect(screen.getByText('notes.txt')).toBeTruthy()
+    expect(onSend).not.toHaveBeenCalled()
+    type('Use these as context')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('Use these as context', [
+      expect.objectContaining({ filename: 'one.png', mimeType: 'image/png' }),
+      expect.objectContaining({ filename: 'two.PNG', mimeType: 'image/png' }),
+    ], [paper]))
+  })
+
   it('rejects a rapid duplicate arriving through paste and drop while the first file is reading', async () => {
     renderComposer(vi.fn(async () => ({ ok: true })))
     const textbox = screen.getByRole('textbox')

@@ -10,6 +10,14 @@ import { parseSearchOutcome, parseSearchQuery, type SearchOutcome, type SearchQu
 import { SearchQueryLine, SearchResults } from './SearchResults'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
+import { FileOperation, fileOperationOf } from './FileOperation'
+import { GenericToolDetails, StructuredValue } from './ToolResultPanel'
+import { DiscoveryDetails, PlanDetails, ShellDetails } from './NativeToolDetails'
+import { readableName, resultState } from './toolResult'
+import { AgentTaskDetails } from './tools/AgentTaskDetails'
+import { JobsDetails } from './tools/JobsDetails'
+import { LibraryDetails } from './tools/LibraryDetails'
+import { ExtensionToolDetails } from './tools/ExtensionToolDetails'
 import { RollingCount } from './RollingCount'
 import { BrowserReport } from './BrowserReport'
 import { MediaCallArtifact } from './MediaCallArtifact'
@@ -127,7 +135,7 @@ function answeredOf(call: ToolCallView): boolean {
 }
 
 export function activityLabel(call: ToolCallView): string {
-  const verb = ACTIONS[call.toolName]?.running ?? call.toolName
+  const verb = ACTIONS[call.toolName]?.running ?? readableName(call.toolName)
   const subject = subjectOf(call)
   return subject === null ? verb : `${verb} ${subject}`
 }
@@ -152,13 +160,17 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       : rawDiff
   const answered = answeredOf(call)
   const searched = searchOutcomeOf(call)
+  const operation = fileOperationOf(call)
   // A search names its aim from its input whether the answer has arrived or
   // not: the query line stands in for the raw input slab while the call runs,
   // and beside the raw answer when the answer fell back to raw.
   const searchQuery = searched === null ? searchQueryOf(call) : null
   const running = call.errorText === null && !answered
+  const failed = resultState(call, live) === 'failed'
   const verb =
-    action === undefined ? call.toolName : running ? action.running : action.done
+    operation !== null && failed
+      ? call.toolName === 'move' ? 'Could not move' : 'Could not delete'
+      : action === undefined ? readableName(call.toolName) : running ? action.running : action.done
 
   // A read is a statement, not a disclosure. Its answer is the page the
   // model read -- the model's business, and a slab a reader was never meant
@@ -229,7 +241,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
               <span className="text-diff-del">-{diff.removed}</span>
             </span>
           ) : null}
-          {call.errorText !== null ? (
+          {failed ? (
             <span className="shrink-0 text-danger">Failed</span>
           ) : running && !live ? (
             // The turn is over and the answer never came. The shimmer is the
@@ -242,23 +254,21 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       open={open}
       onToggle={() => setOpen((value) => !value)}
       chevron="hover"
-      // A diff arrives as its own framed card, so the body stands flush: the
-      // rule would draw a second edge a hand's width from the card's, and
-      // the indent would park the diff off the boundary every other response
-      // element shares. A search's result list stands flush too, carrying its
-      // own nesting step instead -- the rule beside a list reads as an
-      // outliner, and the list says whose it is by alignment and by echoing
-      // the chip's pattern. Everything else keeps the rule.
-      flush={(diff !== null && file !== null) || searched !== null}
+      flush
     >
-      <CallWorkingOut
-        call={call}
-        diff={diff}
-        file={file}
-        outcome={outcome}
-        searched={searched}
-        searchQuery={searchQuery}
-      />
+      {operation !== null ? (
+        <FileOperation call={call} view={operation} live={live} />
+      ) : (
+        <CallWorkingOut
+          call={call}
+          diff={diff}
+          file={file}
+          outcome={outcome}
+          searched={searched}
+          searchQuery={searchQuery}
+          live={live}
+        />
+      )}
     </DisclosureRow>
   )
 }
@@ -269,8 +279,8 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
  * own sentence; a question call shows each question and the exact answer
  * it was given; a search shows its answer as a result list -- the files,
  * the lines, the matched words -- and its aim as one line while the answer
- * is still out; everything else shows the raw input and answer, pretty-
- * printed but untouched. A read lands here only when it failed -- the error
+ * is still out; other tools use dedicated reports or readable field lists.
+ * A read lands here only when it failed -- the error
  * is its working-out -- because an answered read is a statement, not a
  * disclosure.
  */
@@ -281,6 +291,7 @@ function CallWorkingOut({
   outcome,
   searched,
   searchQuery,
+  live,
 }: {
   call: ToolCallView
   diff: LineDiff | null
@@ -288,8 +299,20 @@ function CallWorkingOut({
   outcome: FileToolOutcome | null
   searched: SearchOutcome | null
   searchQuery: SearchQuery | null
+  live: boolean
 }) {
   const diffed = diff !== null && file !== null
+  if (!diffed && searched === null && call.toolName !== 'ask_user_question') {
+    if (call.toolName === 'shell' || call.toolName === 'git') return <ShellDetails call={call} live={live} />
+    if (call.toolName === 'plan') return <PlanDetails call={call} live={live} />
+    if (call.toolName === 'discover') return <DiscoveryDetails call={call} live={live} />
+    if (call.toolName === 'task') return <AgentTaskDetails call={call} live={live} />
+    if (call.toolName === 'jobs') return <JobsDetails call={call} live={live} />
+    if (call.toolName === 'library_search' || call.toolName === 'library_keep') return <LibraryDetails call={call} live={live} />
+    if (call.toolName.startsWith('mcp__')) return <ExtensionToolDetails call={call} live={live} />
+    return <GenericToolDetails call={call} live={live}
+      request={searchQuery !== null ? <SearchQueryLine query={searchQuery} /> : undefined} />
+  }
   return (
     <div className="flex flex-col gap-1">
       {searched !== null ? (
@@ -298,13 +321,7 @@ function CallWorkingOut({
         <FileDiff path={file} diff={diff} />
       ) : call.toolName === 'ask_user_question' ? (
         <AskWorkingOut call={call} />
-      ) : searchQuery !== null ? (
-        <SearchQueryLine query={searchQuery} />
-      ) : (
-        <div className="font-mono text-code text-muted-foreground">
-          <Detail label="in" value={call.input} />
-        </div>
-      )}
+      ) : null}
       {call.errorText !== null ? (
         <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-danger">
           {call.errorText}
@@ -323,11 +340,7 @@ function CallWorkingOut({
           // facts the card does not; the echo is the card, whose gutters now
           // carry the echo's own numbers.
           <OutcomeSentence outcome={outcome} />
-        ) : call.toolName === 'ask_user_question' ? null : (
-          <div className="font-mono text-code text-muted-foreground">
-            <Detail label="out" value={call.output} />
-          </div>
-        )
+        ) : call.toolName !== 'ask_user_question' ? <StructuredValue value={call.output.value} /> : null
       ) : null}
     </div>
   )
@@ -568,32 +581,4 @@ function askSubject(input: Record<string, unknown>): string | null {
   const header = first['header']
   if (typeof header !== 'string' || header.length === 0) return null
   return questions.length > 1 ? `${header} +${questions.length - 1}` : header
-}
-
-function Detail({
-  label,
-  value,
-}: {
-  label: string
-  value: { readonly present: boolean; readonly value: unknown } | null
-}) {
-  if (value === null || !value.present) return null
-  // A string answer renders as itself: a read's numbered lines and a shell
-  // command's output are text to show, not data to quote -- JSON-quoting
-  // them escaped every newline into a `\n` and turned a page of output into
-  // one unbreakable line. Only structured answers print as JSON.
-  const rendered = typeof value.value === 'string' ? value.value : jsonOf(value.value)
-  return (
-    <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere]">
-      {label}: {rendered}
-    </pre>
-  )
-}
-
-function jsonOf(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2) ?? String(value)
-  } catch {
-    return String(value)
-  }
 }

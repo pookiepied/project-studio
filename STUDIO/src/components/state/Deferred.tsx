@@ -49,18 +49,21 @@ const DELAY_MS = 150
 
 export function Deferred({
   fallback = null,
+  immediateFallback = false,
   label,
   children,
 }: {
   /** Something true to show meanwhile; nothing when there is nothing. */
   fallback?: ReactNode
+  /** Existing content must retain its geometry while its enhancement loads. */
+  immediateFallback?: boolean
   /** What is loading, for the status region: "Settings", "Video player". */
   label: string
   children: ReactNode
 }) {
   return (
     <ChunkBoundary label={label}>
-      <Suspense fallback={<Delayed label={label}>{fallback}</Delayed>}>{children}</Suspense>
+      <Suspense fallback={immediateFallback ? fallback : <Delayed label={label}>{fallback}</Delayed>}>{children}</Suspense>
     </ChunkBoundary>
   )
 }

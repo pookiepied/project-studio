@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { Artifact } from '@/domain/artifacts/types'
 import type { BrowserFrame, BrowserStep } from '@/domain/browser/steps'
 import type { ReportFamilyId } from '@/features/chat/transcript/live/reportFamily'
+import type { RecordedChange } from '@/features/changes/recordedChanges'
 
 /**
  * The side rail's state.
@@ -37,6 +38,14 @@ import type { ReportFamilyId } from '@/features/chat/transcript/live/reportFamil
  * thing; the union says they are not.
  */
 export type RailEntry =
+  | {
+      readonly kind: 'changes'
+      readonly id: string
+      readonly conversationId: string
+      readonly conversationTitle: string
+      readonly openedAt: number
+      readonly changes: readonly RecordedChange[]
+    }
   | {
       readonly kind: 'artifact'
       /** The artifact's own id, which is also what makes opening idempotent. */
@@ -94,6 +103,8 @@ export type RailEntry =
        * family, and its own tab: a conversation may drive both at once.
        */
       readonly family: ReportFamilyId
+      /** A turn's saved preview, independent of the standing live report. */
+      readonly recorded?: true
       /** `browser:<conversation id>` or `computer:<conversation id>` - one per conversation and family. */
       readonly id: string
       readonly conversationId: string
@@ -160,7 +171,9 @@ const MAX_ENTRIES = 12
  */
 function capped(grown: readonly RailEntry[]): readonly RailEntry[] {
   if (grown.length <= MAX_ENTRIES) return grown
-  const oldest = grown.find((entry) => entry.kind === 'artifact')
+  // Standing entries can exceed the soft cap; the just-opened result must stay.
+  const incoming = grown[grown.length - 1]
+  const oldest = grown.find((entry) => entry !== incoming && (entry.kind === 'artifact' || entry.kind === 'changes' || (entry.kind === 'browser' && entry.recorded)))
   return oldest === undefined ? grown : grown.filter((entry) => entry !== oldest)
 }
 
@@ -191,6 +204,10 @@ interface RailValue {
   openPlan: (conversationId: string, conversationTitle: string) => void
   /** Opens - or focuses - the conversation's background commands. Idempotent too. */
   openJobs: (conversationId: string, conversationTitle: string) => void
+  openChanges: (conversationId: string, resultId: string, changes: readonly RecordedChange[]) => void
+  openBrowserResult: (conversationId: string, resultId: string, preview: {
+    readonly url: string; readonly title: string; readonly frame: BrowserFrame | null; readonly steps: readonly BrowserStep[]
+  }) => void
   /**
    * Takes the browser's whole derived report and replaces what the entry
    * holds.
@@ -234,6 +251,27 @@ export function RailProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [width, setRawWidth] = useState(420)
   const [collapsed, setCollapsed] = useState(false)
+  const openBrowserResult = useCallback<RailValue['openBrowserResult']>((conversationId, resultId, preview) => {
+    const id = `preview:${conversationId}:${resultId}:${preview.url}`
+    setEntries((current) => {
+      const existing = current.find((item) => item.id === id)
+      const entry: RailEntry = {
+        kind: 'browser', family: 'browser', recorded: true, id, conversationId,
+        conversationTitle: 'Web preview', openedAt: existing?.openedAt ?? Date.now(), ...preview,
+      }
+      return existing ? current.map((item) => item.id === id ? entry : item) : capped([...current, entry])
+    })
+    setActiveId(id)
+    setCollapsed(false)
+  }, [])
+  const openChanges = useCallback((conversationId: string, resultId: string, changes: readonly RecordedChange[]) => {
+    const id = `changes:${conversationId}:${resultId}`
+    const entry: RailEntry = { kind: 'changes', id, conversationId, conversationTitle: 'File changes', openedAt: Date.now(), changes }
+    setEntries((current) => current.some((item) => item.id === id)
+      ? current.map((item) => item.id === id ? entry : item) : capped([...current, entry]))
+    setActiveId(id)
+    setCollapsed(false)
+  }, [])
 
   const openArtifact = useCallback(
     (artifact: Artifact, conversationId: string, conversationTitle: string) => {
@@ -378,6 +416,8 @@ export function RailProvider({ children }: { children: ReactNode }) {
       openArtifact,
       openPlan,
       openJobs,
+      openChanges,
+      openBrowserResult,
       showBrowser,
       focus: setActiveId,
       close,
@@ -394,6 +434,8 @@ export function RailProvider({ children }: { children: ReactNode }) {
       openArtifact,
       openPlan,
       openJobs,
+      openChanges,
+      openBrowserResult,
       showBrowser,
       close,
       closeAll,
