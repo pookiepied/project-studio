@@ -255,10 +255,30 @@ polling or uploads from recording themselves. No arguments, clipboard data,
 URLs or pairing values enter these events. Arrival does not confirm completion
 or provide a parent join to an asynchronous command's transport operation.
 Service, stream and supervisor facts provide their separate actual lifecycles;
-window/clipboard/browser-opening/remote-management command outcomes are
-currently unsupported.
+detached-browser creation/focus outcomes are covered. Other window, clipboard,
+external-browser-opening and remote-management command outcomes remain unsupported.
 
 ## Feature checklist
+
+The detached browser viewer uses admitted
+`POST /api/conversations/:id/browser/interact`, then the private system-server
+`studio/browser` RPC. `browser.interaction` inherits the HTTP execution parent
+and adds the existing conversation identity; action names are fixed operational
+metadata. The client and MCP connection retain separate request, operation,
+connection and RPC identities. Viewer leases use client UUIDs and convey control
+ownership, never admission authority. Native window labels encode the complete
+opaque conversation ID without lossy sanitizing; opening a viewer never creates
+a second conversation identity. Inputs are not retried. The viewer reads one
+latest bounded screencast frame, dropping superseded frames by design;
+these frames are product delivery, not diagnostic recordings. Manual text,
+keys, addresses, cursor telemetry and live frames are excluded from MCP
+diagnostic content even with scoped capture enabled. The browser child does
+not claim per-frame diagnostic capture. Native `open_browser_window` records
+arrival plus a separate start/end operation for creation or focusing, preserving
+the original result and omitting IDs, titles and error prose. Paint and the
+IPC-arrival-to-command-operation parent join remain unsupported.
+Lease expiry releases held input before automation resumes; a refused automated
+tool remains a returned MCP tool error, never a successful browser action.
 
 The separate [Studio Inspector](studio-inspector.md) consumes this contract.
 The native `diagnostic_inspector_status` / `diagnostic_inspector_configure`

@@ -6,6 +6,7 @@
   "windows": [
     "main",
     "conversation-*",
+    "browser-*",
     "diagnostic-*",
     "computer-indicator"
   ],

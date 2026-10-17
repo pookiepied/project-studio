@@ -5,6 +5,9 @@ import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
 import { familyById, type ReportFamily } from '@/features/chat/transcript/live/reportFamily'
 import type { RailEntry } from '@/stores/rail'
+import { openBrowserWindow } from '@/platform/tauri'
+import { Icons } from '@/components/icons'
+import { IconButton } from '@/components/primitives/IconButton/IconButton'
 
 /**
  * The browser preview, at a size worth looking at.
@@ -46,6 +49,7 @@ export function BrowserPanel({
   // a state initialiser racing an entry that replaces itself mid-render.
   const latest = latestStepId(entry.steps)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
   const selected =
     entry.steps.find((step) => step.id === (selectedId ?? latest)) ?? null
   const family = familyById(entry.family)
@@ -66,8 +70,17 @@ export function BrowserPanel({
             </span>
           )}
         </div>
-        {entry.recorded ? null : <StopBrowser conversationId={entry.conversationId} family={family} />}
+        <div className="flex shrink-0 items-center gap-2">
+          {entry.recorded || family.id !== 'browser' ? null : (
+            <IconButton label="Open browser in new window" onClick={() => {
+              setOpenError(null)
+              void openBrowserWindow(entry.conversationId).catch(() => setOpenError('The browser window could not open. Try again.'))
+            }}><Icons.openExternal /></IconButton>
+          )}
+          {entry.recorded ? null : <StopBrowser conversationId={entry.conversationId} family={family} />}
+        </div>
       </div>
+      {openError ? <p role="alert" className="text-caption text-muted-foreground">{openError}</p> : null}
 
       <BrowserFrameView
         conversationId={entry.conversationId}

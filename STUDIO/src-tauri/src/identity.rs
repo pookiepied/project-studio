@@ -25,9 +25,21 @@ pub(crate) fn request_id(headers: &mut Option<Vec<(String, String)>>) -> String 
     id
 }
 
+/// Window labels preserve opaque conversation identity without lossy sanitizing.
+pub(crate) fn browser_window_label(conversation_id: &str) -> String {
+    let encoded: String = conversation_id.as_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("browser-{encoded}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn browser_windows_do_not_merge_distinct_opaque_conversation_ids() {
+        assert_ne!(browser_window_label("cnv/a"), browser_window_label("cnv?a"));
+        assert_eq!(browser_window_label("cnv/a"), browser_window_label("cnv/a"));
+        assert!(browser_window_label("\u{03bb}/a").bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-'));
+    }
     #[test]
     fn native_ids_are_distinct_uuid_v4_values() {
         let first = new_uuid();

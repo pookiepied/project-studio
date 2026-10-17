@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { candidates, CHANNELS, engineReport, knownLocations, noBrowserMessage } from "../../src/browser/resolve.js";
 import { definitions, TOOLS, toolByName } from "../../src/browser/tools.js";
+import { createStudioUuid } from "../../src/contracts/uuid.js";
 
 /**
  * The browser capability, tested at the two seams that can break silently.
@@ -254,6 +255,16 @@ describe.skipIf(!existsSync(BUNDLE))("the server on the wire", () => {
     expect(error["code"]).toBe(-32602);
     // And is still there afterwards, which is the half that matters.
     expect((await call("tools/list", {}))["result"]).toBeDefined();
+  });
+
+  it("keeps live controls private and never adopts another conversation's session", async () => {
+    const listed = (await call("tools/list", {}))["result"] as { tools: { name: string }[] };
+    expect(listed.tools.some((tool) => tool.name.includes("interact") || tool.name.includes("claim"))).toBe(false);
+    const response = await call("studio/browser", {
+      input: { action: "view", viewerId: createStudioUuid() },
+      _meta: { "studio/conversation": createStudioUuid() },
+    });
+    expect(response["error"]).toHaveProperty("message", "This browser session has ended. Ask Studio to open a page again.");
   });
 
   it("answers a bad call as a tool result, not as a dead transport", async () => {

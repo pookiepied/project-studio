@@ -16,6 +16,8 @@ import { BrowserPanel } from './BrowserPanel'
 
 const stop = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
 const stopComputer = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
+const openBrowser = vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined)
+vi.mock('@/platform/tauri', async (original) => ({ ...await original<object>(), openBrowserWindow: (id: string) => openBrowser(id) }))
 
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({ browser: { stop }, computer: { stop: stopComputer } }),
@@ -43,10 +45,20 @@ afterEach(() => {
   cleanup()
   stop.mockReset()
   stopComputer.mockReset()
+  openBrowser.mockClear()
   vi.useRealTimers()
 })
 
 describe('BrowserPanel', () => {
+  it('opens the live conversation browser and keeps recorded and computer previews read-only', async () => {
+    const view = render(<BrowserPanel entry={entry()} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open browser in new window' })))
+    expect(openBrowser).toHaveBeenCalledWith('cnv_1')
+    view.rerender(<BrowserPanel entry={{ ...entry(), recorded: true }} />)
+    expect(screen.queryByRole('button', { name: 'Open browser in new window' })).toBeNull()
+    view.rerender(<BrowserPanel entry={entry('computer')} />)
+    expect(screen.queryByRole('button', { name: 'Open browser in new window' })).toBeNull()
+  })
   it('keeps a recorded website preview separate from live browser controls', () => {
     render(<BrowserPanel entry={{ ...entry(), recorded: true }} />)
     expect(screen.queryByRole('button', { name: 'Stop browser' })).toBeNull()

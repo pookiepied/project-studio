@@ -121,6 +121,7 @@ pub(crate) fn command_received(command: &str) {
         "diagnostic_inspector_status" | "diagnostic_inspector_configure" => return,
         "app_ready" => "app_ready",
         "open_conversation_window" => "open_conversation_window",
+        "open_browser_window" => "open_browser_window",
         "open_diagnostic_window" => "open_diagnostic_window",
         "computer_indicator_show" => "computer_indicator_show",
         "computer_indicator_hide" => "computer_indicator_hide",
@@ -149,6 +150,19 @@ pub(crate) fn command_received(command: &str) {
         record(&span, "progress", None, stage, None, None);
         span.finished = true;
     }
+}
+
+/// Observe the new window command without retaining its ID, title or error text.
+pub(crate) fn observe_browser_window<T, E>(action: impl FnOnce() -> Result<T, E>) -> Result<T, E> {
+    let span = NativeSpan::new("native.command", None, None);
+    if let Some(span) = &span { record(span, "start", None, "open_browser_window", None, None); }
+    let result = action();
+    if let Some(mut span) = span {
+        span.finished = true;
+        record(&span, "end", Some(if result.is_ok() { "completed" } else { "failed" }), "open_browser_window", None,
+            result.as_ref().err().map(|_| "window_open_failed"));
+    }
+    result
 }
 
 /// Dropped futures remain unknown; completing a reader never means its run ended.
@@ -394,6 +408,19 @@ mod tests {
         assert!(commands.iter().all(|event| event.phase == "progress" && event.outcome.is_none() && is_uuid(&event.operation_id)));
         assert_ne!(commands[0].operation_id, commands[1].operation_id);
         assert!(!serde_json::to_string(&captured).expect("command export").contains("private-body"));
+        let success: Result<u8, &str> = observe_browser_window(|| Ok(7));
+        let failure: Result<u8, &str> = observe_browser_window(|| Err("private-window-error"));
+        assert_eq!(success, Ok(7));
+        assert_eq!(failure, Err("private-window-error"));
+        let windows = diagnostic_capture_snapshot().expect("window outcomes");
+        let events: Vec<_> = windows.events.iter().filter(|event| event.stage == "open_browser_window").collect();
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0].operation_id, events[1].operation_id);
+        assert_eq!(events[2].operation_id, events[3].operation_id);
+        assert_ne!(events[0].operation_id, events[2].operation_id);
+        assert_eq!(events[1].outcome, Some("completed"));
+        assert_eq!(events[3].outcome, Some("failed"));
+        assert!(!serde_json::to_string(&windows).expect("window export").contains("private-window-error"));
         configure(None, None).expect("stop the fixture");
     }
 }

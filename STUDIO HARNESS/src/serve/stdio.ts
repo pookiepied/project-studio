@@ -51,6 +51,8 @@ export interface StdioServerOptions {
   readonly explain?: (message: string) => string;
   /** Runs when stdin closes or the process is told to stop, before exit. */
   readonly finish: () => Promise<void>;
+  /** Studio-owned UI RPCs, separate from the model's discoverable tools. */
+  readonly control?: (method: string, params: Record<string, unknown>) => Promise<unknown>;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,6 +157,14 @@ async function handle(options: StdioServerOptions, message: Record<string, unkno
     }
 
     default: {
+      if (!isNotification && method === "studio/browser" && options.control !== undefined) {
+        try {
+          reply(id, await options.control(method, params));
+        } catch (error) {
+          fail(id, -32602, error instanceof Error ? error.message : "The browser request failed.");
+        }
+        return;
+      }
       if (!isNotification) fail(id, -32601, `Unknown method "${method}".`);
     }
   }

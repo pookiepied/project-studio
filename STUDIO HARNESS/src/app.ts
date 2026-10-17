@@ -457,7 +457,10 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       // The read-only roster the Settings pane reads: the same registry the
       // mount, the gate's filter, and the scope substitution resolve through.
       agents: agentRegistry,
-      browser: { stop: (conversationId) => runtime.stopBrowser(conversationId) },
+      browser: {
+        stop: (conversationId) => runtime.stopBrowser(conversationId),
+        interact: (conversationId, input) => runtime.interactBrowser(conversationId, input),
+      },
       computer: { stop: (conversationId) => runtime.stopComputer(conversationId) },
       admission: admission.verifier,
       // The same list the model picker is filled from: a submission's model

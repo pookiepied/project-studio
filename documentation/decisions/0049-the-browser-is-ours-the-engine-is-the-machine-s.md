@@ -183,6 +183,20 @@ Two things this does require:
 
 ### 7. The window shows a report, not a browser
 
+**Amended 2026-10-18:** the side rail remains a recorded report. An explicit
+Open in New Window action now opens an interactive Studio viewer of the same
+headless conversation browser. The viewer uses the installed engine, not a
+second webview session or bundled Chromium. A bounded CDP screencast travels
+through the admitted harness transport and private system MCP RPC, separately
+from model tool responses. Manual control is exclusive and leased; automation
+calls are refused while the person holds control, and detaching or lease expiry
+releases held input. Tabs and navigation are transient browser state. The
+existing disposable-cookie and no-download policies remain. The Studio cursor
+uses trusted mouse-event coordinates, with element target positions for actions
+such as direct field fill. Browser chrome, native menus, downloads, file picker
+integration and durable profiles are outside this viewer's current surface.
+The paragraphs below retain the reasoning for the original preview-only choice.
+
 An artifact appears in the transcript when the browser starts and updates as it
 works. Expanding it opens the side rail with the latest frame and the sequence
 of actions.

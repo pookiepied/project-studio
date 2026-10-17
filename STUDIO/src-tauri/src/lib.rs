@@ -376,6 +376,34 @@ async fn open_conversation_window(
   Ok(())
 }
 
+/// The browser viewer uses the same hidden-until-ready shell as conversations.
+#[tauri::command]
+async fn open_browser_window(app: AppHandle, conversation_id: String) -> Result<(), String> {
+  diagnostics::observe_browser_window(|| {
+    let label = identity::browser_window_label(&conversation_id);
+    if let Some(existing) = app.get_webview_window(&label) {
+      existing.unminimize().map_err(|error| error.to_string())?;
+      existing.set_focus().map_err(|error| error.to_string())?;
+      return Ok(());
+    }
+    let url = format!("index.html?browser={}", urlencoding(&conversation_id));
+    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+      .disable_drag_drop_handler()
+      .title("Studio Browser")
+      .inner_size(1120.0, 800.0)
+      .min_inner_size(640.0, 480.0)
+      .decorations(false)
+      .transparent(true)
+      .shadow(false)
+      .visible(false)
+      .resizable(true)
+      .build()
+      .map_err(|error| error.to_string())?;
+    window::apply_rounded_corners(&window);
+    Ok(())
+  })
+}
+
 /// Window labels accept a restricted character set; ids are ours but may not be.
 fn sanitize(value: &str) -> String {
   value
@@ -831,6 +859,7 @@ pub fn run() {
       inspector::diagnostic_inspector_configure,
       app_ready,
       open_conversation_window,
+      open_browser_window,
       open_diagnostic_window,
       computer_indicator_show,
       computer_indicator_hide,

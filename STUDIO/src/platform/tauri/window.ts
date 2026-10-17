@@ -103,6 +103,18 @@ export function detachedConversationId(): string | null {
   return new URLSearchParams(window.location.search).get('conversation')
 }
 
+export function browserConversationId(): string | null {
+  return typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('browser')
+}
+
+export async function openBrowserWindow(conversationId: string): Promise<void> {
+  if (!isTauri()) {
+    window.open(`?browser=${encodeURIComponent(conversationId)}`, `studio-browser-${conversationId}`)
+    return
+  }
+  await invoke('open_browser_window', { conversationId })
+}
+
 /**
  * Which diagnostic this window is, or null for an ordinary window.
  *

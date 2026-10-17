@@ -142,6 +142,8 @@ export interface BoundClient {
   }
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
   readonly browser: {
+    view: (conversationId: string, viewerId: string, since?: number) => Promise<HarnessResult<import('@/domain/browser/live').LiveBrowserState>>
+    interact: (conversationId: string, viewerId: string, command: import('@/domain/browser/live').BrowserCommand) => Promise<HarnessResult<void>>
     stop: (conversationId: string) => Promise<HarnessResult<boolean>>
   }
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */

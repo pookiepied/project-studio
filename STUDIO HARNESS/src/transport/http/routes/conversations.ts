@@ -29,6 +29,7 @@ import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
 import type { ConversationSnapshots } from "../../../snapshots/store.js";
 import { TaskStore } from "../../../agents/definitions/task-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
+import { browserInteractionSchema, type BrowserInteraction } from "../../../browser/interaction.js";
 
 export interface ConversationRoutesOptions {
   readonly queuedMessages?: (conversationId: string, submissionId: string | null, action: "list" | "steer" | "remove" | "edit") => Promise<unknown>;
@@ -100,6 +101,7 @@ export interface ConversationRoutesOptions {
    */
   readonly browser?: {
     stop(conversationId: string): Promise<boolean>;
+    interact?(conversationId: string, input: BrowserInteraction): Promise<unknown>;
   };
   /**
    * The person's stop for a conversation's computer control (ADR 0055 §7):
@@ -360,6 +362,16 @@ export function createConversationRoutes(
   routes.post("/:id/browser/stop", async (context) => {
     const stopped = (await options.browser?.stop(context.req.param("id"))) ?? false;
     return context.json({ stopped });
+  });
+
+  routes.post("/:id/browser/interact", async (context) => {
+    context.header("Cache-Control", "no-store");
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
+    const parsed = v.safeParse(browserInteractionSchema, await body(context));
+    if (!parsed.success) throw invalidBody("The browser interaction is invalid.");
+    if (options.browser?.interact === undefined) return context.json({ error: { message: "Live browser control is unavailable." } }, 503);
+    return context.json(await options.browser.interact(id, parsed.output));
   });
 
   routes.post("/:id/computer/stop", async (context) => {

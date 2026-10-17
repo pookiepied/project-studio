@@ -169,7 +169,10 @@ export interface CreateHttpAppOptions {
    */
   readonly agents?: { list(): readonly RegisteredAgent[] };
   /** The person's stop for a conversation's browser (ADR 0049 §4). */
-  readonly browser?: { stop(conversationId: string): Promise<boolean> };
+  readonly browser?: {
+    stop(conversationId: string): Promise<boolean>;
+    interact?(conversationId: string, input: import("../../browser/interaction.js").BrowserInteraction): Promise<unknown>;
+  };
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
   readonly computer?: { stop(conversationId: string): Promise<boolean> };
   /**

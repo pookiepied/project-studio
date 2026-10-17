@@ -1,5 +1,7 @@
 export {
   detachedConversationId,
+  browserConversationId,
+  openBrowserWindow,
   openConversationWindow,
   isTauri,
   minimizeWindow,

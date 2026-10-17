@@ -4,6 +4,7 @@ import { AppearanceProvider, type Appearance } from '@/design/theme'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
 import {
   detachedConversationId,
+  browserConversationId,
   diagnosticKind,
   indicatorKind,
   signalAppReady,
@@ -14,6 +15,7 @@ import { ComputerIndicatorWindow } from '@/shell/ComputerIndicatorWindow'
 import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { CaptureMonitor } from '@/shell/CaptureMonitor'
 import { DetachedShell } from '@/shell/DetachedShell'
+import { BrowserWindow } from '@/features/browser/BrowserWindow'
 import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { useFileDropGuard } from '@/shell/useFileDropGuard'
@@ -38,6 +40,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
   // Read once and never stored: the URL is fixed for the life of a window, so
   // this is a fact about which window this is, not state.
   const detached = detachedConversationId()
+  const browserConversation = browserConversationId()
   const diagnostic = diagnosticKind()
   const indicator = indicatorKind()
 
@@ -101,7 +104,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
           <RailProvider>
             <NavigationProvider>
               <CaptureMonitor />
-              {detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
+              {browserConversation ? <BrowserWindow conversationId={browserConversation} /> : detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
             </NavigationProvider>
           </RailProvider>
         </WorkspaceProvider>

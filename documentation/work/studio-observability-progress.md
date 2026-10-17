@@ -13,6 +13,32 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Detached live browser extension, 2026-10-18
+
+Branch `codex/live-browser-window` adds an admitted conversation-scoped human
+browser-control route and private system MCP RPC. `browser.interaction` joins
+the HTTP parent to conversation and MCP connection/RPC identity. The existing
+client request and native service boundaries cover delivery. Native
+`open_browser_window` reports arrival and a separate creation/focus operation
+with success/failure. Paint and IPC-arrival parent joining remain unsupported. The browser
+child's CDP frames and numeric cursor events are transient product data;
+per-frame diagnostic observations are unsupported. Manual input and frames are
+excluded from MCP content capture even under scoped consent. No resend owner
+is introduced. Tests cover lease exclusion/expiry, cross-conversation isolation,
+admission/validation, capture privacy, and actual installed-browser input,
+frames, cursor telemetry, popups and detach preservation. Validation outcomes
+are recorded with the implementation report; earlier gate counts above remain
+historical and do not certify this extension.
+
+Extension validation on 2026-10-18: harness typecheck/lint/build and the complete
+verbose suite passed (2,467 tests, 28 skipped); client `pnpm check`
+passed (1,545 tests); native Cargo tests passed (150), and Clippy passed with
+warnings denied. The final rendered-window fixture passed with an isolated
+Vite cache. Negative controls covered control exclusion, tab bounds, private
+content, real input delivery, detached-client startup and native window identity
+and outcome reporting. These results validate this extension, not the remaining
+Studio readiness inventory as a whole.
+
 ### Live inspection follow-up: task continuity and job termination (2026-10-17)
 
 Branch `codex/studio-run-continuity`, based on the installed Inspector branch.
@@ -88,7 +114,7 @@ later repairs supersede the open findings in earlier checkpoints.
 | Language provider | Target/hook/response/parsed item observers compose original callbacks. Actual HTTP attempts on supported Pi fetch adapters have separate IDs and already-serialized request bodies; Request/Response objects and fetch receivers are preserved. Unsupported adapters retain their original fetch path. Response byte archives and unsupported adapter wire payloads are unavailable; parsed items are not network bytes. |
 | MCP | Connection/RPC IDs, request/notification/connection facts and registry server links. Supervision keeps one logical operation with new attempt IDs on actual restarts; incoming shared notifications deliberately have no conversation/content owner. Connection, wire-frame, duplicate-reply and supervisor fixtures pass. Captured JSON-RPC frames are not transport byte archives; unsupported wire evidence stays explicit. |
 | Client delivery/UI | Submission/stream/delivery/projection and first/final paced DOM commits join request/conversation/submission/stream/message/block IDs. Bounded uploads, epoch policy, registry parity and persistent outage-aware badge. Real paced-text and badge fixtures pass. DOM commit is not screen paint; historical remounts are display observations, not new executions. |
-| Native host | Separate bounded 2,000-event ring, host-only ingestion, verified device provenance, request/stream/byte/lifecycle IDs and command-arrival IDs. Real loopback receipt fixture and source-ingest tests pass. Diagnostic/service arrivals avoid recursive recording. Window/clipboard/remote-management completion and generic IPC-to-transport parent joins are unsupported; plugin-managed OS UI calls are outside custom IPC capture. |
+| Native host | Separate bounded 2,000-event ring, host-only ingestion, verified device provenance, request/stream/byte/lifecycle IDs and command-arrival IDs. Real loopback receipt fixture and source-ingest tests pass. Diagnostic/service arrivals avoid recursive recording. Detached-browser creation/focus has separate start/end outcomes. Other window/clipboard/remote-management completion and generic IPC-to-transport parent joins are unsupported; plugin-managed OS UI calls are outside custom IPC capture. |
 | Background commands/media/retrieval/hooks/skills/snapshots | Detached process/media lifetimes; invocation/submission/request links for title/improve/describe; title retry scope distinct from authorization; resolved media targets and retrieval fallback attempts; snapshot, command expansion and skill packaging boundaries. New tools/MCP/agents through these registries inherit their boundaries. Per-storage-row and arbitrary internal function tracing are intentionally excluded. |
 | Configuration/user control | Enable/stop/scope/delete/copy, bounded retention, capture epochs, optimistic policy guards, serialized native reconciliation and persistent status. Stale receipt, deletion, outage and policy-race fixtures pass. Synchronization polls every three seconds; it is not an instantaneous distributed consent transaction. Retention is count/bytes and process lifetime; no time-based expiry or durable content storage. |
 | Extensibility | Operation/job/provider helpers and shared AGENTS/CLAUDE contract. Client event vocabulary and native command policy have registry parity tests. Unsupported content/clock/delivery evidence is explicit. |

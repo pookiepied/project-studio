@@ -3,6 +3,7 @@ import { chromium } from "playwright-core";
 
 import { candidates, noBrowserMessage } from "./resolve.js";
 import { BrowserError } from "./errors.js";
+import { LiveBrowser } from "./live.js";
 
 /**
  * One browser, its tabs, and the reasons it is allowed to exist.
@@ -74,6 +75,7 @@ interface Tab {
 }
 
 export class BrowserSession {
+  readonly live = new LiveBrowser(this);
   #browser: Browser | undefined;
   #context: BrowserContext | undefined;
   #driving: string | undefined;
@@ -106,6 +108,13 @@ export class BrowserSession {
 
   get activeTabId(): string | undefined {
     return this.#active;
+  }
+
+  keepAlive(): void { this.#touch(); }
+
+  selectTab(id: string): void {
+    if (!this.#tabs.has(id)) throw new BrowserError("no_tab");
+    this.#active = id;
   }
 
   /**
@@ -141,6 +150,7 @@ export class BrowserSession {
           // not answer (ADR 0049 §7).
           acceptDownloads: false,
         });
+        this.#context.on("page", (page) => this.#registerPage(page));
         browser.on("disconnected", () => {
           // Chromium can die on its own — a crash, a task manager, an update
           // replacing the binary underneath it. Forgetting it here is what
@@ -192,9 +202,14 @@ export class BrowserSession {
       throw new BrowserError("internal", { message: "The browser context did not start." });
     }
 
+    const page = await context.newPage();
+    const tab = [...this.#tabs.values()].find((entry) => entry.page === page);
+    return tab ?? this.#registerPage(page);
+  }
+
+  #registerPage(page: Page): Tab {
     this.#counter += 1;
     const id = `tab_${this.#counter}`;
-    const page = await context.newPage();
     const tab: Tab = { id, page, console: [], network: [], bodies: new Map() };
 
     // Attached now, because none of this can be asked for later. A console
@@ -268,6 +283,7 @@ export class BrowserSession {
    */
   async close(): Promise<void> {
     this.#closing ??= (async () => {
+      await this.live.close();
       const browser = this.#browser;
       this.#forget();
       if (browser !== undefined) {
@@ -280,6 +296,7 @@ export class BrowserSession {
   }
 
   #forget(): void {
+    void this.live.close();
     if (this.#idle !== undefined) clearTimeout(this.#idle);
     this.#idle = undefined;
     this.#browser = undefined;

@@ -339,7 +339,9 @@ export const TOOLS: readonly ToolDefinition[] = [
       const modifiers = Array.isArray(input["modifiers"])
         ? (input["modifiers"] as ("Alt" | "Control" | "Meta" | "Shift")[])
         : undefined;
-      await locate(tab.page, target(input)).click({
+      const element = locate(tab.page, target(input));
+      await session.live.point(element, tab.id);
+      await element.click({
         timeout: TIMEOUT,
         button: (str(input, "button") as "left" | "right" | "middle" | undefined) ?? "left",
         clickCount: num(input, "count") ?? 1,
@@ -376,6 +378,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         throw new BrowserError("bad_input", { message: 'This tool needs "text".' });
       }
       const field = locate(tab.page, target(input));
+      await session.live.point(field, tab.id);
       if (input["append"] === true) await field.pressSequentially(value, { timeout: TIMEOUT });
       else await field.fill(value, { timeout: TIMEOUT });
       if (input["submit"] === true) {
@@ -435,7 +438,9 @@ export const TOOLS: readonly ToolDefinition[] = [
     inputSchema: object({ ...TARGET, ...TAB }),
     run: async (session, input) => {
       const tab = await pageFor(session, input);
-      await locate(tab.page, target(input)).hover({ timeout: TIMEOUT });
+      const element = locate(tab.page, target(input));
+      await session.live.point(element, tab.id);
+      await element.hover({ timeout: TIMEOUT });
       return acted(tab.page, tab.id, "Hovered.");
     },
   },
@@ -497,6 +502,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       await locate(tab.page, asTarget(from)).dragTo(locate(tab.page, asTarget(to)), {
         timeout: TIMEOUT,
       });
+      await session.live.point(locate(tab.page, asTarget(to)), tab.id);
       return acted(tab.page, tab.id, `Dragged ${from} onto ${to}.`);
     },
   },

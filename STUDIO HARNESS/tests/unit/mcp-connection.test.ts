@@ -60,6 +60,27 @@ class FakeChannel implements McpChannel {
 }
 
 describe("one conversation with one MCP server", () => {
+  it("excludes manual browser input and live frames from scoped diagnostic content", async () => {
+    diagnosticRecorder.clear();
+    diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: ["selected"] });
+    const channel = new FakeChannel();
+    const connection = new McpConnection(channel);
+    try {
+      const pending = runWithExecutionContext(createRootExecutionContext({ flue: { instanceId: "selected" } }),
+        () => connection.request("studio/browser", { input: { action: "text", text: "private password sentinel" } }));
+      const id = channel.lastSent().id;
+      channel.emit({ jsonrpc: "2.0", id, result: { frame: "private live frame sentinel" } });
+      expect(await pending).toEqual({ frame: "private live frame sentinel" });
+      const events = diagnosticRecorder.read().events;
+      expect(events.some((event) => event.name === "mcp.send")).toBe(true);
+      expect(events.some((event) => event.name === "mcp.receive")).toBe(true);
+      expect(JSON.stringify(events)).not.toContain("sentinel");
+    } finally {
+      connection.close();
+      diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+      diagnosticRecorder.clear();
+    }
+  });
   it("retains the first settling frame when duplicate replies arrive in one chunk", async () => {
     diagnosticRecorder.clear();
     diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: ["selected"] });

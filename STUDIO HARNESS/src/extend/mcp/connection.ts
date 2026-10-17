@@ -218,7 +218,9 @@ export class McpConnection {
 
     const id = this.#pending.nextId();
     const recordObservation = createObservationWriter();
-    const captureContent = diagnosticRecorder.capturesContent(currentExecutionContext()?.flueInstanceId);
+    // Human browser input can contain passwords; live frames and keystrokes
+    // never enter diagnostics, even when tool-content capture is enabled.
+    const captureContent = method !== "studio/browser" && diagnosticRecorder.capturesContent(currentExecutionContext()?.flueInstanceId);
     const waiting = this.#pending
       .register(id, { timeoutMs: this.#timeoutMs, ...(signal ? { signal } : {}) })
       // However this settles, the id stops being special. Written as part of

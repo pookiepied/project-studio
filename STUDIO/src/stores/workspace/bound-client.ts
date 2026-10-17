@@ -97,6 +97,12 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
         ),
     },
     browser: {
+      view: (conversationId, viewerId, since) =>
+        call('The harness is not running, so the browser is unavailable.', (client) =>
+          client.viewConversationBrowser(conversationId, viewerId, since)),
+      interact: (conversationId, viewerId, command) =>
+        call('The harness is not running, so the browser is unavailable.', (client) =>
+          client.interactConversationBrowser(conversationId, viewerId, command)),
       stop: (conversationId) =>
         call('The harness is not running, so there is no browser to stop.', (client) =>
           client.stopConversationBrowser(conversationId),

@@ -23,6 +23,9 @@ import {
   bootstrappedSupportedReasoningLevels,
 } from "../gateway/language/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
+import type { BrowserInteraction } from "../browser/interaction.js";
+import { BrowserError } from "../browser/errors.js";
+import { observeOperation } from "../observability/operation.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
 import {
@@ -1528,6 +1531,17 @@ export class StudioRuntime implements AgentHost {
     return text.includes("is closed");
   }
 
+  async interactBrowser(conversationId: string, input: BrowserInteraction): Promise<unknown> {
+    return observeOperation("mcp", "browser.interaction", async () => {
+      const record = this.#registry.get(BROWSER_SERVER_ID);
+      if (record?.provenance !== "system" || this.#supervisor.status(record.id)?.state !== "ready") {
+        throw new BrowserError("no_tab", { message: "This browser session has ended. Ask Studio to open a page again." });
+      }
+      const connection = await this.#supervisor.ensure(record);
+      return connection.request("studio/browser", { input, _meta: { "studio/conversation": conversationId } });
+    }, { action: input.action }, conversationId);
+  }
+
   /**
    * Ends one conversation's computer control, at the person's request.
    *
@@ -1554,7 +1568,7 @@ export class StudioRuntime implements AgentHost {
     const result = await connection.request("tools/call", {
       name: tool,
       arguments: {},
-      _meta: { "studio/conversation": conversationId },
+      _meta: { "studio/conversation": conversationId, "studio/human-stop": true },
     });
     return typeof result === "object" && result !== null && Array.isArray((result as { content?: unknown }).content)
       ? (result as { content: { text?: unknown }[] }).content

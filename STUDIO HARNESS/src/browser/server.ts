@@ -1,7 +1,9 @@
-import { conversationKey, serveStdio } from "../serve/stdio.js";
+import { conversationKey, isRecord, serveStdio } from "../serve/stdio.js";
 import { BrowserError } from "./errors.js";
 import { BrowserSession } from "./session.js";
 import { definitions, toolByName } from "./tools.js";
+import * as v from "valibot";
+import { browserInteractionSchema } from "./interaction.js";
 
 /**
  * The browser capability, as an MCP server in its own process.
@@ -82,7 +84,23 @@ serveStdio({
     // Unreachable through `serveStdio`, which asks `has` first; kept as a
     // typed refusal so the taxonomy holds even for the impossible branch.
     if (tool === undefined) throw new BrowserError("bad_input", { message: `There is no tool called "${name}".` });
-    return tool.run(sessionFor(meta), args);
+    const session = sessionFor(meta);
+    const humanStop = name === "studio_browser_quit" && isRecord(meta) && meta["studio/human-stop"] === true;
+    return session.live.agent(() => tool.run(session, args), humanStop);
+  },
+  control: async (_method, params) => {
+    const parsed = v.safeParse(browserInteractionSchema, params["input"]);
+    if (!parsed.success) throw new BrowserError("bad_input", { message: "The browser interaction is invalid." });
+    const session = sessions.get(conversationKey(params["_meta"]));
+    if (session === undefined) throw new BrowserError("no_tab", { message: "This browser session has ended. Ask Studio to open a page again." });
+    try {
+      return await session.live.interact(parsed.output);
+    } catch (error) {
+      if (error instanceof BrowserError) throw error;
+      // Library errors can echo an address or text the person entered. The
+      // private input path must never turn those into diagnostic content.
+      throw new BrowserError("internal", { message: "The browser interaction failed. Reconnect before continuing." });
+    }
   },
   explain,
   // A browser with nobody to answer to is 300 megabytes doing nothing.

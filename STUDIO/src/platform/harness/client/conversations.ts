@@ -26,6 +26,7 @@ import { MCP_PATH } from './mcp'
 import { SKILLS_PATH } from './skills'
 import type { HarnessResult, Requester } from './request'
 import { parseQueuedMessage, parseQueuedMessages, type QueuedMessage } from './queued-messages'
+import { parseLiveBrowserState, type BrowserCommand, type LiveBrowserState } from '@/domain/browser/live'
 
 /**
  * `/api/conversations`: the index rows, their destruction, and the three
@@ -36,6 +37,8 @@ import { parseQueuedMessage, parseQueuedMessages, type QueuedMessage } from './q
 const CONVERSATIONS_PATH = '/api/conversations'
 
 export interface ConversationIndexClient {
+  viewConversationBrowser(id: string, viewerId: string, since?: number): Promise<HarnessResult<LiveBrowserState>>
+  interactConversationBrowser(id: string, viewerId: string, command: BrowserCommand): Promise<HarnessResult<void>>
   queuedMessages(id: string): Promise<HarnessResult<readonly QueuedMessage[]>>
   changeQueuedMessage(id: string, submissionId: string, action: 'steer' | 'remove'): Promise<HarnessResult<void>>
   editQueuedMessage(id: string, submissionId: string): Promise<HarnessResult<QueuedMessage>>
@@ -290,6 +293,14 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
             ? (value as Record<string, unknown>)['stopped'] === true
             : false,
       )
+    },
+
+    viewConversationBrowser(id, viewerId, since) {
+      return json('POST', conversationPath(id, '/browser/interact'), { action: 'view', viewerId, since }, parseLiveBrowserState)
+    },
+
+    interactConversationBrowser(id, viewerId, command) {
+      return empty('POST', conversationPath(id, '/browser/interact'), { ...command, viewerId })
     },
 
     stopConversationComputer(id) {
