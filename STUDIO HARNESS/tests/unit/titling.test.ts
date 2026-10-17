@@ -8,6 +8,8 @@ import {
 } from "../../src/conversations/titling.js";
 import type { LogFields, Logger } from "../../src/observability/logger.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
+import { createRootExecutionContext, currentExecutionContext, runWithExecutionContext, type ExecutionContext } from "../../src/execution/context.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
 
 function openStore(): { db: StudioDatabase; store: ConversationStore } {
   const db = openDatabase({ path: ":memory:" });
@@ -155,6 +157,31 @@ function titlerWith(
 }
 
 describe("titleFromReply", () => {
+  it("preserves first-admission context and consent through deferred dispatch and its retry", () => {
+    const { db, store } = openStore();
+    const handlers: ((observation: FlueObservation) => void)[] = [];
+    const contexts: (ExecutionContext | undefined)[] = [];
+    const titler = new ConversationTitler({ conversations: store,
+      subscribe: (handler) => { handlers.push(handler); return () => undefined; },
+      dispatchJob: async () => { contexts.push(currentExecutionContext()); } });
+    try {
+      store.record({ id: "cnv_1", firstMessage: "First words" });
+      diagnosticRecorder.configure({ enabled: true });
+      const root = createRootExecutionContext();
+      runWithExecutionContext(root, () => titler.firstAdmission("cnv_1", "First words"));
+      const captureId = diagnosticRecorder.captureId;
+      diagnosticRecorder.clear();
+      titler.start();
+      handlers[0]?.(settled());
+      handlers[0]?.(settled({ agentName: "title", outcome: "failed" }));
+      expect(contexts).toHaveLength(2);
+      expect(contexts.every((context) => context?.requestId === root.requestId &&
+        context.observationCaptureId === captureId)).toBe(true);
+    } finally {
+      titler.stop(); db.close();
+      diagnosticRecorder.configure({ enabled: false }); diagnosticRecorder.clear();
+    }
+  });
   it("accepts exactly one object with one title string", () => {
     expect(titleFromReply('{"title":"Fix the Windows build"}')).toBe(
       "Fix the Windows build",

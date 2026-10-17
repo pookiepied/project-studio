@@ -30,6 +30,7 @@ export {
   redactGenAiContent,
 } from "./redaction.js";
 import { configureRedaction, resetRedaction } from "./redaction.js";
+import { diagnosticRecorder } from "./recorder.js";
 export { resolveObservabilityConfig } from "./config.js";
 
 export interface ObservabilityHandle {
@@ -112,6 +113,7 @@ export async function shutdownObservability(): Promise<void> {
     // Back to the shipped defaults, so a later start does not inherit the last
     // one's overrides. Module-level state has to be returned as well as set.
     resetRedaction();
+    diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
     handle = undefined;
   }
 }

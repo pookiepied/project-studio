@@ -145,9 +145,10 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     enabledByDefault: true,
     // Last on purpose. It is the widest rule and the catch-all for shapes we
     // have no pattern for, so anything a specific rule could have labelled
-    // better has already had its turn.
+    // better has already had its turn. Bound field-name matching so a long
+    // identifier with no assignment cannot cause quadratic backtracking.
     pattern:
-      /\b(api[_-]?key|secret|password|passphrase|token|credential|authorization)\b\s*[:=]\s*["']?([^\s"',;]+)/gi,
+      /\b([a-z0-9_-]{0,160}(?:api[_-]?key|secret|password|passphrase|token|credential|authorization)[a-z0-9_-]{0,160})["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?|[^\s"',;]+)/gi,
     replacement: "$1=[REDACTED]",
   },
   {

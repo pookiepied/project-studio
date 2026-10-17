@@ -339,12 +339,14 @@ impl RemoteAccess {
 }
 
 /// What every connection is served with, cloned per listener and per request.
+type AssetSource = dyn Fn(&str) -> Response<RemoteBody> + Send + Sync;
+
 #[derive(Clone)]
 struct Shared {
     supervisor: HarnessSupervisor,
     devices: Arc<Devices>,
     pairing: Arc<PairingState>,
-    assets: Arc<dyn Fn(&str) -> Response<RemoteBody> + Send + Sync>,
+    assets: Arc<AssetSource>,
 }
 
 /// Accepts on one bound port until `stopped` says otherwise.
@@ -548,8 +550,8 @@ where
 
     if proxy::is_harness_path(&path) {
         // The gate: a request without a current device cookie goes no further.
-        let revoked = match gate::authorize_request(request.headers(), devices) {
-            Ok(revoked) => revoked,
+        let (device_id, revoked) = match gate::authorize_request(request.headers(), devices) {
+            Ok(authorized) => authorized,
             Err(refused) => return Ok(refused),
         };
         // The supervisor's own routes, answered here rather than forwarded -
@@ -569,6 +571,8 @@ where
             url: endpoint.url.clone(),
             token: endpoint.token.clone(),
         };
+        let mut request = request;
+        request.extensions_mut().insert(proxy::PairedSource(device_id));
         return Ok(proxy::forward(&upstream, request, revoked).await);
     }
 

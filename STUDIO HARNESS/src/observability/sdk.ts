@@ -12,14 +12,12 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import {
   AggregationTemporality,
-  InMemoryMetricExporter,
   PeriodicExportingMetricReader,
   type PushMetricExporter,
   type ResourceMetrics,
 } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import {
-  InMemorySpanExporter,
   SimpleSpanProcessor,
   type ReadableSpan,
   type SpanExporter,
@@ -54,6 +52,34 @@ interface FinishedMetricSource {
   getMetrics(): ResourceMetrics[];
 }
 
+/** Disabled export really discards; diagnostic memory export has an explicit cap. */
+class LocalSpanExporter implements SpanExporter, FinishedSpanSource {
+  readonly #limit: number;
+  #spans: ReadableSpan[] = [];
+  constructor(limit: number) { this.#limit = limit; }
+  export(spans: ReadableSpan[], callback: (result: ExportResult) => void): void {
+    if (this.#limit > 0) this.#spans = [...this.#spans, ...spans].slice(-this.#limit);
+    callback({ code: ExportResultCode.SUCCESS });
+  }
+  getFinishedSpans(): ReadableSpan[] { return [...this.#spans]; }
+  forceFlush(): Promise<void> { return Promise.resolve(); }
+  shutdown(): Promise<void> { this.#spans = []; return Promise.resolve(); }
+}
+
+class LocalMetricExporter implements PushMetricExporter, FinishedMetricSource {
+  readonly #limit: number;
+  #metrics: ResourceMetrics[] = [];
+  constructor(limit: number) { this.#limit = limit; }
+  export(value: ResourceMetrics, callback: (result: ExportResult) => void): void {
+    if (this.#limit > 0) this.#metrics = [...this.#metrics, value].slice(-this.#limit);
+    callback({ code: ExportResultCode.SUCCESS });
+  }
+  getMetrics(): ResourceMetrics[] { return [...this.#metrics]; }
+  selectAggregationTemporality(): AggregationTemporality { return AggregationTemporality.CUMULATIVE; }
+  forceFlush(): Promise<void> { return Promise.resolve(); }
+  shutdown(): Promise<void> { this.#metrics = []; return Promise.resolve(); }
+}
+
 interface SdkState {
   readonly config: ObservabilityConfig;
   readonly sdk: NodeSDK;
@@ -75,12 +101,12 @@ class MemoryDumpWriter {
   }
 
   recordSpans(spans: readonly ReadableSpan[]): void {
-    this.#spans = [...this.#spans, ...spans];
+    this.#spans = [...this.#spans, ...spans].slice(-2_000);
     this.#scheduleWrite();
   }
 
   recordMetrics(resourceMetrics: ResourceMetrics): void {
-    this.#metrics = [...this.#metrics, resourceMetrics];
+    this.#metrics = [...this.#metrics, resourceMetrics].slice(-120);
     this.#scheduleWrite();
   }
 
@@ -103,10 +129,14 @@ class MemoryDumpWriter {
         traceId: span.spanContext().traceId,
         spanId: span.spanContext().spanId,
         parentSpanId: span.parentSpanContext?.spanId,
+        startTime: span.startTime,
+        endTime: span.endTime,
+        duration: span.duration,
         status: span.status,
         attributes: span.attributes,
         events: span.events.map((event) => ({
           name: event.name,
+          time: event.time,
           attributes: event.attributes,
         })),
       })),
@@ -127,10 +157,10 @@ class MemoryDumpWriter {
 }
 
 class DumpingSpanExporter implements SpanExporter {
-  readonly #inner: InMemorySpanExporter;
+  readonly #inner: LocalSpanExporter;
   readonly #dump: MemoryDumpWriter | undefined;
 
-  constructor(inner: InMemorySpanExporter, dump: MemoryDumpWriter | undefined) {
+  constructor(inner: LocalSpanExporter, dump: MemoryDumpWriter | undefined) {
     this.#inner = inner;
     this.#dump = dump;
   }
@@ -162,11 +192,11 @@ class DumpingSpanExporter implements SpanExporter {
 }
 
 class DumpingMetricExporter implements PushMetricExporter {
-  readonly #inner: InMemoryMetricExporter;
+  readonly #inner: LocalMetricExporter;
   readonly #dump: MemoryDumpWriter | undefined;
 
   constructor(
-    inner: InMemoryMetricExporter,
+    inner: LocalMetricExporter,
     dump: MemoryDumpWriter | undefined,
   ) {
     this.#inner = inner;
@@ -195,9 +225,9 @@ class DumpingMetricExporter implements PushMetricExporter {
   }
 
   selectAggregationTemporality(
-    instrumentType: Parameters<InMemoryMetricExporter["selectAggregationTemporality"]>[0],
+    ..._args: Parameters<NonNullable<PushMetricExporter["selectAggregationTemporality"]>>
   ) {
-    return this.#inner.selectAggregationTemporality(instrumentType);
+    return this.#inner.selectAggregationTemporality();
   }
 
   getMetrics(): ResourceMetrics[] {
@@ -257,10 +287,8 @@ export function startObservabilitySdk(config: ObservabilityConfig): Observabilit
   let exportIntervalMillis = 60_000;
 
   if (config.exporter === "memory") {
-    const innerSpans = new InMemorySpanExporter();
-    const innerMetrics = new InMemoryMetricExporter(
-      AggregationTemporality.CUMULATIVE,
-    );
+    const innerSpans = new LocalSpanExporter(2_000);
+    const innerMetrics = new LocalMetricExporter(120);
     dumpWriter = config.memoryDumpPath
       ? new MemoryDumpWriter(config.memoryDumpPath)
       : undefined;
@@ -282,10 +310,8 @@ export function startObservabilitySdk(config: ObservabilityConfig): Observabilit
     });
   } else {
     // Keep providers registered without network export. Finished data is discarded.
-    spanExporter = new InMemorySpanExporter();
-    pushMetricExporter = new InMemoryMetricExporter(
-      AggregationTemporality.CUMULATIVE,
-    );
+    spanExporter = new LocalSpanExporter(0);
+    pushMetricExporter = new LocalMetricExporter(0);
   }
 
   const spanProcessor: SpanProcessor = new SimpleSpanProcessor(spanExporter);

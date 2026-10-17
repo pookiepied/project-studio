@@ -28,6 +28,7 @@ import { itRuns } from "../helpers/contained.js";
 import { CallGate } from "../../src/tools/gate.js";
 import type { SnapshotHook } from "../../src/snapshots/turn.js";
 import { defineStudioTool, type ToolDefinition } from "../../src/tools/types.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
 
 const SCOPE: ExecutionScope = {
   conversationId: "conv-1",
@@ -118,6 +119,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+  diagnosticRecorder.clear();
   db.close();
   rmSync(workspace, { recursive: true, force: true });
 });
@@ -179,6 +182,19 @@ function hangingTool(): ToolDefinition<Record<string, never>, string> {
 }
 
 describe("nothing runs without passing the gate", () => {
+  it("automatically gives a new schema-declared tool scoped argument observations", async () => {
+    diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: [SCOPE.conversationId] });
+    const instance = gate();
+    const tool = readTool(calls);
+    instance.register({ ...tool, descriptor: { ...tool.descriptor, inputSchema: { type: "object",
+      properties: { path: { type: "string" }, authToken: { type: "string" } } } } });
+    expect(await instance.call({ name: "native/read", input: { path: "src/app.ts", authToken: "opaque" }, scope: SCOPE })).toBe("source");
+    const input = diagnosticRecorder.read().events.find((event) => event.name === "tools.input");
+    expect(input?.identity.conversationId).toBe(SCOPE.conversationId);
+    expect(input?.contentState).toBe("projected");
+    expect(input?.content).toEqual({ path: "src/app.ts", authToken: "[REDACTED]" });
+    expect(input?.identity.operationId).toBeDefined();
+  });
   it("refuses a tool that was never registered", async () => {
     const instance = gate();
 

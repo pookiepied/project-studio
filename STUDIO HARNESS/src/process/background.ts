@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { createStudioUuid } from "../contracts/uuid.js";
+import { OperationObservation } from "../observability/operation.js";
 
 import { buildEnvironment } from "./environment.js";
 import { killProcessTree } from "./exec.js";
@@ -75,6 +77,7 @@ export interface JobStatus {
 }
 
 interface Job {
+  readonly observation: OperationObservation;
   readonly id: string;
   readonly command: string;
   readonly conversationId: string;
@@ -126,18 +129,6 @@ export class BackgroundJobs {
    * fires nothing, because a stop is somebody already watching; see `stop`.
    */
   readonly #endListeners = new Set<(conversationId: string) => void>();
-  #counter = 0;
-  /**
-   * A tag for this runtime, so an id cannot mean two things.
-   *
-   * The registry is in memory, so a restart empties it and every id from
-   * before the restart is already unknown - which is the safe answer. What is
-   * not safe is the counter starting over: a model that remembers `job_1` as
-   * the download it started an hour ago would, after a restart, aim `stop` at
-   * whatever happens to be the first job of the new run. Three characters of
-   * run tag make that a clean "there is no such job" instead.
-   */
-  readonly #tag = Math.random().toString(36).slice(2, 5);
 
   /**
    * Starts a command and returns at once.
@@ -149,9 +140,9 @@ export class BackgroundJobs {
   start(options: StartJobOptions): JobStatus {
     assertRunnableCommand(options.executable, options.args);
 
-    this.#counter += 1;
-    const id = `job_${this.#tag}${this.#counter}`;
+    const id = `job_${createStudioUuid().replaceAll("-", "")}`;
     const job: Job = {
+      observation: new OperationObservation("tool", "background.job", { conversationId: options.conversationId, jobId: id }),
       id,
       command: options.command,
       conversationId: options.conversationId,
@@ -190,6 +181,7 @@ export class BackgroundJobs {
       const wasRunning = job.state === "running";
       job.state = "failed";
       job.error = cause.message;
+      job.observation.finish("failed", { stage: "spawn_error" });
       // A genuine transition, not a confirmation: the job that never started
       // is news the same way an exit is, and the listeners hear it here.
       if (wasRunning) this.#announceEnd(job.conversationId);
@@ -205,6 +197,8 @@ export class BackgroundJobs {
         this.#announceEnd(job.conversationId);
       }
       job.endedAt ??= Date.now();
+      job.observation.finish(job.state === "stopped" ? "cancelled" : job.state === "failed" || job.exitCode !== 0 ? "failed" : "completed",
+        { exitCode: code, stage: "process_closed" });
     });
 
     return statusOf(job);
@@ -247,6 +241,7 @@ export class BackgroundJobs {
     if (job.state === "running") {
       job.state = "stopped";
       job.endedAt = Date.now();
+      job.observation.progress({ stage: "stop_requested" });
       job.kill();
     }
     // A stop is somebody already watching, so there is nothing left to tell
@@ -287,6 +282,7 @@ export class BackgroundJobs {
       if (job.state !== "running") continue;
       job.state = "stopped";
       job.endedAt = Date.now();
+      job.observation.progress({ stage: "shutdown_stop_requested" });
       job.kill();
     }
   }

@@ -1,5 +1,6 @@
 import type { SecureCredentialStore } from "../../credentials/credential-store.js";
 import { RetrievalError } from "./errors.js";
+import { observeOperation } from "../../observability/operation.js";
 import {
   READER_PROVIDERS,
   SEARCH_PROVIDERS,
@@ -62,22 +63,24 @@ export class RetrievalService {
     limit: number,
     signal: AbortSignal | undefined,
   ): Promise<SlotOutcome<SearchResult>> {
-    const slots = await this.#slotsFor("search", SEARCH_PROVIDERS);
-    return runWithFallback(slots, (provider) =>
-      provider.search({ query, limit, signal }),
-    );
+    return observeOperation("provider", "retrieval.search", async () => {
+      const slots = await this.#slotsFor("search", SEARCH_PROVIDERS);
+      return runWithFallback(slots, (provider) => observeOperation("provider", "retrieval.provider",
+        () => provider.search({ query, limit, signal }), { capability: "search", provider: provider.id }));
+    });
   }
 
   async read(
     url: string,
     signal: AbortSignal | undefined,
   ): Promise<SlotOutcome<ReadResult>> {
-    const slots = await this.#slotsFor("reader", READER_PROVIDERS);
-    // The one place `blocked` advances the slot. A site refusing one reader is
-    // exactly what a different reader is for; a search service refusing us is
-    // not. See `runWithFallback`.
-    return runWithFallback(slots, (provider) => provider.read({ url, signal }), {
-      allowFallbackOnBlocked: true,
+    return observeOperation("provider", "retrieval.read", async () => {
+      const slots = await this.#slotsFor("reader", READER_PROVIDERS);
+      // Only a reader's blocked result advances to another provider.
+      return runWithFallback(slots, (provider) => observeOperation("provider", "retrieval.provider",
+        () => provider.read({ url, signal }), { capability: "reader", provider: provider.id }), {
+        allowFallbackOnBlocked: true,
+      });
     });
   }
 

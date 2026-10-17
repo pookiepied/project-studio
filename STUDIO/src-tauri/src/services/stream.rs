@@ -165,6 +165,22 @@ enum Delivery {
     ReaderGone,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum StreamCompletion {
+    Closed,
+    Cancelled,
+    ReaderGone,
+}
+
+impl StreamCompletion {
+    fn observation_outcome(&self) -> &'static str {
+        match self {
+            Self::Closed => "completed",
+            Self::Cancelled | Self::ReaderGone => "cancelled",
+        }
+    }
+}
+
 /// Issues one streaming request to a named side system and delivers its
 /// events over a channel as they arrive.
 ///
@@ -186,7 +202,7 @@ pub async fn service_stream(
     registry: &Arc<StreamRegistry>,
     service: ServiceId,
     path: String,
-    init: ServiceRequestInit,
+    mut init: ServiceRequestInit,
     offset: String,
     stream_id: &str,
     channel: Channel<StreamEvent>,
@@ -198,8 +214,10 @@ pub async fn service_stream(
                     .to_owned(),
         });
     }
+    let request_id = crate::identity::request_id(&mut init.headers);
+    let span = crate::diagnostics::NativeSpan::start("native.stream", Some(request_id), Some(stream_id.to_owned()));
     let (registration, cancel) = registry.register(stream_id);
-    let result = match service {
+    let result = async { match service {
         ServiceId::Harness => {
             let endpoint = supervisor.get_endpoint().ok_or(ServiceError::NotRunning)?;
             harness_stream(
@@ -213,9 +231,10 @@ pub async fn service_stream(
             )
             .await
         }
-    };
+    } }.await;
     drop(registration);
-    result
+    if let Some(span) = span { span.finish(result.as_ref().map_or("failed", StreamCompletion::observation_outcome), None, result.as_ref().err().map(ServiceError::kind)); }
+    result.map(|_| ())
 }
 
 /// Waits for the cancellation signal.
@@ -243,7 +262,7 @@ pub(crate) async fn harness_stream(
     channel: Channel<StreamEvent>,
     heartbeat_every: Duration,
     mut cancel: watch::Receiver<bool>,
-) -> Result<(), ServiceError> {
+) -> Result<StreamCompletion, ServiceError> {
     let url = compose_stream_url(endpoint, path, &offset)?;
     let method = method_from_init(&init)?;
 
@@ -276,7 +295,7 @@ pub(crate) async fn harness_stream(
             // is no reader task yet and nothing to tear down; dropping this
             // future drops the request, which closes the connection.
             log::debug!("service_stream: cancelled while connecting");
-            return Ok(());
+            return Ok(StreamCompletion::Cancelled);
         }
     };
 
@@ -419,14 +438,14 @@ pub(crate) async fn harness_stream(
     let _ = reader.await;
 
     match outcome {
-        Outcome::Closed => Ok(()),
+        Outcome::Closed => Ok(StreamCompletion::Closed),
         Outcome::ReaderGone => {
             // Nothing is wrong with the stream; its consumer is gone. There
             // is nobody to tell, so this is a log line, not an error — and
             // not a silent `Ok(())` either, which would be indistinguishable
             // from a finished run in any future diagnostic that counted them.
             log::debug!("service_stream: the channel stopped accepting; request cancelled");
-            Ok(())
+            Ok(StreamCompletion::ReaderGone)
         }
         Outcome::Cancelled => {
             // Same audience problem as `ReaderGone` — the canceller asked
@@ -436,7 +455,7 @@ pub(crate) async fn harness_stream(
             // Reattaching is the caller's business; the offset it needs was
             // on every event already delivered.
             log::debug!("service_stream: cancelled through its stream id");
-            Ok(())
+            Ok(StreamCompletion::Cancelled)
         }
         Outcome::BodyEnded => {
             // The server closed the connection without the close frame that
@@ -449,8 +468,8 @@ pub(crate) async fn harness_stream(
                     for frame in frames {
                         match deliver(frame, &mut current_offset, &mut up_to_date, &channel) {
                             Ok(Delivery::Continue) => {}
-                            Ok(Delivery::Closed) => return Ok(()),
-                            Ok(Delivery::ReaderGone) => return Ok(()),
+                            Ok(Delivery::Closed) => return Ok(StreamCompletion::Closed),
+                            Ok(Delivery::ReaderGone) => return Ok(StreamCompletion::ReaderGone),
                             Err(message) => {
                                 return Err(ServiceError::StreamBroken { message });
                             }
@@ -1053,6 +1072,8 @@ mod tests {
             result.is_ok(),
             "a gone reader is not a broken stream: {result:?}"
         );
+        assert_eq!(result.expect("reader stopped"), StreamCompletion::ReaderGone);
+        assert_eq!(StreamCompletion::ReaderGone.observation_outcome(), "cancelled");
         assert!(
             eventually(&disconnected, Duration::from_secs(5)),
             "the server never observed the cancellation"

@@ -1,5 +1,27 @@
+diff --git a/dist/agent-coordinator-f9gHF-F5.mjs b/dist/agent-coordinator-f9gHF-F5.mjs
+index 28508021b9a3a5b642c416fbe0e9973928890a4e..56c8248c2a305eba5b7286f4396338746fd593dd 100644
+--- a/dist/agent-coordinator-f9gHF-F5.mjs
++++ b/dist/agent-coordinator-f9gHF-F5.mjs
+@@ -711,6 +711,8 @@ var CloudflareAgentCoordinator = class {
+ 			admitted = adopted;
+ 			deduplicated = true;
+ 		}
++		// [project-studio patch] Optional identity-only source hook before worker scheduling.
++		try { globalThis.__projectStudioObservationSource?.admission?.(input.agent, input.id, admitted.submissionId, deduplicated); } catch {}
+ 		this.emitCoordinatorEvent({
+ 			type: "submission_queued",
+ 			submissionId: admitted.submissionId,
+@@ -796,6 +798,8 @@ var CloudflareAgentCoordinator = class {
+ 				submission = adopted;
+ 				deduplicated = true;
+ 			}
++			// [project-studio patch] Optional identity-only source hook before worker scheduling.
++			try { globalThis.__projectStudioObservationSource?.admission?.(input.agent, input.id, submission.submissionId, deduplicated); } catch {}
+ 			this.emitCoordinatorEvent({
+ 				type: "submission_queued",
+ 				submissionId: submission.submissionId,
 diff --git a/dist/builtin-providers-C5FpT9g1.mjs b/dist/builtin-providers-C5FpT9g1.mjs
-index 63c9b95ea0a8333a7109fce9084ad4068711506d..36f309544930b89f9dbd6f362829d27ee95288c2 100644
+index 63c9b95ea0a8333a7109fce9084ad4068711506d..85da42199a1e998f64fe4b12f091498052716181 100644
 --- a/dist/builtin-providers-C5FpT9g1.mjs
 +++ b/dist/builtin-providers-C5FpT9g1.mjs
 @@ -1,4 +1,6 @@
@@ -52,7 +74,16 @@ index 63c9b95ea0a8333a7109fce9084ad4068711506d..36f309544930b89f9dbd6f362829d27e
  			const claimed = await submissions.claimSubmission({
  				submissionId: submission.submissionId,
  				attemptId: generateAttemptId(),
-@@ -1326,6 +1348,77 @@ function createNodeAgentCoordinator(options) {
+@@ -1297,6 +1319,8 @@ function createNodeAgentCoordinator(options) {
+ 					};
+ 					deduplicated = true;
+ 				}
++				// [project-studio patch] Optional identity-only source hook before worker scheduling.
++				try { globalThis.__projectStudioObservationSource?.admission?.(input.agent, input.id, admission.submission.submissionId, deduplicated); } catch {}
+ 				coordinatorEventEmitter(input)({
+ 					type: "submission_queued",
+ 					submissionId: admission.submission.submissionId,
+@@ -1326,6 +1350,77 @@ function createNodeAgentCoordinator(options) {
  				activityLease?.release();
  			}
  		},
@@ -130,7 +161,16 @@ index 63c9b95ea0a8333a7109fce9084ad4068711506d..36f309544930b89f9dbd6f362829d27e
  		async abortInstance(agentName, instanceId) {
  			const sessionKey = createSessionStorageKey(agentName, instanceId, SUBMISSION_HARNESS_NAME, SUBMISSION_SESSION_NAME);
  			const affected = await submissions.requestSessionAbort(sessionKey);
-@@ -1597,6 +1690,9 @@ async function assembleNodeAgentRuntime(options) {
+@@ -1409,6 +1504,8 @@ function createNodeAgentCoordinator(options) {
+ 						admitted = adopted;
+ 						deduplicated = true;
+ 					}
++					// [project-studio patch] Optional identity-only source hook before worker scheduling.
++					try { globalThis.__projectStudioObservationSource?.admission?.(input.agent, input.id, admitted.submissionId, deduplicated); } catch {}
+ 					coordinatorEventEmitter(input)({
+ 						type: "submission_queued",
+ 						submissionId: admitted.submissionId,
+@@ -1597,6 +1694,9 @@ async function assembleNodeAgentRuntime(options) {
  		activityGate,
  		createAgentAdmission: (agentName, instanceId) => coordinator.createAdmission(agentName, instanceId),
  		abortAgentInstance: (agentName, instanceId) => coordinator.abortInstance(agentName, instanceId),
@@ -141,7 +181,7 @@ index 63c9b95ea0a8333a7109fce9084ad4068711506d..36f309544930b89f9dbd6f362829d27e
  		attachmentStore
  	};
 diff --git a/dist/conversation-stream-store-CXrgv-b0.mjs b/dist/conversation-stream-store-CXrgv-b0.mjs
-index 28be2fc98bba07dfc9628da831dbbe6a029ba970..03c06c17efdff580070dcb5fdc97bd65faa8a3a2 100644
+index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf91447ff1a72 100644
 --- a/dist/conversation-stream-store-CXrgv-b0.mjs
 +++ b/dist/conversation-stream-store-CXrgv-b0.mjs
 @@ -442,14 +442,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
@@ -312,7 +352,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..03c06c17efdff580070dcb5fdc97bd65
  		revert: (submissionId) => submissions.revertJoiningSubmission(attempt, submissionId),
  		listUnresolved: () => submissions.listJoinedSubmissions(attempt.submissionId)
 diff --git a/dist/dispatch-t-UmrrMW.mjs b/dist/dispatch-t-UmrrMW.mjs
-index 7274a8ed2f7a693bcf089743c29c847f079037c2..ec2475b3024e9312b12c32369fc56e0fe1c3a2a3 100644
+index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef91140402 100644
 --- a/dist/dispatch-t-UmrrMW.mjs
 +++ b/dist/dispatch-t-UmrrMW.mjs
 @@ -1,7 +1,7 @@
@@ -575,8 +615,48 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..ec2475b3024e9312b12c32369fc56e0f
  * Node lookup: the root `conversation_created` record is the first record of
  * the instance's stream, so existence and uid come from stream meta plus the
  * first batch.
+diff --git a/dist/events-BhCLb2HD.mjs b/dist/events-BhCLb2HD.mjs
+index b579ec5a5959da9fdde298f03f0feb7e27c29a61..845198a4f83e06a49fd6e46c112475a164e7b843 100644
+--- a/dist/events-BhCLb2HD.mjs
++++ b/dist/events-BhCLb2HD.mjs
+@@ -1,9 +1,14 @@
+ //#region src/observation.ts
+ function createObservation(event, detail) {
++	// [project-studio patch] Reuse keys the mandatory snapshot freeze already
++	// visits. The opt-in host bridge retains bounded key prefixes, never data.
++	// Rebase on createObservation/freezeValue; absent bridges preserve behavior.
++	let source;
++	try { source = globalThis.__projectStudioObservationSource?.capture?.(event); } catch {}
+ 	return freezeValue(cloneValue({
+ 		...event,
+ 		...detail
+-	}));
++	}), new Set(), source);
+ }
+ function cloneValue(value, seen = /* @__PURE__ */ new Map()) {
+ 	if (value === null || typeof value !== "object") return value;
+@@ -20,10 +25,17 @@ function cloneValue(value, seen = /* @__PURE__ */ new Map()) {
+ 	for (const key of Reflect.ownKeys(value)) copy[key] = cloneValue(value[key], seen);
+ 	return copy;
+ }
+-function freezeValue(value, seen = /* @__PURE__ */ new Set()) {
++function freezeValue(value, seen = /* @__PURE__ */ new Set(), source) {
+ 	if (value === null || typeof value !== "object" || seen.has(value)) return value;
+ 	seen.add(value);
+-	for (const key of Reflect.ownKeys(value)) freezeValue(value[key], seen);
++	const keys = Reflect.ownKeys(value);
++	try {
++		if (source?.remaining > 0) {
++			source.remaining--;
++			source.register(value, keys);
++		}
++	} catch {}
++	for (const key of keys) freezeValue(value[key], seen, source);
+ 	return Object.freeze(value);
+ }
+ //#endregion
 diff --git a/dist/observation-CCQRUQQq.d.mts b/dist/observation-CCQRUQQq.d.mts
-index 3bb3d2fbb1be44c40f6621b53b430a692e886e8d..8688f98600f320900c3ef040989010538fb46307 100644
+index 3bb3d2fbb1be44c40f6621b53b430a692e886e8d..c67ed35c29a8e4a80940bfacdda445a1c0433f36 100644
 --- a/dist/observation-CCQRUQQq.d.mts
 +++ b/dist/observation-CCQRUQQq.d.mts
 @@ -59,6 +59,10 @@ interface FlueExecutionContext {
@@ -591,7 +671,7 @@ index 3bb3d2fbb1be44c40f6621b53b430a692e886e8d..8688f98600f320900c3ef04098901053
  type FlueExecutionInterceptor = <T>(operation: FlueExecutionOperation, ctx: FlueExecutionContext, next: () => Promise<T>) => Promise<T>;
  //#endregion
 diff --git a/dist/sql-agent-execution-store-LqbFqydc.mjs b/dist/sql-agent-execution-store-LqbFqydc.mjs
-index 9fdf8f303561d680212644471b225f044955186a..2a253b241bba2442adf7c8ce3f8f1c62e10ef4ba 100644
+index 9fdf8f303561d680212644471b225f044955186a..64bf501b2cbcaf77c55bafdb8055467f95a21789 100644
 --- a/dist/sql-agent-execution-store-LqbFqydc.mjs
 +++ b/dist/sql-agent-execution-store-LqbFqydc.mjs
 @@ -1,3 +1,4 @@
@@ -644,7 +724,7 @@ index 9fdf8f303561d680212644471b225f044955186a..2a253b241bba2442adf7c8ce3f8f1c62
  						 (submission_id, session_key, kind, payload, status, accepted_at)
  						 VALUES (?, ?, ?, ?, 'queued', ?)`, row.submissionId, row.sessionKey, row.kind, row.payload, row.acceptedAt);
 diff --git a/dist/types-B1PuLhZt.d.mts b/dist/types-B1PuLhZt.d.mts
-index 8c2299c8ee6225d171cb9fccb53454d5a18b1441..acfbcc5fbc66e0d5cd36ca086d1c02d37b4ea5ed 100644
+index 8c2299c8ee6225d171cb9fccb53454d5a18b1441..9ad9920991547c6fbeda1603f7bcd2ec56e5b7ce 100644
 --- a/dist/types-B1PuLhZt.d.mts
 +++ b/dist/types-B1PuLhZt.d.mts
 @@ -588,6 +588,19 @@ interface CompactionConfig {

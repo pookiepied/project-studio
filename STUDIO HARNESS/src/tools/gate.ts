@@ -7,12 +7,16 @@ import {
 import { requiresUndoPoint } from "../contracts/effects.js";
 import { isStudioError } from "../contracts/errors.js";
 import type { ErrorReporter } from "../observability/error-reporter.js";
+import { observeOperation, observeSynchronousOperation } from "../observability/operation.js";
 import type { PermissionKernel } from "../permissions/kernel.js";
 import type { LocalSandbox } from "../sandbox/local-sandbox.js";
 import type { SnapshotHook } from "../snapshots/turn.js";
 import { CallBounds, type CallBoundsOptions } from "./bounds.js";
 import { ToolError } from "./errors.js";
 import type { ToolContext, ToolDefinition } from "./types.js";
+import { createObservationWriter, diagnosticRecorder } from "../observability/recorder.js";
+import { diagnosticProjectedContent } from "../observability/diagnostic-value.js";
+import { schemaContentFields } from "../observability/content-fields.js";
 
 /**
  * The single door between "the model asked for something" and "code ran".
@@ -71,6 +75,7 @@ export interface ToolCall {
 
 export class CallGate {
   readonly #tools = new Map<string, RegisteredTool>();
+  readonly #contentFields = new WeakMap<RegisteredTool, readonly string[]>();
   readonly #kernel: PermissionKernel;
   readonly #sandbox: LocalSandbox;
   readonly #reporter: ErrorReporter | undefined;
@@ -111,7 +116,9 @@ export class CallGate {
     this.#bounds.declare(tool.descriptor, tool.deadlineMs);
     // One cast, at the one boundary where the parameter types are erased. The
     // functions are only ever called with values `parse` produced.
-    this.#tools.set(key, tool as unknown as RegisteredTool);
+    const registered = tool as unknown as RegisteredTool;
+    this.#tools.set(key, registered);
+    this.#contentFields.set(registered, tool.descriptor.provenance.origin === "native" ? schemaContentFields(tool.descriptor.inputSchema) : []);
   }
 
   /**
@@ -239,8 +246,16 @@ export class CallGate {
     return undefined;
   }
 
-  async call(call: ToolCall): Promise<unknown> {
+  call(call: ToolCall): Promise<unknown> {
+    return observeOperation("tool", "tools.call", () => this.#call(call), { capability: call.name }, call.scope.conversationId);
+  }
+
+  async #call(call: ToolCall): Promise<unknown> {
     const tool = this.#tools.get(call.name);
+    const record = createObservationWriter();
+    if (tool !== undefined) record({ name: "tools.input", phase: "progress", attributes: { capability: call.name },
+      ...(diagnosticRecorder.capturesContent(call.scope.conversationId)
+        ? { content: diagnosticProjectedContent(call.input, this.#contentFields.get(tool) ?? []) } : {}) });
     if (!tool) {
       // Reported, not silent: a model calling something that does not exist is
       // usually a stale tool list, which is worth seeing in telemetry.
@@ -260,7 +275,7 @@ export class CallGate {
     };
 
     try {
-      const input = tool.parse(call.input);
+      const input = observeSynchronousOperation("tool", "tools.validate", () => tool.parse(call.input));
 
       // Resolved before authorization on purpose. A path outside the workspace
       // is refused whatever the permissions say, and it must never reach the
@@ -277,7 +292,7 @@ export class CallGate {
           ? [tool.resource(input, context)]
           : tool.resources(input, context);
       for (const resource of touched) {
-        await this.#kernel.authorize(
+        await observeOperation("tool", "tools.authorize", () => this.#kernel.authorize(
           tool.descriptor.id,
           call.scope,
           {
@@ -288,14 +303,14 @@ export class CallGate {
             root: this.#sandbox.policy.workspaceRoot,
           },
           call.signal,
-        );
+        ));
       }
       const resource = touched[0];
       // Permission is not containment. Approval says the user agreed; this says
       // we can actually hold the boundary. Both are required, and the sandbox
       // is asked second so an unapproved call is refused before we consider
       // whether we could have contained it.
-      this.#sandbox.assertSupports(tool.descriptor);
+      observeSynchronousOperation("tool", "tools.containment", () => this.#sandbox.assertSupports(tool.descriptor));
 
       if (call.signal?.aborted) {
         throw new ToolError("cancelled", {
@@ -316,11 +331,12 @@ export class CallGate {
       // anyway, and nothing noticed. `execute` earns a restore point for the
       // same reason it earns an approval — we did not choose the program, so we
       // cannot know what it touched. See `T-14`.
-      if (this.#snapshots && requiresUndoPoint(tool.descriptor)) {
-        await this.#snapshots.beforeWrite(
+      const snapshots = this.#snapshots;
+      if (snapshots && requiresUndoPoint(tool.descriptor)) {
+        await observeOperation("tool", "tools.snapshot", () => snapshots.beforeWrite(
           resource,
           resource === undefined ? "none" : tool.resourceKind,
-        );
+        ));
       }
 
       // Bounds wrap execution and nothing before it. Authorization can put a

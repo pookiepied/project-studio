@@ -1,5 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createStudioUuid } from "../../contracts/uuid.js";
+import { runWithExecutionContext } from "../../execution/context.js";
+import { OperationObservation, observeOperation } from "../../observability/operation.js";
 
 import type { CapabilitySlot } from "../../contracts/providers.js";
 import type { Generation, MediaBytes, PolledGeneration } from "./adapters/types.js";
@@ -96,6 +99,7 @@ export interface MediaJobsOptions {
 }
 
 interface Job {
+  readonly observation: OperationObservation;
   readonly id: string;
   readonly conversationId: string;
   readonly slot: CapabilitySlot;
@@ -155,9 +159,6 @@ export class MediaJobs {
   readonly #now: () => number;
   readonly #intervals: readonly number[];
   readonly #maxDurationMs: number;
-  #counter = 0;
-  /** The same run tag `BackgroundJobs` uses, for the same reason: an id from before a restart must mean nothing. */
-  readonly #tag = Math.random().toString(36).slice(2, 5);
 
   constructor(options: MediaJobsOptions) {
     this.#artifactsDirectory = options.artifactsDirectory;
@@ -169,13 +170,15 @@ export class MediaJobs {
 
   /** Starts driving a generation and returns its status at once. */
   start(options: StartMediaJobOptions): MediaJobStatus {
-    this.#counter += 1;
-    const id = `media_${this.#tag}${this.#counter}`;
+    const id = `media_${createStudioUuid().replaceAll("-", "")}`;
     let settle: () => void = () => {};
     const settled = new Promise<void>((resolve) => {
       settle = resolve;
     });
     const job: Job = {
+      observation: new OperationObservation("provider", "media.job", { conversationId: options.conversationId, jobId: id,
+        ...(options.generation.shape === "poll" ? { externalJobId: options.generation.job.id } : {}) },
+        { slot: options.slot, modelId: options.modelId, shape: options.generation.shape }),
       id,
       conversationId: options.conversationId,
       slot: options.slot,
@@ -193,7 +196,7 @@ export class MediaJobs {
     };
     this.#jobs.set(id, job);
 
-    void this.#drive(job, options.generation);
+    void runWithExecutionContext(job.observation.execution, () => this.#drive(job, options.generation));
     return statusOf(job);
   }
 
@@ -302,13 +305,14 @@ export class MediaJobs {
           return;
         }
 
-        const outcome = await generation.job.poll();
+        const outcome = await observeOperation("provider", "media.poll", () => generation.job.poll());
         if (job.state !== "queued" && job.state !== "running") return;
 
         switch (outcome.state) {
           case "queued":
           case "running":
             job.state = outcome.state;
+            job.observation.progress({ stage: outcome.state });
             // The last word the vendor gave stands until it gives another:
             // a poll that says only "running" is not news that the earlier
             // progress line was wrong.
@@ -368,6 +372,7 @@ export class MediaJobs {
   #end(job: Job, state: MediaJobState): void {
     job.state = state;
     job.endedAt = this.#now();
+    job.observation.finish(state === "done" ? "completed" : state === "stopped" ? "cancelled" : "failed", { state, outputCount: job.outputs.length });
     job.settle();
     // Fired while the job still reads untold, so whoever hears the news is
     // the one whose drain delivers it - the same arbiter the tool-result

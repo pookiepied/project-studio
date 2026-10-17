@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ExtendError } from "../../src/extend/errors.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
 import type { McpChannel } from "../../src/extend/mcp/connection.js";
 import { LEGACY_PROTOCOL_VERSIONS } from "../../src/extend/mcp/handshake.js";
 import type { McpServerRecord } from "../../src/extend/mcp/registry.js";
@@ -127,6 +128,32 @@ function scriptedSupervisor(options: {
 }
 
 describe("supervising MCP servers", () => {
+  it("retains one supervision operation with a distinct attempt for each real retry", async () => {
+    diagnosticRecorder.clear();
+    diagnosticRecorder.configure({ enabled: true });
+    let launches = 0;
+    const supervisor = scriptedSupervisor({ launch: async () => {
+      launches++;
+      if (launches === 1) throw new ExtendError("internal");
+      return new ScriptedChannel();
+    }, backoff: IMMEDIATE });
+    try {
+      await expect(supervisor.ensure(RECORD)).rejects.toBeInstanceOf(ExtendError);
+      await settle();
+      expect(supervisor.status(RECORD.id)?.state).toBe("ready");
+      const starts = diagnosticRecorder.read().events.filter((event) => event.name === "mcp.start" && event.phase === "start");
+      expect(starts).toHaveLength(2);
+      expect(starts[0]?.identity.operationId).toBe(starts[1]?.identity.operationId);
+      expect(starts[0]?.identity.attemptId).not.toBe(starts[1]?.identity.attemptId);
+      const ready = diagnosticRecorder.read().events.find((event) => event.name === "mcp.start" && event.outcome === "completed");
+      expect(ready?.attributes.connectionId).toBeDefined();
+      expect(ready?.attributes.serverId).toBe(RECORD.id);
+    } finally {
+      await supervisor.stopAll();
+      diagnosticRecorder.configure({ enabled: false });
+      diagnosticRecorder.clear();
+    }
+  });
   describe("starting", () => {
     it("starts a server on first use and reports it ready", async () => {
       let launches = 0;

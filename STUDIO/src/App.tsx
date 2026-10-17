@@ -12,6 +12,7 @@ import {
 import { AppShell } from '@/shell/AppShell'
 import { ComputerIndicatorWindow } from '@/shell/ComputerIndicatorWindow'
 import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
+import { CaptureMonitor } from '@/shell/CaptureMonitor'
 import { DetachedShell } from '@/shell/DetachedShell'
 import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
@@ -97,6 +98,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
           <WorkspaceProvider>
           <RailProvider>
             <NavigationProvider>
+              <CaptureMonitor />
               {detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
             </NavigationProvider>
           </RailProvider>

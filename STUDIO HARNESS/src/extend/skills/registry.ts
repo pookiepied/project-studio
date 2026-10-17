@@ -7,6 +7,7 @@ import { buildPackagedSkill, createSkillReference, parseSkillMarkdown } from "@f
 import { ExtendError } from "../errors.js";
 import type { ExtensionSummary } from "../inventory.js";
 import { installationRoot, userSkillsDirectory } from "../../platform/paths.js";
+import { observeSynchronousOperation } from "../../observability/operation.js";
 
 /**
  * The skills installed on this machine.
@@ -193,6 +194,10 @@ export class SkillRegistry {
    * file.
    */
   reference(id: string): SkillReference {
+    return observeSynchronousOperation("skill", "skill.package", () => this.#reference(id));
+  }
+
+  #reference(id: string): SkillReference {
     const record = this.get(id);
     if (record === undefined) {
       throw new ExtendError("not_installed", {

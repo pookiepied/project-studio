@@ -3,6 +3,7 @@ import { MediaError } from "../../contracts/media.js";
 import type { CapabilityResolver, CapabilityResolution } from "../connections/capability-defaults.js";
 import { libraryBaseUrlFor } from "../catalog/index.js";
 import type { DriverEndpoint } from "./drivers/types.js";
+import { createObservationWriter } from "../../observability/recorder.js";
 
 /**
  * Binding a capability slot to a media driver.
@@ -58,6 +59,7 @@ export async function bindGenerationSlot(
   slot: GenerationSlot,
   requestedModelId?: string,
 ): Promise<MediaBinding & { readonly protocol: MediaProtocol }> {
+  const record = createObservationWriter();
   const resolution: CapabilityResolution | undefined = await resolver.resolve(slot);
   if (resolution === undefined) {
     throw new MediaError(
@@ -74,6 +76,8 @@ export async function bindGenerationSlot(
     );
   }
   const baseUrl = addressOf(connection, slot);
+  record({ name: "media.binding", phase: "progress", attributes: { stage: "resolved", slot,
+    connectionId: connection.id, protocol, modelId: requestedModelId ?? model.modelId } });
   return {
     slot,
     protocol,
@@ -93,6 +97,7 @@ export async function bindDocumentSlot(
   resolver: CapabilityResolver,
   requestedModelId?: string,
 ): Promise<MediaBinding & { readonly protocol: MediaProtocol }> {
+  const record = createObservationWriter();
   const slot = "documentReading";
   const resolution: CapabilityResolution | undefined = await resolver.resolve(slot);
   if (resolution === undefined) {
@@ -109,10 +114,13 @@ export async function bindDocumentSlot(
       `The connected ${LABELS[slot]} provider serves no media wire.`,
     );
   }
+  const baseUrl = addressOf(connection, slot);
+  record({ name: "media.binding", phase: "progress", attributes: { stage: "resolved", slot,
+    connectionId: connection.id, protocol, modelId: requestedModelId ?? model.modelId } });
   return {
     slot,
     protocol,
-    baseUrl: addressOf(connection, slot),
+    baseUrl,
     credential: resolution.credential,
     modelId: requestedModelId ?? model.modelId,
   };
@@ -123,6 +131,7 @@ export async function bindAudioSlot(
   slot: "speechGeneration" | "transcription",
   requestedModelId?: string,
 ): Promise<MediaBinding> {
+  const record = createObservationWriter();
   const resolution: CapabilityResolution | undefined = await resolver.resolve(slot);
   if (resolution === undefined) {
     throw new MediaError(
@@ -148,6 +157,8 @@ export async function bindAudioSlot(
     );
   }
   const baseUrl = addressOf(connection, slot);
+  record({ name: "media.binding", phase: "progress", attributes: { stage: "resolved", slot,
+    connectionId: connection.id, protocol, modelId: requestedModelId ?? model.modelId } });
 
   return {
     slot,

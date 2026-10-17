@@ -3,6 +3,10 @@ import { dispatch, type DeliveredMessageInput } from "@flue/runtime";
 import { agentRegistry } from "./index.js";
 import { AgentRegistryError } from "./registry.js";
 import type { TaskStore } from "./task-store.js";
+import { observeOperation } from "../../observability/operation.js";
+import { currentExecutionContext } from "../../execution/context.js";
+import { forgetProvisionalInvocation, rememberInvocation } from "../../observability/invocations.js";
+import { createObservationWriter } from "../../observability/recorder.js";
 
 /**
  * The one in-process dispatcher for background agents (ADR 0058 D5).
@@ -65,6 +69,8 @@ export interface BackgroundTaskContext {
   readonly parentConversationId?: string | undefined;
   /** The rail row's label, when the caller has a better one than the title. */
   readonly title?: string | undefined;
+  /** Diagnostic scope only; does not announce task results or grant authority. */
+  readonly diagnosticConversationId?: string;
 }
 
 export async function dispatchBackgroundAgent(
@@ -73,44 +79,57 @@ export async function dispatchBackgroundAgent(
   message: DeliveredMessageInput,
   context: BackgroundTaskContext,
 ): Promise<string> {
-  const registered = agentRegistry.get(agentName);
-  if (registered === undefined || registered.definition.kind !== "background") {
-    // Names are pinned literals shared with the caller's module, so this is
-    // a build-time authoring failure showing up at dispatch time - the
-    // registry's own error vocabulary, not a generic "unknown agent".
-    throw new AgentRegistryError(
-      "invalid",
-      `No background agent named "${agentName}" is registered.`,
-      { agentName },
-    );
-  }
-  // Before the dispatch, deliberately: the row is the index of work attempted,
-  // and recording after the receipt would lose every task whose process died
-  // between admission and receipt - the one crash the durable submission
-  // survives and an after-the-fact row would not.
-  context.tasks.record({
-    id,
-    agentName,
-    ...(context.parentConversationId === undefined
-      ? {}
-      : { parentConversationId: context.parentConversationId }),
-    ...(context.title === undefined ? {} : { title: context.title }),
-  });
-  try {
-    const receipt = await dispatch(registered.agent, { id, message });
-    context.tasks.setOriginSubmission(id, receipt.submissionId);
-    return receipt.submissionId;
-  } catch (error) {
-    // The dispatch was refused - runtime not configured, target unavailable,
-    // process shutting down. The row exists because it was written first, so
-    // the failure it indexes is settled here, with the reason the rail can
-    // show; the error itself continues to the caller, which has its own
-    // handling (the titler logs and ends its ladder, the improver rejects).
-    context.tasks.setStatus(
+  return observeOperation("subagent", "background.dispatch", async () => {
+    const execution = currentExecutionContext();
+    const conversationId = context.diagnosticConversationId ?? context.parentConversationId;
+    const record = createObservationWriter();
+    const registered = agentRegistry.get(agentName);
+    if (registered === undefined || registered.definition.kind !== "background") {
+      // Names are pinned literals shared with the caller's module, so this is
+      // a build-time authoring failure showing up at dispatch time - the
+      // registry's own error vocabulary, not a generic "unknown agent".
+      throw new AgentRegistryError(
+        "invalid",
+        `No background agent named "${agentName}" is registered.`,
+        { agentName },
+      );
+    }
+    // Before the dispatch, deliberately: the row is the index of work attempted,
+    // and recording after the receipt would lose every task whose process died
+    // between admission and receipt - the one crash the durable submission
+    // survives and an after-the-fact row would not.
+    context.tasks.record({
       id,
-      "failed",
-      `The task never started: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    throw error;
-  }
+      agentName,
+      ...(context.parentConversationId === undefined
+        ? {}
+        : { parentConversationId: context.parentConversationId }),
+      ...(context.title === undefined ? {} : { title: context.title }),
+    });
+    const linkSubmission = execution === undefined ? undefined : rememberInvocation(agentName, id, execution, conversationId);
+    try {
+      const receipt = await dispatch(registered.agent, { id, message });
+      linkSubmission?.(receipt.submissionId, receipt.deduplicated === true);
+      record({ name: "background.admitted", phase: "end", outcome: "completed",
+        identity: { agentName, agentInstanceId: id, submissionId: receipt.submissionId,
+          ...(execution === undefined ? {} : { invocationId: execution.operationId }),
+          ...(conversationId === undefined ? {} : { conversationId }) } });
+      context.tasks.setOriginSubmission(id, receipt.submissionId);
+      return receipt.submissionId;
+    } catch (error) {
+      // The dispatch was refused - runtime not configured, target unavailable,
+      // process shutting down. The row exists because it was written first, so
+      // the failure it indexes is settled here, with the reason the rail can
+      // show; the error itself continues to the caller, which has its own
+      // handling (the titler logs and ends its ladder, the improver rejects).
+      context.tasks.setStatus(
+        id,
+        "failed",
+        `The task never started: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    } finally {
+      if (execution !== undefined) forgetProvisionalInvocation(execution.operationId);
+    }
+  }, { agentName, agentInstanceId: id }, context.diagnosticConversationId ?? context.parentConversationId);
 }

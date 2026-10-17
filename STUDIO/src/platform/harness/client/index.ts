@@ -37,6 +37,7 @@ import { libraryClient, type LibraryClient } from './library'
 import { documentClient, type DocumentClient } from './documents'
 import { taskClient, type TaskClient } from './tasks'
 import { agentClient, type AgentClient } from './agents'
+import { diagnosticClient, type DiagnosticClient } from './diagnostics'
 
 export type {
   HarnessAddress,
@@ -60,7 +61,8 @@ export interface HarnessClient
     DecisionClient,
     ProjectClient,
     TaskClient,
-    AgentClient {}
+    AgentClient,
+    DiagnosticClient {}
 
 export function createHarnessClient(options: HarnessClientOptions): HarnessClient {
   const request = createRequester(options)
@@ -77,5 +79,6 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     ...projectClient(request),
     ...taskClient(request),
     ...agentClient(request),
+    ...diagnosticClient(request),
   }
 }

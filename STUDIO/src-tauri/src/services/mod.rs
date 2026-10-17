@@ -147,7 +147,7 @@ fn is_refused_route(path: &str) -> bool {
 /// Hono does: an encoded `%2F` inside a segment stays content and never
 /// becomes a separator. Decoding the whole path first would invent separators
 /// the router never sees, and could refuse a legitimate id that carries one.
-fn canonical_route(path: &str) -> String {
+pub(crate) fn canonical_route(path: &str) -> String {
     let addressed = path.split(['?', '#']).next().unwrap_or("");
     let mut resolved: Vec<String> = Vec::new();
     for segment in addressed.split('/') {

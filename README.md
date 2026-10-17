@@ -191,6 +191,11 @@ code tests nothing.
 
 `documentation/` is the only documentation root.
 
+Identity and instrumentation follow the [observability developer contract](documentation/architecture/observability.md).
+Local Diagnostics settings provide opt-in bounded recording, scoped content,
+stop, clear and export controls. Capture starts disabled and needs no account.
+The separate external AI inspector is a later project.
+
 | Path | What it holds |
 |---|---|
 | [`project-map.md`](documentation/project-map.md) | Where everything lives. Read first. |

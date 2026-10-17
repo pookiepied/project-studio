@@ -136,6 +136,21 @@ minimumReleaseAgeExclude:
 #       only while a row remains queued. tests/integration/stop.test.ts pins
 #       separate delivery, image restoration and refusal after a run starts.
 #
+#   11. events-*.mjs, createObservation/freezeValue - an optional local
+#       observation-source bridge reuses the keys already visited while
+#       freezing the detached snapshot. The host keeps bounded prefixes only
+#       for explicitly scoped content capture. No event fields, execution or
+#       persistence semantics change; absent/failed bridges are ignored.
+#       Observability integration tests pin original-envelope capture.
+#
+#   12. agent-coordinator-*.mjs and builtin-providers-*.mjs, direct/dispatch
+#       admission - an optional identity-only source hook receives agent,
+#       instance, actual submission ID and the real deduplication flag before
+#       worker scheduling. This prevents concurrent admission from inheriting
+#       another request's parent. Bodies and credentials never cross the hook;
+#       callback failures are ignored and public/persisted event shapes stay
+#       unchanged. Re-anchor at admission immediately before submission_queued.
+#
 #   How to re-derive at the next upgrade: every hunk carries its own recipe
 #   in a `[project-studio patch]` comment, and every recipe says to anchor
 #   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of

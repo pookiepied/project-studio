@@ -5,6 +5,9 @@ import { dispatchBackgroundAgent } from "../../src/agents/definitions/dispatch.j
 import { AgentRegistryError } from "../../src/agents/definitions/registry.js";
 import { IMPROVE_AGENT_ID, STUDIO_AGENT_ID, TITLE_AGENT_ID } from "../../src/contracts/agents.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
+import { createRootExecutionContext, runWithExecutionContext } from "../../src/execution/context.js";
+import { invocationFor } from "../../src/observability/invocations.js";
 
 /**
  * The task index (ADR 0058 D5, Stage 2: the store, no routes).
@@ -24,6 +27,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+  diagnosticRecorder.clear();
   db.close();
 });
 
@@ -155,8 +160,11 @@ describe("the task index", () => {
  */
 describe("the background dispatcher's row", () => {
   it("records the row first and settles it failed when the dispatch is refused", async () => {
+    diagnosticRecorder.configure({ enabled: true });
+    const root = createRootExecutionContext();
     await expect(
-      dispatchBackgroundAgent(TITLE_AGENT_ID, "cnv_a-t1", "Name this.", { tasks }),
+      runWithExecutionContext(root, () => dispatchBackgroundAgent(TITLE_AGENT_ID, "cnv_a-t1", "Name this.",
+        { tasks, diagnosticConversationId: "cnv_a" })),
     ).rejects.toThrow();
 
     const row = tasks.get("cnv_a-t1");
@@ -164,6 +172,11 @@ describe("the background dispatcher's row", () => {
     expect(row?.status).toBe("failed");
     expect(row?.resultSummary).toContain("The task never started:");
     expect(row?.settledAt).toBeTypeOf("number");
+    const events = diagnosticRecorder.read().events;
+    expect(events.map((event) => [event.name, event.phase])).toEqual([["background.dispatch", "start"], ["background.dispatch", "end"]]);
+    expect(events[1]?.outcome).toBe("failed");
+    expect(events[0]?.identity).toMatchObject({ requestId: root.requestId, parentOperationId: root.operationId, conversationId: "cnv_a" });
+    expect(invocationFor(TITLE_AGENT_ID, "cnv_a-t1")).toBeUndefined();
   });
 
   it("records a named parent conversation and title verbatim", async () => {

@@ -36,6 +36,8 @@ import { createAgentRoutes } from "./routes/agents.js";
 import type { CompactionReadiness } from "../../conversations/compaction.js";
 import type { ConversationSnapshots } from "../../snapshots/store.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
+import { createDiagnosticRoutes } from "./routes/diagnostics.js";
+import { createObservationRoutes } from "./routes/observations.js";
 import { createMediaRoutes } from "./routes/media.js";
 import type { TextImproverPort } from "../../application/text-improver.js";
 import { createMcpRoutes } from "./routes/mcp.js";
@@ -240,6 +242,11 @@ export interface CreateHttpAppOptions {
 export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv> {
   const app = new Hono<AdmissionEnv>();
   app.use("*", createAdmissionMiddleware(options.admission));
+  app.use("/api/diagnostics/*", requireAdmissionScope(ADMISSION_SCOPES.DIAGNOSTIC));
+  app.route("/api/diagnostics", createDiagnosticRoutes());
+  app.use("/api/observations/*", requireAdmissionScope(ADMISSION_SCOPES.AGENT_RUN));
+  app.use("/api/observations/native", requireAdmissionScope(ADMISSION_SCOPES.DIAGNOSTIC));
+  app.route("/api/observations", createObservationRoutes());
 
   app.route("/api/mcp", createMcpRoutes(options.servers));
   app.route("/api/skills", createSkillRoutes(options.skills));

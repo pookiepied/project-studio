@@ -1,4 +1,6 @@
 mod harness;
+mod diagnostics;
+mod identity;
 mod clipboard;
 mod permissions;
 mod remote;
@@ -815,7 +817,11 @@ pub fn run() {
         }
       }
     })
-    .invoke_handler(tauri::generate_handler![
+    .invoke_handler({
+      let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+      diagnostics::diagnostic_capture_sync,
+      diagnostics::diagnostic_capture_snapshot,
+      diagnostics::diagnostic_capture_clear,
       app_ready,
       open_conversation_window,
       open_diagnostic_window,
@@ -840,7 +846,12 @@ pub fn run() {
       remote_device_revoke,
       remote_device_revoke_all,
       remote_addresses
-    ])
+      ];
+      move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
+        diagnostics::command_received(invoke.message.command());
+        handler(invoke)
+      }
+    })
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
     .run(move |app_handle, event| {

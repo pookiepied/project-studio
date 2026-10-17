@@ -66,7 +66,8 @@
 
 import { invoke as tauriInvoke } from '@tauri-apps/api/core'
 
-import { newId } from '@/lib/id'
+import { newId, newUuid } from '@/lib/id'
+import { recordClientObservation } from '@/platform/diagnostics/events'
 import { isTauri } from '@/platform/tauri'
 import { harnessTransport } from './transport'
 import {
@@ -444,9 +445,11 @@ export function createConversationClient(options: ConversationClientOptions): Co
     method: string,
     path: string,
     body: string | undefined,
+    requestId = newUuid(),
   ): Promise<{ status: number; bodyText: string } | { failure: SeamFailure }> {
     const headers: readonly (readonly [string, string])[] = [
       ['accept', 'application/json'],
+      ['x-project-studio-request-id', requestId],
       ...(body === undefined ? [] : ([['content-type', 'application/json']] as const)),
     ]
     try {
@@ -507,6 +510,9 @@ export function createConversationClient(options: ConversationClientOptions): Co
     },
 
     async submitTurn(message, settings, images) {
+      const requestId = newUuid()
+      const identity = { conversationId, requestId }
+      recordClientObservation({ name: 'client.submission', phase: 'start', identity })
       // Never retried, here or above: an identical resend is a SECOND TURN
       // (the harness pins this behaviour in its own test), so a retry loop
       // would be duplication wearing a retry's clothes.
@@ -550,10 +556,14 @@ export function createConversationClient(options: ConversationClientOptions): Co
         // conversation somebody moved.
         ...(wire.projectId === undefined ? {} : { projectId: wire.projectId }),
         ...(carried.length === 0 ? {} : { attachments: carried }),
-      }))
-      if ('failure' in sent) return { ok: false, error: sent.failure }
+      }), requestId)
+      if ('failure' in sent) {
+        recordClientObservation({ name: 'client.submission', phase: 'end', identity, outcome: 'unknown', attributes: { failure: sent.failure.kind } })
+        return { ok: false, error: sent.failure }
+      }
 
       if (sent.status < 200 || sent.status >= 300) {
+        recordClientObservation({ name: 'client.submission', phase: 'end', identity, outcome: 'failed', attributes: { status: sent.status } })
         return { ok: false, error: refusalOf(sent.status, sent.bodyText) }
       }
 
@@ -561,6 +571,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
       try {
         admission = JSON.parse(sent.bodyText)
       } catch {
+        recordClientObservation({ name: 'client.submission', phase: 'end', identity, outcome: 'unknown', attributes: { failure: 'malformed-receipt' } })
         return {
           ok: false,
           error: {
@@ -572,6 +583,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
       const submissionId = isRecord(admission) ? nonEmpty(admission['submissionId']) : null
       const offset = isRecord(admission) ? nonEmpty(admission['offset']) : null
       if (submissionId === null || offset === null) {
+        recordClientObservation({ name: 'client.submission', phase: 'end', identity, outcome: 'unknown', attributes: { failure: 'incomplete-receipt' } })
         return {
           ok: false,
           error: {
@@ -581,11 +593,14 @@ export function createConversationClient(options: ConversationClientOptions): Co
           },
         }
       }
+      recordClientObservation({ name: 'client.submission', phase: 'end', identity: { ...identity, submissionId }, outcome: 'completed', attributes: { stage: 'admitted' } })
       return { ok: true, value: { submissionId, offset } }
     },
 
     attach(handlers, attachOptions) {
       const streamId = newId('stream')
+      const streamIdentity = { conversationId, streamId }
+      recordClientObservation({ name: 'client.stream', phase: 'start', identity: streamIdentity })
       const previous = active
 
       // One settle, whichever fact arrives first: the `Ended` delivery, the
@@ -610,6 +625,9 @@ export function createConversationClient(options: ConversationClientOptions): Co
           if (!done) {
             done = true
             if (active === registration) active = null
+            recordClientObservation({ name: 'client.stream', phase: 'end', identity: streamIdentity,
+              outcome: settlement.outcome === 'cancelled' ? 'cancelled' : settlement.outcome === 'broken' || settlement.outcome === 'refused' ? 'failed' : 'completed',
+              attributes: { settlement: settlement.outcome } })
             resolve(settlement)
           }
         }
@@ -622,6 +640,8 @@ export function createConversationClient(options: ConversationClientOptions): Co
         if (done) return
         // Every variant carries the resume point; none is exempt.
         trackedOffset = event.offset
+        if (event.kind !== 'keep-alive') recordClientObservation({ name: 'client.delivery', phase: 'progress', identity: streamIdentity,
+          attributes: { kind: event.kind, replaying: !upToDate, ...(event.kind === 'frame' ? { characters: event.data.length } : {}) } })
         switch (event.kind) {
           case 'frame': {
             if (event.event !== undefined && event.event !== 'data') {
@@ -668,6 +688,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
           }
           case 'up-to-date':
             upToDate = true
+            recordClientObservation({ name: 'client.stream', phase: 'progress', identity: streamIdentity, attributes: { stage: 'caught_up' } })
             handlers.onEvent(event)
             return
           case 'keep-alive':
@@ -713,6 +734,8 @@ export function createConversationClient(options: ConversationClientOptions): Co
       const openFromHistory = () => {
         void (async () => {
           const answer = await request('GET', historyPath(), undefined)
+          recordClientObservation({ name: 'client.stream', phase: 'progress', identity: streamIdentity,
+            attributes: { stage: 'history_received', stopped, failed: 'failure' in answer } })
           if (done || stopped) return
           if ('failure' in answer) {
             resolveSettled(

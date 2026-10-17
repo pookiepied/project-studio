@@ -5,9 +5,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import { LEASE_DURATION_MS } from "@flue/runtime/adapter";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient } from "../../src/application/harness-client.js";
+import type { DiagnosticPage } from "../../src/contracts/diagnostics.js";
 
 /**
  * Background agent tasks, end to end, through the real built harness
@@ -273,6 +275,9 @@ describe.sequential("background agent tasks, end to end", () => {
       // is always indexed. The settlement then arrives from the stream, not
       // from anything this route path did.
       const running = await startHarness(await createDatabasePath());
+      const policy = await authorized(running, "/api/diagnostics/policy", { method: "PUT",
+        body: JSON.stringify({ enabled: true, captureContent: true, conversations: ["cnv_task_settles"] }) });
+      expect(policy.status).toBe(200);
       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
       const conversationId = "cnv_task_settles";
 
@@ -306,6 +311,19 @@ describe.sequential("background agent tasks, end to end", () => {
       const settledRow = rowFor(await listTasks(running), conversationId);
       expect(settledRow?.status).toBe("completed");
       expect(settledRow?.resultSummary).toBeDefined();
+      const evidence = await authorized(running, "/api/diagnostics/events?limit=500");
+      const page = await evidence.json() as DiagnosticPage;
+      const admission = page.events.find((event) => event.name === "http.admission" && event.identity.submissionId === sent.submissionId);
+      const background = page.events.find((event) => event.name === "background.admitted" && event.identity.agentName === "title");
+      expect(admission?.identity.requestId).toBeDefined();
+      expect(background?.identity).toMatchObject({ requestId: admission?.identity.requestId,
+        conversationId, agentName: "title", agentInstanceId: conversationId });
+      expect(background?.identity.invocationId).toBeDefined();
+      const titleTurns = page.events.filter((event) => event.name === "runtime.turn_request" &&
+        event.identity.submissionId === background?.identity.submissionId);
+      expect(titleTurns.length).toBeGreaterThan(0);
+      expect(titleTurns.every((event) => event.identity.requestId === admission?.identity.requestId &&
+        event.identity.conversationId === conversationId && event.identity.invocationId === background?.identity.invocationId)).toBe(true);
     },
     90_000,
   );
@@ -389,7 +407,10 @@ describe.sequential("background agent tasks, end to end", () => {
       await waitUntil(async () => {
         const rows = await listTasks(second);
         return rows.find((task) => task.id === taskId)?.status !== "running";
-      }, 30_000);
+      // A killed owner retains its 30s lease. Node scans expired leases every
+      // 15s, then the fixture holds the recovered model for another 12s. The
+      // previous 30s deadline expired before valid recovery could complete.
+      }, LEASE_DURATION_MS + 45_000);
       // The row settles from the replacement run's settlement - whatever the
       // stream said. Measured here: a submission killed mid-attempt is
       // re-run by the restart's reconciliation, and the runtime's own

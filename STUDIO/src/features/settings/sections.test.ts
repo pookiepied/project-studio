@@ -16,7 +16,7 @@ describe('the settings taxonomy', () => {
       SETTINGS_GROUPS.map((group) => [group.id, group.sections.map((section) => section.id)]),
     )
 
-    expect(members.get('application')).toEqual(['general', 'appearance', 'devices', 'shortcuts'])
+    expect(members.get('application')).toEqual(['general', 'appearance', 'devices', 'shortcuts', 'diagnostics'])
     expect(members.get('account')).toEqual(['account', 'library', 'personalization'])
     expect(members.get('providers')).toEqual(['models', 'media', 'tools'])
     expect(members.get('extensions')).toEqual(['mcp', 'connectors', 'browser-use'])

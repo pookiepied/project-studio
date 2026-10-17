@@ -4,6 +4,11 @@ import { handshake, type McpSession } from "./handshake.js";
 import type { McpServerRecord } from "./registry.js";
 import { getBackoffDelay, type BackoffOptions } from "../../reliability/backoff.js";
 import { transition, type LifecycleEvent, type LifecycleState } from "./wire/lifecycle.js";
+import { createChildExecutionContext, createRetryExecutionContext, createRootExecutionContext,
+  currentExecutionContext, runWithExecutionContext, type ExecutionContext } from "../../execution/context.js";
+import { createObservationWriter } from "../../observability/recorder.js";
+import { observationFailure } from "../../observability/operation.js";
+import { performance } from "node:perf_hooks";
 
 /**
  * The live half of MCP: which servers are running, and what to do when one is
@@ -103,6 +108,7 @@ export interface McpServerStatus {
 }
 
 interface Entry {
+  execution: ExecutionContext | undefined;
   readonly record: McpServerRecord;
   /** The launcher's answer, kept so an entry can report and remove itself. */
   readonly key: string;
@@ -313,6 +319,7 @@ export class McpSupervisor {
     if (existing !== undefined) return existing;
 
     const entry: Entry = {
+      execution: undefined,
       record,
       state: { kind: "idle" },
       connection: undefined,
@@ -346,14 +353,31 @@ export class McpSupervisor {
   #beginStart(entry: Entry): Promise<McpConnection> {
     this.#apply(entry, { kind: "start" });
     entry.generation += 1;
+    const parent = currentExecutionContext();
+    entry.execution = entry.execution === undefined
+      ? parent ? createChildExecutionContext(parent, { kind: "mcp" }) : createRootExecutionContext({ kind: "mcp" })
+      : createRetryExecutionContext(entry.execution);
 
-    const started: Promise<McpConnection> = this.#bringUp(
-      entry,
-      entry.generation,
+    const started: Promise<McpConnection> = runWithExecutionContext(entry.execution, async () => {
+      const record = createObservationWriter();
+      const began = performance.now();
+      const attributes = { serverId: entry.record.id, generation: entry.generation };
+      record({ name: "mcp.start", phase: "start", attributes });
+      try {
+        const connection = await this.#bringUp(entry, entry.generation);
+        record({ name: "mcp.start", phase: "end", outcome: "completed",
+          attributes: { ...attributes, connectionId: connection.connectionId, durationMs: performance.now() - began } });
+        return connection;
+      } catch (error) {
+        const failure = observationFailure(error);
+        record({ name: "mcp.start", phase: "end", outcome: failure.cancelled ? "cancelled" : "failed",
+          attributes: { ...attributes, errorCode: failure.errorCode, durationMs: performance.now() - began } });
+        throw error;
+      }
       // Cleared however the attempt ends, and only if it is still the current
       // one. Written as a link in the returned chain, because an attempt that
       // fails synchronously would otherwise clear the field before it was set.
-    ).finally(() => {
+    }).finally(() => {
       if (entry.starting === started) entry.starting = undefined;
     });
 
@@ -385,7 +409,7 @@ export class McpSupervisor {
         });
       }
 
-      const connection = new McpConnection(channel, this.#connectionOptions);
+      const connection = new McpConnection(channel, { ...this.#connectionOptions, serverId: entry.record.id });
       // From here the connection owns the channel: closing it closes both, and
       // closing the channel underneath it would leave the connection believing
       // it is alive.

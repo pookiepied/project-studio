@@ -580,6 +580,7 @@ impl HarnessSupervisor {
     /// because a callback that observes half-finished bookkeeping is a bug
     /// waiting for a second subscriber.
     fn emit(&self, event: LifecycleEvent) {
+        crate::diagnostics::lifecycle(event.name());
         let sink = self.shared.lifecycle.lock().unwrap();
         if let Some(sink) = sink.as_ref() {
             sink(&event);
@@ -2176,7 +2177,7 @@ mod tests {
                 .expect("make the stand-in executable");
         }
 
-        let found = find_node_in(&[directory.clone()]).expect("the stand-in is found");
+        let found = find_node_in(std::slice::from_ref(&directory)).expect("the stand-in is found");
         assert_eq!(found, stand_in);
 
         let empty = directory.join("empty");

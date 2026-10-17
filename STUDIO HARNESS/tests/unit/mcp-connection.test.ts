@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { ExtendError } from "../../src/extend/errors.js";
 import { McpConnection, type McpChannel } from "../../src/extend/mcp/connection.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
+import { createRootExecutionContext, runWithExecutionContext } from "../../src/execution/context.js";
 
 /**
  * A channel with no process behind it.
@@ -58,6 +60,69 @@ class FakeChannel implements McpChannel {
 }
 
 describe("one conversation with one MCP server", () => {
+  it("retains the first settling frame when duplicate replies arrive in one chunk", async () => {
+    diagnosticRecorder.clear();
+    diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: ["selected"] });
+    const channel = new FakeChannel();
+    const connection = new McpConnection(channel);
+    try {
+      const pending = runWithExecutionContext(createRootExecutionContext({ flue: { instanceId: "selected" } }),
+        () => connection.request("tools/call", {}));
+      const id = channel.lastSent().id;
+      const first = { jsonrpc: "2.0", id, result: { text: "first answer" } };
+      const duplicate = { jsonrpc: "2.0", id, error: { code: -32000, message: "duplicate failure" } };
+      channel.raw(`${JSON.stringify(first)}\n${JSON.stringify(duplicate)}\n`);
+      expect(await pending).toEqual(first.result);
+      expect(diagnosticRecorder.read().events.find((event) => event.name === "mcp.receive")?.content).toEqual(first);
+    } finally {
+      connection.close();
+      diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+      diagnosticRecorder.clear();
+    }
+  });
+  it("captures the actual scoped frames without serializing tool arguments a second time", async () => {
+    diagnosticRecorder.clear();
+    diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: ["selected"] });
+    const channel = new FakeChannel();
+    const connection = new McpConnection(channel);
+    let reads = 0;
+    try {
+      const pending = runWithExecutionContext(createRootExecutionContext({ flue: { instanceId: "selected" } }),
+        () => connection.request("tools/call", { get argument() { reads++; return "hello"; }, authToken: "opaque" }));
+      const id = channel.lastSent().id;
+      channel.emit({ jsonrpc: "2.0", id, result: { text: "answer" } });
+      expect(await pending).toEqual({ text: "answer" });
+      expect(reads).toBe(1);
+      const events = diagnosticRecorder.read().events;
+      expect(events.find((event) => event.name === "mcp.send")?.content).toEqual({ jsonrpc: "2.0", id, method: "tools/call",
+        params: { argument: "hello", authToken: "[REDACTED]" } });
+      expect(events.find((event) => event.name === "mcp.receive")?.content).toEqual({ jsonrpc: "2.0", id, result: { text: "answer" } });
+    } finally {
+      connection.close();
+      diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+      diagnosticRecorder.clear();
+    }
+  });
+  it("does not assign shared incoming notifications to the conversation that launched it", () => {
+    diagnosticRecorder.clear();
+    diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: ["first"] });
+    const channel = new FakeChannel();
+    const execution = createRootExecutionContext({ flue: { instanceId: "first" } });
+    const connection = runWithExecutionContext(execution, () => new McpConnection(channel, { serverId: "shared" }));
+    try {
+      runWithExecutionContext(execution, () => channel.emit({ jsonrpc: "2.0", method: "notifications/progress", params: { private: "other conversation" } }));
+      const notification = diagnosticRecorder.read().events.find((event) => event.attributes.stage === "notification");
+      expect(notification?.identity).toEqual({});
+      expect(notification?.attributes.connectionId).toBe(connection.connectionId);
+      expect(notification?.attributes.serverId).toBe("shared");
+      expect(notification?.content).toBeUndefined();
+      expect(notification?.contentState).toBe("out_of_scope");
+    } finally {
+      connection.close();
+      diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+      diagnosticRecorder.clear();
+    }
+  });
   describe("a request finds its answer", () => {
     it("sends a well-formed request and resolves on the matching id", async () => {
       const channel = new FakeChannel();

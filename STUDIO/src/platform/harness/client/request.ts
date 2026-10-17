@@ -1,5 +1,7 @@
 import { parseHarnessErrorBody } from '../contracts'
 import { harnessTransport } from '../transport'
+import { newUuid } from '@/lib/id'
+import { recordClientObservation } from '@/platform/diagnostics/events'
 
 /**
  * One request to the harness, and what comes back.
@@ -100,10 +102,11 @@ export function createRequester(options: HarnessClientOptions): Requester {
    * header (`transport/http/middleware/admission.ts`), answering 401 with
    * `WWW-Authenticate: Bearer` when it is missing or malformed.
    */
-  function headers(hasBody: boolean): Record<string, string> {
+  function headers(hasBody: boolean, requestId: string): Record<string, string> {
     return {
       Authorization: `Bearer ${credential}`,
       Accept: 'application/json',
+      'X-Project-Studio-Request-Id': requestId,
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
     }
   }
@@ -116,20 +119,29 @@ export function createRequester(options: HarnessClientOptions): Requester {
   ): Promise<HarnessResult<Response>> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), budgetMs)
+    const requestId = newUuid()
+    const identity = { requestId }
+    const started = performance.now()
+    const diagnostic = path.startsWith('/api/diagnostics') || path.startsWith('/api/observations')
+    if (!diagnostic) recordClientObservation({ name: 'client.request', phase: 'start', identity, attributes: { method } })
     try {
       const response = await send(join(baseUrl, path), {
         method,
-        headers: headers(body !== undefined),
+        headers: headers(body !== undefined, requestId),
         cache: 'no-store',
         signal: controller.signal,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
+      if (!diagnostic) recordClientObservation({ name: 'client.request', phase: 'end', identity,
+        outcome: response.ok ? 'completed' : 'failed', attributes: { method, status: response.status, durationMs: performance.now() - started } })
       return { ok: true, value: response }
     } catch (error) {
       // fetch rejects for exactly one class of reason: the exchange never
       // completed. A refused connection, a DNS failure and our own abort all
       // arrive here, and all three mean the same thing to the user.
       const timedOut = controller.signal.aborted
+      if (!diagnostic) recordClientObservation({ name: 'client.request', phase: 'end', identity,
+        outcome: timedOut ? 'cancelled' : 'unknown', attributes: { method, timedOut, durationMs: performance.now() - started } })
       return failed({
         kind: 'not-reachable',
         timedOut,

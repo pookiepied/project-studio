@@ -2,7 +2,7 @@ import {
   createOpenTelemetryInstrumentation,
   type OpenTelemetryInstrumentation,
 } from "@flue/opentelemetry";
-import { instrument, type FlueExecutionInterceptor } from "@flue/runtime";
+import { instrument, observe, type FlueExecutionInterceptor } from "@flue/runtime";
 import type {
   FlueExecutionContext,
   FlueExecutionOperation,
@@ -20,10 +20,18 @@ import {
 import type { ObservabilityConfig } from "./config.js";
 import { redactGenAiContent } from "./redaction.js";
 import { TelemetryError } from "./telemetry-errors.js";
+import { recordFlueObservation } from "./runtime-observations.js";
+import { bindObservationContext, createObservationWriter } from "./recorder.js";
+import { observationFailure, returnedToolError } from "./operation.js";
+import { performance } from "node:perf_hooks";
+import { installObservationSource } from "./observation-source.js";
+import { invocationFor } from "./invocations.js";
 
 let disposeInstrumentation: (() => Promise<void>) | undefined;
 let disposeTurnBoundary: (() => Promise<void>) | undefined;
 let instrumentation: OpenTelemetryInstrumentation | undefined;
+let stopObservations: (() => void) | undefined;
+let stopSource: (() => void) | undefined;
 
 export function isFlueInstrumentationRegistered(): boolean {
   return disposeInstrumentation !== undefined;
@@ -51,6 +59,8 @@ export function registerFlueInstrumentation(config: ObservabilityConfig): void {
   });
 
   disposeInstrumentation = instrument(instrumentation);
+  stopSource = installObservationSource();
+  stopObservations = observe(recordFlueObservation);
 }
 
 export async function unregisterFlueInstrumentation(): Promise<void> {
@@ -59,6 +69,10 @@ export async function unregisterFlueInstrumentation(): Promise<void> {
   disposeInstrumentation = undefined;
   disposeTurnBoundary = undefined;
   instrumentation = undefined;
+  stopObservations?.();
+  stopObservations = undefined;
+  stopSource?.();
+  stopSource = undefined;
   await disposeBoundary?.();
   await dispose?.();
 }
@@ -73,10 +87,33 @@ export function registerFlueTurnBoundary(
   }
 
   const interceptor: FlueExecutionInterceptor = async (operation, context, next) => {
-    const execution = executionContextForFlue(operation, context);
+    const recordObservation = createObservationWriter();
+    const linked = invocationFor(context.agentName, context.instanceId, context.submissionId);
+    const current = currentExecutionContext();
+    const unobservedEntry = linked === undefined && operation.type === "agent" && operation.operationKind === "prompt" &&
+      context.taskId === undefined && context.submissionId !== undefined && current?.flueSubmissionId !== context.submissionId;
+    const bound = bindObservationContext(executionContextForFlue(operation, context));
+    const execution = unobservedEntry ? { ...bound, observationStartUnobserved: true } : bound;
     return runWithExecutionContext(execution, async () => {
-      if (operation.type === "model") await beforeModel(execution);
-      return next();
+      const started = performance.now();
+      const name = `execution.${operation.type}`;
+      const attributes = { kind: execution.kind, stage: operation.type === "model" ? "interceptor_step"
+        : operation.type === "agent" && context.submissionId !== undefined ? "submission" : "operation" };
+      recordObservation({ name, phase: "start", attributes });
+      try {
+        if (operation.type === "model") await beforeModel(execution);
+        const result = await next();
+        const isError = operation.type === "tool" ? returnedToolError(result) : false;
+        recordObservation({ name, phase: "end", outcome: isError === undefined ? "unknown" : isError ? "failed" : "completed",
+          attributes: { ...attributes, durationMs: performance.now() - started,
+            ...(isError === true ? { returnedError: true } : isError === undefined ? { resultErrorUnavailable: true } : {}) } });
+        return result;
+      } catch (error) {
+        const failure = observationFailure(error);
+        recordObservation({ name, phase: "end", outcome: failure.cancelled ? "cancelled" : "failed",
+          attributes: { ...attributes, durationMs: performance.now() - started, errorCode: failure.errorCode } });
+        throw error;
+      }
     });
   };
   disposeTurnBoundary = instrument({
@@ -145,7 +182,13 @@ function executionContextForFlue(
 ): ExecutionContext {
   const kind = operationKind(operation);
   const links = linksForFlue(operation, context);
-  const parent = currentExecutionContext();
+  const invocation = invocationFor(context.agentName, context.instanceId, context.submissionId);
+  const current = currentExecutionContext();
+  const detachedEntry = operation.type === "agent" && operation.operationKind === "prompt" && context.taskId === undefined && context.submissionId !== undefined;
+  const descendant = current?.flueSubmissionId === context.submissionId && current?.flueAgentName === context.agentName && current?.flueInstanceId === context.instanceId;
+  const parent = detachedEntry && !descendant
+    ? invocation?.execution
+    : current ?? invocation?.execution;
   if (parent !== undefined) return createChildExecutionContext(parent, { kind, flue: links });
   // The submission first: one admitted piece of durable work is the tightest
   // thing a request id can name. Then the INSTANCE, which is this product's

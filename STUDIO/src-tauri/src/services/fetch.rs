@@ -100,11 +100,21 @@ pub async fn service_fetch(
     supervisor: &HarnessSupervisor,
     service: ServiceId,
     path: String,
-    init: ServiceRequestInit,
+    mut init: ServiceRequestInit,
 ) -> Result<SerializedResponse, ServiceError> {
-    match service {
+    let request_id = crate::identity::request_id(&mut init.headers);
+    let route = crate::services::canonical_route(&path);
+    let diagnostic = ["/api/diagnostics", "/api/observations"].iter()
+        .any(|prefix| route == *prefix || route.starts_with(&format!("{prefix}/")));
+    let span = if diagnostic { None } else { crate::diagnostics::NativeSpan::start("native.request", Some(request_id), None) };
+    let result = match service {
         ServiceId::Harness => harness_fetch(supervisor, &path, init).await,
+    };
+    if let Some(span) = span {
+        let status = result.as_ref().ok().map(|response| response.status);
+        span.finish(if result.is_ok() && status.is_some_and(|value| value < 400) { "completed" } else { "failed" }, status, result.as_ref().err().map(ServiceError::kind));
     }
+    result
 }
 
 /// Reads one attachment's bytes through the same seam [`service_fetch`]
@@ -126,7 +136,10 @@ pub async fn service_fetch_bytes(
     service: ServiceId,
     path: String,
 ) -> Result<tauri::ipc::Response, ServiceError> {
-    match service {
+    let request_id = crate::identity::new_uuid();
+    let span = crate::diagnostics::NativeSpan::start("native.bytes", Some(request_id.clone()), None);
+    let mut response_status = None;
+    let result = async { match service {
         ServiceId::Harness => {
             validate_path(&path)?;
             let endpoint = supervisor.get_endpoint().ok_or(ServiceError::NotRunning)?;
@@ -136,6 +149,7 @@ pub async fn service_fetch_bytes(
                 .map_err(|error| request_failure(&endpoint.token, error))?;
             let request = client
                 .get(format!("{}{}", endpoint.url, path))
+                .header("x-project-studio-request-id", request_id)
                 .bearer_auth(&endpoint.token)
                 .build()
                 .map_err(|error| ServiceError::InvalidRequest {
@@ -147,6 +161,7 @@ pub async fn service_fetch_bytes(
                 .map_err(|error| request_failure(&endpoint.token, error))?;
 
             let status = response.status();
+            response_status = Some(status.as_u16());
             if !status.is_success() {
                 // The harness writes its refusals as JSON with an `error`
                 // sentence; that sentence is better than any this side could
@@ -174,7 +189,11 @@ pub async fn service_fetch_bytes(
                 .map_err(|error| request_failure(&endpoint.token, error))?;
             Ok(tauri::ipc::Response::new(bytes.to_vec()))
         }
+    } }.await;
+    if let Some(span) = span {
+        span.finish(if result.is_ok() { "completed" } else { "failed" }, response_status, result.as_ref().err().map(ServiceError::kind));
     }
+    result
 }
 
 #[cfg(test)]

@@ -31,6 +31,7 @@ const EnvironmentsPane = lazyNamed(
   'EnvironmentsPane',
 )
 const DevicesPane = lazyNamed(() => import('@/features/settings/devices/DevicesPane'), 'DevicesPane')
+const DiagnosticsPane = lazyNamed(() => import('@/features/settings/diagnostics/DiagnosticsPane'), 'DiagnosticsPane')
 
 function deferred(label: string, pane: ReactNode): () => ReactNode {
   return () => (
@@ -62,6 +63,7 @@ const BUILT: Readonly<Record<string, () => ReactNode>> = {
   library: deferred('Library', <LibraryPane />),
   environments: deferred('Environments', <EnvironmentsPane />),
   devices: deferred('Other devices', <DevicesPane />),
+  diagnostics: deferred('Diagnostics', <DiagnosticsPane />),
 }
 
 export function paneFor(sectionId: string): ReactNode {

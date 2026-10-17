@@ -23,6 +23,7 @@ import type {
   TranscriptionSlotInput,
 } from "./drivers/types.js";
 import { bindAudioSlot, bindDocumentSlot, bindGenerationSlot, type GenerationSlot } from "./resolve.js";
+import { observeOperation } from "../../observability/operation.js";
 
 /**
  * The one module routes and tools both read for media.
@@ -136,29 +137,32 @@ export class MediaService {
     input: Omit<ImageGenerationInput, "modelId">,
     options: GenerateOptions,
   ): Promise<MediaJobStatus> {
-    const slot: GenerationSlot =
-      input.inputImages !== undefined && input.inputImages.length > 0
-        ? "imageEditing"
-        : "imageGeneration";
-    const binding = await bindGenerationSlot(this.#resolver, slot, options.modelId);
-    const adapter = this.#adapterFor(binding.protocol, slot);
-    if (adapter.generateImage === undefined) {
-      throw new MediaError(
-        "slot-protocol",
-        `The connected image provider's adapter does not generate images yet.`,
-      );
-    }
-    const generation = await adapter.generateImage(
-      { ...input, modelId: binding.modelId },
-      binding satisfies DriverEndpoint,
-    );
-    return this.#requireJobs().start({
-      conversationId: options.conversationId,
-      slot,
-      description: input.prompt,
-      modelId: binding.modelId,
-      generation,
-    });
+    return observeOperation("provider", "media.generate_image", async () => {
+      const slot: GenerationSlot =
+        input.inputImages !== undefined && input.inputImages.length > 0
+          ? "imageEditing"
+          : "imageGeneration";
+      const binding = await bindGenerationSlot(this.#resolver, slot, options.modelId);
+      const adapter = this.#adapterFor(binding.protocol, slot);
+      if (adapter.generateImage === undefined) {
+        throw new MediaError(
+          "slot-protocol",
+          `The connected image provider's adapter does not generate images yet.`,
+        );
+      }
+      const generateImage = adapter.generateImage.bind(adapter);
+      const generation = await observeOperation("provider", "media.dispatch", () => generateImage(
+        { ...input, modelId: binding.modelId },
+        binding satisfies DriverEndpoint,
+      ), { slot, modelId: binding.modelId, protocol: binding.protocol });
+      return this.#requireJobs().start({
+        conversationId: options.conversationId,
+        slot,
+        description: input.prompt,
+        modelId: binding.modelId,
+        generation,
+      });
+    }, {}, options.conversationId);
   }
 
   /** Starts a video generation as a job and answers its status at once. */
@@ -166,25 +170,28 @@ export class MediaService {
     input: Omit<VideoGenerationInput, "modelId">,
     options: GenerateOptions,
   ): Promise<MediaJobStatus> {
-    const binding = await bindGenerationSlot(this.#resolver, "videoGeneration", options.modelId);
-    const adapter = this.#adapterFor(binding.protocol, "videoGeneration");
-    if (adapter.generateVideo === undefined) {
-      throw new MediaError(
-        "slot-protocol",
-        `The connected video provider's adapter does not generate video yet.`,
-      );
-    }
-    const generation = await adapter.generateVideo(
-      { ...input, modelId: binding.modelId },
-      binding satisfies DriverEndpoint,
-    );
-    return this.#requireJobs().start({
-      conversationId: options.conversationId,
-      slot: "videoGeneration",
-      description: input.prompt,
-      modelId: binding.modelId,
-      generation,
-    });
+    return observeOperation("provider", "media.generate_video", async () => {
+      const binding = await bindGenerationSlot(this.#resolver, "videoGeneration", options.modelId);
+      const adapter = this.#adapterFor(binding.protocol, "videoGeneration");
+      if (adapter.generateVideo === undefined) {
+        throw new MediaError(
+          "slot-protocol",
+          `The connected video provider's adapter does not generate video yet.`,
+        );
+      }
+      const generateVideo = adapter.generateVideo.bind(adapter);
+      const generation = await observeOperation("provider", "media.dispatch", () => generateVideo(
+        { ...input, modelId: binding.modelId },
+        binding satisfies DriverEndpoint,
+      ), { slot: "videoGeneration", modelId: binding.modelId, protocol: binding.protocol });
+      return this.#requireJobs().start({
+        conversationId: options.conversationId,
+        slot: "videoGeneration",
+        description: input.prompt,
+        modelId: binding.modelId,
+        generation,
+      });
+    }, {}, options.conversationId);
   }
 
   #adapterFor(protocol: string, slot: CapabilitySlot): MediaAdapter {
@@ -212,18 +219,21 @@ export class MediaService {
    * the model-invoked half; nothing in the app calls it directly.
    */
   async readDocument(input: Omit<DocumentReadingInput, "modelId"> & { readonly modelId?: string }): Promise<DocumentReadingResult> {
-    const binding = await bindDocumentSlot(this.#resolver, input.modelId);
-    const adapter = this.#adapterFor(binding.protocol, "documentReading");
-    if (adapter.readDocument === undefined) {
-      throw new MediaError(
-        "slot-protocol",
-        "The connected document reading provider's adapter does not read documents.",
-      );
-    }
-    return adapter.readDocument(
-      { ...input, modelId: binding.modelId },
-      binding satisfies DriverEndpoint,
-    );
+    return observeOperation("provider", "media.read_document", async () => {
+      const binding = await bindDocumentSlot(this.#resolver, input.modelId);
+      const adapter = this.#adapterFor(binding.protocol, "documentReading");
+      if (adapter.readDocument === undefined) {
+        throw new MediaError(
+          "slot-protocol",
+          "The connected document reading provider's adapter does not read documents.",
+        );
+      }
+      const readDocument = adapter.readDocument.bind(adapter);
+      return observeOperation("provider", "media.dispatch", () => readDocument(
+        { ...input, modelId: binding.modelId },
+        binding satisfies DriverEndpoint,
+      ), { slot: "documentReading", modelId: binding.modelId, protocol: binding.protocol });
+    });
   }
 
   async transcribe(input: {
@@ -231,25 +241,27 @@ export class MediaService {
     readonly mimeType: string;
     readonly modelId?: string;
   }): Promise<TranscribeResult> {
-    if (input.mimeType === "" || !input.mimeType.startsWith("audio/")) {
-      throw new MediaError("provider-refused", "Only audio can be transcribed.");
-    }
-    const binding = await bindAudioSlot(this.#resolver, "transcription", input.modelId);
-    const transcribe = this.#transcribe ?? this.#adapterFor(binding.protocol, "transcription").transcribe;
-    if (transcribe === undefined) {
-      throw new MediaError(
-        "slot-protocol",
-        "The connected dictation provider's adapter does not transcribe.",
-      );
-    }
-    return transcribe(
-      {
-        audio: input.audio,
-        mimeType: input.mimeType,
-        modelId: binding.modelId,
-      } satisfies TranscriptionSlotInput,
-      binding satisfies DriverEndpoint,
-    );
+    return observeOperation("provider", "media.transcribe", async () => {
+      if (input.mimeType === "" || !input.mimeType.startsWith("audio/")) {
+        throw new MediaError("provider-refused", "Only audio can be transcribed.");
+      }
+      const binding = await bindAudioSlot(this.#resolver, "transcription", input.modelId);
+      const transcribe = this.#transcribe ?? this.#adapterFor(binding.protocol, "transcription").transcribe;
+      if (transcribe === undefined) {
+        throw new MediaError(
+          "slot-protocol",
+          "The connected dictation provider's adapter does not transcribe.",
+        );
+      }
+      return observeOperation("provider", "media.dispatch", () => transcribe(
+        {
+          audio: input.audio,
+          mimeType: input.mimeType,
+          modelId: binding.modelId,
+        } satisfies TranscriptionSlotInput,
+        binding satisfies DriverEndpoint,
+      ), { slot: "transcription", modelId: binding.modelId, protocol: binding.protocol });
+    });
   }
 
   async speak(input: {
@@ -257,27 +269,29 @@ export class MediaService {
     readonly modelId?: string;
     readonly voiceId?: string;
   }): Promise<SpeechResult> {
-    if (input.text.length > MAX_SPEECH_CHARS) {
-      throw new MediaError(
-        "provider-refused",
-        `Read-aloud takes up to ${MAX_SPEECH_CHARS} characters per request.`,
-      );
-    }
-    const binding = await bindAudioSlot(this.#resolver, "speechGeneration", input.modelId);
-    const speak = this.#speech ?? this.#adapterFor(binding.protocol, "speechGeneration").speak;
-    if (speak === undefined) {
-      throw new MediaError(
-        "slot-protocol",
-        "The connected read-aloud provider's adapter does not speak.",
-      );
-    }
-    return speak(
-      {
-        text: input.text,
-        modelId: binding.modelId,
-        ...(input.voiceId === undefined ? {} : { voiceId: input.voiceId }),
-      } satisfies SpeechSlotInput,
-      binding satisfies DriverEndpoint,
-    );
+    return observeOperation("provider", "media.speak", async () => {
+      if (input.text.length > MAX_SPEECH_CHARS) {
+        throw new MediaError(
+          "provider-refused",
+          `Read-aloud takes up to ${MAX_SPEECH_CHARS} characters per request.`,
+        );
+      }
+      const binding = await bindAudioSlot(this.#resolver, "speechGeneration", input.modelId);
+      const speak = this.#speech ?? this.#adapterFor(binding.protocol, "speechGeneration").speak;
+      if (speak === undefined) {
+        throw new MediaError(
+          "slot-protocol",
+          "The connected read-aloud provider's adapter does not speak.",
+        );
+      }
+      return observeOperation("provider", "media.dispatch", () => speak(
+        {
+          text: input.text,
+          modelId: binding.modelId,
+          ...(input.voiceId === undefined ? {} : { voiceId: input.voiceId }),
+        } satisfies SpeechSlotInput,
+        binding satisfies DriverEndpoint,
+      ), { slot: "speechGeneration", modelId: binding.modelId, protocol: binding.protocol });
+    });
   }
 }

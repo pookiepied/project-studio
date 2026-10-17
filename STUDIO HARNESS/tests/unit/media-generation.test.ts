@@ -26,6 +26,7 @@ import {
   type AdmissionEnv,
 } from "../../src/transport/http/middleware/admission.js";
 import { createMediaRoutes } from "../../src/transport/http/routes/media.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
 
 /**
  * Generation through the service: the slot resolves to a connection, the
@@ -108,6 +109,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+  diagnosticRecorder.clear();
   jobs.stopAll();
   db.close();
   if (previousHome === undefined) delete process.env.PROJECT_STUDIO_HOME;
@@ -119,6 +122,7 @@ const PNG = { bytes: new Uint8Array([0x89, 0x50]), mimeType: "image/png" };
 
 describe("image generation through the service", () => {
   it("resolves the slot, picks the adapter by the connection's media wire, and runs a job", async () => {
+    diagnosticRecorder.configure({ enabled: true });
     await connectOpenAi();
     const { adapter, recorded } = standIn("openai", () => ({
       shape: "sync",
@@ -146,6 +150,20 @@ describe("image generation through the service", () => {
     expect(recorded.images[0]?.endpoint.credential).toBe("sk-openai-media-1");
     expect(recorded.images[0]?.endpoint.baseUrl).toBe("https://api.openai.test/v1");
     expect(JSON.stringify(finished)).not.toContain("sk-openai");
+    const events = diagnosticRecorder.read().events;
+    const dispatch = events.filter((event) => event.name === "media.dispatch");
+    const binding = events.find((event) => event.name === "media.binding");
+    expect(binding).toMatchObject({ phase: "progress", attributes: { stage: "resolved", connectionId: "openai",
+      slot: "imageGeneration", modelId: "gpt-image-2", protocol: "openai" } });
+    expect(binding?.identity.operationId).toBe(dispatch[0]?.identity.parentOperationId);
+    expect(dispatch.map((event) => event.phase)).toEqual(["start", "end"]);
+    expect(dispatch.every((event) => event.identity.conversationId === "conv-1" &&
+      event.attributes.slot === "imageGeneration" && event.attributes.modelId === "gpt-image-2" &&
+      event.attributes.protocol === "openai")).toBe(true);
+    expect(dispatch[1]?.outcome).toBe("completed");
+    expect(JSON.stringify(events)).not.toContain("sk-openai");
+    expect(JSON.stringify(events)).not.toContain("api.openai.test");
+    expect(JSON.stringify(events)).not.toContain("a red bicycle");
   });
 
   it("calls a library vendor at the library's own address when the connection carries none", async () => {

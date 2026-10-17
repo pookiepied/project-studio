@@ -1,6 +1,7 @@
 import type { ErrorReporter } from "../observability/error-reporter.js";
 import { SnapshotError } from "./errors.js";
 import type { Snapshot, SnapshotStore } from "./store.js";
+import { observeOperation } from "../observability/operation.js";
 
 /**
  * When a snapshot is taken.
@@ -121,7 +122,7 @@ export class TurnSnapshots implements SnapshotHook {
 
   async #capture(): Promise<Snapshot | undefined> {
     try {
-      return await this.#store.capture(this.#label);
+      return await observeOperation("tool", "snapshot.capture", () => this.#store.capture(this.#label));
     } catch (error) {
       this.#reporter?.report(error, {
         operation: "snapshots.capture",

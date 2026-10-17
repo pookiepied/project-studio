@@ -60,6 +60,18 @@ pub enum ServiceError {
 }
 
 impl ServiceError {
+    /// Stable classification for observations; the user-facing prose stays separate.
+    pub(crate) fn kind(&self) -> &'static str {
+        match self {
+            Self::NotRunning => "not-running",
+            Self::InvalidPath { .. } => "invalid-path",
+            Self::InvalidRequest { .. } => "invalid-request",
+            Self::Request { .. } => "request",
+            Self::StreamRefused { .. } => "stream-refused",
+            Self::Refused { .. } => "refused",
+            Self::StreamBroken { .. } => "stream-broken",
+        }
+    }
     /// The sentence inside the failure, whatever shape it took.
     ///
     /// Every variant either carries a message or is the one variant that

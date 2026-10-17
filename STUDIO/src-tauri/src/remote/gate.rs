@@ -174,7 +174,7 @@ where
 pub(crate) fn authorize_request(
     headers: &HeaderMap,
     devices: &Devices,
-) -> Result<watch::Receiver<bool>, Response<RemoteBody>> {
+) -> Result<(String, watch::Receiver<bool>), Response<RemoteBody>> {
     let refused = || {
         json_refusal(
             StatusCode::UNAUTHORIZED,
@@ -185,7 +185,10 @@ pub(crate) fn authorize_request(
         return Err(refused());
     };
     match devices.authorize(&cookie, now_ms()) {
-        Ok(revoked) => Ok(revoked),
+        Ok(revoked) => match cookie.split_once('.') {
+            Some((id, _)) => Ok((id.to_owned(), revoked)),
+            None => Err(refused()),
+        },
         Err(why) => {
             // The reason is for this process's log; the device gets the same
             // refusal however it failed.

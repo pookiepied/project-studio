@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { recordClientObservation } from '@/platform/diagnostics/events'
 
 import { useConversation } from '@/features/chat/connection/useConversation'
 import type { ConversationContent } from '@/features/chat/connection/useConversation'
@@ -96,6 +97,8 @@ export function useConversationTranscript(conversationId: string): {
   const seededFor = useRef(conversationId)
 
   const onContent = useCallback((content: ConversationContent) => {
+    recordClientObservation({ name: 'client.projection', phase: 'progress', identity: { conversationId },
+      attributes: { stage: 'delivery_received', kind: content.kind, replaying: content.kind !== 'chunks' || content.replaying } })
     const consumed = new Set<string>()
     if (content.kind === 'snapshot') {
       for (const message of content.snapshot.messages) {

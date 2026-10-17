@@ -10,6 +10,9 @@
 # list.
 * text=auto eol=lf
 
+# Unified patch context prefixes source tabs with a format-required space.
+*.patch whitespace=-space-before-tab
+
 # Binaries, named rather than trusted to auto-detection.
 *.png binary
 *.jpg binary

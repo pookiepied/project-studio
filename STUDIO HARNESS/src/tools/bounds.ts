@@ -3,6 +3,7 @@ import {
   type CapabilityDescriptor,
 } from "../contracts/capabilities.js";
 import { ToolError } from "./errors.js";
+import { observeOperation } from "../observability/operation.js";
 
 /**
  * How long a tool call may take, and how many may run at once.
@@ -230,7 +231,9 @@ export class CallBounds {
 
     let release: (() => void) | undefined;
     try {
-      release = await this.#permits.acquire(signal);
+      release = await observeOperation("tool", "tools.queue", () => this.#permits.acquire(signal), {
+        deadlineMs: this.deadlineFor(descriptor), active: this.#permits.active, queued: this.#permits.queued,
+      });
     } catch (error) {
       // `acquire` rejects with the abort reason, which is a `DOMException` and
       // not part of the tool error contract — so it is translated here, where
@@ -249,25 +252,26 @@ export class CallBounds {
     }
 
     try {
-      const work = execute(signal);
-      // The abandoned promise still settles, and an unobserved rejection would
-      // surface as an unhandled rejection unrelated to any live call.
-      work.catch(() => undefined);
+      return await observeOperation("tool", "tools.execute", async () => {
+        const work = execute(signal);
+        // Abandoned work still settles; observe rejection without claiming it stopped.
+        work.catch(() => undefined);
 
-      return await Promise.race([
-        work,
-        new Promise<never>((_resolve, rejectRace) => {
-          if (signal.aborted) {
-            rejectRace(endedError(descriptor, reason(), true));
-            return;
-          }
-          signal.addEventListener(
-            "abort",
-            () => rejectRace(endedError(descriptor, reason(), true)),
-            { once: true },
-          );
-        }),
-      ]);
+        return await Promise.race([
+          work,
+          new Promise<never>((_resolve, rejectRace) => {
+            if (signal.aborted) {
+              rejectRace(endedError(descriptor, reason(), true));
+              return;
+            }
+            signal.addEventListener(
+              "abort",
+              () => rejectRace(endedError(descriptor, reason(), true)),
+              { once: true },
+            );
+          }),
+        ]);
+      });
     } finally {
       release();
     }

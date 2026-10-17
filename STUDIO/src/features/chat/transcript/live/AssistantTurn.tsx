@@ -1,4 +1,5 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
+import { recordClientObservation, type ClientObservationIdentity } from '@/platform/diagnostics/events'
 import { Icons } from '@/components/icons'
 import { Arrive, Arriving } from '@/components/motion/Arrive'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
@@ -102,6 +103,7 @@ export const AssistantTurn = memo(function AssistantTurn({
             key={segment.id}
             segment={segment}
             growing={live && index === lastIndex && segment.kind === 'text'}
+            identity={{ conversationId, messageId: item.id, ...(item.submissionId === null ? {} : { submissionId: item.submissionId }) }}
           />
         ))}
       </Arriving>
@@ -151,13 +153,30 @@ function writtenRuns(item: Extract<TranscriptItem, { kind: 'assistant' }>): stri
 function TextSegment({
   segment,
   growing,
+  identity,
 }: {
   segment: Extract<AssistantSegment, { kind: 'text' }>
   /** This run is the one the turn is currently writing. */
   growing: boolean
+  identity: ClientObservationIdentity
 }) {
   const shown = useSmoothText(segment.text, growing)
   const revealing = shown.length < segment.text.length
+  const displayed = useRef({ first: false, settled: false })
+  useEffect(() => {
+    // These are commits of the paced DOM text, not model timing or screen paint.
+    const observed = { ...identity, blockId: segment.id }
+    if (shown.length > 0 && !displayed.current.first) {
+      displayed.current.first = true
+      recordClientObservation({ name: 'client.display', phase: 'progress', identity: observed,
+        attributes: { stage: 'first_dom_commit', characters: shown.length, streaming: growing } })
+    }
+    if (shown.length > 0 && !growing && !revealing && !displayed.current.settled) {
+      displayed.current.settled = true
+      recordClientObservation({ name: 'client.display', phase: 'end', identity: observed, outcome: 'completed',
+        attributes: { stage: 'settled_dom_commit', characters: shown.length } })
+    }
+  }, [shown.length, growing, revealing, segment.id, identity])
 
   return (
     <Arrive className="studio-prose min-w-0">

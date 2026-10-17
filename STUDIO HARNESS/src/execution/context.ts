@@ -64,6 +64,10 @@ export interface FlueExecutionLinks {
 }
 
 export interface ExecutionContext {
+  /** Diagnostic consent at operation start; never an authorization decision. */
+  readonly observationCaptureId?: string | null;
+  /** No retained admission/parent proves the consent of this recovered entry. */
+  readonly observationStartUnobserved?: boolean;
   /** Stable logical request family. Retries keep this value. */
   readonly requestId: string;
   readonly requestIdSource: ExecutionRootSource;
@@ -164,6 +168,11 @@ export function createChildExecutionContext(
 
 export function currentExecutionContext(): ExecutionContext | undefined {
   return executionStorage.getStore();
+}
+
+/** Retry the same logical operation; never use this to authorize an automatic resend. */
+export function createRetryExecutionContext(previous: ExecutionContext): ExecutionContext {
+  return { ...previous, attemptId: createStudioUuid() };
 }
 
 export function runWithExecutionContext<T>(

@@ -6,6 +6,11 @@ import {
 } from "node:http";
 
 import type { Api, Model } from "@earendil-works/pi-ai";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { StudioRuntime } from "../../src/application/studio-runtime.js";
+import { openDatabase } from "../../src/storage/database.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
@@ -145,6 +150,39 @@ async function collectText(stream: AsyncIterable<any>): Promise<string> {
 }
 
 describe("local BYOK source", () => {
+  it("sends the native file and command tools through the alias to the OpenAI-compatible wire", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "studio-native-wire-"));
+    const previousHome = process.env.PROJECT_STUDIO_HOME;
+    process.env.PROJECT_STUDIO_HOME = join(directory, "home");
+    const projectRoot = join(directory, "project");
+    await mkdir(projectRoot);
+    const database = openDatabase({ path: join(directory, "studio.db") });
+    const studio = new StudioRuntime({ database, projectRoot, credentials: secrets });
+    try {
+      const sandbox = studio.createAgentSandbox({ agentId: "studio", conversationId: "native-wire" });
+      const env = await sandbox.createSandbox({ id: "studio" });
+      const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
+      const required = ["read", "write", "edit", "move", "delete", "glob", "grep", "shell", "git", "jobs", "discover"];
+      expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(required));
+      const { adapter } = buildAdapter();
+      await collectText(adapter.stream(aliasPlaceholder(), {
+        systemPrompt: "Use the available native tools.",
+        tools,
+        messages: [{ role: "user", content: "Create a file", timestamp: Date.now() }],
+      }));
+      const body = mock.requests[0]?.body as { tools?: { function: { name: string; parameters: unknown } }[] } | undefined;
+      expect(body?.tools?.map((tool) => tool.function.name)).toEqual(expect.arrayContaining(required));
+      expect(body?.tools?.find((tool) => tool.function.name === "write")?.function.parameters).toMatchObject({
+        required: ["path", "content"], properties: { path: { type: "string" }, content: { type: "string" } },
+      });
+    } finally {
+      await studio.stop();
+      database.close();
+      if (previousHome === undefined) delete process.env.PROJECT_STUDIO_HOME;
+      else process.env.PROJECT_STUDIO_HOME = previousHome;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
   it("resolves the stable alias to the configured model", () => {
     const { adapter } = buildAdapter();
 

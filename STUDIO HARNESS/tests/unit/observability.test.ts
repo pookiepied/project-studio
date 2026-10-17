@@ -245,6 +245,22 @@ describe("error normalization", () => {
 });
 
 describe("content redaction", () => {
+  it("redacts quoted JSON and complete quoted passphrases in text content", () => {
+    const inputs = [
+      '{"password":"opaque-json-value","authToken":"opaque-auth-value"}',
+      'password="opaque multiword phrase" next=value',
+      "client_secret='opaque multiword phrase' next=value",
+      'password="opaque escaped \\"word\\" tail" next=value',
+    ];
+    for (const input of inputs) {
+      const redacted = redactSensitiveString(input);
+      expect(redacted).toContain("[REDACTED]");
+      expect(redacted).not.toContain("opaque");
+      expect(redacted).not.toContain("multiword");
+      expect(redacted).not.toContain("tail");
+    }
+    expect(redactSensitiveString("ordinary output next=value")).toBe("ordinary output next=value");
+  });
   it("redacts credential-like values", () => {
     const redacted = redactGenAiContent({
       text: "Authorization: Bearer abcdef123456 token=xyz",

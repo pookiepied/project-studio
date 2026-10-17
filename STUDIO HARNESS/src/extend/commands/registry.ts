@@ -3,6 +3,7 @@ import { basename, extname, join } from "node:path";
 
 import { ExtendError } from "../errors.js";
 import { installationRoot, userCommandsDirectory } from "../../platform/paths.js";
+import { observeSynchronousOperation } from "../../observability/operation.js";
 
 /**
  * Slash commands: a name the person types after `/`, and what it does.
@@ -287,7 +288,7 @@ export class CommandRegistry {
 
   /** The prompt one command expands to for the words typed after it. */
   expand(id: string, args: string): string {
-    return expandCommand(this.source(id).body, args);
+    return observeSynchronousOperation("request", "command.expand", () => expandCommand(this.source(id).body, args));
   }
 
   /**

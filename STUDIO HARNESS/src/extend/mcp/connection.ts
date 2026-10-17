@@ -1,5 +1,5 @@
 import { ExtendError } from "../errors.js";
-import { NdjsonDecoder, encodeNdjson } from "./wire/framing.js";
+import { NdjsonDecoder, encodeNdjson, serializedNdjsonFrame } from "./wire/framing.js";
 import {
   isJsonRpcErrorResponse,
   isJsonRpcNotification,
@@ -7,6 +7,11 @@ import {
   JSONRPC_VERSION,
 } from "./wire/jsonrpc.js";
 import { PendingRequests } from "./wire/pending.js";
+import { createStudioUuid } from "../../contracts/uuid.js";
+import { observeOperation, observeSynchronousOperation } from "../../observability/operation.js";
+import { createObservationWriter, diagnosticRecorder } from "../../observability/recorder.js";
+import { diagnosticJsonContent } from "../../observability/diagnostic-value.js";
+import { currentExecutionContext } from "../../execution/context.js";
 
 /**
  * One conversation with one MCP server.
@@ -58,6 +63,8 @@ export interface McpChannel {
 }
 
 export interface McpConnectionOptions {
+  /** Stable registry identity; never the launch key, which can contain paths. */
+  readonly serverId?: string;
   /**
    * How long one request may wait. A per-request deadline rather than one for
    * the connection: a slow tool must not be indistinguishable from a dead
@@ -84,12 +91,15 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_STDERR_LINES = 200;
 
 export class McpConnection {
+  readonly connectionId = createStudioUuid();
   readonly #channel: McpChannel;
   readonly #pending = new PendingRequests();
+  readonly #responseFrames = new Map<number, string | undefined>();
   readonly #decoder = new NdjsonDecoder();
   readonly #timeoutMs: number;
   readonly #stderrLimit: number;
   readonly #stderr: string[] = [];
+  readonly #serverId: string | undefined;
   /**
    * Ids whose caller wants the whole answer rather than its result.
    *
@@ -105,6 +115,7 @@ export class McpConnection {
   #closed = false;
 
   constructor(channel: McpChannel, options: McpConnectionOptions = {}) {
+    this.#serverId = options.serverId;
     this.#channel = channel;
     this.#timeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.#stderrLimit = options.stderrLines ?? DEFAULT_STDERR_LINES;
@@ -112,6 +123,7 @@ export class McpConnection {
     channel.onData((chunk) => this.#receive(chunk));
     channel.onStderr((chunk) => this.#recordDiagnostics(chunk));
     channel.onClose((reason) => this.#ended(reason));
+    this.#connectionObservation("channel_attached");
   }
 
   /** Whether this connection has ended, from either side. */
@@ -148,7 +160,7 @@ export class McpConnection {
     params?: unknown,
     signal?: AbortSignal,
   ): Promise<unknown> {
-    return this.#send(method, params, false, signal);
+    return observeOperation("mcp", "mcp.request", () => this.#send(method, params, false, signal), { connectionId: this.connectionId, method });
   }
 
   /**
@@ -170,7 +182,7 @@ export class McpConnection {
     params?: unknown,
     signal?: AbortSignal,
   ): Promise<unknown> {
-    return this.#send(method, params, true, signal);
+    return observeOperation("mcp", "mcp.request_envelope", () => this.#send(method, params, true, signal), { connectionId: this.connectionId, method });
   }
 
   /**
@@ -205,6 +217,8 @@ export class McpConnection {
     }
 
     const id = this.#pending.nextId();
+    const recordObservation = createObservationWriter();
+    const captureContent = diagnosticRecorder.capturesContent(currentExecutionContext()?.flueInstanceId);
     const waiting = this.#pending
       .register(id, { timeoutMs: this.#timeoutMs, ...(signal ? { signal } : {}) })
       // However this settles, the id stops being special. Written as part of
@@ -213,16 +227,18 @@ export class McpConnection {
       .finally(() => this.#wantsEnvelope.delete(id));
 
     if (wantsEnvelope) this.#wantsEnvelope.add(id);
+    if (captureContent) this.#responseFrames.set(id, undefined);
 
     try {
-      this.#channel.send(
-        encodeNdjson({
+      const wire = encodeNdjson({
           jsonrpc: JSONRPC_VERSION,
           id,
           method,
           ...(params === undefined ? {} : { params }),
-        }),
-      );
+        });
+      recordObservation({ name: "mcp.send", phase: "progress", attributes: { connectionId: this.connectionId, rpcId: id, method },
+        ...(captureContent ? { content: diagnosticJsonContent(wire) } : {}) });
+      this.#channel.send(wire);
     } catch (error) {
       // The send failed, so no answer is coming. Settling here rather than
       // leaving it to the timeout turns a thirty-second wait into an immediate
@@ -230,7 +246,18 @@ export class McpConnection {
       this.#pending.reject(id, error);
     }
 
-    return waiting;
+    try {
+      const answer: unknown = await waiting;
+      const frame = this.#responseFrames.get(id);
+      recordObservation({ name: "mcp.receive", phase: "progress", attributes: { connectionId: this.connectionId, rpcId: id, method },
+        ...(frame === undefined ? {} : { content: diagnosticJsonContent(frame) }) });
+      return answer;
+    } catch (error) {
+      const frame = this.#responseFrames.get(id);
+      recordObservation({ name: "mcp.receive", phase: "progress", outcome: "failed", attributes: { connectionId: this.connectionId, rpcId: id, method },
+        ...(frame === undefined ? {} : { content: diagnosticJsonContent(frame) }) });
+      throw error;
+    } finally { this.#responseFrames.delete(id); }
   }
 
   /**
@@ -242,13 +269,13 @@ export class McpConnection {
    */
   notify(method: string, params?: unknown): void {
     if (this.#closed) return;
-    this.#channel.send(
+    observeSynchronousOperation("mcp", "mcp.notify", () => this.#channel.send(
       encodeNdjson({
         jsonrpc: JSONRPC_VERSION,
         method,
         ...(params === undefined ? {} : { params }),
       }),
-    );
+    ));
   }
 
   /** Ends the connection and fails everything still waiting. */
@@ -264,7 +291,7 @@ export class McpConnection {
   }
 
   #receive(chunk: string | Uint8Array): void {
-    for (const message of this.#decoder.feed(chunk)) {
+    for (const message of this.#decoder.feed(chunk, this.#responseFrames.size > 0)) {
       if (!message.ok) {
         // A line we could not read is recorded and the stream continues. One
         // bad line from a chatty server must not take down a connection that
@@ -275,20 +302,26 @@ export class McpConnection {
       }
 
       const value = message.value;
-
       if (isJsonRpcSuccessResponse(value)) {
+        this.#connectionObservation("response", { rpcId: value.id, isError: false });
         if (value.id !== null) {
-          if (this.#wanted(value.id)) this.#pending.resolve(value.id, value);
-          else this.#pending.resolve(value.id, value.result);
+          const settled = this.#pending.resolve(value.id, this.#wanted(value.id) ? value : value.result);
+          if (settled && typeof value.id === "number" && this.#responseFrames.has(value.id)) {
+            this.#responseFrames.set(value.id, serializedNdjsonFrame(message));
+          }
         }
         continue;
       }
 
       if (isJsonRpcErrorResponse(value)) {
+        this.#connectionObservation("response", { rpcId: value.id, isError: true, rpcErrorCode: value.error.code });
         if (value.id !== null && this.#wanted(value.id)) {
           // An error is a legitimate answer to the one caller that asked for
           // the envelope, so it resolves rather than rejects.
-          this.#pending.resolve(value.id, value);
+          const settled = this.#pending.resolve(value.id, value);
+          if (settled && typeof value.id === "number" && this.#responseFrames.has(value.id)) {
+            this.#responseFrames.set(value.id, serializedNdjsonFrame(message));
+          }
           continue;
         }
 
@@ -299,14 +332,18 @@ export class McpConnection {
           this.#record(`server error: ${value.error.message}`);
           continue;
         }
-        this.#pending.reject(
+        const settled = this.#pending.reject(
           value.id,
           new ExtendError("internal", { message: value.error.message }),
         );
+        if (settled && typeof value.id === "number" && this.#responseFrames.has(value.id)) {
+          this.#responseFrames.set(value.id, serializedNdjsonFrame(message));
+        }
         continue;
       }
 
       if (isJsonRpcNotification(value)) {
+        this.#connectionObservation("notification", { method: value.method });
         const notification = {
           method: value.method,
           params: value.params,
@@ -344,6 +381,14 @@ export class McpConnection {
     while (this.#stderr.length > this.#stderrLimit) this.#stderr.shift();
   }
 
+  #connectionObservation(stage: string, attributes: Readonly<Record<string, unknown>> = {}): void {
+    // A shared connection's incoming messages have no proven conversation owner.
+    // Do not inherit the first launch caller's async context or content consent.
+    diagnosticRecorder.record({ name: "mcp.connection", phase: "progress", identity: {},
+      attributes: { stage, connectionId: this.connectionId,
+        ...(this.#serverId === undefined ? {} : { serverId: this.#serverId }), ...attributes } });
+  }
+
   /**
    * The connection ended.
    *
@@ -355,6 +400,7 @@ export class McpConnection {
   #ended(reason?: unknown): void {
     if (this.#closed) return;
     this.#closed = true;
+    this.#connectionObservation("connection_ended", { pending: this.#pending.size });
     this.#closeReason =
       reason ??
       new ExtendError("disconnected", {

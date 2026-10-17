@@ -34,6 +34,12 @@ export type NdjsonMessage =
 
 /** How much of an oversize line is kept, so a report is diagnosable but bounded. */
 const RAW_PREVIEW_CHARS = 200;
+const serializedFrames = new WeakMap<NdjsonMessage, string>();
+
+/** The source frame for a decoded message, without reserializing its value. */
+export function serializedNdjsonFrame(message: NdjsonMessage): string | undefined {
+  return message.ok ? serializedFrames.get(message) : message.raw;
+}
 
 // One encoder, not one per call. `byteLength` runs on every line and on every
 // chunk that has not yet completed one, so allocating here allocates in the
@@ -81,7 +87,7 @@ export class NdjsonDecoder {
     this.#maxBytes = options.maxMessageBytes ?? DEFAULT_MAX_MESSAGE_BYTES;
   }
 
-  feed(chunk: string | Uint8Array): NdjsonMessage[] {
+  feed(chunk: string | Uint8Array, retainFrames = false): NdjsonMessage[] {
     let text: string;
     if (typeof chunk === "string") {
       text = chunk;
@@ -154,7 +160,9 @@ export class NdjsonDecoder {
 
       try {
         const value: unknown = JSON.parse(line);
-        out.push({ ok: true, value });
+        const message: NdjsonMessage = { ok: true, value };
+        if (retainFrames) serializedFrames.set(message, line);
+        out.push(message);
       } catch (error: unknown) {
         out.push({ ok: false, reason: "malformed", raw: line, error });
       }

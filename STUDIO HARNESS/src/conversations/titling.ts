@@ -6,6 +6,8 @@ import type { TaskStore } from "../agents/definitions/task-store.js";
 import { STUDIO_AGENT_ID, TITLE_AGENT_ID } from "../contracts/agents.js";
 import type { Logger } from "../observability/logger.js";
 import type { ConversationStore } from "./store.js";
+import { currentExecutionContext, runWithExecutionContext, type ExecutionContext } from "../execution/context.js";
+import { bindObservationContext } from "../observability/recorder.js";
 
 /**
  * The seam the admission path uses to hand a first message to titling. The
@@ -253,14 +255,14 @@ export class ConversationTitler implements ConversationTitlingPort {
   readonly #logger: Logger | undefined;
   readonly #subscribe: NonNullable<ConversationTitlerOptions["subscribe"]>;
   readonly #dispatchJob: NonNullable<ConversationTitlerOptions["dispatchJob"]>;
-  readonly #pending = new Map<string, string>();
+  readonly #pending = new Map<string, { message: string; execution: ExecutionContext | undefined }>();
   /**
    * Jobs in flight, keyed by conversation id: the words (kept so a failed
    * attempt can be re-sent) and how many attempts have been made. Bounded
    * with `pending` - an entry lives until the job lands or the ladder is
    * exhausted.
    */
-  readonly #inFlight = new Map<string, { message: string; attempts: number }>();
+  readonly #inFlight = new Map<string, { message: string; attempts: number; execution: ExecutionContext | undefined }>();
   /**
    * Replies captured off each title run's `agent_end`, keyed by the run's
    * instance id and consumed by that run's settlement. Bounded the same way
@@ -302,6 +304,7 @@ export class ConversationTitler implements ConversationTitlingPort {
         // conversation it names - the index already shows it.
         await dispatchBackgroundAgent(TITLE_AGENT_ID, instanceId, message, {
           tasks,
+          diagnosticConversationId: conversationId,
         });
       });
   }
@@ -338,12 +341,13 @@ export class ConversationTitler implements ConversationTitlingPort {
       const oldest = this.#pending.keys().next();
       if (!oldest.done) this.#pending.delete(oldest.value);
     }
-    this.#pending.set(
-      conversationId,
-      firstMessage.length > MAX_MESSAGE_CHARS
+    const execution = currentExecutionContext();
+    this.#pending.set(conversationId, {
+      execution: execution === undefined ? undefined : bindObservationContext(execution),
+      message: firstMessage.length > MAX_MESSAGE_CHARS
         ? firstMessage.slice(0, MAX_MESSAGE_CHARS)
         : firstMessage,
-    );
+    });
   }
 
   /**
@@ -441,8 +445,9 @@ export class ConversationTitler implements ConversationTitlingPort {
     this.#titleAttemptFailed(instanceId);
   }
 
-  #studioExchangeSettled(conversationId: string): void {    const message = this.#pending.get(conversationId);
-    if (message === undefined) return;
+  #studioExchangeSettled(conversationId: string): void {
+    const pending = this.#pending.get(conversationId);
+    if (pending === undefined) return;
     // Consumed now: exactly one titling job per conversation, whatever
     // happens below, and an old conversation's later turn - this process
     // restarted after its first exchange - finds nothing here.
@@ -456,13 +461,15 @@ export class ConversationTitler implements ConversationTitlingPort {
     }
     if (row.titleManual) return;
 
-    this.#inFlight.set(conversationId, { message, attempts: 1 });
-    this.#dispatch(conversationId, message, 0);
+    this.#inFlight.set(conversationId, { ...pending, attempts: 1 });
+    this.#dispatch(conversationId, pending.message, 0);
   }
 
   /** Sends one attempt; a refused dispatch is logged, never thrown. */
   #dispatch(conversationId: string, message: string, attempt: number): void {
-    void this.#dispatchJob(conversationId, message, attempt)
+    const execution = this.#inFlight.get(conversationId)?.execution;
+    const dispatchJob = () => this.#dispatchJob(conversationId, message, attempt);
+    void (execution === undefined ? dispatchJob() : runWithExecutionContext(execution, dispatchJob))
       .then(() => {
         this.#logger?.info("Conversation titling dispatched.", {
           conversation_id: conversationId,

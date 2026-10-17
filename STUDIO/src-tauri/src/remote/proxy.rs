@@ -36,7 +36,7 @@ use tokio::sync::mpsc;
 use tokio::sync::watch;
 
 use crate::harness::supervisor::redact;
-use crate::services::validate_path;
+use crate::services::{canonical_route, validate_path};
 
 use super::body::RemoteBody;
 
@@ -82,6 +82,10 @@ pub(crate) struct Upstream {
     /// The per-launch bearer. Never sent to a device; attached on the way out.
     pub(crate) token: String,
 }
+
+/// Constructed only after the device gate verifies the credential.
+#[derive(Clone)]
+pub(crate) struct PairedSource(pub(crate) String);
 
 /// Headers that describe one hop and must not be copied to the next.
 ///
@@ -176,6 +180,13 @@ where
         return refusal(StatusCode::BAD_REQUEST, &error.message());
     }
 
+    // Diagnostics may contain other conversations; pairing is not diagnostic consent.
+    let canonical = canonical_route(&path_and_query);
+    if canonical == "/api/diagnostics" || canonical.starts_with("/api/diagnostics/") ||
+        canonical == "/api/observations/native" || canonical.starts_with("/api/observations/native/") {
+        return refusal(StatusCode::FORBIDDEN, "Diagnostics are available only on the local Studio host.");
+    }
+
     let long_lived = is_long_lived(&request);
     let (parts, body) = request.into_parts();
 
@@ -220,12 +231,16 @@ where
             || name == hyper::header::HOST
             || name == hyper::header::AUTHORIZATION
             || name == hyper::header::COOKIE
+            || name.as_str() == "x-project-studio-device-id"
         {
             continue;
         }
         outgoing = outgoing.header(name.as_str(), value.as_bytes());
     }
     outgoing = outgoing.bearer_auth(&upstream.token);
+    if let Some(device) = parts.extensions.get::<PairedSource>() {
+        outgoing = outgoing.header("x-project-studio-device-id", &device.0);
+    }
     if !body.is_empty() {
         outgoing = outgoing.body(body);
     }
@@ -697,11 +712,10 @@ Content-Length: {}
         // The device sends a credential of its own. It must not reach the
         // harness: this seam owns `Authorization`, and letting a device's
         // value through would send it in place of the bearer.
-        let response = forward(
-            &upstream,
-            get("/api/conversations", Some("Bearer i-made-this-up")),
-            revoked,
-        )
+        let mut request = get("/api/conversations", Some("Bearer i-made-this-up"));
+        request.headers_mut().insert("x-project-studio-device-id", HeaderValue::from_static("pd_forged"));
+        request.extensions_mut().insert(PairedSource("pd_verified".to_owned()));
+        let response = forward(&upstream, request, revoked)
         .await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
@@ -712,6 +726,9 @@ Content-Length: {}
             .map(|(_, value)| value.clone())
             .collect();
         assert_eq!(authorization, vec!["Bearer the-per-launch-bearer".to_owned()]);
+        let source: Vec<_> = seen.iter().filter(|(name, _)| name == "x-project-studio-device-id")
+            .map(|(_, value)| value.as_str()).collect();
+        assert_eq!(source, vec!["pd_verified"]);
     }
 
     #[tokio::test]
@@ -761,6 +778,17 @@ Content-Length: {}
                 .expect("the body never ended")
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn diagnostics_never_leave_the_local_host() {
+        let upstream = Upstream { url: "http://127.0.0.1:1".to_owned(), token: "bearer".to_owned() };
+        let (_revoke, revoked) = live_device();
+        for path in ["/api/diagnostics", "/api/diagnostics/events", "/api/%64iagnostics/policy", "/api/x/../diagnostics/events",
+            "/api/observations/native", "/api/observations/%6eative/", "/api/observations/x/../native"] {
+            let response = forward(&upstream, get(path, None), revoked.clone()).await;
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{path}");
+        }
     }
 
     #[tokio::test]
