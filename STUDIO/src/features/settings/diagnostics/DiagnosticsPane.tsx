@@ -4,7 +4,7 @@ import { useHarnessClient } from '@/platform/harness/react'
 import type { DiagnosticHealth, DiagnosticPolicy } from '@/platform/harness/client/diagnostics'
 import { isTauri } from '@/platform/tauri'
 import { useWorkspace } from '@/stores/workspace'
-import { clearNativeCapture, readNativeCapture, syncNativeCapture } from '@/platform/diagnostics/native'
+import { clearNativeCapture, readNativeCapture, syncNativeCapture, inspectorSharing, type InspectorSharing } from '@/platform/diagnostics/native'
 
 const BUTTON = 'rounded-md border px-3 py-1.5 text-ui hover:bg-tint disabled:opacity-50'
 
@@ -16,6 +16,27 @@ export function DiagnosticsPane() {
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const local = isTauri()
+  const [sharing, setSharing] = useState<InspectorSharing>({ enabled: false, path: null, status: 'off' })
+
+  useEffect(() => {
+    if (!local || busy) return
+    let live = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const load = async () => {
+      try { const value = await inspectorSharing(); if (live) setSharing(value) }
+      catch { if (live) setError('Local Inspector sharing is unavailable.') }
+      finally { if (live) timer = setTimeout(() => { void load() }, 3000) }
+    }
+    void load()
+    return () => { live = false; clearTimeout(timer) }
+  }, [local, busy])
+
+  const share = async () => {
+    setBusy(true)
+    try { setSharing(await inspectorSharing(!sharing.enabled)); setError(null) }
+    catch { setError('Local Inspector sharing could not be changed. Refresh to check its state.') }
+    finally { setBusy(false) }
+  }
 
   const refresh = useCallback(async () => {
     const client = await connect()
@@ -115,9 +136,16 @@ export function DiagnosticsPane() {
     finally { setBusy(false) }
   }
 
-  return <Pane title="Diagnostics" description="Record a bounded local window to investigate Studio behavior. Nothing is uploaded.">
+  return <Pane title="Diagnostics" description="Record a bounded local window. Sharing with the local Inspector is separate and optional.">
     {!local ? <Row label="Open this page on the desktop" hint="Diagnostic recordings are available on the local Studio host." /> : <>
       {error ? <p role="alert" className="py-3 text-ui text-muted-foreground">{error}</p> : null}
+      <Row label="Local Inspector" hint="Share the retained diagnostic window through a local file, including content you allowed below. This does not start recording. Inspector archives have their own retention and deletion controls.">
+        <button className={BUTTON} disabled={busy} onClick={() => void share()}>{sharing.enabled ? 'Stop sharing with Inspector' : 'Share with local Inspector'}</button>
+        {sharing.enabled && sharing.path !== null ? <button className={BUTTON} disabled={busy} onClick={() => {
+          void navigator.clipboard.writeText(sharing.path ?? '').then(() => setError(null)).catch(() => setError('The feed path could not be copied.'))
+        }}>Copy Inspector feed path</button> : null}
+      </Row>
+      {sharing.enabled ? <p role="status" className="pb-3 text-caption text-muted-foreground">Inspector feed: {sharing.status}. Collected archives are managed by Inspector.</p> : null}
       <Row label="Host evidence" hint="Native lifecycle and transport events survive a harness restart until Studio quits.">
         <button className={BUTTON} disabled={busy} onClick={() => void copyHost()}>Copy host events</button>
       </Row>

@@ -23,3 +23,18 @@ export async function readNativeCapture(): Promise<Readonly<Record<string, unkno
 export async function clearNativeCapture(): Promise<void> {
   if (isTauri()) await invoke('diagnostic_capture_clear')
 }
+
+export interface InspectorSharing {
+  readonly enabled: boolean
+  readonly path: string | null
+  readonly status: string
+}
+
+export async function inspectorSharing(enabled?: boolean): Promise<InspectorSharing> {
+  if (!isTauri()) return { enabled: false, path: null, status: 'off' }
+  const result: unknown = enabled === undefined ? await invoke('diagnostic_inspector_status')
+    : await invoke('diagnostic_inspector_configure', { enabled })
+  if (!isRecord(result) || typeof result.enabled !== 'boolean' || typeof result.status !== 'string' ||
+    (result.path !== null && typeof result.path !== 'string')) throw new Error('The local Inspector sharing status is unavailable.')
+  return { enabled: result.enabled, path: result.path, status: result.status }
+}

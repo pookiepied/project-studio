@@ -4,12 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DiagnosticHealth, DiagnosticPolicy } from '@/platform/harness/client/diagnostics'
 import { DiagnosticsPane } from './DiagnosticsPane'
 
-const fixture = vi.hoisted(() => ({ desktop: true, connect: vi.fn() }))
+const fixture = vi.hoisted(() => ({ desktop: true, connect: vi.fn(), share: vi.fn(async (_enabled?: boolean) => ({ enabled: false, path: null, status: 'off' })) }))
 vi.mock('@/platform/tauri', () => ({ isTauri: () => fixture.desktop }))
 vi.mock('@/platform/harness/react', () => ({ useHarnessClient: () => fixture.connect }))
 vi.mock('@/stores/workspace', () => ({ useWorkspace: () => ({ conversations: [{ id: 'cnv_one', title: 'Investigate' }] }) }))
 vi.mock('@/platform/diagnostics/native', () => ({
   syncNativeCapture: async () => true, readNativeCapture: async () => null, clearNativeCapture: async () => undefined,
+  inspectorSharing: fixture.share,
 }))
 
 let health: DiagnosticHealth
@@ -34,6 +35,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); Reflect.deleteProperty(navigator, 'clipboard') })
 
 describe('diagnostic recording controls', () => {
+  it('shares only after an explicit action and never enables recording as a side effect', async () => {
+    render(<DiagnosticsPane />)
+    await screen.findByText('Start recording')
+    expect(fixture.share.mock.calls.every((args) => args[0] === undefined)).toBe(true)
+    expect(configure).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Share with local Inspector'))
+    await waitFor(() => expect(fixture.share).toHaveBeenCalledWith(true))
+    expect(configure).not.toHaveBeenCalled()
+  })
+
   it('does not enable recording on mount and lets the person start it explicitly', async () => {
     render(<DiagnosticsPane />)
     fireEvent.click(await screen.findByText('Start recording'))

@@ -252,6 +252,16 @@ currently unsupported.
 
 ## Feature checklist
 
+The separate [Studio Inspector](studio-inspector.md) consumes this contract.
+The native `diagnostic_inspector_status` / `diagnostic_inspector_configure`
+commands are excluded diagnostic self-control. Its explicit, default-off local
+feed uses native-generated request/feed/snapshot UUIDs, fixed admitted diagnostic
+GETs, epoch guards, bounded atomic snapshots and clear/disable writer fences.
+It never enables recording or exports the owner bearer. The Inspector archive
+has independent consent/retention; clearing the source does not erase copies.
+Sharing and source policy synchronization are not instantaneous. New bridge
+coverage is tracked with the external Inspector implementation.
+
 For each change, document the stable capability/entity name, entry point and
 identity owner, parent propagation, actual retry ownership, outcome vocabulary,
 content policy, unsupported observations and relevant coverage tests. Check direct,

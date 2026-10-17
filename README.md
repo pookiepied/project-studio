@@ -21,6 +21,11 @@ One git repository, no submodules. Each product has its own `package.json` and
 `pnpm-workspace.yaml`, so they are independent builds within one history and a
 single commit can span both. The Harness is the primary codebase.
 
+[Studio Inspector](studio-inspector/README.md) is a separate local collector and
+read-only MCP tool in this repository. It consumes explicit diagnostic exports
+or an opt-in desktop feed and can be used from Codex or Claude to investigate
+Studio conversations. It has its own store and no execution authority.
+
 `Backend/` is a separate project — the undeployed `pookiepied.dev` umbrella scaffold — kept in
 this repository as reference material. Ignore it: it is not part of any product here, and no
 task in this repository modifies it.

@@ -451,5 +451,8 @@ remain outside the instrumentation commit. No merge or commit on `main` is made.
 
 This tracker stays at its requested path as the ongoing boundary inventory for
 future features. The durable developer contract and AGENTS/CLAUDE instructions
-define how new work inherits identity and capture. Stage B remains a separate,
-unstarted external-inspector project.
+define how new work inherits identity and capture. Stage B is a separate project;
+its implementation and verification now live in
+[Studio Inspector progress](studio-inspector-progress.md). The new opt-in desktop
+sharing boundary is described in the durable observability contract. It is
+diagnostic self-control, excludes itself from capture and preserves source policy.

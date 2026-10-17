@@ -117,7 +117,8 @@ pub(crate) fn lifecycle(stage: &'static str) {
 /// IPC arrival is evidence of a command being received, not of its completion.
 pub(crate) fn command_received(command: &str) {
     let stage = match command {
-        "diagnostic_capture_sync" | "diagnostic_capture_snapshot" | "diagnostic_capture_clear" => return,
+        "diagnostic_capture_sync" | "diagnostic_capture_snapshot" | "diagnostic_capture_clear" |
+        "diagnostic_inspector_status" | "diagnostic_inspector_configure" => return,
         "app_ready" => "app_ready",
         "open_conversation_window" => "open_conversation_window",
         "open_diagnostic_window" => "open_diagnostic_window",
@@ -195,7 +196,10 @@ fn configure(capture_id: Option<String>, expected_revision: Option<u64>) -> Resu
     if expected_revision.is_some_and(|revision| revision != CLEAR_REVISION.load(Ordering::Relaxed)) {
         return Ok(capture.health());
     }
-    if capture_id.is_some() && capture.capture_id != capture_id { capture.events.clear(); capture.capture_id = capture_id.clone(); }
+    if capture_id.is_some() && capture.capture_id != capture_id {
+        capture.events.clear(); capture.capture_id = capture_id.clone();
+        crate::inspector::clear_snapshot();
+    }
     ENABLED.store(capture_id.is_some(), Ordering::Relaxed);
     Ok(capture.health())
 }
@@ -278,6 +282,7 @@ pub(crate) fn diagnostic_capture_snapshot() -> Result<NativeSnapshot, String> {
 
 #[tauri::command]
 pub(crate) fn diagnostic_capture_clear() -> Result<(), String> {
+    crate::inspector::clear_snapshot();
     let mut capture = recorder().lock().map_err(|_| "Native diagnostics are unavailable.".to_owned())?;
     CLEAR_REVISION.fetch_add(1, Ordering::Relaxed);
     capture.events.clear();

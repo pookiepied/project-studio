@@ -1,6 +1,7 @@
 mod harness;
 mod diagnostics;
 mod identity;
+mod inspector;
 mod clipboard;
 mod external;
 mod permissions;
@@ -759,6 +760,7 @@ pub fn run() {
       Some(vec![tray::HIDDEN_FLAG]),
     ))
     .setup(move |app| {
+      inspector::initialize(app.handle());
       // Logging in every build. It was debug only, which left a release
       // build with no record of anything - a harness that failed to start
       // could only be diagnosed by rebuilding in debug. Release keeps the
@@ -825,6 +827,8 @@ pub fn run() {
       diagnostics::diagnostic_capture_sync,
       diagnostics::diagnostic_capture_snapshot,
       diagnostics::diagnostic_capture_clear,
+      inspector::diagnostic_inspector_status,
+      inspector::diagnostic_inspector_configure,
       app_ready,
       open_conversation_window,
       open_diagnostic_window,
@@ -860,6 +864,7 @@ pub fn run() {
     .expect("error while building tauri application")
     .run(move |app_handle, event| {
       if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
+        inspector::shutdown();
         if let Some(remote) = app_handle.try_state::<remote::RemoteAccess>() {
           remote.stop();
         }
