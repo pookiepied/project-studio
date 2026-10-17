@@ -115,3 +115,27 @@ server, then inspect a chosen conversation from a fresh assistant chat. This
 verifies the user's actual binary, feed path and host configuration; the isolated
 protocol fixture does not substitute for that claim. Source capture and external
 archive deletion remain separate controls.
+
+## Local activation acceptance - 17 October 2026
+
+Following the user's explicit request to set up the running desktop session,
+the actual Studio started through `start.bat` was configured using its existing
+Diagnostics controls. Local recording/sharing and one selected conversation's
+content scope are enabled. A hidden independent collector is running with its
+store outside the repository. No source credential was read or exported.
+
+The actual feed reported ready, recording enabled, and no source drops or gaps.
+An existing conversation became discoverable in the independent store. A real
+stdio MCP process discovered all nine tools and successfully read its overview
+and timeline, with healthy harness/native source receipts. This closes the
+previously pending native-desktop-to-collector-to-MCP acceptance step.
+
+User-level Codex and Claude Code MCP entries were added after backing up their
+existing configuration files locally. Claude Code's own connection check passed.
+The current assistant chat's tool inventory did not refresh dynamically; access
+from a fresh Codex chat (or app reload if needed) remains to be observed by the
+user. No claim is made that this existing chat gained a new live tool namespace.
+Setup instructions, process/log references and recovery details are saved only
+in the user's local Inspector directory. No personal evidence/configuration is
+part of the Git commit or GitHub push. The Inspector feature branch is published;
+`main` is unchanged. Source sharing remains intentionally off after Studio exits.
