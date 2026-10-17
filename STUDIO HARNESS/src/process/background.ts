@@ -57,7 +57,7 @@ const MAX_KEPT_LINES = 400;
 /** A hard ceiling on one job's buffered bytes, before lines are dropped. */
 const MAX_KEPT_BYTES = 256 * 1024;
 
-type JobState = "running" | "exited" | "stopped" | "failed";
+type JobState = "running" | "stopping" | "exited" | "stopped" | "failed";
 
 export interface JobStatus {
   readonly id: string;
@@ -77,6 +77,8 @@ export interface JobStatus {
 }
 
 interface Job {
+  readonly closed: Promise<void>;
+  readonly confirmClosed: () => void;
   readonly observation: OperationObservation;
   readonly id: string;
   readonly command: string;
@@ -141,7 +143,11 @@ export class BackgroundJobs {
     assertRunnableCommand(options.executable, options.args);
 
     const id = `job_${createStudioUuid().replaceAll("-", "")}`;
+    let confirmClosed = (): void => {};
+    const closed = new Promise<void>((resolve) => { confirmClosed = resolve; });
     const job: Job = {
+      closed,
+      confirmClosed,
       observation: new OperationObservation("tool", "background.job", { conversationId: options.conversationId, jobId: id }),
       id,
       command: options.command,
@@ -195,10 +201,14 @@ export class BackgroundJobs {
         job.state = "exited";
         job.exitCode = code ?? 1;
         this.#announceEnd(job.conversationId);
+      } else if (job.state === "stopping") {
+        job.state = "stopped";
+        job.exitCode = code;
       }
       job.endedAt ??= Date.now();
       job.observation.finish(job.state === "stopped" ? "cancelled" : job.state === "failed" || job.exitCode !== 0 ? "failed" : "completed",
         { exitCode: code, stage: "process_closed" });
+      job.confirmClosed();
     });
 
     return statusOf(job);
@@ -239,8 +249,7 @@ export class BackgroundJobs {
     const job = this.#jobs.get(id);
     if (job === undefined || job.conversationId !== conversationId) return false;
     if (job.state === "running") {
-      job.state = "stopped";
-      job.endedAt = Date.now();
+      job.state = "stopping";
       job.observation.progress({ stage: "stop_requested" });
       job.kill();
     }
@@ -250,6 +259,19 @@ export class BackgroundJobs {
     // the news's only intended reader.
     job.reported = true;
     return true;
+  }
+
+  /** A bounded confirmation wait; a timeout leaves the status honestly stopping. */
+  async waitForStop(conversationId: string, id: string): Promise<JobStatus | undefined> {
+    const job = this.#jobs.get(id);
+    if (job === undefined || job.conversationId !== conversationId) return undefined;
+    if (job.state === "stopping") {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 2_000);
+        void job.closed.then(() => { clearTimeout(timer); resolve(); });
+      });
+    }
+    return statusOf(job);
   }
 
   /**
@@ -269,7 +291,7 @@ export class BackgroundJobs {
     const finished: JobStatus[] = [];
     for (const job of this.#jobs.values()) {
       if (job.conversationId !== conversationId) continue;
-      if (job.state === "running" || job.reported) continue;
+      if (job.state === "running" || job.state === "stopping" || job.reported) continue;
       job.reported = true;
       finished.push(statusOf(job));
     }
@@ -277,14 +299,14 @@ export class BackgroundJobs {
   }
 
   /** Everything, for shutdown. Nothing of ours keeps running without Studio. */
-  stopAll(): void {
+  async stopAll(): Promise<void> {
     for (const job of this.#jobs.values()) {
       if (job.state !== "running") continue;
-      job.state = "stopped";
-      job.endedAt = Date.now();
+      job.state = "stopping";
       job.observation.progress({ stage: "shutdown_stop_requested" });
       job.kill();
     }
+    await Promise.all([...this.#jobs.values()].map((job) => this.waitForStop(job.conversationId, job.id)));
   }
 }
 

@@ -281,6 +281,23 @@ export function Studio({ id }: AgentProps) {
   // to the one the person sent. The attributes carry what the transcript
   // draws; the body carries what the model reads.
   useAgentStart(({ append }) => {
+    // Job state changes between model steps. Putting it in instructions makes
+    // Flue announce an instruction update in the middle of the active task.
+    // Deliver it once at admission; tool results carry subsequent changes.
+    const jobs = runtime.conversationBackgroundJobs?.(id) ?? [];
+    const tasks = runtime.conversationBackgroundTasks?.(id) ?? [];
+    if (jobs.length > 0 || tasks.length > 0) {
+      append({
+        kind: "signal",
+        type: "background_work",
+        body: [
+          "Background work status. Continue the current user request; this status does not replace it.",
+          ...jobs,
+          ...tasks,
+          "Use jobs to read command output or request a stop.",
+        ].join("\n"),
+      });
+    }
     // A finished job's own signal wakes the same seam; a document waits for
     // the person's words, not for a background job's.
     if (delivery.kind !== "user") return;
@@ -347,10 +364,8 @@ export function Studio({ id }: AgentProps) {
       // is for now reads identically whichever mode this is: the workspace
       // holds the work, this holds everything else.
       conversationScratchDirectory(id),
-      // Drains the ended ones, so this is the delivery and not a peek. It runs
-      // once per turn, here, because assembling the prompt is the one thing a
-      // turn does exactly once.
-      runtime.conversationBackgroundJobs?.(id),
+      // Live work rides the admission hook, never the digested instructions.
+      undefined,
       // The folders the person's uploads and the generations' outputs land
       // in, named for the same reason the scratch directory is: a model that
       // has not been told reaches for neither. Both are read roots, and
@@ -361,10 +376,7 @@ export function Studio({ id }: AgentProps) {
       // The library, when this harness has one: the folder that outlives
       // conversations, named so the model asks its tool instead of globbing.
       runtime.libraryDirectory?.(),
-      // The background agent tasks under way, a read rather than a drain:
-      // current state beside the running commands, while an ended task's
-      // news arrives through the finished-task announcement.
-      runtime.conversationBackgroundTasks?.(id),
+      undefined,
     ),
   )}${capabilities}`;
 }

@@ -437,6 +437,41 @@ export function stream(
       const initial = createMessage(model);
       events.push({ type: "start", partial: initial });
 
+      // Read the whole transcript, including status signals, to prove that a
+      // second user task survives a background job's start/stop boundaries.
+      const contextText = context.messages.map((message) => JSON.stringify(message)).join("\n");
+      if (contextText.includes("[job-continuity]") && (context.systemPrompt ?? "").includes("# Studio")) {
+        const started = context.messages.find((message) => message.role === "toolResult" && message.toolCallId === "continuity-start");
+        const stopped = context.messages.some((message) => message.role === "toolResult" && message.toolCallId === "continuity-stop");
+        const jobId = started === undefined ? undefined : /job_[a-f0-9]+/.exec(JSON.stringify(started))?.[0];
+        if (started === undefined || (jobId !== undefined && !stopped)) {
+          const toolCall = started === undefined
+            ? { type: "toolCall" as const, id: "continuity-start", name: "shell",
+                arguments: { command: 'node -e "setTimeout(() => {}, 10000)"', background: true } }
+            : { type: "toolCall" as const, id: "continuity-stop", name: "jobs",
+                arguments: { ...(jobId === undefined ? {} : { id: jobId }), stop: true } };
+          const message = createMessage(model, [toolCall]);
+          message.stopReason = "toolUse";
+          events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+          events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+          events.push({ type: "done", reason: "toolUse", message });
+          return;
+        }
+        const text = JSON.stringify({
+          earlierRequestPresent: contextText.includes("earlier-html-task"),
+          currentRequestPresent: contextText.includes("build-next-project"),
+          jobStarted: jobId !== undefined,
+          stopRequested: stopped,
+          instructionChurn: contextText.includes("System instructions updated.") || (context.systemPrompt ?? "").includes("Background work you started:"),
+        });
+        const completed = createMessage(model, [{ type: "text", text }]);
+        events.push({ type: "text_start", contentIndex: 0, partial: initial });
+        events.push({ type: "text_delta", contentIndex: 0, delta: text, partial: completed });
+        events.push({ type: "text_end", contentIndex: 0, content: text, partial: completed });
+        events.push({ type: "done", reason: "stop", message: completed });
+        return;
+      }
+
       // The extension scenario, two steps. Under the withhold an extension's
       // tools are not in the array until discovered, so the first pass calls
       // discover - by the fixture's full id, which this scenario knows, the

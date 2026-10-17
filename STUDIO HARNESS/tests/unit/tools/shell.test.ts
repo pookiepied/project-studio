@@ -819,8 +819,7 @@ describe("running a command in the background", () => {
    * it was testing.
    */
   async function releaseAll(jobs: BackgroundJobs): Promise<void> {
-    jobs.stopAll();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await jobs.stopAll();
   }
 
   it("returns a job id instead of waiting for the command to finish", async () => {

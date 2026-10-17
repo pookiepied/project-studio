@@ -10,6 +10,9 @@ import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { DiagnosticPage } from "../../src/contracts/diagnostics.js";
 import { FlueHarnessClient } from "../../src/application/harness-client.js";
+import { openDatabase } from "../../src/storage/database.js";
+import { ConversationStore } from "../../src/conversations/store.js";
+import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
 
 interface RunningHarness {
   baseUrl: string;
@@ -85,12 +88,20 @@ async function createTempDir(): Promise<string> {
 
 async function startHarness(options: {
   captureContent?: boolean;
+  autoConversation?: string;
 }): Promise<RunningHarness> {
   const directory = await createTempDir();
   const databasePath = join(directory, "flue.db");
   const dumpPath = join(directory, "telemetry.json");
   const port = await availablePort();
   const admission = createAdmissionSession({ clientType: "test", scopes: ALL_ADMISSION_SCOPES });
+
+  if (options.autoConversation !== undefined) {
+    const database = openDatabase({ path: join(directory, "studio.db") });
+    new ConversationStore(database).record({ id: options.autoConversation, firstMessage: "Fixture", permissionMode: "auto" });
+    new WorkspaceTrustStore(database).set(join(directory, "data", "conversations", options.autoConversation, "workspace"), true);
+    database.close();
+  }
 
   const child = spawn(process.execPath, ["dist/server.mjs"], {
     cwd: process.cwd(),
@@ -203,6 +214,20 @@ afterEach(async () => {
 });
 
 describe.sequential("observability vertical slice", () => {
+  it("preserves the latest request across job start and stop without changing instructions", async () => {
+    const running = await startHarness({ captureContent: false, autoConversation: "job-continuity" });
+    const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+    await client.wait(await client.send("job-continuity", "earlier-html-task: create only a plain HTML file."));
+    const result = await client.wait(await client.send("job-continuity", "[job-continuity] build-next-project: now use a framework in a separate folder."));
+    expect(JSON.parse(result.text)).toEqual({
+      earlierRequestPresent: true,
+      currentRequestPresent: true,
+      jobStarted: true,
+      stopRequested: true,
+      instructionChurn: false,
+    });
+  });
+
   it("captures original scoped runtime envelope fields through the installed snapshot-source bridge", async () => {
     const running = await startHarness({ captureContent: false });
     const headers = { authorization: `Bearer ${running.token}`, "content-type": "application/json" };

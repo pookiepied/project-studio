@@ -13,6 +13,48 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Live inspection follow-up: task continuity and job termination (2026-10-17)
+
+Branch `codex/studio-run-continuity`, based on the installed Inspector branch.
+The live Next.js test built successfully, then reverted to an earlier HTML-only
+request after a job-induced instructions-update signal and deleted the new work.
+Private transcript evidence stays outside the repository. This does not establish
+that the provider lost the latest request; the exact historical wire context is
+unavailable.
+
+- Move changing job/delegate facts from digested instructions to the existing
+  admission hook's `background_work` signal. Current tool results still deliver
+  subsequent changes. Keep latest applicable user intent explicit in the prompt.
+- Background jobs now distinguish `stopping` from `stopped`; the latter and its
+  timestamp require close confirmation. Jobs and runtime shutdown wait up to two
+  seconds for confirmation. Windows taskkill asynchronous errors/nonzero exits
+  receive a direct-root fallback instead of being ignored or crashing the host.
+- Clarify required plan update fields without weakening the input schema.
+- Coverage: existing admitted runtime-signal and background-job boundaries; no
+  recording policy expansion, new credentials, provider replay or permission bypass.
+- Regression proofs: original code failed all three new context/stop assertions;
+  deliberate reintroduction of job instructions and removal of taskkill handlers
+  failed all four corresponding assertions. Mutations restored. A built runtime
+  test retains both old/new requests across start/stop with no instruction churn;
+  direct and shell-launched child termination fixtures pass.
+- Full checks passed sequentially: harness typecheck/lint/build and 2,455 tests
+  (28 skipped, 186 passed files and two skipped); client typecheck/lint and 1,538
+  tests (169 files). Client exit was zero with the previously recorded
+  `running-mark.test.tsx` worker-termination warning; that teardown issue remains
+  separate. Native code was unchanged, so Cargo checks were not rerun.
+- A built-runtime mutation reintroduced job facts into instructions. Both old
+  and current requests remained present, while `instructionChurn` became true
+  and the regression failed. Restoring the fix restored the exact full-gate
+  source hash and the regression passed again. This rules out basic input loss
+  in this controlled Flue path, not provider-specific historical serialization
+  or model behavior. The original GLM incident still requires a live repeat.
+- Changed source: `agents/studio.ts` and `context/system-prompt.ts` for stable
+  instructions and task continuity; `process/background.ts`, `process/exec.ts`,
+  `tools/shell/jobs.ts` and `application/studio-runtime.ts` for stop lifecycle;
+  `tools/plan/plan.ts` for required-field examples; the scripted test provider
+  and regression/cleanup fixtures for verification. No client/native source or
+  dependencies changed. No unrelated product rules were introduced.
+
 - Version 1 observation/identity/policy/health/page contracts.
 - Cryptographic UUIDv4 for new client records, including remote HTTP fallback.
 - Explicit logical-operation retry context helper; external IDs preserved.

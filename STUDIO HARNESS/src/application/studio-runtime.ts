@@ -1428,8 +1428,8 @@ export class StudioRuntime implements AgentHost {
   conversationBackgroundJobs(conversationId: string): readonly string[] {
     const running = this.#jobs
       .list(conversationId)
-      .filter((job) => job.state === "running")
-      .map((job) => `${job.id} is running: ${job.command}`);
+      .filter((job) => job.state === "running" || job.state === "stopping")
+      .map((job) => `${job.id} is ${job.state}: ${job.command}`);
     const ended = this.#jobs.drainFinished(conversationId).map((job) => shellEndedLine(job));
     const media =
       this.#media === undefined ? { running: [], ended: [] } : mediaJobLines(this.#media, conversationId);
@@ -2307,7 +2307,7 @@ export class StudioRuntime implements AgentHost {
     // knows about: a dev server the model started still holding port 3000
     // after Studio has closed is a process the person never started and
     // cannot see to end.
-    this.#jobs.stopAll();
+    await this.#jobs.stopAll();
     await this.#supervisor.stopAll();
   }
 }

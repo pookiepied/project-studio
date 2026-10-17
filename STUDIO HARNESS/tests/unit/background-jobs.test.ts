@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { connect } from "node:net";
+import { dirname } from "node:path";
+import { resolveInterpreter } from "../../src/process/interpreter.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
 
 import { BackgroundJobs, finishedNotice, type JobStatus } from "../../src/process/background.js";
 
@@ -20,8 +24,9 @@ const NODE = process.execPath;
 
 let jobs: BackgroundJobs;
 
-afterEach(() => {
-  jobs?.stopAll();
+afterEach(async () => {
+  await jobs?.stopAll();
+  diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
 });
 
 /** A program that prints and then stays up, the way a server does. */
@@ -103,6 +108,7 @@ describe("a command started in the background", () => {
   });
 
   it("stops one when it is asked to", async () => {
+    diagnosticRecorder.configure({ enabled: true, captureContent: false, conversations: ["cnv_1"] });
     jobs = new BackgroundJobs();
     const started = jobs.start({
       executable: NODE,
@@ -113,7 +119,19 @@ describe("a command started in the background", () => {
     });
 
     expect(jobs.stop("cnv_1", started.id)).toBe(true);
-    expect(jobs.get("cnv_1", started.id)?.state).toBe("stopped");
+    // A request cannot certify that a process has died before close arrives.
+    expect(jobs.get("cnv_1", started.id)?.state).toBe("stopping");
+    expect(jobs.get("cnv_1", started.id)?.endedAt).toBeNull();
+    const requested = diagnosticRecorder.read().events.filter((event) => event.identity.jobId === started.id);
+    expect(requested.some((event) => event.attributes.stage === "stop_requested")).toBe(true);
+    expect(requested.some((event) => event.phase === "end")).toBe(false);
+    const stopped = await settles(started.id, (candidate) => candidate.state === "stopped");
+    expect(stopped.endedAt).toBeTypeOf("number");
+    const events = diagnosticRecorder.read().events.filter((event) => event.identity.jobId === started.id);
+    expect(events.filter((event) => event.phase === "end")).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({ outcome: "cancelled", attributes: { stage: "process_closed" } });
+    expect(new Set(events.map((event) => event.identity.operationId)).size).toBe(1);
+    expect(events.every((event) => event.content === undefined && !JSON.stringify(event.attributes).includes("node server"))).toBe(true);
   });
 
   it("keeps one conversation's jobs out of another's reach", () => {
@@ -132,6 +150,46 @@ describe("a command started in the background", () => {
     expect(jobs.stop("cnv_2", started.id)).toBe(false);
     expect(jobs.list("cnv_2")).toEqual([]);
     expect(jobs.get("cnv_1", started.id)?.state).toBe("running");
+  });
+
+  it("closes a descendant's server before reporting a stopped job", async () => {
+    jobs = new BackgroundJobs();
+    const child = "require('node:net').createServer().listen(0, '127.0.0.1', function() { console.log('READY ' + this.address().port); });";
+    const started = jobs.start({
+      executable: NODE,
+      args: ["-e", `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(child)}], {stdio: 'inherit'}); setInterval(() => {}, 1000);`],
+      cwd: process.cwd(),
+      command: "fixture server with a descendant",
+      conversationId: "cnv_1",
+    });
+    const ready = await settles(started.id, (candidate) => /READY \d+/.test(candidate.output));
+    const port = Number(/READY (\d+)/.exec(ready.output)?.[1]);
+    expect(port).toBeGreaterThan(0);
+    jobs.stop("cnv_1", started.id);
+    await settles(started.id, (candidate) => candidate.state === "stopped");
+    const reachable = await new Promise<boolean>((resolve) => {
+      const socket = connect({ host: "127.0.0.1", port });
+      socket.once("connect", () => { socket.destroy(); resolve(true); });
+      socket.once("error", () => { socket.destroy(); resolve(false); });
+    });
+    expect(reachable).toBe(false);
+  });
+
+  it.skipIf(resolveInterpreter()?.kind !== "bash")("stops a command launched through the shell interpreter", async () => {
+    const interpreter = resolveInterpreter();
+    if (interpreter === undefined) throw new Error("Fixture interpreter disappeared.");
+    jobs = new BackgroundJobs();
+    const started = jobs.start({
+      executable: interpreter.path,
+      args: [...interpreter.args, 'node -e "console.log(\'ready\'); setTimeout(() => {}, 10000)"'],
+      env: { PATH: dirname(NODE) },
+      cwd: process.cwd(),
+      command: "fixture shell child",
+      conversationId: "cnv_1",
+    });
+    await settles(started.id, (candidate) => candidate.output.includes("ready"));
+    jobs.stop("cnv_1", started.id);
+    await settles(started.id, (candidate) => candidate.state === "stopped");
   });
 
   it("keeps a bounded tail and says what it dropped", async () => {
@@ -245,7 +303,7 @@ describe("telling the caller a job has ended", () => {
     expect(jobs.drainFinished("cnv_1")).toHaveLength(1);
   });
 
-  it("gives each run its own ids, so a remembered one cannot land on a new job", () => {
+  it("gives each run its own ids, so a remembered one cannot land on a new job", async () => {
     const first = new BackgroundJobs();
     const second = new BackgroundJobs();
     const a = first.start({
@@ -262,8 +320,7 @@ describe("telling the caller a job has ended", () => {
       command: "node two",
       conversationId: "cnv_1",
     });
-    first.stopAll();
-    second.stopAll();
+    await Promise.all([first.stopAll(), second.stopAll()]);
 
     // The registry is in memory, so a restart empties it - but the counter
     // starting over would let `job_1` from before the restart name whatever

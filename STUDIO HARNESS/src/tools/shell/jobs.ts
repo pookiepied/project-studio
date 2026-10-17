@@ -72,6 +72,8 @@ function summarize(job: JobStatus): string {
   const state =
     job.state === "running"
       ? "running"
+      : job.state === "stopping"
+        ? "stopping (exit not confirmed)"
       : job.state === "stopped"
         ? "stopped"
         : job.state === "failed"
@@ -186,8 +188,8 @@ export function createJobsTool(
         // Scoped to the conversation, so an id guessed from another one is
         // "no such job" rather than a process somebody else was using.
         if (!jobs.stop(conversationId, input.id)) throw noSuchJob(input.id);
-        const stopped = jobs.get(conversationId, input.id);
-        return stopped === undefined ? `Stopped ${input.id}.` : detail(stopped);
+        const stopped = await jobs.waitForStop(conversationId, input.id);
+        return stopped === undefined ? `Stop requested for ${input.id}; exit is not confirmed.` : detail(stopped);
       }
 
       const job = jobs.get(conversationId, input.id);

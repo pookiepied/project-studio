@@ -51,7 +51,9 @@ export const PLAN_TOOL_DESCRIPTOR: CapabilityDescriptor = {
     "several distinct steps the person benefits from watching; three to seven items is the " +
     "useful size, twenty is the ceiling, and a plan for a single-step answer is noise that " +
     "trains the person to stop reading. Calls merge by id: an id you have used before addresses " +
-    "the same item, and a call changes only the items it names - every item you leave out keeps " +
+    "the same item. Every item you send, including a status update, requires id, text and status. " +
+    "For example: {\"items\":[{\"id\":\"build\",\"text\":\"Build the project\",\"status\":\"done\"}]}. " +
+    "A call changes only the items it names - every item you leave out keeps " +
     "its current state, because the person may have ticked it in the meantime. The result is the " +
     "whole current list after your change, and it may contain their edits: an item they marked " +
     "done is done, so do not redo it and do not mark it back. Statuses are honest or the list is " +

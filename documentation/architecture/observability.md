@@ -63,6 +63,14 @@ at the real terminal transition. It preserves the starting parent, emits at most
 one end and rejects late evidence from a deleted/replaced capture epoch. A stop
 request is recorded as cancellation requested, not proof that a process died.
 
+Background command state follows that distinction in product results too:
+`stopping` means cancellation was requested; `stopped` and `endedAt` require
+the child's `close` event. The jobs tool and shutdown await a bounded confirmation
+window and must not turn a timeout into a confirmed exit. The existing job
+operation keeps its identity through `stop_requested` and `process_closed`.
+Changing job/delegate status is delivered through the admitted `background_work`
+signal and tool results, rather than changing the agent's digested instructions.
+
 Use the existing tool gate for new tools: it covers validation, authorization,
 containment, snapshots, queue and execution. Register capabilities through its
 registry so tools retain stable capability keys. MCP requests also carry a

@@ -120,7 +120,7 @@ export function killProcessTree(pid: number | undefined, kill: () => void): void
     const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
     const taskkillPath = `${systemRoot.replace(/\\$/, "")}\\System32\\taskkill.exe`;
     try {
-      spawn(taskkillPath, ["/pid", String(pid), "/T", "/F"], {
+      const terminator = spawn(taskkillPath, ["/pid", String(pid), "/T", "/F"], {
         stdio: "ignore",
         windowsHide: true,
         // Explicit empty env would break SystemRoot lookup inside taskkill itself;
@@ -130,7 +130,11 @@ export function killProcessTree(pid: number | undefined, kill: () => void): void
           windir: systemRoot,
           PATH: "",
         },
-      }).unref();
+      });
+      // Spawn errors arrive asynchronously, outside the surrounding catch.
+      terminator.once("error", kill);
+      terminator.once("exit", (code) => { if (code !== 0) kill(); });
+      terminator.unref();
       return;
     } catch {
       // Fall through: a failed taskkill is still better than no kill at all.
@@ -138,10 +142,13 @@ export function killProcessTree(pid: number | undefined, kill: () => void): void
     // Fallback to bare name only if the absolute path failed to spawn (e.g.
     // SystemRoot misconfigured) — still better than no tree kill.
     try {
-      spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      const terminator = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
         stdio: "ignore",
         windowsHide: true,
-      }).unref();
+      });
+      terminator.once("error", kill);
+      terminator.once("exit", (code) => { if (code !== 0) kill(); });
+      terminator.unref();
       return;
     } catch {
       // Fall through to single-process kill

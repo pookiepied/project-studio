@@ -117,6 +117,6 @@ describe("detached operation observations", () => {
       expect(events[2]?.attributes.stage).toBe("process_closed");
       expect(events[2]?.identity.jobId).toBe(job.id);
       expect(JSON.stringify(events)).not.toContain("private command text");
-    } finally { jobs.stopAll(); }
+    } finally { await jobs.stopAll(); }
   });
 });
