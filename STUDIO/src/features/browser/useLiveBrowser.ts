@@ -1,42 +1,74 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BrowserCommand, LiveBrowserState } from '@/domain/browser/live'
 import { newUuid } from '@/lib/id'
-import { useWorkspace } from '@/stores/workspace'
+import { useHarnessClient } from '@/platform/harness/react'
+import type { HarnessClient, HarnessResult } from '@/platform/harness'
 
 /** Poll only the newest screencast frame; never retry a human input. */
 export function useLiveBrowser(conversationId: string) {
-  const { browser, storePhase, ensureStore } = useWorkspace()
-  const ready = storePhase.status === 'ready'
+  const getClient = useHarnessClient()
+  const client = useRef<HarnessClient | null>(null)
   const [viewerId] = useState(newUuid)
   const [state, setState] = useState<LiveBrowserState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [inputError, setInputError] = useState<string | null>(null)
+  const [reconnecting, setReconnecting] = useState(false)
   const [revision, setRevision] = useState(0)
   const epoch = useRef(0)
   const queue = useRef<BrowserCommand[]>([])
-  const sending = useRef(false)
+  const sending = useRef<number | null>(null)
   const connected = useRef(false)
 
   useEffect(() => {
-    if (!ready) return
     const current = ++epoch.current
     let timer: ReturnType<typeof setTimeout> | undefined
     let sequence: number | undefined
+    let failures = 0
     connected.current = true
+    setState(null)
     setError(null)
+    setInputError(null)
+    setReconnecting(false)
     const read = async () => {
-      if (!connected.current || epoch.current !== current) return
-      const result = await browser.view(conversationId, viewerId, sequence)
+      if (epoch.current !== current) return
+      const harness = await getClient()
+      if (epoch.current !== current) return
+      client.current = harness
+      const result: HarnessResult<LiveBrowserState> = harness
+        ? await harness.viewConversationBrowser(conversationId, viewerId, sequence)
+        : { ok: false, error: { kind: 'not-reachable', timedOut: false, message: 'The harness is not running.' } }
       if (epoch.current !== current) return
       if (!result.ok) {
+        // Only reads can be repeated. A dropped input may already have acted.
+        if (result.error.kind === 'not-reachable' && failures < 5) {
+          failures += 1
+          connected.current = false
+          queue.current = []
+          setReconnecting(true)
+          timer = setTimeout(() => { connected.current = true; void read() }, failures * 500)
+          return
+        }
         connected.current = false
         queue.current = []
+        setReconnecting(false)
         setError(result.error.message)
         return
       }
+      if ((failures > 0 || !connected.current) && result.value.control === 'human' && harness) {
+        // Dropping queued input can also drop a key-up. Recovery releases
+        // held input; it never repeats the uncertain command.
+        const reset = await harness.interactConversationBrowser(conversationId, viewerId, { action: 'reset' })
+        if (epoch.current !== current) return
+        if (!reset.ok) setInputError(reset.error.message)
+      }
+      failures = 0
+      connected.current = true
+      setError(null)
+      setReconnecting(false)
       if (result.value.frame) sequence = result.value.frame.sequence
       setState((previous) => ({ ...result.value,
         frame: result.value.frameUnavailable ? null : result.value.frame ?? (previous?.frame?.tabId === result.value.activeTabId ? previous.frame : null) }))
-      timer = setTimeout(() => void read(), document.hidden ? 1500 : 120)
+      timer = setTimeout(() => void read(), document.hidden ? 1500 : result.value.control === 'human' ? 40 : 100)
     }
     void read()
     return () => {
@@ -44,51 +76,58 @@ export function useLiveBrowser(conversationId: string) {
       connected.current = false
       queue.current = []
       clearTimeout(timer)
-      void browser.interact(conversationId, viewerId, { action: 'detach' })
+      void client.current?.interactConversationBrowser(conversationId, viewerId, { action: 'detach' })
     }
-  }, [browser, conversationId, viewerId, revision, ready])
+  }, [getClient, conversationId, viewerId, revision])
 
   const send = useCallback((command: BrowserCommand) => {
     if (!connected.current) return
+    setInputError(null)
     const last = queue.current[queue.current.length - 1]
-    if (command.action === 'pointer' && command.kind === 'move' && last?.action === 'pointer' && last.kind === 'move') {
+    if (command.action === 'pointer' && command.kind === 'move' && last?.action === 'pointer' && last.kind === 'move' && command.tabId === last.tabId) {
       queue.current[queue.current.length - 1] = command
+    } else if (command.action === 'wheel' && last?.action === 'wheel' && command.tabId === last.tabId) {
+      queue.current[queue.current.length - 1] = { ...command,
+        x: Math.max(-4000, Math.min(4000, last.x + command.x)), y: Math.max(-4000, Math.min(4000, last.y + command.y)) }
     } else {
       if (queue.current.length >= 128) {
         connected.current = false
         queue.current = []
-        setError('Browser input fell behind. Reconnect before continuing.')
+        setInputError('Browser input fell behind. Pending input was discarded.')
+        setReconnecting(true)
         return
       }
       queue.current.push(command)
     }
-    if (sending.current) return
     const current = epoch.current
-    sending.current = true
+    if (sending.current === current) return
+    sending.current = current
     void (async () => {
       try {
         while (queue.current.length > 0 && current === epoch.current && connected.current) {
           const next = queue.current.shift()
           if (!next) break
-          const result = await browser.interact(conversationId, viewerId, next)
+          const harness = client.current
+          if (!harness) return
+          const result = await harness.interactConversationBrowser(conversationId, viewerId, next)
           if (current !== epoch.current) return
           if (!result.ok) {
             queue.current = []
-            setError(result.error.message)
-            connected.current = false
+            if (result.error.kind === 'not-reachable') {
+              setInputError(result.error.message)
+              setReconnecting(true)
+              connected.current = false
+            } else setInputError(result.error.message)
             return
           }
         }
-      } finally { sending.current = false }
+      } finally { if (sending.current === current) sending.current = null }
     })()
-  }, [browser, conversationId, viewerId])
+  }, [conversationId, viewerId])
 
-  const unavailable = storePhase.status === 'no-harness' ? 'The harness is not running.'
-    : storePhase.status === 'failed' ? storePhase.error?.message ?? 'The workspace could not load.' : null
-  return { state: ready ? state : null, error: ready ? error : unavailable, send,
+  return { state, error, inputError, reconnecting, send,
     reconnect: () => {
       setError(null)
-      if (!ready) void ensureStore()
       setRevision((value) => value + 1)
     } }
 }

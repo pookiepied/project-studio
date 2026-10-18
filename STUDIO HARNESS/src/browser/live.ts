@@ -23,6 +23,7 @@ export class LiveBrowser {
   readonly #held = new Map<Page, Set<string>>();
   #cursorBinding: { name: string; script: string } | undefined;
   #watching: Promise<void> | undefined;
+  readonly #titles = new Map<Page, { value: string; readAt: number; pending: boolean }>();
 
   constructor(readonly session: BrowserSession) {}
 
@@ -148,15 +149,28 @@ export class LiveBrowser {
     }
   }
 
-  async #state(viewerId: string, since?: number): Promise<unknown> {
+  #state(viewerId: string, since?: number): unknown {
     const ids = this.session.tabIds;
     const active = this.session.activeTabId;
     const ordered = active ? [active, ...ids.filter((id) => id !== active)] : ids;
     const tabs: { id: string; url: string; title: string }[] = [];
+    const pages = new Set(ordered.slice(0, 128).map((id) => this.session.tab(id)?.page));
+    for (const page of this.#titles.keys()) if (!pages.has(page)) this.#titles.delete(page);
     let bytes = 0;
     for (const id of ordered.slice(0, 128)) {
       const page = this.session.tab(id)?.page;
-      const tab = { id, url: (page?.url() ?? "").slice(0, 8192), title: (await page?.title().catch(() => "") ?? "").slice(0, 1024) };
+      let title = page ? this.#titles.get(page) : undefined;
+      if (page && (!title || (!title.pending && Date.now() - title.readAt >= 1000))) {
+        title ??= { value: "", readAt: 0, pending: false };
+        const entry = title;
+        this.#titles.set(page, entry);
+        entry.pending = true;
+        // A title evaluation can wait for navigation. It must never hold the
+        // frame, lease renewal or connection health hostage to that document.
+        void page.title().then((value) => { entry.value = value.slice(0, 1024); }, () => undefined)
+          .finally(() => { entry.pending = false; entry.readAt = Date.now(); });
+      }
+      const tab = { id, url: (page?.url() ?? "").slice(0, 8192), title: title?.value ?? "" };
       bytes += Buffer.byteLength(JSON.stringify(tab));
       if (bytes > 200_000) break;
       tabs.push(tab);
@@ -217,11 +231,11 @@ export class LiveBrowser {
     await cdp.send("Runtime.evaluate", { expression: source });
     cdp.on("Page.screencastFrame", (event) => {
       if (this.#cdp !== cdp) return;
-      const viewport = page.viewportSize() ?? { width: 1280, height: 800 };
       // One latest frame, bounded by both the capture dimensions and bytes.
       this.#frameUnavailable = event.data.length > 700_000;
       if (!this.#frameUnavailable) {
-        this.#frame = { data: event.data, sequence: ++this.#sequence, tabId, ...viewport };
+        this.#frame = { data: event.data, sequence: ++this.#sequence, tabId,
+          width: event.metadata.deviceWidth, height: event.metadata.deviceHeight };
       } else this.#frame = null;
       void cdp.send("Page.screencastFrameAck", { sessionId: event.sessionId }).catch(() => undefined);
     });
@@ -257,6 +271,7 @@ export class LiveBrowser {
   }
 
   async close(): Promise<void> {
+    this.#titles.clear();
     this.#owner = undefined;
     this.#held.clear();
     this.#cursor = null;

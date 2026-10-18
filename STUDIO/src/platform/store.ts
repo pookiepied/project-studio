@@ -30,3 +30,16 @@ export function openStore(file: string): Promise<StoreFile | null> {
   }
   return pending
 }
+
+/** Subscribe before the catch-up read so a newly opened window misses no change. */
+export async function watchStoreKey(file: string, key: string, receive: (value: unknown) => void): Promise<(() => void) | null> {
+  const store = await openStore(file)
+  if (!store) return null
+  let changed = false
+  const off = await store.onKeyChange<unknown>(key, (value) => { changed = true; receive(value) })
+  try {
+    const value = await store.get(key)
+    if (!changed) receive(value)
+    return off
+  } catch { off(); return null }
+}

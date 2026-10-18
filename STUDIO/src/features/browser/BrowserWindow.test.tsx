@@ -14,6 +14,15 @@ vi.mock('@/platform/tauri', async (original) => ({ ...await original<object>(), 
 afterEach(() => { cleanup(); send.mockClear(); state = { ...state, control: 'agent', frame: null, cursor: null } })
 
 describe('detached browser window', () => {
+  it('fits a small viewport without magnifying its page', () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    state = { ...state, frame: { data: '/9j/', tabId: 'tab_1', sequence: 1, width: 640, height: 400 } }
+    render(<BrowserWindow conversationId="cnv_1" />)
+    const surface = screen.getByRole('application', { name: 'Live browser page' })
+    expect(surface.style.width).toBe('640px')
+    expect(surface.style.height).toBe('400px')
+    vi.unstubAllGlobals()
+  })
   it('requires human control before navigation and tab changes', () => {
     const view = render(<BrowserWindow conversationId="cnv_1" />)
     expect(screen.getByRole('button', { name: 'New tab' }).hasAttribute('disabled')).toBe(true)

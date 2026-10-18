@@ -13,6 +13,19 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Browser reliability and shared appearance correction, 2026-10-18
+
+The detached viewer resolves its own client, with bounded, visible recovery of
+address/frame reads only. Manual inputs are never replayed; input refusal is
+separate from transport failure. A page-title evaluation cannot block frames or
+lease renewal. Frame dimensions use capture metadata and previews never upscale
+small viewports. Scroll coalescing retains ordering relative to clicks.
+Shared native preference-store/browser storage subscriptions update every window
+without persistence echoes. The existing client recorder emits only the fixed
+`client.window` / `appearance_received` stage, with no preference values.
+Validation for this correction is tracked in `report/browser-window-fixes.md`;
+the previous extension's gate counts below are not this correction's results.
+
 ### Detached live browser extension, 2026-10-18
 
 Branch `codex/live-browser-window` adds an admitted conversation-scoped human

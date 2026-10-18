@@ -32,7 +32,7 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
       server: { host: "127.0.0.1", port: 0, strictPort: false },
       plugins: [{ name: "isolated-browser-window-fixture", enforce: "pre",
         resolveId(id, importer) {
-          if ((id === "@/stores/workspace" || id.replaceAll("\\", "/").endsWith("/stores/workspace"))
+          if ((id === "@/platform/harness/react" || id.replaceAll("\\", "/").endsWith("/platform/harness/react"))
             && importer?.replaceAll("\\", "/").endsWith("/useLiveBrowser.ts")) return "\0browser-workspace";
           if (id === "/__browser-entry.tsx") return id;
           return undefined;
@@ -45,10 +45,12 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
               return {ok:true,value:await response.json()};
             };
             const browser = {
-              view: (_id, viewerId, since) => post({action:'view',viewerId,since}),
-              interact: (_id, viewerId, command) => post({...command,viewerId})
+              viewConversationBrowser: (_id, viewerId, since) => post({action:'view',viewerId,since}),
+              interactConversationBrowser: (_id, viewerId, command) => post({...command,viewerId})
             };
-            export const useWorkspace = () => ({browser,storePhase:{status:'ready'},ensureStore:async()=>{}});`;
+            let attempts = 0;
+            const getClient = async () => ++attempts < 3 ? null : browser;
+            export const useHarnessClient = () => getClient;`;
           if (id === "/__browser-entry.tsx") return `
             import React from 'react';
             import {createRoot} from 'react-dom/client';
@@ -87,6 +89,7 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
     const address = server.httpServer?.address();
     if (address === null || address === undefined || typeof address === "string") throw new Error("Fixture server did not bind.");
     const page = (await viewer.page()).page;
+    await page.setViewportSize({ width: 1120, height: 800 });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`http://127.0.0.1:${address.port}/__browser-viewer`);
@@ -94,6 +97,14 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
     await page.getByRole("button", { name: "Resume Studio" }).waitFor();
     await page.getByRole("img", { name: "Live browser page" }).waitFor();
     await expect.poll(async () => tab.page.viewportSize()?.height).not.toBe(800);
+    await expect.poll(async () => {
+      const image = page.getByRole("img", { name: "Live browser page" });
+      return image.evaluate((element) => {
+        const picture = element as HTMLImageElement;
+        const bounds = picture.getBoundingClientRect();
+        return Math.abs(bounds.width / bounds.height - picture.naturalWidth / picture.naturalHeight);
+      });
+    }).toBeLessThan(0.01);
     const input = await tab.page.getByRole("textbox", { name: "Name" }).boundingBox();
     const surface = await page.getByRole("application", { name: "Live browser page" }).boundingBox();
     if (!input || !surface) throw new Error("Fixture page has no input surface.");

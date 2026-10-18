@@ -1,4 +1,5 @@
-import { openStore as openStoreFile } from '@/platform/store'
+import { openStore as openStoreFile, watchStoreKey } from '@/platform/store'
+import { recordClientObservation } from '@/platform/diagnostics/events'
 import { isTauri } from '@/platform/tauri'
 import {
   CODE_OFFSET_CHOICES,
@@ -51,6 +52,26 @@ const STORAGE_KEY = 'studio.appearance'
 const STORE_FILE = 'preferences.json'
 
 const openStore = () => openStoreFile(STORE_FILE)
+
+/** Preferences are shared by all windows; receiving them never writes them back. */
+export async function watchAppearance(receive: (appearance: Appearance) => void): Promise<() => void> {
+  const accept = (value: unknown) => {
+    recordClientObservation({ name: 'client.window', phase: 'progress', attributes: { stage: 'appearance_received' } })
+    receive(coerce(value))
+  }
+  const off = await watchStoreKey(STORE_FILE, STORAGE_KEY, accept)
+  if (off) return off
+  if (isTauri()) return () => undefined
+  const changed = (event: StorageEvent) => {
+    if (event.storageArea === localStorage && (event.key === STORAGE_KEY || event.key === null)) {
+      accept(readLegacy())
+    }
+  }
+  window.addEventListener('storage', changed)
+  // The appearance loaded before React mounted may already be out of date.
+  accept(readLegacy())
+  return () => window.removeEventListener('storage', changed)
+}
 
 /**
  * Reads the stored preferences, migrating anything still in `localStorage`.

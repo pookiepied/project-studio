@@ -5,6 +5,7 @@ import {
   isDefaultAppearance,
   resolveTheme,
   saveAppearance,
+  watchAppearance,
   DEFAULT_APPEARANCE,
   type Appearance,
   type ResolvedTheme,
@@ -46,14 +47,24 @@ export function AppearanceProvider({
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(appearance.theme),
   )
-  // The first run would rewrite the file with exactly what was just read out
-  // of it, which turns "never chosen anything" into a stored opinion and
-  // quietly defeats the reset.
-  const hydrated = useRef(false)
+  // Receiving another window's preference must never echo a write back.
+  const locallyChanged = useRef(false)
+
+  useEffect(() => {
+    let disposed = false
+    let off: (() => void) | undefined
+    void watchAppearance((next) => {
+      if (disposed || locallyChanged.current) return
+      setAppearance((current) => current.theme === next.theme && current.uiSize === next.uiSize
+        && current.codeOffset === next.codeOffset && current.pointerCursor === next.pointerCursor ? current : next)
+    }).then((unsubscribe) => { if (disposed) unsubscribe(); else off = unsubscribe }).catch(() => undefined)
+    return () => { disposed = true; off?.() }
+  }, [])
 
   useEffect(() => {
     setResolvedTheme(applyAppearance(appearance))
-    if (hydrated.current) {
+    if (locallyChanged.current) {
+      locallyChanged.current = false
       // Only a *deviation* is stored. Matching the defaults deletes the entry
       // rather than writing the defaults into it, and the difference is the
       // whole point: an absent value means "no opinion", so a future change to
@@ -67,7 +78,6 @@ export function AppearanceProvider({
       // reset was undone one tick after it ran.
       void (isDefaultAppearance(appearance) ? forgetAppearance() : saveAppearance(appearance))
     }
-    hydrated.current = true
 
     if (appearance.theme !== 'system') return
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -81,10 +91,10 @@ export function AppearanceProvider({
       appearance,
       resolvedTheme,
       isDefault: isDefaultAppearance(appearance),
-      update: (change) => setAppearance((current) => ({ ...current, ...change })),
+      update: (change) => { locallyChanged.current = true; setAppearance((current) => ({ ...current, ...change })) },
       // Returning the live state to the defaults is enough: the effect above
       // sees an appearance that matches them and clears the stored entry.
-      reset: () => setAppearance(DEFAULT_APPEARANCE),
+      reset: () => { locallyChanged.current = true; setAppearance({ ...DEFAULT_APPEARANCE }) },
     }),
     [appearance, resolvedTheme],
   )

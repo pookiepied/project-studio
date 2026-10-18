@@ -279,6 +279,19 @@ the original result and omitting IDs, titles and error prose. Paint and the
 IPC-arrival-to-command-operation parent join remain unsupported.
 Lease expiry releases held input before automation resumes; a refused automated
 tool remains a returned MCP tool error, never a successful browser action.
+The viewer resolves its own client rather than depending on workspace catalog
+initialization. Only unavailable address/frame reads have bounded recovery;
+manual commands retain one dispatch. Refused input is distinct from lost
+transport. Frame dimensions come from the captured frame metadata, while title
+refresh is bounded to one pending evaluation per listed page and never delays
+frame delivery.
+
+All window kinds share appearance updates through the existing preference-store
+subscription (browser windows use storage events). Receiving an update emits
+only `client.window` / `appearance_received`, under the existing capture policy;
+no preference value, window title or content is recorded. Received preferences
+are applied without another persistence write. Subscription disposal suppresses
+late UI updates; a catch-up read closes the initial load/subscription gap.
 
 The separate [Studio Inspector](studio-inspector.md) consumes this contract.
 The native `diagnostic_inspector_status` / `diagnostic_inspector_configure`

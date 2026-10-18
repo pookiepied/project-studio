@@ -11,11 +11,11 @@ import { windowFrame } from '@/shell/chrome/windowFrame'
 import { useLiveBrowser } from './useLiveBrowser'
 
 export function BrowserWindow({ conversationId }: { conversationId: string }) {
-  const { state, error, send, reconnect } = useLiveBrowser(conversationId)
+  const { state, error, inputError, reconnecting, send, reconnect } = useLiveBrowser(conversationId)
   const frame = windowFrame()
   const active = state?.tabs.find((tab) => tab.id === state.activeTabId)
   const [address, setAddress] = useState('')
-  const manual = state?.control === 'human' && !error
+  const manual = state?.control === 'human' && !error && !reconnecting
 
   useEffect(() => { setAddress(active?.url === 'about:blank' ? '' : active?.url ?? '') }, [active?.url])
 
@@ -30,9 +30,9 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
         <TrafficLights />
         <span className="pointer-events-none text-caption text-muted-foreground">Studio Browser</span>
         <span className="ml-auto text-micro text-muted-foreground" role="status">
-          {error ? 'Disconnected' : !state ? 'Connecting' : !state.running ? 'Session ended' : manual ? 'You have control' : state.control === 'other' ? 'Controlled in another window' : 'Studio has control'}
+          {reconnecting ? 'Reconnecting' : error ? 'Disconnected' : !state ? 'Connecting' : !state.running ? 'Session ended' : manual ? 'You have control' : state.control === 'other' ? 'Controlled in another window' : 'Studio has control'}
         </span>
-        <button type="button" disabled={!state?.running || state.control === 'other' || !!error}
+        <button type="button" disabled={!state?.running || state.control === 'other' || !!error || reconnecting}
           onClick={() => send({ action: manual ? 'release' : 'claim' })}
           className="rounded-full bg-tint px-3 py-1 text-caption text-muted-foreground transition-colors duration-base hover:bg-muted disabled:opacity-40">
           {manual ? 'Resume Studio' : 'Take control'}
@@ -79,6 +79,7 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
           <button type="button" onClick={reconnect} className="rounded-full bg-tint px-3 py-1">Reconnect</button>
         </motion.div> : null}
       </AnimatePresence>
+      {inputError ? <p role="alert" className="border-b border-border/50 px-5 py-2 text-caption text-muted-foreground">{inputError}</p> : null}
 
       {state?.frame && active?.id === state.frame.tabId ? (
         <BrowserSurface state={state} manual={manual} send={send} />
@@ -134,7 +135,7 @@ function BrowserSurface({ state, manual, send }: {
   }, [manual, send])
 
   if (!picture || !tabId) return null
-  const scale = Math.min(size.width / picture.width, size.height / picture.height)
+  const scale = Math.min(1, size.width / picture.width, size.height / picture.height)
   const cursor = state.cursor?.tabId === tabId && !manual ? state.cursor : null
 
   const pointer = (event: PointerEvent<HTMLDivElement>, kind: 'move' | 'down' | 'up') => {
