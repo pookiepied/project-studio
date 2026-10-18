@@ -1,5 +1,10 @@
 # Browser window reliability and shared appearance
 
+Follow-up: the Windows teardown issue recorded below was resolved during
+[main consolidation](main-consolidation.md). The subsequent complete Harness
+gate passed 2,468 tests with 28 platform skips; client, native and Inspector
+checks also passed. The failed run below remains a historical checkpoint.
+
 Branch: `codex/live-browser-window`. This correction continues the detached
 browser implementation already committed on this branch. No commit on `main`.
 

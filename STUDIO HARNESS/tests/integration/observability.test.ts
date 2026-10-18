@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +13,7 @@ import { FlueHarnessClient } from "../../src/application/harness-client.js";
 import { openDatabase } from "../../src/storage/database.js";
 import { ConversationStore } from "../../src/conversations/store.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
+import { removeTestDirectory } from "../helpers/remove-test-directory.js";
 
 interface RunningHarness {
   baseUrl: string;
@@ -207,11 +208,11 @@ afterEach(async () => {
   await Promise.all([...processes].map(stopHarness));
   await Promise.all(
     [...temporaryDirectories].map(async (directory) => {
-      await rm(directory, { recursive: true, force: true });
+      await removeTestDirectory(directory);
       temporaryDirectories.delete(directory);
     }),
   );
-});
+}, 25_000);
 
 describe.sequential("observability vertical slice", () => {
   it("preserves the latest request across job start and stop without changing instructions", async () => {
