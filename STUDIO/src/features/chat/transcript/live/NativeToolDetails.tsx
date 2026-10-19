@@ -69,11 +69,28 @@ export function PlanDetails({ call, live }: { call: ToolCallView; live: boolean 
 
 interface DiscoveryEntry { readonly name: string; readonly description: string }
 
-/** Recognises the native catalog's three reports, never guesses from input. */
+/** Reads current results and saved transcripts, never guesses tools from input. */
 export function discoveryEntries(output: string): DiscoveryEntry[] {
   const lines = output.split('\n')
   const loaded = lines.filter((line) => /^mcp:[^\s/]+\/[^\s]+(?: - its full definition\.)?$/.test(line))
   if (loaded.length > 0) return loaded.map((line) => ({ name: line.replace(/ - its full definition\.$/, ''), description: '' }))
+  if (/^Showing \d+ of \d+ matching (?:servers|tools)\./.test(output)) {
+    return lines.flatMap((line) => {
+      const match = /^((?:mcp:[^\s/]+)|[a-zA-Z0-9_-]{1,64})(?: \((?:Native MCP|Third-party MCP), \d+ tools\))? - (.*)$/.exec(line)
+      return match?.[1] === undefined ? [] : [{ name: match[1], description: match[2] ?? '' }]
+    })
+  }
+  const inspected: DiscoveryEntry[] = []
+  for (const line of lines) {
+    if (!line.startsWith('{')) continue
+    try {
+      const value: unknown = JSON.parse(line)
+      if (isRecord(value) && typeof value['name'] === 'string' && /^mcp:[^\s/]+\/[a-zA-Z0-9_-]{1,64}$/.test(value['name'])) {
+        inspected.push({ name: value['name'], description: typeof value['description'] === 'string' ? value['description'] : '' })
+      }
+    } catch { /* Older transcripts can contain prose alongside a schema. */ }
+  }
+  if (inspected.length > 0) return inspected
   const entries: DiscoveryEntry[] = []
   let server: string | null = null
   for (const line of lines) {
@@ -95,9 +112,10 @@ export function discoveryEntries(output: string): DiscoveryEntry[] {
 export function DiscoveryDetails({ call, live }: { call: ToolCallView; live: boolean }) {
   const output: unknown = call.output?.present ? call.output.value : null
   const entries = typeof output === 'string' ? discoveryEntries(output) : []
-  const scope = inputOf(call)['scope']
+  const input = inputOf(call)
+  const server = input['server'] ?? input['scope']
   return <ToolResultPanel title="Tool discovery" call={call} live={live}>
-    {typeof scope === 'string' ? <p className="text-muted-foreground">Looking up {readableName(scope.replace(/^mcp:/, ''))}</p> : null}
+    {typeof server === 'string' ? <p className="text-muted-foreground">Looking up {readableName(server.replace(/^mcp:/, ''))}</p> : null}
     {entries.length > 0 ? <ul className="flex flex-col gap-2.5">
       {entries.map((entry, index) => <li key={index} className="flex items-start gap-2.5">
         <span className="mt-0.5 text-muted-foreground"><Icons.mcp /></span>

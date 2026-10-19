@@ -10,9 +10,9 @@ export type {
  * and the door it loads what it finds through.
  *
  * A family of one, beside the ask and plan families. It is alone because the
- * mechanism (ADR 0048) is deliberately narrow - one capability, one `scope`
- * argument, one registration per answer - and because every other extension
- * contributes its own tools here rather than gaining a discovery of its own;
+ * mechanism (ADR 0048) keeps browsing, inspection and loading in one tool,
+ * and because every MCP server contributes its tools here rather than gaining
+ * a discovery tool of its own;
  * a second way in would be a second permanent schema in the prefix, which is
  * the cost the mechanism exists to stop.
  */

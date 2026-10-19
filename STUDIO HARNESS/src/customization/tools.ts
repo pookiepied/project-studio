@@ -324,7 +324,7 @@ const addConnection: ConnectionTool = {
       `Installed ${title} as ${id}. ${whatItIs}${keyLine} ` +
         `Switched on for ${scopeWords(scope, projectId)}. A project or everywhere connection starts in ` +
         `the background: connection_status ${id} says when it is ready - or what went wrong if it is not - ` +
-        `and discover "mcp:${id}" brings its tools in once it is. A conversation-only switch starts ` +
+        `and discover with action load, server "mcp:${id}" and tools all loads its tools once it is. A conversation-only switch starts ` +
         "nothing; it narrows what this conversation's own array resolves.",
     );
   },

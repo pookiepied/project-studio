@@ -82,6 +82,36 @@ describe('purpose-built tool reports', () => {
     expect(screen.queryByText('Missing add camera', { exact: true })).toBeNull()
   })
 
+  it('shows paged summaries and named loads from the new discovery interface', () => {
+    expect(discoveryEntries('Showing 1 of 20 matching tools.\nadd_camera - Add a camera.\nNext cursor: private_cursor\nNo tools were loaded.')).toEqual([
+      { name: 'add_camera', description: 'Add a camera.' },
+    ])
+    expect(discoveryEntries('Showing 1 of 1 matching servers.\nmcp:studio-browser (Native MCP, 24 tools) - Browse pages.')).toEqual([
+      { name: 'mcp:studio-browser', description: 'Browse pages.' },
+    ])
+    expand(call({ toolName: 'discover', input: present({ action: 'load', server: 'mcp:blender', tools: ['add_camera'] }),
+      output: present('Loaded 1 tool from mcp:blender.\nmcp:blender/add_camera\nAvailable from your next step.') }))
+    expect(screen.getByText('Looking up Blender')).toBeTruthy()
+    expect(screen.getByText('Blender add camera')).toBeTruthy()
+    expect(screen.queryByText(/next step/)).toBeNull()
+  })
+
+  it('shows inspected names and descriptions without exposing schemas or instructions', () => {
+    expand(call({ toolName: 'discover', input: present({ action: 'inspect', server: 'mcp:blender', tools: ['add_camera'] }),
+      output: present('{"name":"mcp:blender/add_camera","description":"Adds a camera.","inputSchema":{"type":"object"}}\nNo tools were loaded. Use action load to make them callable.') }))
+    expect(screen.getByText('Blender add camera')).toBeTruthy()
+    expect(screen.getByText('Adds a camera.')).toBeTruthy()
+    expect(screen.queryByText(/inputSchema/)).toBeNull()
+    expect(screen.queryByText(/Use action load/)).toBeNull()
+  })
+
+  it('reports a missing MCP server as a failure without guessing tools from input', () => {
+    expand(call({ toolName: 'discover', input: present({ action: 'load', server: 'mcp:missing', tools: ['add_camera'] }),
+      output: present('No MCP server mcp:missing is installed. Use action list without server to see enabled servers.') }))
+    expect(screen.getByRole('status').textContent).toBe('Failed')
+    expect(screen.queryByText('Missing add camera', { exact: true })).toBeNull()
+  })
+
   it('renders unknown tools as readable fields, lists and booleans', () => {
     const { container } = expand(call({ toolName: 'mcp__assets__inspect_scene', input: present({ includeTextures: true }), output: present({ files: ['a.png', 'b.png'], total: 2 }) }))
     expect(screen.getByText('Include Textures')).toBeTruthy()

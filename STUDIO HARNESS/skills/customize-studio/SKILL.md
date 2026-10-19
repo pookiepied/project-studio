@@ -14,8 +14,9 @@ would without any of this.
 ## The tools, and the shape of the work
 
 All of this runs through the **Studio Customization** connection tools. They
-are discovered like any MCP capability: discover `mcp:studio-customization`
-and their definitions arrive with the next step.
+load through `discover`: use `action: "load"`, `server: "mcp:studio-customization"`
+and `tools: "all"`, or an array of the exact tool names you need. They are
+callable from your next model step.
 
 `add_connection` installs and switches on in one call. Three ways in:
 
@@ -71,7 +72,8 @@ when you try.
 A freshly added connection starts in the background. Its tools do not exist
 for you until it is up: `connection_status <id>` says when it is ready - or
 why it is not, in the connection's own words, alongside what its process
-printed. Then discover `mcp:<id>` and its tools arrive with your next step.
+printed. Browse it with `discover` and `server: "mcp:<id>"`, then load the
+tools you need with `action: "load"` and a `tools` array.
 `restart_connection` stops one and lets the harness start it straight back;
 `set_connection` with a new `secret` does that walk itself, because secrets
 are read at launch.

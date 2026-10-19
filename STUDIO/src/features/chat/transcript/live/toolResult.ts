@@ -14,7 +14,7 @@ export function resultState(call: ToolCallView, live = false): ResultState {
   if (isRecord(output) && (output['isError'] === true ||
     (typeof output['exitCode'] === 'number' && output['exitCode'] !== 0))) return 'failed'
   if (call.toolName === 'discover' && typeof output === 'string' &&
-    /^(?:No extension .+ is installed|mcp:\S+ is installed, but switched off|mcp:\S+ has no tool named)/.test(output)) return 'failed'
+    /^(?:No (?:extension|MCP server) .+ is installed|mcp:\S+ is installed, but switched off|mcp:\S+ has no tool named)/.test(output)) return 'failed'
   if (call.toolName === 'shell' || call.toolName === 'git') {
     if (typeof output === 'string') {
       if (call.toolName === 'git' && /^git \S+ exited with code -?\d+\.\n/.test(output)) return 'failed'

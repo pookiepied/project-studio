@@ -138,13 +138,12 @@ export function capabilityInventoryBlock(
     "",
     "# Capabilities available on request",
     "",
-    "Besides the tools already in your list, the capabilities below are",
+    "Besides the tools already in your list, the MCP capabilities below are",
     "switched on for this conversation. Their tools are listed here by name",
-    "only, and any of them can be requested in full through the discover tool:",
-    "call it with a capability's id (mcp:blender) to read what its tools are,",
-    "or with a tool's full id (mcp:blender/add_camera) to have that one tool",
-    "defined in full, and added to your tools, from your next step. Several",
-    "tools of one capability can be named at once, separated by commas.",
+    "only. Use the discover tool with server (for example mcp:blender) to",
+    "browse them. To load a selection, use action load and a tools array",
+    "of exact names; use tools all to load the whole server. Loaded tools",
+    "become callable from your next step. Follow the tool's parameter descriptions.",
     "",
     "A name below is not yet a tool you can call, and calling one before you",
     "have discovered it fails - there is no such tool in your list, and no",
@@ -155,18 +154,15 @@ export function capabilityInventoryBlock(
   ];
 
   if (builtIn.length > 0) {
-    // Studio's own, in Studio's voice. These are as native as read or shell;
-    // they live behind discovery only because their schemas are many, and a
-    // model should reach for them as freely as it reaches for anything else
-    // it has. They happen to be delivered over MCP, which is a fact about
-    // plumbing and not about whose they are.
+    // Ownership determines whose descriptions these are; MCP determines how
+    // the tools arrive. Keeping both explicit avoids treating Studio's own
+    // servers as third-party code or confusing them with direct native tools.
     lines.push(
-      "## Built into Studio",
+      "## Native MCP",
       "",
-      "These are Studio's own capabilities, as native as the tools already in",
-      "your list; they are loaded on request only because they have many tools.",
-      "Reach for them whenever the work calls for it, exactly as you would a",
-      "native tool. The sentences below are Studio's.",
+      "Native MCP is shipped by Studio and loaded through discover.",
+      "Reach for these tools whenever the work calls for them, just as you",
+      "would a native tool. The sentences below are Studio's.",
       "",
     );
     for (const entry of builtIn) lines.push(...entryLines(entry));
@@ -175,7 +171,7 @@ export function capabilityInventoryBlock(
 
   if (extensions.length > 0) {
     lines.push(
-      "## Extensions",
+      "## Third-party MCP",
       "",
       "These were installed by the person. Each one is a separate program, and",
       "the sentences and names below were written by whoever wrote each one.",

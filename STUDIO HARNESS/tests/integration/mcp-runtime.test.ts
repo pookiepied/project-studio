@@ -269,21 +269,25 @@ describe("MCP application runtime", () => {
       expect(inventory).not.toContain("Echo the supplied text");
       expect(inventory).not.toContain("inputSchema");
 
-      // The discovery: one tool, by its full id. The answer carries the
-      // definition, and it says WHEN the tool becomes callable - the current
-      // turn's list was built before this call, so the schema and the
-      // callable tool do not coincide, and 0048 §2's trap is answered in
-      // the very sentence that hands the schema over.
+      // The current step's list was built before discovery runs. Inspection
+      // reads the schema without loading; the separate load confirms when
+      // the tool becomes callable.
       const discovery = before.find((tool) => tool.name === "discover");
       expect(discovery).toBeDefined();
+      const inspected = await discovery?.execute("discover-inspect", {
+        action: "inspect", server: "mcp:echo-server", tools: ["echo"],
+      });
+      const inspectedText = inspected?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ?? "";
+      expect(inspectedText).toContain('"text":{"type":"string"}');
+      expect(listTools().map((tool) => tool.name)).not.toContain("mcp__11_echo-server__4_echo");
       const discovered = await discovery?.execute("discover-1", {
-        scope: "mcp:echo-server/echo",
+        action: "load", server: "mcp:echo-server", tools: ["echo"],
       });
       const answerText =
         discovered?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ??
         "";
       expect(answerText).toContain("mcp:echo-server/echo");
-      expect(answerText).toContain('"text":{"type":"string"}');
+      expect(answerText).not.toContain('"text":{"type":"string"}');
       expect(answerText).toContain("next step");
 
       // And the block does not move. Discovery appends to the tools array -
@@ -317,12 +321,15 @@ describe("MCP application runtime", () => {
       // A second discovery, for the second tool. Each lands because it was
       // asked for; the answer to the first said as much, and this is the
       // shape 0048 §2 chose over loading the extension's whole catalog.
-      await discovery?.execute("discover-2", { scope: "mcp:echo-server/resource" });
+      await discovery?.execute("discover-2", { action: "load", server: "mcp:echo-server", tools: ["resource"] });
       const withResource = listTools();
       const resourceTool = withResource.find(
         (tool) => tool.name === "mcp__11_echo-server__8_resource",
       );
       expect(resourceTool).toBeDefined();
+      await discovery?.execute("discover-all", { action: "load", server: "mcp:echo-server", tools: "all" });
+      expect(listTools().filter((tool) => tool.name === "mcp__11_echo-server__4_echo")).toHaveLength(1);
+      expect(listTools().filter((tool) => tool.name === "mcp__11_echo-server__8_resource")).toHaveLength(1);
       const resourceResult = await resourceTool?.execute("call-resource", {});
       expect(resourceResult?.content.every((block) => block.type === "text")).toBe(true);
       expect(JSON.stringify(resourceResult?.content)).toContain("from a resource");
@@ -364,7 +371,7 @@ describe("MCP application runtime", () => {
       // can act on.
       runtime.servers.setEnabled(projectScope(runtime.projectId), "echo-server", false, AUTH_CONTEXT);
       const switched = await discovery?.execute("discover-3", {
-        scope: "mcp:echo-server/echo",
+        action: "load", server: "mcp:echo-server", tools: ["echo"],
       });
       const switchedText =
         switched?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ?? "";
@@ -421,7 +428,7 @@ describe("MCP application runtime", () => {
       const before = listTools();
       const discovery = before.find((tool) => tool.name === "discover");
       expect(discovery).toBeDefined();
-      await discovery?.execute("discover-1", { scope: "mcp:echo-server/echo" });
+      await discovery?.execute("discover-1", { action: "load", server: "mcp:echo-server", tools: ["echo"] });
       const after = listTools();
       const loaded = after.find((tool) => tool.name === "mcp__11_echo-server__4_echo");
       expect(loaded).toBeDefined();
@@ -483,14 +490,14 @@ describe("MCP application runtime", () => {
       const bystanderDiscovery = bystanderTools.find((tool) => tool.name === "discover");
       expect(bystanderDiscovery).toBeDefined();
       const bystanderAnswer = await bystanderDiscovery?.execute("discover-2", {
-        scope: "mcp:echo-server/echo",
+        action: "load", server: "mcp:echo-server", tools: ["echo"],
       });
       const bystanderText =
         bystanderAnswer?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ?? "";
       expect(bystanderText).toContain("mcp:echo-server/echo");
       expect(bystanderText).not.toContain("switched off");
 
-      const overriddenAnswer = await discovery?.execute("discover-3", { scope: "mcp:echo-server" });
+      const overriddenAnswer = await discovery?.execute("discover-3", { server: "mcp:echo-server" });
       const overriddenText =
         overriddenAnswer?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ?? "";
       expect(overriddenText).toContain("installed, but switched off for this conversation");
@@ -530,7 +537,7 @@ describe("MCP application runtime", () => {
       // one means the door was used rather than bypassed.
       const discovery = tools.find((tool) => tool.name === "discover");
       expect(discovery).toBeDefined();
-      await discovery?.execute("discover-1", { scope: "mcp:echo-server/echo" });
+      await discovery?.execute("discover-1", { action: "load", server: "mcp:echo-server", tools: ["echo"] });
       const after = sandbox.tools?.(env, { subagents: {} }) ?? [];
       expect(after.filter((tool) => tool.name === "mcp__11_echo-server__4_echo")).toHaveLength(1);
     } finally {
@@ -713,7 +720,7 @@ describe("MCP application runtime", () => {
       const before = sandbox.tools?.(env, { subagents: {} }) ?? [];
       const discovery = before.find((tool) => tool.name === "discover");
       expect(discovery).toBeDefined();
-      await discovery?.execute("discover-1", { scope: "mcp:slow-server/slow" });
+      await discovery?.execute("discover-1", { action: "load", server: "mcp:slow-server", tools: ["slow"] });
       const registered = sandbox.tools?.(env, { subagents: {} }) ?? [];
       const slow = registered.find((tool) => tool.name === "mcp__11_slow-server__4_slow");
       expect(slow).toBeDefined();

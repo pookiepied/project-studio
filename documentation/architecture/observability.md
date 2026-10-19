@@ -393,6 +393,20 @@ queued, cancelled, refused and failed paths as applicable. Keep execution,
 delivery and capture health separate. Returned `isError` values and thrown errors
 must not be silently collapsed into one outcome.
 
+MCP discovery keeps the existing `native/discover` capability and tool gate.
+Its `discover.list`, `discover.inspect` and `discover.load` child operations
+inherit that gate's execution parent. Page observations contain counts and a
+continuation flag; successful loads contain selection count and serialized schema
+bytes. Search text, cursors, names, descriptions and schemas remain tool content
+under the existing scoped capture policy. There is no new collection switch,
+retry, permission grant or external call. Loading publishes schemas for the next
+model step; it does not execute MCP tools. Enablement, name validation and byte
+checks precede adoption. An unexpected registration exception is preserved; this
+in-memory registration loop is not a transactional rollback boundary.
+The schema byte budget applies at explicit-load preflight. Catalog refreshes
+still follow the existing replacement policy; this is not a permanent context
+size bound or a provider token estimate.
+
 Existing coverage and unfinished work live in the implementation tracker. Update
 it when a feature adds or closes a boundary. Do not call the system complete
 until the coverage inventory, user controls, end-to-end fixtures, performance

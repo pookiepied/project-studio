@@ -13,6 +13,22 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### MCP discovery browsing and explicit loading, 2026-10-20
+
+`native/discover` retains the existing tool gate and conversation adoption set.
+List/search, read-only inspection and explicit named/all loading now have child
+operations `discover.list`, `discover.inspect` and `discover.load`. Operational
+observations contain counts, continuation state and serialized schema bytes only;
+arguments and results retain the existing gated content path. Native and third-party
+MCP share enablement and byte bounds. Cursors bind the catalog/search, not authority.
+No MCP request, retry, capture switch or permission concept was added. Unit coverage
+includes parent linkage, failed outcomes, content exclusion and pre-adoption
+refusals. The full harness check passed typecheck, lint, build and 2,548 tests
+(28 skipped). The sequential client check passed typecheck, lint and 1,571 tests.
+Focused harness coverage rose from 52 to 88 tests; negative controls caught the
+wrong page size, bypassed enablement and missing byte guards before restoration.
+Earlier gate results below are historical.
+
 ### Computer/browser presence and shared desktop ownership, 2026-10-19
 
 The existing computer MCP boundary now carries bounded non-injected input

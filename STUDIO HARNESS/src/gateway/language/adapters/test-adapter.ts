@@ -474,11 +474,9 @@ export function stream(
 
       // The extension scenario, two steps. Under the withhold an extension's
       // tools are not in the array until discovered, so the first pass calls
-      // discover - by the fixture's full id, which this scenario knows, the
-      // way a model that read the inventory would - and the tool joins the
-      // array only for the NEXT submission. A third call in the same
-      // submission still cannot see it; the trap 0048 §2 warns about, kept
-      // rather than fixed, so the call happens on the next message.
+      // discover with the fixture's server and tool name, which this scenario
+      // knows from the inventory. Flue rebuilds the tool array for the next
+      // model step, so the same submission can call the newly loaded tool.
       const mcpName = mcpToolName(context);
       if (userText.toLowerCase().includes("mcp")) {
         if (mcpName !== undefined && !hasMcpToolResult(context)) {
@@ -500,7 +498,7 @@ export function stream(
             type: "toolCall" as const,
             id: "mcp-discover-1",
             name: "discover",
-            arguments: { scope: "mcp:echo-server/echo" },
+            arguments: { action: "load", server: "mcp:echo-server", tools: ["echo"] },
           };
           const message = createMessage(model, [discoverCall]);
           message.stopReason = "toolUse";

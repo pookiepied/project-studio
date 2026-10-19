@@ -1991,6 +1991,7 @@ export class StudioRuntime implements AgentHost {
           };
         },
         tools: (serverId) => this.#catalog.tools([serverId]),
+        loaded: () => [...registeredMcp.values()],
         // Adoption is registration plus remembering: the registration makes
         // the tool callable, the key makes the adoption survive the
         // submission. Forgetting the key here would work for the current

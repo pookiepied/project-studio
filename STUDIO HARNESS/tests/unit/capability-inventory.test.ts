@@ -143,15 +143,15 @@ describe("what the inventory says about a server", () => {
 
 describe("a capability Studio wrote is announced as Studio's own", () => {
   it("puts built-in capabilities in their own section, in Studio's voice", () => {
-    // ADR 0055: the browser and the computer are as native as read or shell
+    // ADR 0055: the browser and the computer are Studio-owned MCP servers
     // and live behind discovery only because their schemas are many. A model
     // told to distrust their sentences would be told to distrust the harness.
     const block = capabilityInventoryBlock([
       entry({ id: "mcp:studio-browser", description: "Opens web pages.", builtIn: true }),
       entry({ id: "mcp:blender" }),
     ]);
-    const builtIn = block.indexOf("## Built into Studio");
-    const extensions = block.indexOf("## Extensions");
+    const builtIn = block.indexOf("## Native MCP");
+    const extensions = block.indexOf("## Third-party MCP");
     expect(builtIn).toBeGreaterThan(-1);
     expect(extensions).toBeGreaterThan(builtIn);
     // The entry lines, not the intro's example ids, which mention mcp:blender.
@@ -160,7 +160,7 @@ describe("a capability Studio wrote is announced as Studio's own", () => {
     expect(browserLine).toBeGreaterThan(builtIn);
     expect(browserLine).toBeLessThan(extensions);
     expect(blenderLine).toBeGreaterThan(extensions);
-    expect(block).toContain("as native as the tools already in");
+    expect(block).toContain("Native MCP is shipped by Studio and loaded through discover.");
     expect(block).toContain("The sentences below are Studio's.");
   });
 
@@ -168,8 +168,8 @@ describe("a capability Studio wrote is announced as Studio's own", () => {
     const block = capabilityInventoryBlock([
       entry({ id: "mcp:studio-computer", description: "Uses this computer.", builtIn: true }),
     ]);
-    expect(block).toContain("## Built into Studio");
-    expect(block).not.toContain("## Extensions");
+    expect(block).toContain("## Native MCP");
+    expect(block).not.toContain("## Third-party MCP");
     expect(block).not.toContain("whoever wrote");
   });
 
@@ -248,16 +248,15 @@ describe("the inventory keeps its promise about discovery", () => {
     );
   });
 
-  it("names the discovery tool and spells both scope shapes it answers to", () => {
-    // The promise has a tool's name in it, because a promise without the way
-    // to fulfil it is decoration. The two example ids are the grammar: a
-    // server id, and the same id with one of the tool names joined by a
-    // slash - the exact spelling the discover tool's answer expects back.
+  it("names discovery and distinguishes browsing from explicit loading", () => {
+    // The inventory must teach the same selection grammar as the tool schema.
     const block = capabilityInventoryBlock([entry()]);
 
     expect(block).toContain("the discover tool");
     expect(block).toContain("mcp:blender)");
-    expect(block).toContain("mcp:blender/add_camera");
+    expect(block).toContain("action load");
+    expect(block).toContain("tools array");
+    expect(block).toContain("tools all");
   });
 });
 

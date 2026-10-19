@@ -140,19 +140,43 @@ permission.
 
 ## The native tools
 
-Nine tools in five families, registered under one `native` namespace by
-`registerNativeTools`:
+Twenty-one tools in eleven families, registered under one `native` namespace
+by `registerNativeTools` when their dependencies are composed:
 
 | Family | Tools |
 |---|---|
-| filesystem | `read`, `write`, `edit` |
+| filesystem | `read`, `write`, `edit`, `delete`, `move` |
 | search | `glob`, `grep` |
 | git | `git` |
-| shell | `shell` |
+| shell | `shell`, `jobs` |
 | web | `web_search`, `fetch` |
+| media | `studio_image`, `studio_video` |
+| documents | `ocr` |
+| library | `library_search`, `library_keep` |
+| ask | `ask_user_question`, `request_folder` |
+| plan | `plan` |
+| discover | `discover` |
 
-MCP tools register and unregister dynamically on top of these, filtered by
-per-project enablement.
+The normal application composes all twenty-one. Framework tools such as `task`,
+`activate_skill` and the conditional `read_skill_resource` are separate from
+this native count.
+
+Native tools are available directly. **Native MCP** means MCP servers shipped
+by Studio; **third-party MCP** means servers installed by the user. Both load
+tools on request through `discover`, subject to conversation, project and global
+enablement and per-call authorization. MCP describes the connection protocol,
+not whether a tool runs locally or accesses the network. Skills load their
+instructions separately through `activate_skill`.
+
+`discover` lists enabled servers with no arguments. Set `server` to browse its
+tools; `query`, `limit` (eight by default, at most 100) and `cursor` control
+browsing. Use `action: "load"` with `server` and a `tools` array of exact names,
+or `tools: "all"`. Loading has no eight-tool cap. New tools are callable from the
+next model step. `action: "inspect"` reads named schemas without loading them.
+Results are bounded to 64 KiB. Before loading, discovery checks a 512 KiB budget
+for the current conversation's registered MCP definitions plus the selection.
+These byte limits are not token counts or a guarantee that the selected model's
+context will fit; later catalog refreshes retain the existing replacement policy.
 
 ## Rules that fail work outright
 

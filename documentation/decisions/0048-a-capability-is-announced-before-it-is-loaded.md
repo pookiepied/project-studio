@@ -1,5 +1,34 @@
 # ADR 0048 — A Capability Is Announced Before It Is Loaded
 
+**Amendment, 2026-10-20:** The current discovery interface is described below.
+It replaces the original `scope` argument and eight-tool loading cap; the earlier
+design remains here as the record of why discovery exists.
+
+`discover` defaults to `action: "list"`. Without `server`, it lists enabled MCP
+servers; with `server`, it lists tool summaries. Listing supports case-insensitive
+substring search through `query`, pages of eight by default (`limit` 1–100), and
+catalog/search-bound continuation cursors. Listing does not load tools.
+
+`action: "load"` requires a server and a `tools` array of exact names, or
+`tools: "all"`. Explicit selection has no eight-tool count cap. Native MCP and
+third-party MCP use the same mechanism. All requested names and resource bounds
+are checked before registration; oversized or invalid selections load nothing.
+Loaded tools appear from the next model step and retain per-call authorization.
+Successful load results confirm names without repeating their schemas.
+
+`action: "inspect"` reads named definitions without loading them. Results are
+bounded to 64 KiB; loading checks a 512 KiB serialized byte budget across the
+conversation's current gate plus the selection. This is a preflight bound, not
+a cap on later catalog replacements, a provider token count or a guarantee of
+model-context fit. The existing
+process-local adoption set and append-only membership rules are unchanged.
+
+The old count cap allowed the same schemas to accumulate through repeated calls,
+so it imposed round trips without bounding the final cost. Explicit loading keeps
+the model's selection deliberate, while byte bounds constrain actual definition
+size. Tool descriptions and parameter validation own the calling rules; the
+system prompt carries only a short pointer and capability inventory.
+
 **Status:** Accepted · 2026-09-07
 **Builds on:** [ADR 0029](0029-mcp-session-tool-membership.md) — session tool
 membership is append-only. That decision says a tool, once in the array, never
