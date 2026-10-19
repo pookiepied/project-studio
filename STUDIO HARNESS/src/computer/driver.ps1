@@ -52,6 +52,7 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
 [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
 '@
 
@@ -101,6 +102,7 @@ function Target-Display {
   if ($script:Target -eq 0) { return $null }
   $h = [IntPtr]$script:Target
   if (-not [Studio.Native]::IsWindow($h) -or [Studio.Native]::IsIconic($h)) { return $null }
+  if ((Window-Identity (Window-Row $script:Target)) -ne $script:TargetIdentity) { return $null }
   $r = New-Object Studio.Native+RECT
   if (-not [Studio.Native]::GetWindowRect($h, [ref]$r)) { return $null }
   return Display-Of ([int](($r.Left + $r.Right) / 2)) ([int](($r.Top + $r.Bottom) / 2))
@@ -202,6 +204,22 @@ function Take-Screenshot($display, $region, $max, $format, $quality, $window) {
 function To-Absolute($display, $x, $y) {
   $d = Resolve-Display $display
   return @{ x = $d.screen.Bounds.X + [int]$x; y = $d.screen.Bounds.Y + [int]$y }
+}
+
+function Control-Point($rect) {
+  $cx = [int]($rect.X + $rect.Width / 2); $cy = [int]($rect.Y + $rect.Height / 2)
+  $display = Display-Of $cx $cy
+  $bounds = @(Get-Displays) | Where-Object { $_.index -eq $display } | Select-Object -First 1
+  return @{ display = $display; x = ($cx - $bounds.x); y = ($cy - $bounds.y) }
+}
+
+# The point chooses the input target before the action, never an unrelated
+# window which happens to take focus afterwards.
+function Point-Window($display, $x, $y) {
+  $absolute = To-Absolute $display $x $y
+  $point = New-Object Studio.Native+POINT
+  $point.X = $absolute.x; $point.Y = $absolute.y
+  return Root-Of ([Studio.Native]::WindowFromPoint($point))
 }
 
 function Get-Cursor {
@@ -486,12 +504,15 @@ function Get-TopWindows($app) {
   [void][Studio.Native]::EnumWindows($script:Enum, [IntPtr]::Zero)
   $fg = [int64][Studio.Native]::GetForegroundWindow()
   $procs = @{}
+  $starts = @{}
   foreach ($w in $script:Windows) {
     if (-not $procs.ContainsKey($w.pid)) {
       $p = Get-Process -Id $w.pid -ErrorAction SilentlyContinue
       $procs[$w.pid] = if ($null -ne $p) { $p.ProcessName } else { "" }
+      $starts[$w.pid] = try { [string]$p.StartTime.ToUniversalTime().Ticks } catch { "" }
     }
     $w.app = $procs[$w.pid]
+    $w.processStarted = $starts[$w.pid]
     $w.foreground = ($w.handle -eq $fg)
     $w.target = ($w.handle -eq $script:Target)
     $w.display = Display-Of ([int]($w.x + $w.width / 2)) ([int]($w.y + $w.height / 2))
@@ -529,9 +550,13 @@ function Get-Apps {
 # becomes the target for the same reason.
 
 $script:Target = [int64]0
+$script:TargetIdentity = ""
 
 function Set-Target($handle) {
-  if ($null -ne $handle -and [int64]$handle -ne 0) { $script:Target = [int64]$handle }
+  if ($null -ne $handle -and [int64]$handle -ne 0) {
+    $script:Target = [int64]$handle
+    $script:TargetIdentity = Window-Identity (Window-Row $handle)
+  }
 }
 
 # The top-level window a handle belongs to: what `windows` would list.
@@ -567,6 +592,9 @@ function Same-Window($front, $target) {
 function Assert-Target($what) {
   if ($script:Target -eq 0) {
     throw "Nothing has been chosen to $what into yet. Open or focus a window, read it and focus a control, or click where the input should go, and then $what."
+  }
+  if ((Window-Identity (Window-Row $script:Target)) -ne $script:TargetIdentity) {
+    throw "The target window closed or changed identity. Nothing was sent. List windows and choose the intended window again."
   }
   $fg = [int64][Studio.Native]::GetForegroundWindow()
   if (-not (Same-Window $fg $script:Target)) {
@@ -663,13 +691,53 @@ function Wait-NewWindow($before, $hint) {
     if ((Given $hint)) {
       $needle = $hint.ToLowerInvariant()
       $named = @($fresh | Where-Object { $_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*" })
-      if ($named.Count -gt 0) { return $named[0] }
+      if ($named.Count -gt 0) { return Select-UniqueWindow $named }
+      continue
     }
-    # The biggest new window is the app; a 1x1 helper the same launch made
-    # is not what anybody meant.
-    return ($fresh | Sort-Object { $_.width * $_.height } -Descending)[0]
+    return Select-UniqueWindow $fresh
   }
   return $null
+}
+
+function Select-UniqueWindow($windows) {
+  $choices = @($windows)
+  if ($choices.Count -ne 1) {
+    $handles = ($choices | Select-Object -First 10 | ForEach-Object { [string]$_.handle }) -join ", "
+    throw "More than one window matches ($handles). List windows and focus the intended handle explicitly; nothing was selected."
+  }
+  return $choices[0]
+}
+
+# These are observations, not proof that an application's intended operation
+# completed. Recovery candidates never grant input authority to another window.
+function Observe-Action($before, $beforeWindows, $observationId) {
+  $after = $null
+  for ($sample = 0; $sample -lt 8; $sample++) {
+    Start-Sleep -Milliseconds 100
+    $after = Get-Status
+  }
+  $now = @(Get-TopWindows $null)
+  $oldIdentities = @{}; $newIdentities = @{}
+  foreach ($window in $beforeWindows) { $oldIdentities[(Window-Identity $window)] = $true }
+  foreach ($window in $now) { $newIdentities[(Window-Identity $window)] = $true }
+  $opened = @($now | Where-Object { -not $oldIdentities.ContainsKey((Window-Identity $_)) })
+  $closed = @($beforeWindows | Where-Object { -not $newIdentities.ContainsKey((Window-Identity $_)) })
+  $previous = $before.target
+  $gone = $null -ne $previous -and (Window-Identity (Window-Row $previous.handle)) -ne (Window-Identity $previous)
+  $candidates = @()
+  if ($gone) {
+    $candidates = @($now | Where-Object { $_.app -eq $previous.app -and -not $_.minimized })
+  }
+  return [ordered]@{
+    observationId = $observationId; available = $true; waitedMs = 800
+    previousTarget = $previous; target = $after.target; front = $after.front
+    targetGone = $gone; targetInFront = $after.targetInFront
+    newWindows = @($opened | Select-Object -First 20)
+    closedWindows = @($closed | Select-Object -First 20)
+    candidates = @($candidates | Select-Object -First 20)
+    truncated = ($opened.Count -gt 20 -or $closed.Count -gt 20 -or $candidates.Count -gt 20)
+    refsInvalidated = $true
+  }
 }
 
 function Open-App($app, $path) {
@@ -677,24 +745,28 @@ function Open-App($app, $path) {
   if ((Given $path)) {
     $p = Start-Process -FilePath $path -PassThru
     $w = Wait-NewWindow $before ([System.IO.Path]::GetFileNameWithoutExtension($path))
-    if ($null -ne $w) { [void](Focus-Window $w.handle); Set-Target $w.handle }
-    return [ordered]@{ started = $true; pid = $p.Id; what = $path; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
+    $focused = $false
+    if ($null -ne $w) { $focused = (Focus-Window $w.handle).focused }
+    return [ordered]@{ started = $true; focused = $focused; pid = $p.Id; what = $path; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
   }
   if (-not (Given $app)) { throw "Say which app to open, or give a path." }
   # Already running with a window: bring it forward rather than start a second.
   $existing = @(Get-TopWindows $app)
   if ($existing.Count -gt 0) {
-    $f = Focus-Window $existing[0].handle
-    return [ordered]@{ started = $false; focused = $f.focused; window = $existing[0].title; pid = $existing[0].pid; handle = $existing[0].handle }
+    $chosen = Select-UniqueWindow $existing
+    $f = Focus-Window $chosen.handle
+    return [ordered]@{ started = $false; focused = $f.focused; window = $chosen.title; pid = $chosen.pid; handle = $chosen.handle }
   }
   $needle = $app.ToLowerInvariant()
   $starts = @(Get-StartApps | Where-Object { $_.Name.ToLowerInvariant() -eq $needle })
   if ($starts.Count -eq 0) { $starts = @(Get-StartApps | Where-Object { $_.Name.ToLowerInvariant() -like "*$needle*" }) }
   if ($starts.Count -eq 0) { throw "No app called `"$app`" is installed. Names are as they appear in the Start menu." }
+  if ($starts.Count -gt 1) { throw "More than one installed app matches. Give an exact app name or program path." }
   Start-Process -FilePath "explorer.exe" -ArgumentList ("shell:AppsFolder\" + $starts[0].AppID)
   $w = Wait-NewWindow $before $app
-  if ($null -ne $w) { [void](Focus-Window $w.handle); Set-Target $w.handle }
-  return [ordered]@{ started = $true; what = $starts[0].Name; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
+  $focused = $false
+  if ($null -ne $w) { $focused = (Focus-Window $w.handle).focused }
+  return [ordered]@{ started = $true; focused = $focused; what = $starts[0].Name; handle = $(if ($null -ne $w) { $w.handle } else { 0 }); window = $(if ($null -ne $w) { $w.title } else { "" }) }
 }
 
 # ---- Bearings ---------------------------------------------------------------
@@ -711,8 +783,9 @@ function Window-Row($handle) {
   $owner = [uint32]0
   [void][Studio.Native]::GetWindowThreadProcessId($h, [ref]$owner)
   $p = Get-Process -Id $owner -ErrorAction SilentlyContinue
+  $started = try { [string]$p.StartTime.ToUniversalTime().Ticks } catch { "" }
   return [ordered]@{
-    handle = [int64]$h; title = (Get-WindowTitle $h); app = $(if ($null -ne $p) { $p.ProcessName } else { "" }); pid = [int]$owner
+    handle = [int64]$h; title = (Get-WindowTitle $h); app = $(if ($null -ne $p) { $p.ProcessName } else { "" }); pid = [int]$owner; processStarted = $started
     x = $r.Left; y = $r.Top; width = ($r.Right - $r.Left); height = ($r.Bottom - $r.Top)
     minimized = [Studio.Native]::IsIconic($h); maximized = [Studio.Native]::IsZoomed($h)
     display = (Display-Of ([int](($r.Left + $r.Right) / 2)) ([int](($r.Top + $r.Bottom) / 2)))
@@ -722,8 +795,8 @@ function Window-Row($handle) {
 function Get-Status {
   $fg = [int64][Studio.Native]::GetForegroundWindow()
   $target = Window-Row $script:Target
-  $gone = ($script:Target -ne 0 -and $null -eq $target)
-  if ($gone) { $script:Target = [int64]0 }
+  $gone = ($script:Target -ne 0 -and ($null -eq $target -or (Window-Identity $target) -ne $script:TargetIdentity))
+  if ($gone) { $script:Target = [int64]0; $script:TargetIdentity = ""; $target = $null }
   return [ordered]@{
     target = $target
     targetGone = $gone
@@ -794,8 +867,7 @@ function Wait-ForWindow($text, $seconds) {
   while ($true) {
     $found = @(Get-TopWindows $null | Where-Object { -not $_.minimized -and ($_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*") })
     if ($found.Count -gt 0) {
-      $fg = [int64][Studio.Native]::GetForegroundWindow()
-      $pick = @($found | Sort-Object { $(if ($_.handle -eq $fg) { 1 } else { 0 }) }, { $_.width * $_.height } -Descending)[0]
+      $pick = Select-UniqueWindow $found
       return [ordered]@{ found = $true; handle = $pick.handle; title = $pick.title; app = $pick.app; display = $pick.display; foreground = $pick.foreground }
     }
     if ([DateTime]::UtcNow -ge $deadline) { return [ordered]@{ found = $false; waited = $limit } }
@@ -807,6 +879,26 @@ function Wait-ForWindow($text, $seconds) {
 
 $script:Refs = @{}
 $script:RefsWindow = [int64]0
+$script:RefsEpoch = ""
+$script:RefsIdentity = ""
+
+function Window-Identity($window) {
+  if ($null -eq $window) { return "" }
+  return "$($window.handle)/$($window.pid)/$($window.processStarted)"
+}
+
+function Reset-UiRefs {
+  $script:Refs = @{}
+  $script:RefsEpoch = ""
+  $script:RefsIdentity = ""
+}
+
+function Begin-UiRead($window, $observationId) {
+  Reset-UiRefs
+  $script:RefsWindow = $window
+  $script:RefsEpoch = [string]$observationId
+  $script:RefsIdentity = Window-Identity (Window-Row $window)
+}
 
 # The handle a read walks: the one given, else the target. Never the window in
 # front - see the target rule above.
@@ -825,8 +917,7 @@ function Ui-Root($window) {
 $Interactive = @("button", "check box", "radio button", "combo box", "edit", "hyperlink", "list item", "menu item", "tab item", "slider", "spinner", "split button", "tree item", "document", "menu bar", "menu", "list", "tab", "tool bar", "data item", "header item")
 
 function Read-Ui($window, $depth, $limit, $all) {
-  $script:Refs = @{}
-  $script:RefsWindow = Ui-Handle $window
+  Begin-UiRead (Ui-Handle $window) $script:ObservationId
   $root = Ui-Root $window
   # Reading a window is choosing it: the refs it hands out belong to it, and
   # what the model does with them next happens there.
@@ -867,9 +958,9 @@ function Read-Ui($window, $depth, $limit, $all) {
       } catch {}
       if (-not $el.Current.IsEnabled) { $parts += "disabled" }
       if ($el.Current.HasKeyboardFocus) { $parts += "focused" }
-      $cx = [int]($rect.X + $rect.Width / 2); $cy = [int]($rect.Y + $rect.Height / 2)
-      $parts += "@($cx,$cy)"
-      $parts += "[ui_$counter]"
+      $point = Control-Point $rect
+      $parts += "display $($point.display) @($($point.x),$($point.y))"
+      $parts += "[ui_$($script:RefsEpoch)_$counter]"
       $lines.Add(($parts -join " "))
     }
     if ($d -lt $maxDepth) {
@@ -885,15 +976,19 @@ function Read-Ui($window, $depth, $limit, $all) {
   $title = try { $root.Current.Name } catch { "" }
   $minimized = $false
   try { $minimized = [Studio.Native]::IsIconic([IntPtr]$root.Current.NativeWindowHandle) } catch {}
-  return [ordered]@{ window = $title; handle = $script:RefsWindow; minimized = $minimized; outline = ($lines -join "`n") }
+  return [ordered]@{ window = $title; handle = $script:RefsWindow; observationId = $script:RefsEpoch; minimized = $minimized; outline = ($lines -join "`n") }
 }
 
 function Ui-Ref($ref) {
-  if ($ref -notmatch '^ui_(\d+)$') { throw "`"$ref`" is not an element reference. A reference looks like ui_12 and comes from read_ui." }
-  $n = [int]$Matches[1]
+  if ($ref -notmatch '^ui_([0-9a-f-]{36})_(\d+)$') { throw "That element reference is invalid or stale. Read the window again and copy the complete reference." }
+  $epoch = $Matches[1]; $n = [int]$Matches[2]
+  if ($epoch -ne $script:RefsEpoch -or $script:RefsIdentity -eq "" -or
+      (Window-Identity (Window-Row $script:RefsWindow)) -ne $script:RefsIdentity) {
+    throw "That element reference belongs to an older observation or window. Read the window again."
+  }
   $el = $script:Refs[$n]
-  if ($null -eq $el) { throw "There is no ui_$n from the last read. References come from read_ui and are replaced by the next read; read the window again." }
-  try { [void]$el.Current.Name } catch { throw "ui_$n is no longer on screen. Read the window again." }
+  if ($null -eq $el) { throw "That element reference is not in the latest observation. Read the window again." }
+  try { [void]$el.Current.Name } catch { throw "That element reference is no longer on screen. Read the window again." }
   return $el
 }
 
@@ -953,18 +1048,35 @@ function Clipboard-Op($action, $text) {
 
 # ---- The loop ---------------------------------------------------------------
 
+function Needs-ActionObservation($operation, $arguments) {
+  if ($operation -eq "button" -and $arguments.action -eq "up") { return $false }
+  return $operation -in @("move", "click", "drag", "button", "scroll", "type", "key", "hold", "open", "focus", "arrange", "act", "set_value", "select_text")
+}
+
 function Answer($id, $result) {
+  if ($null -ne $script:ActionBefore) {
+    Reset-UiRefs
+    $observation = try {
+      Observe-Action $script:ActionBefore $script:ActionWindows $script:ObservationId
+    } catch { [ordered]@{ available = $false; observationId = $script:ObservationId; refsInvalidated = $true } }
+    if ($result -is [System.Collections.IDictionary]) { $result["observation"] = $observation }
+  }
   $o = [ordered]@{ id = $id; ok = $true; result = $result }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 8))
   [Console]::Out.Flush()
 }
 
 function Refuse($id, $message) {
+  Reset-UiRefs
+  if ($null -ne $script:ActionBefore) {
+    $message += " Observe status and read the intended window again before any further input; do not replay this action automatically."
+  }
   $o = [ordered]@{ id = $id; ok = $false; error = $message }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 4))
   [Console]::Out.Flush()
 }
 
+$script:ActionBefore = $null
 Answer "ready" ([ordered]@{ displays = @(Get-Displays) })
 
 while ($true) {
@@ -972,10 +1084,19 @@ while ($true) {
   if ($null -eq $line) { break }
   if ($line.Trim() -eq "") { continue }
   $id = $null
+  $script:ActionBefore = $null
   try {
     $req = ConvertFrom-Json $line
     $id = $req.id
     $a = $req.args
+    $script:ObservationId = [string]$a.observationId
+    $script:ActionBefore = $null
+    $script:ActionWindows = @()
+    if (Needs-ActionObservation $req.op $a) {
+      # Failure to read the pre-action state must refuse before sending input.
+      $script:ActionBefore = Get-Status
+      $script:ActionWindows = @(Get-TopWindows $null)
+    }
     switch ($req.op) {
       "displays" { Answer $id @(Get-Displays) }
       "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality $a.window) }
@@ -986,11 +1107,9 @@ while ($true) {
       "move" { Move-Pointer $a.display $a.x $a.y; Answer $id (Get-Cursor) }
       "click" {
         $outside = (Given $a.x) -and (Outside-Target $a.display $a.x $a.y)
+        $clickedWindow = Point-Window $a.display $a.x $a.y
         Click-At $a.display $a.x $a.y $a.button $a.count $a.modifiers
-        # A beat for the window to act on the click before the picture that
-        # rides along is taken, or the picture shows the moment before.
-        Start-Sleep -Milliseconds 150
-        Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow()))
+        Set-Target $clickedWindow
         $c = Get-Cursor; if ($outside) { $c.outside = "The point was outside the window being worked in before the click; whatever is there took it instead." }
         Answer $id $c
       }
@@ -998,13 +1117,19 @@ while ($true) {
         $note = $null
         if (Outside-Target $a.display $a.from[0] $a.from[1]) { $note = "The drag started outside the window being worked in, so that window saw none of it." }
         elseif (Outside-Target $a.display $a.to[0] $a.to[1]) { $note = "The drag ended outside the window being worked in." }
+        $dragWindow = Point-Window $a.display $a.from[0] $a.from[1]
         Drag-Pointer $a.display $a.from $a.to
-        Start-Sleep -Milliseconds 150
-        Set-Target (Root-Of ([Studio.Native]::GetForegroundWindow()))
+        Set-Target $dragWindow
         $c = Get-Cursor; if ($null -ne $note) { $c.outside = $note }
         Answer $id $c
       }
-      "button" { Press-Button $(if ($a.button) { $a.button } else { "left" }) $a.action; Answer $id ([ordered]@{ done = $true }) }
+      "button" {
+        Reset-UiRefs
+        Press-Button $(if ($a.button) { $a.button } else { "left" }) $a.action
+        # Releasing held input is cleanup and must not depend on observing a
+        # window first, including when Stop is recovering a failed driver.
+        Answer $id ([ordered]@{ done = $true; observation = @{ available = $false; observationId = $script:ObservationId; refsInvalidated = $true } })
+      }
       "scroll" { Scroll-At $a.display $a.x $a.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true }) }
       "type" { Assert-Target "type"; Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length; front = (Front-Note) }) }
       "key" { Assert-Target "press keys"; Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true; front = (Front-Note) }) }

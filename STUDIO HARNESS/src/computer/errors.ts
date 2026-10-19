@@ -17,7 +17,7 @@ export type ComputerFailure =
   | "driver"
   /** The call did not say what to act on, or said something contradictory. */
   | "bad_input"
-  /** A `ui_N` reference from before the last read, or one that has gone. */
+  /** A reference from an older observation or window, or one that has gone. */
   | "no_element"
   /** Windows refused the input, almost always an elevated window. */
   | "refused"

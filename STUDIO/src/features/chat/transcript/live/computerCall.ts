@@ -70,7 +70,19 @@ export function computerVerb(action: string, running: boolean): string {
  * front". The report reads the same phrase and shows the title as the place,
  * the way the browser's report shows a URL.
  */
-function windowOf(body: string): string | null {
+function windowOf(body: string, output: unknown): string | null {
+  // The prose can name the window before an action replaced it. Prefer the
+  // explicit post-action observation, without treating foreground as control.
+  let value = output
+  for (let depth = 0; depth < 3 && isRecord(value); depth++) {
+    const structured = value['structuredContent']
+    const observation = isRecord(structured) ? structured['observation'] : null
+    if (isRecord(observation) && observation['available'] === true) {
+      const window = isRecord(observation['target']) ? observation['target'] : observation['front']
+      return isRecord(window) && typeof window['title'] === 'string' ? window['title'] : null
+    }
+    value = value['value'] ?? value['result']
+  }
   const match = /"([^"\n]+)" \(window \d+\)/.exec(body)
   return match?.[1] ?? null
 }
@@ -87,7 +99,7 @@ export function readComputerCall(
   return {
     action,
     url: null,
-    title: windowOf(body),
+    title: windowOf(body, output),
     tab: null,
     frame: errorText === null ? frameOf(output) : null,
     said: said === '' ? null : said,

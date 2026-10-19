@@ -16,7 +16,7 @@ import type { ComputerSession } from "./session.js";
  * Two conventions run through all of them. **Coordinates are the display's
  * physical pixels**, and every picture says which frame it stands for, so a
  * model reads the frame and never the picture's own size. **A control is
- * addressed by a `ui_N` ref from `read_ui`**, which is the reliable way, or
+ * addressed by an observation-scoped ref from `read_ui`**, which is the reliable way, or
  * by a coordinate when there is nothing to reference - a canvas, a game, a
  * window that exposes no accessibility tree.
  */
@@ -24,6 +24,7 @@ import type { ComputerSession } from "./session.js";
 export interface ToolAnswer {
   readonly content: readonly { readonly type: string; readonly [key: string]: unknown }[];
   readonly isError?: boolean;
+  readonly structuredContent?: Record<string, unknown>;
 }
 
 export interface ToolDefinition {
@@ -107,6 +108,28 @@ function answer(body: string): ToolAnswer {
   return { content: [text(body)] };
 }
 
+function actionAnswer(body: string, result: unknown): ToolAnswer {
+  const observation = isRecord(result) && isRecord(result["observation"]) ? result["observation"] : null;
+  if (observation === null) return answer(body);
+  const lines = [body, "Input was dispatched; the intended application result is not verified."];
+  if (observation["available"] !== true) {
+    lines.push("Post-action observation is unavailable. Get status and read the intended window before further input. Do not replay the action automatically.");
+  } else {
+    for (const [field, label] of [["target", "Target"], ["front", "In front"]] as const) {
+      const row = observation[field];
+      if (isRecord(row)) lines.push(`${label}: ${windowLine(row)}.`);
+    }
+    if (observation["targetGone"] === true) lines.push("The previous target has closed or changed identity. Choose the intended replacement explicitly; foreground alone is not authority to continue.");
+    for (const [field, label] of [["newWindows", "Opened"], ["closedWindows", "Closed"], ["candidates", "Recovery candidate"]] as const) {
+      const rows = observation[field];
+      if (Array.isArray(rows)) for (const row of rows) if (isRecord(row)) lines.push(`${label}: ${windowLine(row)}.`);
+    }
+    if (observation["truncated"] === true) lines.push("Window changes were truncated; list windows for the current inventory.");
+    lines.push("Previous UI references are invalid. Observe the result and call read_ui again before using a control reference. Never repeat input just because verification is unavailable.");
+  }
+  return { content: [text(lines.join("\n"))], structuredContent: { observation } };
+}
+
 interface Picture {
   readonly display: number;
   readonly frameWidth: number;
@@ -160,22 +183,23 @@ async function picture(
  * answered as well by a small frame as by a large one, and a tool exists for
  * the times a real screenshot is the point.
  */
-async function acted(session: ComputerSession, said: string, display: number | undefined): Promise<ToolAnswer> {
-  const cursor = await session.request("cursor");
-  const where = isRecord(cursor)
-    ? `Pointer at (${String(cursor["x"])},${String(cursor["y"])}) on display ${String(cursor["display"])}.`
-    : "";
+async function acted(session: ComputerSession, said: string, display: number | undefined, result?: unknown): Promise<ToolAnswer> {
+  const receipt = actionAnswer(said, result);
   try {
+    const cursor = await session.request("cursor");
+    const where = isRecord(cursor)
+      ? `Pointer at (${String(cursor["x"])},${String(cursor["y"])}) on display ${String(cursor["display"])}.`
+      : "";
     const shot = await picture(session, {
       ...(display === undefined ? {} : { display }),
       max: 1280,
       format: "jpeg",
     });
-    return { content: [text(`${said} ${where}\n${shot.line}`), shot.image] };
+    return { ...receipt, content: [...receipt.content, text(`${where}\n${shot.line}`), shot.image] };
   } catch {
     // A frame that could not be taken is not a reason to fail the click
     // that worked; the words still say what happened.
-    return answer(`${said} ${where}`);
+    return { ...receipt, content: [...receipt.content, text("The post-action screenshot is unavailable. Input may already have taken effect; get status before continuing and do not automatically repeat it.")] };
   }
 }
 
@@ -229,7 +253,7 @@ function openSentence(result: Record<string, unknown>): string {
   const named = windowName(result);
   if (result["started"] === true) {
     return typeof result["handle"] === "number" && result["handle"] !== 0
-      ? `Started ${String(result["what"])}; its window is ${named}, in front and being worked in.`
+      ? `Started ${String(result["what"])}; its window is ${named}. ${result["focused"] === true ? "It is in front and being worked in." : "Focus was not confirmed; observe status before input."}`
       : `Started ${String(result["what"])}, but no new window appeared within five seconds. List windows to find it, then focus it by handle.`;
   }
   return result["focused"] === true
@@ -338,8 +362,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     description: "Move the pointer without clicking, for hover states and tooltips.",
     inputSchema: object({ ...POINT, ...DISPLAY }, ["x", "y"]),
     run: async (session, input) => {
-      await session.request("move", { ...displayArg(input), x: requiredNumber(input, "x"), y: requiredNumber(input, "y") });
-      return acted(session, "Moved.", num(input, "display"));
+      const sent = await session.request("move", { ...displayArg(input), x: requiredNumber(input, "x"), y: requiredNumber(input, "y") });
+      return acted(session, "Moved.", num(input, "display"), sent);
     },
   },
 
@@ -348,7 +372,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     description:
       "Click at a point on a display. One tool for every kind of click: choose the button, " +
       "how many times (2 for a double-click, 3 to select a line), and any keys to hold. " +
-      "Prefer act with a ui_ reference from read_ui when the control has one; click when it does not.",
+      "Prefer act with a complete ui_ reference from the latest read_ui when the control has one; click when it does not. " +
+      "Copy the display index and display-relative centre from read_ui. After input, inspect the observation and read controls again; do not reuse references.",
     inputSchema: object(
       {
         ...POINT,
@@ -373,7 +398,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         modifiers: str(input, "modifiers") ?? "",
       });
       const what = count === 1 ? "Clicked" : count === 2 ? "Double-clicked" : "Triple-clicked";
-      return acted(session, withNote(`${what}.`, sent, "outside"), num(input, "display"));
+      return acted(session, withNote(`${what}.`, sent, "outside"), num(input, "display"), sent);
     },
   },
 
@@ -397,7 +422,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         throw new ComputerError("bad_input", { message: "Give from and to as [x, y]." });
       }
       const sent = await session.request("drag", { ...displayArg(input), from, to });
-      return acted(session, withNote("Dragged.", sent, "outside"), num(input, "display"));
+      return acted(session, withNote("Dragged.", sent, "outside"), num(input, "display"), sent);
     },
   },
 
@@ -418,8 +443,8 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (action !== "down" && action !== "up") {
         throw new ComputerError("bad_input", { message: "action must be down or up." });
       }
-      await session.request("button", { action, button: str(input, "button") ?? "left" });
-      return answer(action === "down" ? "Button held." : "Button released.");
+      const sent = await session.request("button", { action, button: str(input, "button") ?? "left" });
+      return actionAnswer(action === "down" ? "Button held." : "Button released.", sent);
     },
   },
 
@@ -437,14 +462,14 @@ export const TOOLS: readonly ToolDefinition[] = [
     ),
     run: async (session, input) => {
       const direction = required(input, "direction");
-      await session.request("scroll", {
+      const sent = await session.request("scroll", {
         ...displayArg(input),
         x: requiredNumber(input, "x"),
         y: requiredNumber(input, "y"),
         direction,
         amount: num(input, "amount") ?? 3,
       });
-      return acted(session, `Scrolled ${direction}.`, num(input, "display"));
+      return acted(session, `Scrolled ${direction}.`, num(input, "display"), sent);
     },
   },
 
@@ -460,7 +485,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const body = input["text"];
       if (typeof body !== "string") throw new ComputerError("bad_input", { message: "Give the text to type." });
       const sent = await session.request("type", { text: body });
-      return acted(session, withFront(`Typed ${String(body.length)} characters.`, sent), undefined);
+      return acted(session, withFront(`Typed ${String(body.length)} characters.`, sent), undefined, sent);
     },
   },
 
@@ -482,7 +507,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const keys = required(input, "keys");
       const repeat = num(input, "repeat") ?? 1;
       const sent = await session.request("key", { keys, repeat });
-      return acted(session, withFront(repeat === 1 ? `Pressed ${keys}.` : `Pressed ${keys} ${String(repeat)} times.`, sent), undefined);
+      return acted(session, withFront(repeat === 1 ? `Pressed ${keys}.` : `Pressed ${keys} ${String(repeat)} times.`, sent), undefined, sent);
     },
   },
 
@@ -500,7 +525,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const keys = required(input, "keys");
       const seconds = Math.min(requiredNumber(input, "seconds"), 30);
       const sent = await session.request("hold", { keys, seconds });
-      return answer(withFront(`Held ${keys} for ${String(seconds)} seconds.`, sent));
+      return actionAnswer(withFront(`Held ${keys} for ${String(seconds)} seconds.`, sent), sent);
     },
   },
 
@@ -557,7 +582,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     name: "studio_computer_open",
     description:
       "Open an application by its Start-menu name, or a file or program by path. " +
-      "An app that already has a window is brought to the front instead of started twice.",
+      "An app with exactly one matching window is brought to the front instead of started twice. " +
+      "Multiple matches are refused; list windows and focus the intended handle.",
     inputSchema: object({
       app: { type: "string", description: 'A name as it appears in the Start menu: "Notepad", "Microsoft Edge".' },
       path: { type: "string", description: "A full path to a program or a file to open." },
@@ -570,7 +596,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       }
       const result = await session.request("open", { app: app ?? "", path: path ?? "" });
       const said = isRecord(result) ? openSentence(result) : "Opened.";
-      return acted(session, said, undefined);
+      return acted(session, said, undefined, result);
     },
   },
 
@@ -588,6 +614,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           ? `${named} is in front and is the window being worked in.`
           : `Windows did not bring ${named} to the front; click inside it, or arrange it (restore, maximize) and try again.`,
         undefined,
+        result,
       );
     },
   },
@@ -677,10 +704,11 @@ export const TOOLS: readonly ToolDefinition[] = [
             ? `Window ${String(window)} has closed.`
             : `Window ${String(window)} was asked to close and is still open; it may be asking about unsaved work.`,
           undefined,
+          result,
         );
       }
       const said = isRecord(result) ? `${pastTense(action)} ${windowLine(result)}.` : `${pastTense(action)} window ${String(window)}.`;
-      return acted(session, said, isRecord(result) && typeof result["display"] === "number" ? result["display"] : undefined);
+      return acted(session, said, isRecord(result) && typeof result["display"] === "number" ? result["display"] : undefined, result);
     },
   },
 
@@ -711,10 +739,13 @@ export const TOOLS: readonly ToolDefinition[] = [
   {
     name: "studio_computer_read_ui",
     description:
-      "Read a window's controls as an outline, each stamped with a reference like ui_12 and its centre point. " +
+      "Read a window's controls as an outline, each stamped with a complete ui_<observation-id>_<index> reference, display index and display-relative centre point. " +
       "The reliable way to find what to act on: use act, set_value or select_text with a reference, " +
       "or click its centre. Reads the window named by handle, or else the one last opened, focused, " +
-      "read or clicked in; it never reads whatever happens to be in front. References are replaced by the next read.",
+      "read or clicked in; it never reads whatever happens to be in front. References expire after any input, a new read, or driver restart. " +
+      "Work one observed step at a time: choose the intended window, read it, act once, and inspect the returned observation and screenshot. " +
+      "If a window closes or changes, use status/windows (or wait_for_window for a delayed transition), choose and focus the intended replacement explicitly, then read_ui again. " +
+      "Never infer authority from foreground alone. A dispatched action is not a verified result; reobserve instead of replaying uncertain input.",
     inputSchema: object({
       window: { type: "number", description: "A handle from windows or open. Defaults to the window being worked in." },
       all: { type: "boolean", description: "Include text and structure, not only controls." },
@@ -745,7 +776,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "Works without moving the pointer, which is what makes it reliable.",
     inputSchema: object(
       {
-        ref: { type: "string", description: "A reference from read_ui, like ui_12." },
+        ref: { type: "string", description: "The complete observation-scoped reference from the latest read_ui. Expired after any input or another read." },
         action: {
           type: "string",
           enum: ["invoke", "toggle", "expand", "collapse", "select", "focus", "scroll_into_view"],
@@ -756,7 +787,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     ),
     run: async (session, input) => {
       const result = await session.request("act", { ref: required(input, "ref"), action: str(input, "action") ?? "invoke" });
-      return acted(session, isRecord(result) ? String(result["said"]) : "Done.", undefined);
+      return acted(session, isRecord(result) ? String(result["said"]) : "Done.", undefined, result);
     },
   },
 
@@ -771,7 +802,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const value = input["value"];
       if (typeof value !== "string") throw new ComputerError("bad_input", { message: "Give the value as text." });
       const result = await session.request("set_value", { ref: required(input, "ref"), value });
-      return acted(session, isRecord(result) ? String(result["said"]) : "Set.", undefined);
+      return acted(session, isRecord(result) ? String(result["said"]) : "Set.", undefined, result);
     },
   },
 
@@ -792,7 +823,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         start: requiredNumber(input, "start"),
         end: requiredNumber(input, "end"),
       });
-      return answer(isRecord(result) ? String(result["said"]) : "Selected.");
+      return actionAnswer(isRecord(result) ? String(result["said"]) : "Selected.", result);
     },
   },
 

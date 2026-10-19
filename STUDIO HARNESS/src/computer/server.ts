@@ -43,7 +43,11 @@ serveStdio({
     // Unreachable through `serveStdio`, which asks `has` first; kept as a
     // typed refusal so the taxonomy holds even for the impossible branch.
     if (tool === undefined) throw new ComputerError("bad_input", { message: `There is no tool called "${name}".` });
-    return tool.run(sessionFor(meta), args);
+    const session = sessionFor(meta);
+    // Stop bypasses the queue so cancellation invalidates queued input.
+    return name === "studio_computer_stop"
+      ? tool.run(session, args)
+      : session.run(() => tool.run(session, args));
   },
   // A driver with nobody to answer to is a PowerShell doing nothing, and one
   // that dies mid-hold leaves a key held. Closing before exit is what keeps

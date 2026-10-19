@@ -53,6 +53,27 @@ describe('recognising one of our own computer calls', () => {
 })
 
 describe('what the card is given', () => {
+  it('uses the observed replacement title instead of the old chooser in the prose', () => {
+    const result = {
+      content: [{ type: 'text', text: 'Started "Profile chooser" (window 10).' }],
+      structuredContent: { observation: { available: true, target: null, front: { handle: 20, title: 'Chrome' } } },
+    }
+    expect(readComputerCall('studio_computer_open', result, null)?.title).toBe('Chrome')
+    expect(readComputerCall('studio_computer_open', { result }, null)?.title).toBe('Chrome')
+  })
+  it('keeps the explicit target distinct from an unrelated foreground window', () => {
+    const result = { structuredContent: { observation: {
+      available: true, target: { title: 'Intended app' }, front: { title: 'Unrelated app' },
+    } } }
+    expect(readComputerCall('studio_computer_act', result, null)?.title).toBe('Intended app')
+  })
+  it('does not resurrect the old title when the observation reports no remaining window', () => {
+    const result = {
+      content: [{ type: 'text', text: 'Closed "Old window" (window 10).' }],
+      structuredContent: { observation: { available: true, target: null, front: null } },
+    }
+    expect(readComputerCall('studio_computer_key', result, null)?.title).toBeNull()
+  })
   it('reads the named window as the place, and keeps the picture', () => {
     const view = readComputerCall('studio_computer_open', RESULT, null)
     expect(view?.title).toBe('Calculator')

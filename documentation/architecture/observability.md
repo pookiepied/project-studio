@@ -260,6 +260,35 @@ external-browser-opening and remote-management command outcomes remain unsupport
 
 ## Feature checklist
 
+Computer actions keep their existing `studio-computer` capability, conversation,
+MCP connection/RPC and tool execution identities. The driver receives a separate
+Studio UUID for each request's product observation; this is neither an execution
+operation nor authority to send input. Accessibility refs include the read's
+observation UUID and expire at input/refusal, another read or driver replacement.
+Target stamps retain native handles plus PID/process-start metadata. Coordinate
+centres from accessibility are display-relative, matching the input contract.
+
+Input replies carry bounded post-action product evidence: eight read-only samples
+over 800ms, current target/foreground, at most 20 opened/closed windows and 20
+same-app recovery candidates, with explicit truncation/unavailability. Candidates
+never select a replacement implicitly. They and window titles remain result
+content under existing gated MCP frame capture, never operational attributes.
+Dispatch is distinct from application success and screenshot availability.
+Held mouse-button release is cleanup: it bypasses pre-action window observation
+so stop can still release input during an observation failure, invalidates refs,
+and reports unavailable evidence rather than claiming a current window snapshot.
+No new diagnostic collection, upload, route, permission or tool is introduced.
+The per-conversation tool queue keeps an input and its observations together;
+failure/stop invalidates queued input and stale continuations cannot restart it.
+Existing gate/MCP operations cover queue lifetime; dedicated driver queue timing,
+native input delivery and application-effect verification remain unsupported.
+Sampling cannot prove a window remains unchanged afterwards or detect every
+unobserved same-process native handle reuse. Screen control across simultaneous
+conversations still has no desktop-wide arbitration in this driver.
+`computer-driver-contract.test.ts` executes production policy functions and the
+click dispatch with native input replaced by doubles; `computer-observation.test.ts`
+covers delivery failures, identity propagation, serialization and cancellation.
+
 Image read disclosures reuse native `read` results and their existing tool-call
 and conversation identities. Only returned PNG/JPEG/GIF/WebP image blocks earn
 a viewed-image row; text reads and refused/pending reads retain their existing

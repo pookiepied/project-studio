@@ -1,9 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { createStudioUuid } from "../contracts/uuid.js";
 
 import driverSource from "./driver.ps1?raw";
 import { ComputerError } from "./errors.js";
@@ -95,9 +97,28 @@ export class ComputerSession {
   #next = 1;
   #idle: NodeJS.Timeout | undefined;
   #lastFrame: { display: number; width: number; height: number } | undefined;
+  #toolTail: Promise<void> = Promise.resolve();
+  #interactionEpoch = 0;
+  readonly #toolContext = new AsyncLocalStorage<number>();
 
   /** @param key Which conversation this driver belongs to. */
   constructor(readonly key: string) {}
+
+  /** Keep an action and its observation together; stop/failure cancels queued input. */
+  run<T>(operation: () => Promise<T>): Promise<T> {
+    const epoch = this.#interactionEpoch;
+    const result = this.#toolTail.then(async () => {
+      if (epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer state changed while this call was queued. Observe status before sending new input." });
+      try {
+        return await this.#toolContext.run(epoch, operation);
+      } catch (error) {
+        this.#interactionEpoch++;
+        throw error;
+      }
+    });
+    this.#toolTail = result.then(() => undefined, () => undefined);
+    return result;
+  }
 
   get running(): boolean {
     return this.#child !== undefined;
@@ -189,6 +210,7 @@ export class ComputerSession {
           message: `The desktop driver stopped (exit ${String(code)}).${stderr === "" ? "" : ` It said: ${stderr.trim()}`} The next call starts it again.`,
         });
         reject(reason);
+        if (this.#child !== child) return;
         for (const waiting of this.#pending.values()) {
           clearTimeout(waiting.timer);
           waiting.reject(reason);
@@ -199,6 +221,7 @@ export class ComputerSession {
       child.on("error", (error) => {
         clearTimeout(timer);
         reject(new ComputerError("driver", { message: `PowerShell could not be started: ${error.message}` }));
+        if (this.#child !== child) return;
         this.#forget();
       });
     });
@@ -211,7 +234,7 @@ export class ComputerSession {
 
   /** The driver's refusals, sorted into the kinds a caller can act on. */
   #classify(message: string): ComputerError {
-    if (/ui_\d+|element reference|read the window again/i.test(message)) {
+    if (/ui_|element reference|read the window again/i.test(message)) {
       return new ComputerError("no_element", { message });
     }
     if (/refused|administrator/i.test(message)) return new ComputerError("refused", { message });
@@ -223,7 +246,10 @@ export class ComputerSession {
    * only place the idle timer is renewed.
    */
   async request(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
+    const epoch = this.#toolContext.getStore();
+    if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control was stopped or replaced. Observe status before continuing." });
     const child = await this.#launch();
+    if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control changed while the driver started. Observe status again." });
     this.#touch();
     const id = this.#next++;
     return new Promise<unknown>((resolve, reject) => {
@@ -235,7 +261,7 @@ export class ComputerSession {
         void this.close();
       }, REQUEST_MS);
       this.#pending.set(id, { resolve, reject, timer });
-      child.stdin.write(`${JSON.stringify({ id, op, args })}\n`);
+      child.stdin.write(`${JSON.stringify({ id, op, args: { ...args, observationId: createStudioUuid() } })}\n`);
     });
   }
 
@@ -243,6 +269,11 @@ export class ComputerSession {
   async close(): Promise<void> {
     const child = this.#child;
     this.#forget();
+    for (const waiting of this.#pending.values()) {
+      clearTimeout(waiting.timer);
+      waiting.reject(new ComputerError("refused", { message: "Computer control stopped before this call's outcome was observed. Reobserve before further input; do not replay it automatically." }));
+    }
+    this.#pending.clear();
     if (child === undefined) return;
     await new Promise<void>((resolve) => {
       const done = (): void => {
@@ -261,10 +292,12 @@ export class ComputerSession {
   }
 
   #forget(): void {
+    this.#interactionEpoch++;
     if (this.#idle !== undefined) clearTimeout(this.#idle);
     this.#idle = undefined;
     this.#child = undefined;
     this.#ready = undefined;
+    this.#lastFrame = undefined;
   }
 
   #touch(): void {

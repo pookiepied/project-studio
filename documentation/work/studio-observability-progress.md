@@ -13,6 +13,22 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Computer-use observation and recovery, 2026-10-19
+
+Computer control now uses UUID-scoped accessibility refs, target process identity
+checks, display-relative accessibility coordinates, explicit ambiguous-window
+refusals, and consistent bounded action observations. Replacement candidates are
+reported without adopting the foreground window or replaying input. A per-session
+tool queue keeps observations together and invalidates queued/stale work on stop
+or failure. Existing tool-gate/MCP capture covers the boundary; no new content
+collection is enabled. The developer contract records unsupported native delivery,
+settlement, same-process handle reuse and cross-conversation arbitration evidence.
+Regression coverage uses isolated driver-policy doubles without desktop input.
+Implementation and verification are tracked in `report/computer-use-recovery.md`.
+Full sequential gates passed: harness typecheck/lint/build and 2,498 tests
+(28 skipped); client typecheck/lint and 1,564 tests. The real Chrome profile-picker
+flow was not exercised on the user's desktop.
+
 ### Image read presentation, 2026-10-19
 
 Native `read` already sends supported image bytes as image content to the model.
