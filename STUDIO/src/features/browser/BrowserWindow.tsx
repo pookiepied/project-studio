@@ -105,9 +105,16 @@ function BrowserSurface({ state, manual, send }: {
   const area = useRef<HTMLDivElement>(null)
   const keyboard = useRef<HTMLTextAreaElement>(null)
   const click = useRef({ at: 0, x: 0, y: 0, button: 0, count: 1 })
+  const presence = useRef({ at: -Infinity, x: 0, y: 0 })
+  const activityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [size, setSize] = useState({ width: 1280, height: 800 })
   const picture = state.frame
   const tabId = state.activeTabId
+
+  useEffect(() => () => {
+    if (activityTimer.current !== null) clearTimeout(activityTimer.current)
+    activityTimer.current = null
+  }, [tabId, manual, send])
 
   useEffect(() => {
     const element = area.current
@@ -139,9 +146,28 @@ function BrowserSurface({ state, manual, send }: {
   const cursor = state.cursor?.tabId === tabId && !manual ? state.cursor : null
 
   const pointer = (event: PointerEvent<HTMLDivElement>, kind: 'move' | 'down' | 'up') => {
-    if (!manual) return
-    event.preventDefault()
     const bounds = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(1, bounds.width)))
+    const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)))
+    if (!manual) {
+      presence.current.x = x; presence.current.y = y
+      if (kind === 'down') event.currentTarget.focus({ preventScroll: true })
+      if (kind === 'up') return
+      const elapsed = performance.now() - presence.current.at
+      if (kind === 'move' && elapsed < 125) {
+        if (activityTimer.current === null) activityTimer.current = setTimeout(() => {
+          activityTimer.current = null
+          presence.current.at = performance.now()
+          send({ action: 'activity', tabId, kind: 'move', x: presence.current.x, y: presence.current.y })
+        }, 125 - elapsed)
+        return
+      }
+      if (activityTimer.current !== null) { clearTimeout(activityTimer.current); activityTimer.current = null }
+      presence.current.at = performance.now()
+      send({ action: 'activity', tabId, kind: kind === 'move' ? 'move' : 'button', x, y })
+      return
+    }
+    event.preventDefault()
     if (kind === 'down') {
       const previous = click.current
       const repeated = performance.now() - previous.at < 500 && previous.button === event.button
@@ -152,8 +178,7 @@ function BrowserSurface({ state, manual, send }: {
       event.currentTarget.setPointerCapture(event.pointerId)
     }
     send({ action: 'pointer', tabId, kind,
-      x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
+      x, y,
       button: event.button === 1 ? 'middle' : event.button === 2 ? 'right' : 'left', clicks: click.current.count })
   }
 
@@ -169,12 +194,17 @@ function BrowserSurface({ state, manual, send }: {
   return (
     <div ref={area} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background">
       <div role="application" aria-label="Live browser page" className="relative shrink-0 touch-none overflow-hidden"
+        tabIndex={manual ? -1 : 0}
         style={{ width: picture.width * scale, height: picture.height * scale }}
+        onKeyDown={() => {
+          if (!manual) send({ action: 'activity', tabId, kind: 'keyboard', x: presence.current.x, y: presence.current.y })
+        }}
         onPointerDown={(event) => pointer(event, 'down')} onPointerMove={(event) => pointer(event, 'move')}
         onPointerUp={(event) => pointer(event, 'up')} onPointerCancel={(event) => pointer(event, 'up')}
         onContextMenu={(event) => event.preventDefault()}
         onWheel={(event) => {
           if (manual) send({ action: 'wheel', tabId, x: Math.max(-4000, Math.min(4000, event.deltaX)), y: Math.max(-4000, Math.min(4000, event.deltaY)) })
+          else send({ action: 'activity', tabId, kind: 'wheel', x: presence.current.x, y: presence.current.y })
         }}>
         <img src={`data:image/jpeg;base64,${picture.data}`} alt="Live browser page" draggable={false} className="pointer-events-none h-full w-full select-none" />
         <textarea ref={keyboard} aria-label="Browser keyboard input" tabIndex={manual ? 0 : -1} readOnly={!manual}
@@ -191,11 +221,14 @@ function BrowserSurface({ state, manual, send }: {
             event.preventDefault()
             if (manual) send({ action: 'text', tabId, text: event.clipboardData.getData('text/plain').slice(0, 16384) })
           }} />
-        {cursor ? <motion.div aria-label="Studio cursor" className="pointer-events-none absolute left-0 top-0 z-10"
+        {cursor ? <motion.div aria-label="Studio cursor" data-cursor-kind={cursor.kind ?? 'default'} data-pressed={cursor.pressed === true} className="pointer-events-none absolute left-0 top-0 z-10"
           animate={{ x: cursor.x * picture.width * scale, y: cursor.y * picture.height * scale }}
           transition={{ duration: DURATION.fast, ease: EASE_OUT }}>
-          <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true">
-            <path d="M2 2L19 15L11 16L7 23Z" className="fill-foreground stroke-background" strokeWidth="1.5" strokeLinejoin="round" />
+          {cursor.pressed ? <span className="absolute -left-3 -top-3 size-7 rounded-full border-2 border-foreground/60 bg-foreground/10 outline outline-1 outline-background" /> : null}
+          <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" className={cursor.kind === 'text' ? '-translate-x-1/2 -translate-y-1/2' : undefined}>
+            {cursor.kind === 'text'
+              ? <><path d="M6 2H16M11 2V23M6 23H16" className="stroke-background" strokeWidth="4" /><path d="M6 2H16M11 2V23M6 23H16" className="stroke-foreground" strokeWidth="2" /></>
+              : <path d={cursor.kind === 'pointer' ? 'M7 13V3Q7 0 10 2V10L12 9L14 10L16 10L19 13L17 23H8L3 16Q2 13 5 13L7 15Z' : 'M2 2L19 15L11 16L7 23Z'} className="fill-foreground stroke-background" strokeWidth="1.5" strokeLinejoin="round" />}
           </svg>
           <span className="ml-3 rounded-full bg-foreground px-2 py-0.5 text-micro text-background">Studio</span>
         </motion.div> : null}

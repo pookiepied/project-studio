@@ -58,6 +58,14 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
 [void][Studio.Native]::SetProcessDPIAware()
 
+$script:Activity = $null
+$script:MonitorUnavailable = $false
+$script:InputPending = $null
+try {
+  Add-Type -Path (Join-Path $PSScriptRoot "activity.cs") -ReferencedAssemblies System.Drawing, System.Windows.Forms
+  $script:Activity = New-Object Studio.Activity
+} catch { $script:MonitorUnavailable = $true }
+
 # Whether an argument was given. The Node side sends "" for "not given", and
 # a number is compared against "" by converting "" to a number: in
 # PowerShell `0 -eq ""` is TRUE, so display 0, x 0 and count 0 all read as
@@ -315,11 +323,15 @@ $ButtonFlags = @{
   right = @{ down = 0x0008; up = 0x0010 }
   middle = @{ down = 0x0020; up = 0x0040 }
 }
+$script:HeldButtons = @{}
+$script:HeldKeys = @{}
 
 function Press-Button($button, $direction) {
   $b = $ButtonFlags[$button]
   if ($null -eq $b) { throw "The button must be left, right or middle." }
   Send-Mouse $b[$direction] 0
+  if ($direction -eq "down") { $script:HeldButtons[$button] = $true }
+  else { $script:HeldButtons.Remove($button) }
 }
 
 function Click-At($display, $x, $y, $button, $count, $modifiers) {
@@ -415,6 +427,13 @@ function Send-Key([int]$vk, [bool]$down) {
   if (-not $down) { $flags = $flags -bor 0x0002 }
   $scan = [uint16][Studio.Native]::MapVirtualKeyW([uint32]$vk, 0)
   Send-Inputs ([Studio.Native+INPUT[]]@((New-KeyInput ([uint16]$vk) $scan ([uint32]$flags)))) "key"
+  if ($down) { $script:HeldKeys[$vk] = $true }
+  else { $script:HeldKeys.Remove($vk) }
+}
+
+function Release-HeldInput {
+  foreach ($button in @($script:HeldButtons.Keys)) { try { Press-Button $button "up" } catch {} }
+  foreach ($key in @($script:HeldKeys.Keys)) { try { Send-Key $key $false } catch {} }
 }
 
 # Modifiers named in "ctrl+shift" form; returns the codes held so they can be
@@ -502,6 +521,7 @@ $script:Enum = [Studio.Native+EnumWindowsProc]{
 function Get-TopWindows($app) {
   $script:Windows = @()
   [void][Studio.Native]::EnumWindows($script:Enum, [IntPtr]::Zero)
+  $script:Windows = @($script:Windows | Where-Object { $null -eq $script:Activity -or -not $script:Activity.IsOverlay($_.handle) })
   $fg = [int64][Studio.Native]::GetForegroundWindow()
   $procs = @{}
   $starts = @{}
@@ -980,6 +1000,7 @@ function Read-Ui($window, $depth, $limit, $all) {
 }
 
 function Ui-Ref($ref) {
+  if ($null -ne $script:Activity) { Collect-UserInput }
   if ($ref -notmatch '^ui_([0-9a-f-]{36})_(\d+)$') { throw "That element reference is invalid or stale. Read the window again and copy the complete reference." }
   $epoch = $Matches[1]; $n = [int]$Matches[2]
   if ($epoch -ne $script:RefsEpoch -or $script:RefsIdentity -eq "" -or
@@ -1053,6 +1074,50 @@ function Needs-ActionObservation($operation, $arguments) {
   return $operation -in @("move", "click", "drag", "button", "scroll", "type", "key", "hold", "open", "focus", "arrange", "act", "set_value", "select_text")
 }
 
+function Collect-UserInput {
+  if ($null -eq $script:Activity) { return }
+  try { $inputState = $script:Activity.Read() }
+  catch {
+    if ($null -eq $script:InputPending) { $script:InputPending = @{ available = $false; moves = 0; buttons = 0; wheels = 0; keys = 0 } }
+    else { $script:InputPending.available = $false }
+    return
+  }
+  $changed = $inputState.Moves + $inputState.Buttons + $inputState.Wheels + $inputState.Keys -gt 0
+  if ($changed) { Reset-UiRefs }
+  if (-not $changed -and $inputState.Available) {
+    if ($null -ne $script:InputPending) {
+      if ($script:InputPending.moves + $script:InputPending.buttons + $script:InputPending.wheels + $script:InputPending.keys -eq 0) { $script:InputPending = $null }
+      else { $script:InputPending.available = $true }
+    }
+    return
+  }
+  if ($null -eq $script:InputPending) {
+    $script:InputPending = @{ available = $inputState.Available; moves = 0; buttons = 0; wheels = 0; keys = 0; truncated = $false; ageMs = 0 }
+  }
+  $script:InputPending.available = $inputState.Available
+  foreach ($field in @("moves", "buttons", "wheels", "keys")) {
+    $total = $script:InputPending[$field] + $inputState.$field
+    if ($total -gt 1000000) { $script:InputPending.truncated = $true }
+    $script:InputPending[$field] = [Math]::Min(1000000, $total)
+  }
+  $script:InputPending.truncated = $script:InputPending.truncated -or $inputState.Truncated
+  $script:InputPending.ageMs = $inputState.AgeMs
+}
+
+function Take-InputUpdate {
+  if ($null -ne $script:Activity) { Collect-UserInput }
+  if ($null -eq $script:InputPending) { return $null }
+  $update = $script:InputPending
+  $script:InputPending = $null
+  $update.stateAvailable = $false
+  try {
+    $status = Get-Status
+    $update.cursor = $status.cursor; $update.target = $status.target; $update.front = $status.front
+    $update.stateAvailable = $true
+  } catch {}
+  return $update
+}
+
 function Answer($id, $result) {
   if ($null -ne $script:ActionBefore) {
     Reset-UiRefs
@@ -1062,6 +1127,7 @@ function Answer($id, $result) {
     if ($result -is [System.Collections.IDictionary]) { $result["observation"] = $observation }
   }
   $o = [ordered]@{ id = $id; ok = $true; result = $result }
+  if ($null -ne $script:Activity -or $null -ne $script:InputPending) { $o.userInput = Take-InputUpdate }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 8))
   [Console]::Out.Flush()
 }
@@ -1072,6 +1138,7 @@ function Refuse($id, $message) {
     $message += " Observe status and read the intended window again before any further input; do not replay this action automatically."
   }
   $o = [ordered]@{ id = $id; ok = $false; error = $message }
+  if ($null -ne $script:Activity -or $null -ne $script:InputPending) { $o.userInput = Take-InputUpdate }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 4))
   [Console]::Out.Flush()
 }
@@ -1079,7 +1146,7 @@ function Refuse($id, $message) {
 $script:ActionBefore = $null
 Answer "ready" ([ordered]@{ displays = @(Get-Displays) })
 
-while ($true) {
+try { while ($true) {
   $line = [Console]::In.ReadLine()
   if ($null -eq $line) { break }
   if ($line.Trim() -eq "") { continue }
@@ -1089,10 +1156,13 @@ while ($true) {
     $req = ConvertFrom-Json $line
     $id = $req.id
     $a = $req.args
+    if ($null -ne $script:Activity) { Collect-UserInput }
     $script:ObservationId = [string]$a.observationId
     $script:ActionBefore = $null
     $script:ActionWindows = @()
     if (Needs-ActionObservation $req.op $a) {
+      if ($null -ne $script:Activity) { $script:Activity.Start(); $script:Activity.Pulse() }
+      elseif ($script:MonitorUnavailable) { $script:InputPending = @{ available = $false; moves = 0; buttons = 0; wheels = 0; keys = 0 } }
       # Failure to read the pre-action state must refuse before sending input.
       $script:ActionBefore = Get-Status
       $script:ActionWindows = @(Get-TopWindows $null)
@@ -1149,6 +1219,10 @@ while ($true) {
   } catch {
     $m = $_.Exception.Message
     if ($null -ne $_.Exception.InnerException) { $m = $_.Exception.InnerException.Message }
+    Release-HeldInput
     Refuse $id $m
   }
+} } finally {
+  Release-HeldInput
+  if ($null -ne $script:Activity) { $script:Activity.Dispose() }
 }

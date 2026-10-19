@@ -6,7 +6,7 @@ if ($parseErrors.Count -ne 0) { throw $parseErrors[0].Message }
 
 # Load only the actual pure policy functions. The driver's top-level native
 # initialization and input loop must never run on the user's desktop in tests.
-foreach ($name in @("Window-Identity", "Same-Window", "Set-Target", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Answer")) {
+foreach ($name in @("Window-Identity", "Same-Window", "Set-Target", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer")) {
   $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
   if ($null -eq $function) { throw "Missing production function $name" }
   . ([scriptblock]::Create($function.Extent.Text))
@@ -96,4 +96,30 @@ $id = "cleanup"
 $case = @($dispatch.Clauses | Where-Object { $_.Item1.Extent.Text -eq '"button"' })[0].Item2.Extent.Text
 . ([scriptblock]::Create($case.Substring(1, $case.Length - 2)))
 $checks.releasedWithoutObservation = $script:released
+
+$script:Rows["10"] = $old
+Begin-UiRead 10 $first
+$script:Refs[1] = [pscustomobject]@{ Current = [pscustomobject]@{ Name = "Fresh" } }
+$script:activityReads = 0
+$script:Activity = [pscustomobject]@{}
+$script:Activity | Add-Member -MemberType ScriptMethod -Name Read -Value {
+  $script:activityReads++
+  return @{ Available = $true; Moves = $(if ($script:activityReads -eq 1) { 3 } else { 0 }); Buttons = 0; Wheels = 0; Keys = 0; Truncated = $false; AgeMs = 5 }
+}
+$checks.userInputExpiresRefs = Rejected { Ui-Ref "ui_$($first)_1" }
+function Get-Status { return @{ cursor = @{ x = 42; y = 18; display = 1 }; target = $old; front = $other } }
+$checks.userInput = Take-InputUpdate
+$checks.inputDrained = $null -eq (Take-InputUpdate)
+$script:InputPending = @{ available = $false; moves = 0; buttons = 0; wheels = 0; keys = 0 }
+$checks.monitorReadyWithoutInput = $null -eq (Take-InputUpdate)
+$script:Activity | Add-Member -MemberType ScriptMethod -Name Read -Force -Value { throw "monitor unavailable" }
+$script:InputPending = @{ available = $true; moves = 2; buttons = 0; wheels = 0; keys = 0 }
+$checks.monitorFailure = Take-InputUpdate
+$script:Activity = $null
+$script:HeldButtons = @{ middle = $true }; $script:HeldKeys = @{ 16 = $true }
+$script:releasedButtons = @(); $script:releasedKeys = @()
+function Press-Button($button, $direction) { $script:releasedButtons += "$button/$direction" }
+function Send-Key($key, $down) { $script:releasedKeys += "$key/$down" }
+Release-HeldInput
+$checks.releasedButtons = $script:releasedButtons; $checks.releasedKeys = $script:releasedKeys
 [Console]::Out.WriteLine((ConvertTo-Json @{ checks = $checks } -Depth 12 -Compress))

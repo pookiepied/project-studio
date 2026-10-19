@@ -70,4 +70,16 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     expect(checks["pressNeedsObservation"]).toBe(true);
     expect(checks["releasedWithoutObservation"]).toBe(true);
   });
+  it("expires refs on physical input and reports the current pointer and windows once", () => {
+    expect(checks["userInputExpiresRefs"]).toBe(true);
+    expect(checks["userInput"]).toMatchObject({ available: true, moves: 3, stateAvailable: true,
+      cursor: { x: 42, y: 18, display: 1 }, target: { handle: 10 }, front: { handle: 30 } });
+    expect(checks["inputDrained"]).toBe(true);
+    expect(checks["monitorReadyWithoutInput"]).toBe(true);
+    expect(checks["monitorFailure"]).toMatchObject({ available: false, moves: 2, stateAvailable: true });
+  });
+  it("releases only the buttons and keys recorded as Studio-held during cleanup", () => {
+    expect(checks["releasedButtons"]).toEqual(["middle/up"]);
+    expect(checks["releasedKeys"]).toEqual(["16/False"]);
+  });
 });

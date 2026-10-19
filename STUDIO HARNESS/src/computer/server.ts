@@ -2,6 +2,7 @@ import { conversationKey, serveStdio } from "../serve/stdio.js";
 import { ComputerError } from "./errors.js";
 import { ComputerSession } from "./session.js";
 import { definitions, toolByName } from "./tools.js";
+import { DesktopControl } from "./control.js";
 
 /**
  * The computer-use capability, as an MCP server in its own process.
@@ -24,6 +25,7 @@ import { definitions, toolByName } from "./tools.js";
  * client sends the conversation in `_meta`; any other caller shares one.
  */
 const sessions = new Map<string, ComputerSession>();
+const desktop = new DesktopControl();
 
 function sessionFor(meta: unknown): ComputerSession {
   const key = conversationKey(meta);
@@ -47,7 +49,7 @@ serveStdio({
     // Stop bypasses the queue so cancellation invalidates queued input.
     return name === "studio_computer_stop"
       ? tool.run(session, args)
-      : session.run(() => tool.run(session, args));
+      : session.runTool(() => desktop.run(session, name, () => tool.run(session, args)));
   },
   // A driver with nobody to answer to is a PowerShell doing nothing, and one
   // that dies mid-hold leaves a key held. Closing before exit is what keeps

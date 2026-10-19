@@ -1,6 +1,6 @@
 # The computer-use capability — the plan
 
-**Status:** Steps 1-5 landed; step 6's input half waits for a handed-over machine · **Opened:** 2026-09-15 · **Last worked:** 2026-09-15
+**Status:** Reliability and presence improvements implemented; hands-on desktop verification deferred by the user · **Opened:** 2026-09-15 · **Last worked:** 2026-10-19
 **Decision:** [ADR 0055](../decisions/0055-the-desktop-is-driven-by-what-windows-already-has.md)
 **Rests on:** [ADR 0049](../decisions/0049-the-browser-is-ours-the-engine-is-the-machine-s.md)
 (a bundled server of Studio's own, discovered not eager, uncontained because ours),
@@ -61,11 +61,11 @@ is a property of a picture, not a mode to be in; `read_clipboard`/
 `write_clipboard` are one `clipboard`. `request_access` is not a tool at all —
 in Studio the kernel decides every call and there is no OS permission on
 Windows to be ready for. `get_app_state` is `read_ui`, and it hands out
-`ui_N` refs the way the browser hands out `ref_N`.
+observation-scoped `ui_<UUID>_<index>` refs.
 
-**Refs.** `read_ui` stamps every element it lists with `ui_N`, kept in the
-session's map until the next `read_ui`, which clears it. A ref from before a
-read is gone, not rebound — the browser's rule, for the browser's reason.
+**Refs.** `read_ui` stamps every element with its read's UUID and numeric index.
+A new read, dispatched input, refusal, or observed non-injected user input
+invalidates prior refs. Process identity checks reject a reused native handle.
 
 **Bearings.** Added 2026-09-15, after a model lost its window among many
 and mistook a picture of the wrong display for a click that did nothing.
@@ -215,3 +215,31 @@ The findings that would otherwise be lost:
 - **Still open:** models calling `studio_computer_*` names without `discover`
   get Pi's "not found". Either open-schema stub entries for the system servers
   or firmer prose in the capability inventory; not decided.
+
+## 8. Current improvement order (2026-10-19)
+
+1. **Implemented:** scoped refs, target identity, coordinate conversion and bounded
+   replacement-window observations. Shipped in `1adc1de9`; proofs and limitations
+   are in `report/computer-use-recovery.md`.
+2. **Implemented, current change:** one desktop input owner across conversations;
+   a nonactivating, click-through cursor marker; non-injected input summaries with
+   current desktop state; browser cursor shape/press feedback and viewer activity
+   context. Input activity does not automatically stop the agent. The explicit
+   browser Take control/Resume interaction retains its existing meaning.
+3. **Needs Implementation:** bounded condition-based waits for meaningful window
+   or control changes, replacing the fixed post-action sampling delay where the
+   caller can state a condition. No automatic input resend.
+4. **Needs Implementation:** bind coordinate actions to the screenshot observation
+   and reject stale visual targeting; preserve crop and monitor transforms.
+5. **Needs Decision:** evaluate a compiled replacement for the remaining PowerShell
+   driver after measuring the current seams. The small presence helper in this
+   change is not a replacement for the driver.
+6. **Deferred by user:** hands-on Chrome chooser, dialogs, DPI/multi-monitor,
+   physical input and cursor-marker checks. Automated isolated tests continue;
+   they do not prove the real desktop scenarios.
+
+Activity reaches the model in its next tool result, including activity observed
+during that call. It does not interrupt a model stream or create an idle turn.
+Browser viewer movement is bounded/coalesced presence evidence, separately
+identified from viewer commands submitted to the page. Native hook availability
+does not prove lossless input delivery or identify who physically used a device.

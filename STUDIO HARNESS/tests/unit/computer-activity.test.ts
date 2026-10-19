@@ -1,0 +1,103 @@
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { beforeAll, describe, expect, it } from "vitest";
+import { windowsPowerShell } from "../../src/computer/resolve.js";
+import { InputUpdates } from "../../src/computer/input.js";
+import { DesktopControl } from "../../src/computer/control.js";
+import { ComputerSession } from "../../src/computer/session.js";
+
+describe.skipIf(process.platform !== "win32")("native physical input policy without hooks", () => {
+  let checks: Record<string, unknown>;
+  beforeAll(async () => {
+    const fixture = fileURLToPath(new URL("../fixtures/computer-activity-contract.ps1", import.meta.url));
+    const source = fileURLToPath(new URL("../../src/computer/activity.cs", import.meta.url));
+    const { stdout } = await promisify(execFile)(windowsPowerShell(), ["-NoProfile", "-NonInteractive", "-File", fixture, "-Source", source], { windowsHide: true, timeout: 30_000 });
+    checks = JSON.parse(stdout.trim());
+  }, 35_000);
+  it("excludes injected and lower-integrity input without reading key contents", () => {
+    expect(checks).toMatchObject({ key: "keyboard", keyUp: "keyboard", move: "mouse_move", button: "mouse_button", buttonUp: "mouse_button", wheel: "mouse_wheel", injectedKey: "", injectedMouse: "", lowerKey: "", lowerMouse: "" });
+    expect(checks["fields"]).toEqual(["Available", "Moves", "Buttons", "Wheels", "Keys", "AgeMs", "Truncated"]);
+  });
+  it("coalesces and drains counts without starting desktop hooks or an overlay", () => {
+    expect(checks["summary"]).toMatchObject({ Available: false, Moves: 1, Buttons: 1, Wheels: 1, Keys: 1 });
+    expect(checks["drained"]).toMatchObject({ Moves: 0, Buttons: 0, Wheels: 0, Keys: 0 });
+    expect(checks["overlayAbsent"]).toBe(true);
+  });
+});
+
+describe("physical input product updates", () => {
+  it("preserves the tool result and observation, bounds counts, and projects no key or text values", () => {
+    const updates = new InputUpdates();
+    updates.add({ available: true, keys: 2, moves: 1, text: "private", key: "private", stateAvailable: true, front: { handle: 20, title: "Current", secret: "private" }, cursor: { x: 10, y: 20, display: 1 } });
+    expect(JSON.stringify(updates.decorate({ content: [] }))).not.toContain("private");
+    updates.add({ available: true, moves: 2_000_000, keys: 1, stateAvailable: true, cursor: { x: 30, y: 40, display: 0 } });
+    const result = updates.decorate({ content: [{ type: "text", text: "Input sent." }], structuredContent: { observation: { available: true } } });
+    expect(result.content[0]).toEqual({ type: "text", text: "Input sent." });
+    expect(result.structuredContent).toMatchObject({ observation: { available: true }, userInput: { moves: 1_000_000, keys: 3, truncated: true, cursor: { x: 30, y: 40, display: 0 } } });
+    expect(JSON.stringify(result)).not.toContain("private");
+    expect(result.content.at(-1)?.["text"]).toContain("counts were truncated");
+    expect(JSON.stringify(result)).toContain("not been stopped automatically");
+  });
+  it("keeps unsupported monitoring explicit and does not invent an interaction", () => {
+    const updates = new InputUpdates();
+    const result = { content: [{ type: "text", text: "Original" }] };
+    expect(updates.decorate(result)).toBe(result);
+    updates.add({ available: false });
+    expect(JSON.stringify(updates.decorate(result))).toContain("monitoring is unavailable");
+  });
+  it("retains known interaction counts if a later monitoring read is unavailable", () => {
+    const updates = new InputUpdates();
+    updates.add({ available: true, moves: 3 }); updates.add({ available: false });
+    const result = JSON.stringify(updates.decorate({ content: [] }));
+    expect(result).toContain("3 mouse moves");
+    expect(result).toContain("monitoring is now unavailable");
+  });
+});
+
+class RunningSession extends ComputerSession {
+  active = true;
+  cleaning = false;
+  override get running() { return this.active; }
+  override get releasing() { return this.cleaning; }
+}
+describe("shared desktop ownership", () => {
+  it("refuses another conversation's input until the owner's driver ends", async () => {
+    const control = new DesktopControl();
+    const first = new RunningSession("first"); const second = new RunningSession("second");
+    await control.run(first, "studio_computer_click", async () => "first");
+    let sent = false;
+    await expect(control.run(second, "studio_computer_type", async () => { sent = true; })).rejects.toThrow("Another conversation");
+    expect(sent).toBe(false);
+    expect(await control.run(second, "studio_computer_status", async () => "observed")).toBe("observed");
+    first.active = false;
+    expect(await control.run(second, "studio_computer_type", async () => "second")).toBe("second");
+  });
+  it("serializes observations across conversations without cancelling the active owner's work", async () => {
+    const control = new DesktopControl(); const current = new RunningSession("first");
+    let release = () => {};
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
+    const order: string[] = [];
+    const first = control.run(current, "studio_computer_click", async () => { order.push("input"); await barrier; order.push("observed"); });
+    const second = control.run(new RunningSession("second"), "studio_computer_screenshot", async () => { order.push("picture"); });
+    await Promise.resolve(); expect(order).toEqual(["input"]);
+    release(); await Promise.all([first, second]); expect(order).toEqual(["input", "observed", "picture"]);
+  });
+  it("retains ownership until release finishes and invalidates queued input when stopped", async () => {
+    const control = new DesktopControl(); const owner = new RunningSession("owner");
+    const other = new RunningSession("other");
+    await control.run(owner, "studio_computer_click", async () => {});
+    owner.active = false; owner.cleaning = true;
+    await expect(control.run(other, "studio_computer_click", async () => {})).rejects.toThrow("Another conversation");
+    owner.cleaning = false;
+    let release = () => {};
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
+    const first = owner.runTool(() => control.run(owner, "studio_computer_click", async () => { await barrier; return { content: [] }; }));
+    let sent = false;
+    const queued = owner.runTool(() => control.run(owner, "studio_computer_click", async () => { sent = true; return { content: [] }; }));
+    const refused = expect(queued).rejects.toThrow("queued");
+    await Promise.resolve(); await Promise.resolve();
+    await owner.close(); release(); await first; await refused;
+    expect(sent).toBe(false);
+  });
+});

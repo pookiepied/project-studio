@@ -68,7 +68,7 @@ export function useLiveBrowser(conversationId: string) {
       if (result.value.frame) sequence = result.value.frame.sequence
       setState((previous) => ({ ...result.value,
         frame: result.value.frameUnavailable ? null : result.value.frame ?? (previous?.frame?.tabId === result.value.activeTabId ? previous.frame : null) }))
-      timer = setTimeout(() => void read(), document.hidden ? 1500 : result.value.control === 'human' ? 40 : 100)
+      timer = setTimeout(() => void read(), document.hidden ? 1500 : result.value.control === 'human' || result.value.busy ? 40 : 100)
     }
     void read()
     return () => {
@@ -82,9 +82,13 @@ export function useLiveBrowser(conversationId: string) {
 
   const send = useCallback((command: BrowserCommand) => {
     if (!connected.current) return
+    // Presence is replaceable evidence; it must not crowd out actual input.
+    if (command.action === 'activity' && queue.current.length >= 16) return
     setInputError(null)
     const last = queue.current[queue.current.length - 1]
     if (command.action === 'pointer' && command.kind === 'move' && last?.action === 'pointer' && last.kind === 'move' && command.tabId === last.tabId) {
+      queue.current[queue.current.length - 1] = command
+    } else if (command.action === 'activity' && command.kind === 'move' && last?.action === 'activity' && last.kind === 'move' && command.tabId === last.tabId) {
       queue.current[queue.current.length - 1] = command
     } else if (command.action === 'wheel' && last?.action === 'wheel' && command.tabId === last.tabId) {
       queue.current[queue.current.length - 1] = { ...command,
@@ -112,6 +116,7 @@ export function useLiveBrowser(conversationId: string) {
           const result = await harness.interactConversationBrowser(conversationId, viewerId, next)
           if (current !== epoch.current) return
           if (!result.ok) {
+            if (next.action === 'activity' && result.error.kind !== 'not-reachable') continue
             queue.current = []
             if (result.error.kind === 'not-reachable') {
               setInputError(result.error.message)

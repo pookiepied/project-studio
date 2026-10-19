@@ -313,7 +313,7 @@ opaque conversation ID without lossy sanitizing; opening a viewer never creates
 a second conversation identity. Inputs are not retried. The viewer reads one
 latest bounded screencast frame, dropping superseded frames by design;
 these frames are product delivery, not diagnostic recordings. Manual text,
-keys, addresses, cursor telemetry and live frames are excluded from MCP
+keys, addresses, raw page cursor telemetry and live frames are excluded from MCP
 diagnostic content even with scoped capture enabled. The browser child does
 not claim per-frame diagnostic capture. Native `open_browser_window` records
 arrival plus a separate start/end operation for creation or focusing, preserving
@@ -327,6 +327,47 @@ manual commands retain one dispatch. Refused input is distinct from lost
 transport. Frame dimensions come from the captured frame metadata, while title
 refresh is bounded to one pending evaluation per listed page and never delays
 frame delivery.
+
+Computer presence reuses the existing admitted `studio-computer` tool/MCP
+boundary. The child driver owns a bounded non-injected input counter and a
+nonactivating, click-through cursor marker on one background message-loop thread.
+The helper is bundled from source with the driver, starts observing on the first
+acting request, never reads key values, never suppresses input and releases hooks
+and its marker on exit. Ordinary driver shutdown/refusal also releases only
+Studio-tracked held keys/buttons. The shared server serializes desktop tools and
+refuses competing input while another conversation's driver owns the desktop,
+including its release interval. Stop bypasses these queues; queue epochs still
+fence stale continuations. Ownership is coordination, not a permission grant.
+It is local to one computer MCP server, not OS-wide arbitration between independent
+harness processes. A wedged or force-killed driver cannot guarantee held-input
+cleanup; an already-running native call can delay the driver's cleanup requests.
+
+Non-injected events invalidate native UI refs. Bounded aggregate counts and current
+pointer/target/foreground state travel in tool results, including action refusal;
+they do not cancel an agent or resend an action. The existing request observation
+UUID remains the product observation identity; activity counts are not
+execution/event IDs. Session-local accumulation keeps reports from internal
+cursor/screenshot requests with their originating tool and preserves the actual
+result or refusal. Unsupported monitoring/state is explicit.
+
+The browser's existing private admitted interaction route also accepts bounded
+viewer-presence samples without claiming control or injecting page input. Browser
+tool results distinguish these coalesced samples from submitted manual page
+commands, carrying no entered text or key values in the activity summary. The
+explicit human-control lease is unchanged. Returned aggregate summaries are
+intentional model context and use the existing scoped, gated MCP result capture;
+the raw private RPC, page binding and live frame remain excluded. Page-owned
+cursor shape/press telemetry is visual evidence only and never input authority.
+Its listeners, pending timers and bindings are removed when the viewer detaches.
+
+No new diagnostic route, collection policy, upload or separate per-event activity
+history is added. Aggregate tool results use the existing conversation history.
+Activity is delivered in the next tool result, not an unsolicited model
+turn or stream interruption. Hook installation does not prove lossless delivery,
+physical human attribution or secure-desktop/elevated-window coverage. Cursor
+styles within child frames remain best effort; no native marker/focus, physical
+input or multi-monitor hands-on verification is claimed. Tests compile the helper
+without starting hooks and exercise controlled browser sessions.
 
 All window kinds share appearance updates through the existing preference-store
 subscription (browser windows use storage events). Receiving an update emits

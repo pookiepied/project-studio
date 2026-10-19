@@ -85,6 +85,37 @@ describe('live browser delivery lifecycle', () => {
     expect(browser.interact.mock.calls[1]).toContainEqual({ action: 'wheel', tabId: 'tab_1', x: 0, y: 1000 })
     expect(browser.interact.mock.calls[2]).toContainEqual(expect.objectContaining({ action: 'pointer', kind: 'down' }))
   })
+  it('keeps replaceable presence traffic from crowding out an explicit control request', async () => {
+    browser.view.mockResolvedValue(success)
+    let finish: ((value: HarnessResult<void>) => void) | undefined
+    browser.interact.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const hook = renderHook(() => useLiveBrowser('cnv_1'))
+    await waitFor(() => expect(hook.result.current.state?.running).toBe(true))
+    act(() => {
+      for (let index = 0; index < 256; index++) hook.result.current.send({ action: 'activity', tabId: 'tab_1', kind: 'keyboard', x: 0, y: 0 })
+      hook.result.current.send({ action: 'claim' })
+    })
+    await act(async () => finish?.({ ok: true, value: undefined }))
+    expect(browser.interact.mock.calls).toContainEqual(['cnv_1', expect.any(String), { action: 'claim' }])
+    expect(browser.interact.mock.calls.length).toBeLessThan(20)
+    expect(hook.result.current.reconnecting).toBe(false)
+  })
+
+  it('discards a refused stale presence sample while retaining an explicit control request', async () => {
+    browser.view.mockResolvedValue(success)
+    let finish: ((value: HarnessResult<void>) => void) | undefined
+    browser.interact.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const hook = renderHook(() => useLiveBrowser('cnv_1'))
+    await waitFor(() => expect(hook.result.current.state?.running).toBe(true))
+    act(() => {
+      hook.result.current.send({ action: 'activity', tabId: 'old-tab', kind: 'move', x: 0, y: 0 })
+      hook.result.current.send({ action: 'claim' })
+    })
+    await act(async () => finish?.({ ok: false, error: { kind: 'harness-error', status: 400, message: 'Old tab closed' } }))
+    expect(browser.interact.mock.calls).toContainEqual(['cnv_1', expect.any(String), { action: 'claim' }])
+    expect(hook.result.current.inputError).toBeNull()
+    expect(hook.result.current.reconnecting).toBe(false)
+  })
   it('does not resend failed input when reconnecting and releases the old viewer', async () => {
     browser.view.mockResolvedValue(success)
     browser.interact.mockResolvedValue({ ok: true, value: undefined })

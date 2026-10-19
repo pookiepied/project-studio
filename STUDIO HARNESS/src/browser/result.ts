@@ -30,6 +30,7 @@ export interface Content {
 export interface ToolAnswer {
   readonly content: readonly Content[];
   readonly isError?: boolean;
+  readonly structuredContent?: Record<string, unknown>;
 }
 
 /** The width a frame is scaled to before it is sent. */

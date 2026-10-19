@@ -20,6 +20,8 @@ describe("private live browser control", () => {
     expect(v.safeParse(browserInteractionSchema, { action: "pointer", viewerId, tabId: "tab_1", kind: "down", x: 2, y: 0, button: "left", clicks: 1 }).success).toBe(false);
     expect(v.safeParse(browserInteractionSchema, { action: "text", viewerId, tabId: "tab_1", text: "x".repeat(16385) }).success).toBe(false);
     expect(v.safeParse(browserInteractionSchema, { action: "claim", viewerId, conversation: "someone-else" }).success).toBe(false);
+    expect(v.safeParse(browserInteractionSchema, { action: "activity", viewerId, tabId: "tab_1", kind: "keyboard", x: 0, y: 0, key: "private" }).success).toBe(false);
+    expect(v.safeParse(browserInteractionSchema, { action: "activity", viewerId, tabId: "tab_1", kind: "move", x: 2, y: 0 }).success).toBe(false);
   });
 
   it("does not launch a browser to view or claim, isolates owners and blocks agent work until release", async () => {

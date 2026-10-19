@@ -13,6 +13,25 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Computer/browser presence and shared desktop ownership, 2026-10-19
+
+The existing computer MCP boundary now carries bounded non-injected input
+summaries and current pointer/window state through tool results. It keeps physical
+key values out of collection, invalidates stale refs, preserves action failures,
+and does not automatically stop or replay input. The driver owns the hook/message
+loop and a click-through, nonactivating pointer marker; shutdown/refusal cleans up
+Studio-held input. One shared desktop owner coordinates conversations, with Stop
+remaining outside the input queues. Browser presence uses its existing admitted
+private route and distinguishes viewer-only samples from manual page commands.
+Cursor shape/press telemetry remains visual-only; aggregate model-context results
+use the existing gated capture policy. No raw private-input diagnostic collection
+was enabled. Hook loss, physical attribution, native visual behavior and hands-on
+desktop workflows remain unproven. The roadmap records deferred manual checks;
+verification is tracked in `report/computer-use-presence.md`.
+Full sequential checks passed: harness typecheck/lint/build and 2,512 tests
+(28 skipped); client typecheck/lint and 1,568 tests. Native hooks and marker behavior
+on the user's desktop remain explicitly unverified.
+
 ### Computer-use observation and recovery, 2026-10-19
 
 Computer control now uses UUID-scoped accessibility refs, target process identity

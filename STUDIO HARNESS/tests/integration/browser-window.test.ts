@@ -128,6 +128,18 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
     await page.getByRole("button", { name: "Resume Studio" }).click();
     await page.getByRole("button", { name: "Take control" }).waitFor();
     expect(await engine.live.agent(async () => "agent resumed")).toBe("agent resumed");
+    engine.selectTab(tab.id);
+    const observer = createStudioUuid();
+    await expect.poll(() => engine.live.interact({ action: "view", viewerId: observer })).toMatchObject({ frame: { tabId: tab.id } });
+    await tab.page.mouse.move(input.x + 40, input.y + 20);
+    await tab.page.mouse.down();
+    await expect.poll(() => page.getByLabel("Studio cursor").getAttribute("data-cursor-kind")).toBe("text");
+    await expect.poll(() => page.getByLabel("Studio cursor").getAttribute("data-pressed")).toBe("true");
+    await page.screenshot({ path: resolve(artifacts, "cursor-dark.png") });
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    await page.screenshot({ path: resolve(artifacts, "cursor-light.png") });
+    await tab.page.mouse.up();
+    await expect.poll(() => page.getByLabel("Studio cursor").getAttribute("data-pressed")).toBe("false");
     expect(errors).toEqual([]);
   }, 60000);
 });

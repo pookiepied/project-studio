@@ -55,4 +55,20 @@ describe('detached browser window', () => {
     expect(screen.getByLabelText('Studio cursor')).toBeTruthy()
     vi.unstubAllGlobals()
   })
+  it('reports viewer activity without claiming control or forwarding key contents to the page', () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    state = { ...state, cursor: { tabId: 'tab_1', x: 0.4, y: 0.2, kind: 'text', pressed: true },
+      frame: { data: '/9j/', tabId: 'tab_1', sequence: 1, width: 1280, height: 800 } }
+    render(<BrowserWindow conversationId="cnv_1" />)
+    const surface = screen.getByRole('application', { name: 'Live browser page' })
+    fireEvent.pointerMove(surface, { clientX: 10, clientY: 20 })
+    fireEvent.keyDown(surface, { key: 'private-key' })
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ action: 'activity', kind: 'move' }))
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ action: 'activity', kind: 'keyboard' }))
+    expect(JSON.stringify(send.mock.calls)).not.toContain('private-key')
+    expect(send.mock.calls.every(([command]) => command.action === 'activity')).toBe(true)
+    expect(screen.getByLabelText('Studio cursor').getAttribute('data-cursor-kind')).toBe('text')
+    expect(screen.getByLabelText('Studio cursor').getAttribute('data-pressed')).toBe('true')
+    vi.unstubAllGlobals()
+  })
 })

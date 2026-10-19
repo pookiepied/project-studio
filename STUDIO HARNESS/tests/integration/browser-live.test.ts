@@ -9,6 +9,48 @@ const viewerId = createStudioUuid();
 afterAll(async () => { await session.close(); });
 
 describe.skipIf(engineReport().seen === undefined)("live control of an installed browser", () => {
+  it("reports viewer presence during automation without injecting input or stopping the agent", async () => {
+    const tab = await session.page();
+    await tab.page.setContent('<input aria-label="Untouched"><button>Target</button>');
+    let release = () => {};
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
+    const work = session.live.agent(async () => { await barrier; return session.live.report({ content: [{ type: "text", text: "Continued." }] }); });
+    await session.live.interact({ action: "activity", viewerId, tabId: tab.id, kind: "move", x: 0.3, y: 0.4 });
+    await session.live.interact({ action: "activity", viewerId, tabId: tab.id, kind: "keyboard", x: 0.3, y: 0.4 });
+    expect(await tab.page.locator("input").inputValue()).toBe("");
+    release();
+    const result = await work;
+    expect(result.content[0]).toEqual({ type: "text", text: "Continued." });
+    expect(result.structuredContent).toMatchObject({ userActivity: { moves: 1, keys: 1, pageInputs: 0, viewerOnly: 2, tabId: tab.id, x: 0.3, y: 0.4 } });
+    expect(await session.live.interact({ action: "view", viewerId })).toMatchObject({ control: "agent" });
+    const next = { content: [{ type: "text", text: "Next" }] };
+    expect(session.live.report(next)).toBe(next);
+    await expect(session.live.interact({ action: "activity", viewerId, tabId: "foreign-tab", kind: "move", x: 0, y: 0 })).rejects.toThrow();
+    await session.live.interact({ action: "detach", viewerId });
+  });
+
+  it("projects actual cursor shape and button state and summarizes manual input without key contents", async () => {
+    const tab = await session.page();
+    await tab.page.setContent('<input aria-label="Private" style="position:absolute;left:0;top:0;width:200px;height:60px;cursor:text">');
+    await session.live.interact({ action: "view", viewerId });
+    await tab.page.mouse.move(40, 30);
+    await tab.page.mouse.down();
+    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { kind: "text", pressed: true } });
+    await tab.page.mouse.up();
+    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { kind: "text", pressed: false } });
+    expect(session.live.hasActivity).toBe(false);
+    await session.live.interact({ action: "claim", viewerId });
+    await session.live.interact({ action: "text", viewerId, tabId: tab.id, text: "private-text" });
+    await session.live.interact({ action: "release", viewerId });
+    const result = await session.live.agent(async () => session.live.report({ content: [] }));
+    expect(result.structuredContent).toMatchObject({ userActivity: { edits: 1, pageInputs: 1, viewerOnly: 0 } });
+    expect(JSON.stringify(result)).not.toContain("private-text");
+    await tab.page.locator("input").evaluate((element) => { element.style.left = "2000px"; });
+    await session.live.point(tab.page.locator("input"), tab.id);
+    expect(await session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: null });
+    await session.live.interact({ action: "detach", viewerId });
+  });
+
   it("streams the same page, accepts human input, adopts popups and retains the session on detach", async () => {
     const tab = await session.page();
     await tab.page.setContent('<title>Live fixture</title><input aria-label="Name" style="position:absolute;left:0;top:0;width:200px;height:60px"><button onclick="window.open(\'about:blank\')">Popup</button>');

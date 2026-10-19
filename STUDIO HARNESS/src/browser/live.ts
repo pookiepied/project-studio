@@ -3,6 +3,7 @@ import type { BrowserSession } from "./session.js";
 import type { BrowserInteraction } from "./interaction.js";
 import { BrowserError } from "./errors.js";
 import { createStudioUuid } from "../contracts/uuid.js";
+import type { ToolAnswer } from "./result.js";
 
 const LEASE_MS = 8000;
 
@@ -18,7 +19,8 @@ export class LiveBrowser {
   #frame: { data: string; sequence: number; tabId: string; width: number; height: number } | null = null;
   #sequence = 0;
   #frameUnavailable = false;
-  #cursor: { x: number; y: number; tabId: string } | null = null;
+  #cursor: { x: number; y: number; tabId: string; kind?: "default" | "pointer" | "text"; pressed?: boolean } | null = null;
+  #activity: { moves: number; buttons: number; wheels: number; keys: number; edits: number; pageInputs: number; viewerOnly: number; tabId: string; x: number | null; y: number | null } | undefined;
   #timer: NodeJS.Timeout | undefined;
   readonly #held = new Map<Page, Set<string>>();
   #cursorBinding: { name: string; script: string } | undefined;
@@ -48,11 +50,19 @@ export class LiveBrowser {
     const page = this.session.tab(tabId)?.page;
     const viewport = page?.viewportSize();
     if (box !== null && viewport) {
-      this.#cursor = { x: (box.x + box.width / 2) / viewport.width, y: (box.y + box.height / 2) / viewport.height, tabId };
+      const x = (box.x + box.width / 2) / viewport.width;
+      const y = (box.y + box.height / 2) / viewport.height;
+      this.#cursor = x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y, tabId } : null;
     }
   }
 
   async interact(input: BrowserInteraction): Promise<unknown> {
+    if (input.action === "activity") {
+      if (this.session.tab(input.tabId) === undefined) throw new BrowserError("no_tab");
+      // Viewer presence never claims control or injects input into the page.
+      this.#recordActivity(input.kind, input.tabId, input.x, input.y, false);
+      return { accepted: true };
+    }
     if (input.action === "view") {
       this.#viewed = Date.now();
       if (this.#owner === input.viewerId && this.#owned()) this.#expires = Date.now() + LEASE_MS;
@@ -95,14 +105,24 @@ export class LiveBrowser {
         if (input.action === "reset") {
           await this.#releaseKeys();
         } else if (input.action === "new") {
+          this.#recordActivity("edit", "", null, null, true);
           await this.session.newTab();
         } else if (input.action === "close") {
+          this.#recordActivity("edit", input.tabId, null, null, true);
           await this.session.closeTab(input.tabId);
         } else {
           const tab = this.session.tab(input.tabId);
           if (tab === undefined) throw new BrowserError("no_tab");
-          if (input.action === "select") this.session.selectTab(tab.id);
-          else await this.#input(tab.page, input);
+          if (input.action === "select") {
+            this.#recordActivity("edit", tab.id, null, null, true);
+            this.session.selectTab(tab.id);
+          }
+          else {
+            this.#recordActivity(input.action === "pointer" ? input.kind === "move" ? "move" : "button"
+              : input.action === "wheel" ? "wheel" : input.action === "key" ? "keyboard" : "edit", tab.id,
+              input.action === "pointer" ? input.x : null, input.action === "pointer" ? input.y : null, true);
+            await this.#input(tab.page, input);
+          }
         }
         this.session.keepAlive();
       }
@@ -112,6 +132,29 @@ export class LiveBrowser {
 
   #owned(): boolean { return this.#owner !== undefined && this.#expires > Date.now(); }
 
+  #recordActivity(kind: string, tabId: string, x: number | null, y: number | null, pageInput: boolean): void {
+    const value = this.#activity ?? { moves: 0, buttons: 0, wheels: 0, keys: 0, edits: 0, pageInputs: 0, viewerOnly: 0, tabId, x, y };
+    const field = kind === "move" ? "moves" : kind === "button" ? "buttons" : kind === "wheel" ? "wheels" : kind === "keyboard" ? "keys" : "edits";
+    value[field] = Math.min(1_000_000, value[field] + 1);
+    const source = pageInput ? "pageInputs" : "viewerOnly";
+    value[source] = Math.min(1_000_000, value[source] + 1);
+    if (value.tabId !== tabId) { value.x = null; value.y = null; }
+    value.tabId = tabId;
+    if (x !== null && y !== null) { value.x = x; value.y = y; }
+    this.#activity = value;
+  }
+
+  get hasActivity(): boolean { return this.#activity !== undefined; }
+
+  report(result: ToolAnswer): ToolAnswer {
+    const activity = this.#activity;
+    if (activity === undefined) return result;
+    this.#activity = undefined;
+    const activeTabId = this.session.activeTabId ?? null;
+    const content = `User activity in Studio Browser: ${JSON.stringify(activity)}. Coordinates are fractions of the viewport. viewerOnly counts coalesced activity samples that did not send input to the page; pageInputs counts submitted viewer commands, not verified application results. Current active tab: ${activeTabId ?? "none"}. Key values and entered text were not collected for this report. This activity does not automatically stop browser use. Reobserve the page if the person interacted with it.`;
+    return { ...result, content: [...result.content, { type: "text", text: content }], structuredContent: { ...result.structuredContent, userActivity: { ...activity, activeTabId } } };
+  }
+
   async #serial<T>(run: () => Promise<T>): Promise<T> {
     const previous = this.#tail;
     const next = previous.then(run, run);
@@ -119,7 +162,7 @@ export class LiveBrowser {
     return next;
   }
 
-  async #input(page: Page, input: Exclude<BrowserInteraction, { action: "view" | "claim" | "release" | "detach" | "new" | "close" | "select" | "reset" }>): Promise<void> {
+  async #input(page: Page, input: Exclude<BrowserInteraction, { action: "view" | "activity" | "claim" | "release" | "detach" | "new" | "close" | "select" | "reset" }>): Promise<void> {
     switch (input.action) {
       case "navigate": await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 10000 }); break;
       case "back": await page.goBack({ waitUntil: "domcontentloaded", timeout: 10000 }); break;
@@ -207,12 +250,24 @@ export class LiveBrowser {
     // content has no authority to invoke controls or submit diagnostic data.
     const source = `(() => {
       const name = ${JSON.stringify(binding)};
+      let last = 0, pending = null, timer;
+      const publish = () => {
+        if (!pending) return;
+        const value = pending; pending = null; last = performance.now();
+        try { globalThis[name](JSON.stringify(value)); } catch {}
+      };
       const move = event => {
         if (!event.isTrusted) return;
-        try { globalThis[name](JSON.stringify({ x: event.clientX, y: event.clientY })); } catch {}
+        const cursor = event.target instanceof Element ? getComputedStyle(event.target).cursor : 'default';
+        const kind = cursor === 'pointer' ? 'pointer' : cursor === 'text' ? 'text' : 'default';
+        pending = { x: event.clientX, y: event.clientY, kind, pressed: event.buttons !== 0 };
+        if (event.type !== 'mousemove' || performance.now() - last >= 33) {
+          clearTimeout(timer); timer = undefined; publish();
+        } else if (timer === undefined) timer = setTimeout(() => { timer = undefined; publish(); }, 33);
       };
-      globalThis[name + '_stop'] = () => removeEventListener('mousemove', move, true);
-      addEventListener('mousemove', move, true);
+      const events = ['mousemove', 'mousedown', 'mouseup'];
+      globalThis[name + '_stop'] = () => { clearTimeout(timer); events.forEach(event => removeEventListener(event, move, true)); };
+      events.forEach(event => addEventListener(event, move, true));
     })()`;
     await cdp.send("Runtime.addBinding", { name: binding });
     cdp.on("Runtime.bindingCalled", (event) => {
@@ -221,13 +276,17 @@ export class LiveBrowser {
         const value: unknown = JSON.parse(event.payload);
         const viewport = page.viewportSize();
         if (viewport && typeof value === "object" && value !== null && "x" in value && "y" in value
-          && typeof value.x === "number" && Number.isFinite(value.x) && typeof value.y === "number" && Number.isFinite(value.y)) {
-          this.#cursor = { tabId, x: value.x / viewport.width, y: value.y / viewport.height };
+          && typeof value.x === "number" && Number.isFinite(value.x) && value.x >= 0 && value.x <= viewport.width
+          && typeof value.y === "number" && Number.isFinite(value.y) && value.y >= 0 && value.y <= viewport.height) {
+          this.#cursor = { tabId, x: value.x / viewport.width, y: value.y / viewport.height,
+            kind: "kind" in value && value.kind === "pointer" ? "pointer" : "kind" in value && value.kind === "text" ? "text" : "default",
+            pressed: "pressed" in value && value.pressed === true };
         }
       } catch { /* A page cannot break the browser by sending malformed cursor telemetry. */ }
     });
     const script = await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source });
     this.#cursorBinding = { name: binding, script: script.identifier };
+    cdp.on("Page.frameNavigated", (event) => { if (this.#cdp === cdp && !event.frame.parentId) this.#cursor = null; });
     await cdp.send("Runtime.evaluate", { expression: source });
     cdp.on("Page.screencastFrame", (event) => {
       if (this.#cdp !== cdp) return;
@@ -259,6 +318,7 @@ export class LiveBrowser {
     this.#cursorBinding = undefined;
     this.#cdp = undefined;
     this.#page = undefined;
+    this.#cursor = null;
     this.#frame = null;
     this.#frameUnavailable = false;
     if (clearTimer && this.#timer !== undefined) { clearInterval(this.#timer); this.#timer = undefined; }
@@ -275,6 +335,7 @@ export class LiveBrowser {
     this.#owner = undefined;
     this.#held.clear();
     this.#cursor = null;
+    this.#activity = undefined;
     await this.#watching?.catch(() => undefined);
     await this.#unwatch();
   }

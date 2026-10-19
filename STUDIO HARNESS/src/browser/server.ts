@@ -86,7 +86,13 @@ serveStdio({
     if (tool === undefined) throw new BrowserError("bad_input", { message: `There is no tool called "${name}".` });
     const session = sessionFor(meta);
     const humanStop = name === "studio_browser_quit" && isRecord(meta) && meta["studio/human-stop"] === true;
-    return session.live.agent(() => tool.run(session, args), humanStop);
+    return session.live.agent(async () => {
+      try { return session.live.report(await tool.run(session, args)); }
+      catch (error) {
+        if (!session.live.hasActivity) throw error;
+        return session.live.report({ isError: true, content: [{ type: "text", text: explain(error instanceof Error ? error.message : "The browser action failed.") }] });
+      }
+    }, humanStop);
   },
   control: async (_method, params) => {
     const parsed = v.safeParse(browserInteractionSchema, params["input"]);

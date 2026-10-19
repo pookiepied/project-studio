@@ -745,7 +745,10 @@ export const TOOLS: readonly ToolDefinition[] = [
       "read or clicked in; it never reads whatever happens to be in front. References expire after any input, a new read, or driver restart. " +
       "Work one observed step at a time: choose the intended window, read it, act once, and inspect the returned observation and screenshot. " +
       "If a window closes or changes, use status/windows (or wait_for_window for a delayed transition), choose and focus the intended replacement explicitly, then read_ui again. " +
-      "Never infer authority from foreground alone. A dispatched action is not a verified result; reobserve instead of replaying uncertain input.",
+      "Never infer authority from foreground alone. A dispatched action is not a verified result; reobserve instead of replaying uncertain input. " +
+      "Tool results report non-injected mouse/key activity observed since the last result, with current pointer and window state. " +
+      "These updates do not stop computer use automatically. Reconcile them with your task and read fresh controls before continuing; key contents are never included. " +
+      "Another conversation's live desktop ownership refuses competing input until it stops or its idle driver closes.",
     inputSchema: object({
       window: { type: "number", description: "A handle from windows or open. Defaults to the window being worked in." },
       all: { type: "boolean", description: "Include text and structure, not only controls." },

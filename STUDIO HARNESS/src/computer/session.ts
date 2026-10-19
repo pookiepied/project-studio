@@ -8,8 +8,11 @@ import { createInterface } from "node:readline";
 import { createStudioUuid } from "../contracts/uuid.js";
 
 import driverSource from "./driver.ps1?raw";
+import activitySource from "./activity.cs?raw";
 import { ComputerError } from "./errors.js";
 import { windowsPowerShell } from "./resolve.js";
+import { InputUpdates } from "./input.js";
+import type { ToolAnswer } from "./tools.js";
 
 /**
  * One desktop driver, and the reasons it is allowed to exist.
@@ -45,6 +48,7 @@ interface Pending {
   readonly resolve: (value: unknown) => void;
   readonly reject: (error: Error) => void;
   readonly timer: NodeJS.Timeout;
+  readonly input: InputUpdates | undefined;
 }
 
 /**
@@ -56,12 +60,13 @@ interface Pending {
  * by an older one.
  */
 function driverPath(): string {
-  const hash = createHash("sha256").update(driverSource).digest("hex").slice(0, 16);
-  const directory = join(tmpdir(), "studio-computer");
+  const hash = createHash("sha256").update(driverSource).update(activitySource).digest("hex").slice(0, 16);
+  const directory = join(tmpdir(), "studio-computer", hash);
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `driver-${hash}.ps1`);
   // Written every time rather than checked: a partial file from an
   // interrupted earlier write would otherwise be trusted by its name.
+  writeFileSync(join(directory, "activity.cs"), activitySource, "utf8");
   writeFileSync(path, driverSource, "utf8");
   return path;
 }
@@ -93,13 +98,14 @@ export function unsupportedMessage(): string {
 export class ComputerSession {
   #child: ChildProcessWithoutNullStreams | undefined;
   #ready: Promise<void> | undefined;
+  #closing: Promise<void> | undefined;
   readonly #pending = new Map<number, Pending>();
   #next = 1;
   #idle: NodeJS.Timeout | undefined;
   #lastFrame: { display: number; width: number; height: number } | undefined;
   #toolTail: Promise<void> = Promise.resolve();
   #interactionEpoch = 0;
-  readonly #toolContext = new AsyncLocalStorage<number>();
+  readonly #toolContext = new AsyncLocalStorage<{ epoch: number; input: InputUpdates }>();
 
   /** @param key Which conversation this driver belongs to. */
   constructor(readonly key: string) {}
@@ -110,7 +116,7 @@ export class ComputerSession {
     const result = this.#toolTail.then(async () => {
       if (epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer state changed while this call was queued. Observe status before sending new input." });
       try {
-        return await this.#toolContext.run(epoch, operation);
+        return await this.#toolContext.run({ epoch, input: new InputUpdates() }, operation);
       } catch (error) {
         this.#interactionEpoch++;
         throw error;
@@ -120,9 +126,25 @@ export class ComputerSession {
     return result;
   }
 
+  async runTool(operation: () => Promise<ToolAnswer>): Promise<ToolAnswer> {
+    let updates: InputUpdates | undefined;
+    try {
+      return await this.run(async () => {
+        updates = this.#toolContext.getStore()?.input;
+        const result = await operation();
+        return updates?.decorate(result) ?? result;
+      });
+    } catch (error) {
+      if (updates === undefined || !updates.hasUpdates) throw error;
+      return updates.decorate({ isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "Computer input failed." }] });
+    }
+  }
+
   get running(): boolean {
     return this.#child !== undefined;
   }
+
+  get releasing(): boolean { return this.#closing !== undefined; }
 
   /** The frame of the last screenshot, so an acting result can name it. */
   get lastFrame(): { display: number; width: number; height: number } | undefined {
@@ -194,6 +216,7 @@ export class ComputerSession {
         if (waiting === undefined) return;
         this.#pending.delete(id);
         clearTimeout(waiting.timer);
+        waiting.input?.add(record["userInput"]);
         if (record["ok"] === true) waiting.resolve(record["result"]);
         else {
           const said = record["error"];
@@ -246,7 +269,9 @@ export class ComputerSession {
    * only place the idle timer is renewed.
    */
   async request(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
-    const epoch = this.#toolContext.getStore();
+    const context = this.#toolContext.getStore();
+    const epoch = context?.epoch;
+    if (this.#closing !== undefined) await this.#closing;
     if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control was stopped or replaced. Observe status before continuing." });
     const child = await this.#launch();
     if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control changed while the driver started. Observe status again." });
@@ -260,7 +285,7 @@ export class ComputerSession {
         }));
         void this.close();
       }, REQUEST_MS);
-      this.#pending.set(id, { resolve, reject, timer });
+      this.#pending.set(id, { resolve, reject, timer, input: context?.input });
       child.stdin.write(`${JSON.stringify({ id, op, args: { ...args, observationId: createStudioUuid() } })}\n`);
     });
   }
@@ -274,8 +299,9 @@ export class ComputerSession {
       waiting.reject(new ComputerError("refused", { message: "Computer control stopped before this call's outcome was observed. Reobserve before further input; do not replay it automatically." }));
     }
     this.#pending.clear();
+    if (this.#closing !== undefined) return this.#closing;
     if (child === undefined) return;
-    await new Promise<void>((resolve) => {
+    const closing = new Promise<void>((resolve) => {
       const done = (): void => {
         clearTimeout(force);
         resolve();
@@ -289,6 +315,8 @@ export class ComputerSession {
       // only for one that does not.
       child.stdin.end();
     });
+    this.#closing = closing;
+    try { await closing; } finally { if (this.#closing === closing) this.#closing = undefined; }
   }
 
   #forget(): void {

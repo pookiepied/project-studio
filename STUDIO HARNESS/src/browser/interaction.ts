@@ -8,6 +8,8 @@ const size = v.pipe(v.number(), v.integer(), v.minValue(320), v.maxValue(2560));
 /** Private human-control protocol; these commands are never model tools. */
 export const browserInteractionSchema = v.variant("action", [
   v.strictObject({ action: v.literal("view"), ...viewer, since: v.optional(v.number()) }),
+  v.strictObject({ action: v.literal("activity"), ...viewer, ...tab,
+    kind: v.picklist(["move", "button", "wheel", "keyboard"]), x: coordinate, y: coordinate }),
   v.strictObject({ action: v.literal("claim"), ...viewer }),
   v.strictObject({ action: v.literal("release"), ...viewer }),
   v.strictObject({ action: v.literal("detach"), ...viewer }),

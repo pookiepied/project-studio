@@ -1,5 +1,6 @@
 export type BrowserCommand =
   | { action: 'view'; since?: number }
+  | { action: 'activity'; tabId: string; kind: 'move' | 'button' | 'wheel' | 'keyboard'; x: number; y: number }
   | { action: 'claim' | 'release' | 'detach' | 'new' | 'reset' }
   | { action: 'select' | 'close' | 'back' | 'forward' | 'reload'; tabId: string }
   | { action: 'navigate'; tabId: string; url: string }
@@ -23,7 +24,7 @@ export interface LiveBrowserState {
   readonly tabs: readonly { id: string; url: string; title: string }[]
   readonly control: 'human' | 'agent' | 'other'
   readonly busy: boolean
-  readonly cursor: { x: number; y: number; tabId: string } | null
+  readonly cursor: { x: number; y: number; tabId: string; kind?: 'default' | 'pointer' | 'text'; pressed?: boolean } | null
   readonly frame: LiveFrame | null
   readonly omittedTabs?: number
   readonly frameUnavailable?: boolean
@@ -57,8 +58,12 @@ export function parseLiveBrowserState(value: unknown): LiveBrowserState | null {
   let cursor: LiveBrowserState['cursor'] = null
   if (value.cursor !== null) {
     const item = value.cursor
-    if (!record(item) || !finite(item.x) || !finite(item.y) || typeof item.tabId !== 'string') return null
-    cursor = { x: item.x, y: item.y, tabId: item.tabId }
+    if (!record(item) || !finite(item.x) || !finite(item.y) || item.x < 0 || item.x > 1 || item.y < 0 || item.y > 1 || typeof item.tabId !== 'string'
+      || (item.kind !== undefined && item.kind !== 'default' && item.kind !== 'pointer' && item.kind !== 'text')
+      || (item.pressed !== undefined && typeof item.pressed !== 'boolean')) return null
+    cursor = { x: item.x, y: item.y, tabId: item.tabId,
+      ...(item.kind === 'default' || item.kind === 'pointer' || item.kind === 'text' ? { kind: item.kind } : {}),
+      ...(typeof item.pressed === 'boolean' ? { pressed: item.pressed } : {}) }
   }
   return { running: value.running, busy: value.busy, activeTabId: value.activeTabId, tabs,
     control: value.control === 'human' ? 'human' : value.control === 'other' ? 'other' : 'agent', frame, cursor,
