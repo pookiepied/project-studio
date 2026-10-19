@@ -19,6 +19,7 @@ import { JobsDetails } from './tools/JobsDetails'
 import { LibraryDetails } from './tools/LibraryDetails'
 import { ExtensionToolDetails } from './tools/ExtensionToolDetails'
 import { RollingCount } from './RollingCount'
+import { ImageReads, readImages, type ReadImage } from './ImageReads'
 import { BrowserReport } from './BrowserReport'
 import { MediaCallArtifact } from './MediaCallArtifact'
 import { readMediaCall } from './mediaCall'
@@ -46,9 +47,20 @@ export function ToolGroups({
   conversationId: string
 }) {
   const calls = groups.flatMap((group) => group.calls)
+  const rows: ({ readonly kind: 'images'; readonly id: string; readonly images: ReadImage[] } |
+    { readonly kind: 'call'; readonly id: string; readonly call: ToolCallView })[] = []
+  for (const call of calls) {
+    const images = readImages(call)
+    const previous = rows[rows.length - 1]
+    if (images.length === 0) rows.push({ kind: 'call', id: call.toolCallId, call })
+    else if (previous?.kind === 'images') previous.images.push(...images)
+    else rows.push({ kind: 'images', id: call.toolCallId, images: [...images] })
+  }
   return (
     <div className="my-1 flex min-w-0 flex-col gap-0.5">
-      {calls.map((call) => <CallRow key={call.toolCallId} call={call} live={live} conversationId={conversationId} />)}
+      {rows.map((row) => row.kind === 'images'
+        ? <ImageReads key={row.id} images={row.images} live={live} conversationId={conversationId} />
+        : <CallRow key={row.id} call={row.call} live={live} conversationId={conversationId} />)}
     </div>
   )
 }
@@ -172,13 +184,13 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
       ? call.toolName === 'move' ? 'Could not move' : 'Could not delete'
       : action === undefined ? readableName(call.toolName) : running ? action.running : action.done
 
-  // A read is a statement, not a disclosure. Its answer is the page the
+  // A text read is a statement, not a disclosure. Its answer is the page the
   // model read -- the model's business, and a slab a reader was never meant
   // to wade through -- and everything the chip could say about it, the verb
   // and the file, it already says. So a read that came back intact opens
   // onto nothing and carries no chevron promising an opening. The exception
-  // is failure: the error is the one part of a read's answer a person may
-  // need, and it lives nowhere else.
+  // is failure: the error is the one part of a text read's answer a person
+  // may need. Image results have already been routed to ImageReads above.
   if (call.toolName === 'read' && call.errorText === null) {
     return (
       <DisclosureRow

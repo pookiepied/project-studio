@@ -13,6 +13,20 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Image read presentation, 2026-10-19
+
+Native `read` already sends supported image bytes as image content to the model.
+The client now groups adjacent successful image reads into a disclosure with
+thumbnails and the existing media lightbox. Text reads remain non-expandable.
+Persisted images reuse the conversation attachment resolver and its existing
+instrumented byte transport; no new tool, identity, route or capture policy is
+introduced. Preview clicks and image paint remain unobserved local presentation.
+Coverage: `ImageReads.test.tsx` and the image case in `ToolGroups.test.tsx`.
+Validation: harness check passed 2,468 tests / 28 skips; the final client check
+passed all 1,561 tests. The earlier client library-test timing failure, passing
+unchanged reruns, mutation evidence and visual verification are recorded in
+`report/image-read-previews.md`.
+
 ### Browser reliability and shared appearance correction, 2026-10-18
 
 The detached viewer resolves its own client, with bounded, visible recovery of

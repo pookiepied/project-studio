@@ -260,6 +260,19 @@ external-browser-opening and remote-management command outcomes remain unsupport
 
 ## Feature checklist
 
+Image read disclosures reuse native `read` results and their existing tool-call
+and conversation identities. Only returned PNG/JPEG/GIF/WebP image blocks earn
+a viewed-image row; text reads and refused/pending reads retain their existing
+presentation. Expanding resolves persisted attachment references through the
+existing attachment byte transport; inline bytes and the larger media viewer
+need no new transport or tool execution. Attachment delivery retains existing
+request/native service observations and resolver cache/retry ownership. Opening
+and closing previews are local presentation state, with no new diagnostic
+content capture or image/path attributes. Missing bytes are shown as unavailable;
+image paint and preview interaction timing remain unsupported observations.
+`ImageReads.test.tsx` covers grouping/order, persisted conversation-scoped
+delivery, missing bytes and exclusion of non-image/error results.
+
 The detached browser viewer uses admitted
 `POST /api/conversations/:id/browser/interact`, then the private system-server
 `studio/browser` RPC. `browser.interaction` inherits the HTTP execution parent

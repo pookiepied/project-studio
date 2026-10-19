@@ -666,9 +666,7 @@ describe('the answer', () => {
 })
 
 /**
- * A read is a statement, not a disclosure -- except when it failed. The
- * error is the one part of a read's answer a person may need, and it lives
- * nowhere else, so failure is the one read that still opens.
+ * Text reads stay quiet; failures and returned images have something to open.
  */
 describe('the read that failed', () => {
   it('keeps its disclosure, and the error under it', () => {
@@ -690,7 +688,7 @@ describe('the read that failed', () => {
     expect(screen.getByText(/There is no file at notes\.txt\./)).toBeTruthy()
   })
 
-  it('renders an image read as the same statement, its bytes never printed', () => {
+  it('opens returned image pixels in a thumbnail and a larger preview without printing bytes', () => {
     const { container } = render(
       <ToolGroups conversationId="conv"
         groups={groupsOf({
@@ -710,9 +708,14 @@ describe('the read that failed', () => {
         })}
       />,
     )
-    const row = screen.getByText('Read').closest('button')
-    expect(row?.disabled).toBe(true)
+    const row = screen.getByRole('button', { name: /Viewed 1 image/ })
+    expect(row.hasAttribute('disabled')).toBe(false)
     expect(container.querySelector('img')).toBeNull()
+    fireEvent.click(row)
+    expect(screen.getByAltText('snake.png').getAttribute('src')).toBe('data:image/png;base64,aGVsbG8=')
+    fireEvent.click(screen.getByRole('button', { name: 'Preview snake.png' }))
+    expect(screen.getByRole('dialog', { name: 'snake.png' })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(container.textContent).not.toContain('aGVsbG8=')
   })
 })
