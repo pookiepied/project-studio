@@ -104,6 +104,10 @@ describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
       message.parts.flatMap((part) => part.type === "text" ? [part.text] : []).join("");
     await waitUntil(async () => (await client.history()).messages.some((message) =>
       message.role === "assistant" && textOf(message).includes("OLD_RESPONSE")));
+    const observed = client.observe({ live: "sse", limit: 2 });
+    observed.subscribe(() => {});
+    toClean.push(async () => observed.close());
+    await waitUntil(async () => observed.getSnapshot().phase === "live");
     const enqueue = async (body: string) => {
       const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ kind: "user", body, deliveryMode: "queue" }) });
       expect(response.status).toBe(202);
@@ -126,6 +130,17 @@ describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
     expect(reply).toMatch(/Echo: CORRECTED_DIRECTION$/);
     expect(reply.split("OLD_RESPONSE").length - 1).toBeLessThan(120);
     expect(history.messages.filter((message) => message.role === "user" && message.submissionId === steered)).toHaveLength(1);
+    const correctionIndex = history.messages.findIndex((message) => message.role === "user" && message.submissionId === steered);
+    const continuedIndex = history.messages.findIndex((message) => message.role === "assistant" && textOf(message).includes("Echo: CORRECTED_DIRECTION"));
+    expect(continuedIndex).toBeGreaterThan(correctionIndex);
+    expect(history.messages.slice(0, correctionIndex).some((message) => textOf(message).includes("OLD_RESPONSE"))).toBe(true);
+    await waitUntil(async () => observed.getSnapshot().conversation?.messages.some((message) =>
+      message.role === "assistant" && textOf(message).includes("Echo: CORRECTED_DIRECTION")) === true);
+    const liveMessages = observed.getSnapshot().conversation?.messages ?? [];
+    const liveCorrection = liveMessages.findIndex((message) => message.role === "user" && message.submissionId === steered);
+    expect(liveCorrection).toBeGreaterThanOrEqual(0);
+    expect(liveMessages.findIndex((message) => message.role === "assistant" && textOf(message).includes("Echo: CORRECTED_DIRECTION"))).toBeGreaterThan(liveCorrection);
+    expect(liveMessages.filter((message) => message.role === "user" && message.submissionId === steered)).toHaveLength(1);
     expect(history.messages.some((message) => message.role === "assistant" && message.submissionId === steered)).toBe(false);
     expect(history.messages.some((message) => message.role === "assistant" && message.submissionId === queued && textOf(message) === "Echo: PRESERVED_FOLLOW_UP")).toBe(true);
     expect(history.settlements.filter((item) => [first.submissionId, queued, steered].includes(item.submissionId)).map((item) => item.outcome)).toEqual(["completed", "completed", "completed"]);

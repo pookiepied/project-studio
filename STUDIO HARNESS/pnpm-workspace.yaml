@@ -160,6 +160,12 @@ minimumReleaseAgeExclude:
 #       stop.test.ts and live-steering-store.test.ts pin delivery, scoping,
 #       queued work, Stop and content-free observation stages.
 #
+#   14. dispatch-*.mjs, projectConversationUi/buildResponseMessageIndex - a
+#       user message ends the current display group without changing submission
+#       ownership. Keep a message-to-group index for streaming and replay so
+#       text after steering appears below the correction, as it does in history.
+#       stop.test.ts checks bounded live SSE and saved history ordering.
+#
 #   How to re-derive at the next upgrade: every hunk carries its own recipe
 #   in a `[project-studio patch]` comment, and every recipe says to anchor
 #   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of

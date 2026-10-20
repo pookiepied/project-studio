@@ -1,5 +1,20 @@
 # Studio observability implementation tracker
 
+## Steering transcript ordering follow-up (2026-10-20)
+
+The runtime's UI projection now splits assistant display groups at user messages,
+including steering joined to an existing submission. Canonical message and
+submission identities remain unchanged. Live encoding keeps each source message's
+group instead of redirecting all output to the submission's first bubble. This is
+a projection correction, not a new execution or capture boundary; existing client
+projection and runtime observations retain their identity and privacy contracts.
+The stop integration fixture checks bounded live SSE and saved history ordering;
+the client transcript fixture checks the pending-to-echo rendering transition.
+Sequential full gates passed: harness typecheck/lint/build and 2,567 tests
+(28 skipped); client typecheck/lint and 1,588 tests. Deliberately removing the
+live grouping boundary failed the SSE ordering assertion; restored bytes matched
+their pre-mutation SHA256. Details are in `report/steering-transcript-order.md`.
+
 Goal: finish and verify the full Studio side before implementing the independent
 Codex/Claude inspection tool. Status: **Stage A implemented and verified** against
 the coverage inventory below. The external inspector has not been started.

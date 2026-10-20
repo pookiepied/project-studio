@@ -270,6 +270,27 @@ describe('what the newest message says about its ending', () => {
 })
 
 describe('which reply counts as the one being written', () => {
+  it('keeps a steering bubble between the earlier output and the continuing response', () => {
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ ...window.matchMedia(''), matches: true })
+    const before = { ...assistant('a1', 'Earlier response'), end: { state: 'complete' as const } }
+    const correction = { ...user('u2', 'Change direction'), submissionId: 'sub_steer' }
+    const after = assistant('a2', 'Continuing response')
+    const { container, rerender } = show([before], STREAMING, { submissionId: 'sub_steer', text: 'Change direction' })
+    expect(screen.getAllByText('Change direction')).toHaveLength(1)
+
+    rerender(<LiveTranscript items={[before, correction, after]} pending={null} phase={STREAMING}
+      viewport={createRef<HTMLElement>()} conversationId="conv_1" />)
+    media.mockRestore()
+    const rows = Array.from(container.firstElementChild?.children ?? [])
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Earlier response'),
+      expect.stringContaining('Change direction'),
+      expect.stringContaining('Continuing response'),
+    ])
+    expect(screen.getAllByText('Change direction')).toHaveLength(1)
+    expect(screen.queryByText('Stopped before finishing')).toBeNull()
+  })
+
   it('is the newest assistant message, even with a user message after it', () => {
     // The log can put a user message behind a reply that has already opened —
     // a second submission, or an echo landing after its own `message-started`.

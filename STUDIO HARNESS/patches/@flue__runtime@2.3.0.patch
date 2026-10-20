@@ -438,7 +438,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  		revert: (submissionId) => submissions.revertJoiningSubmission(attempt, submissionId),
  		listUnresolved: () => submissions.listJoinedSubmissions(attempt.submissionId)
 diff --git a/dist/dispatch-t-UmrrMW.mjs b/dist/dispatch-t-UmrrMW.mjs
-index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef91140402 100644
+index 7274a8ed2f7a693bcf089743c29c847f079037c2..c66fe099e939ea57ccfb0745f652df01eab7addf 100644
 --- a/dist/dispatch-t-UmrrMW.mjs
 +++ b/dist/dispatch-t-UmrrMW.mjs
 @@ -1,7 +1,7 @@
@@ -532,7 +532,7 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  }
  function isToolBatchAssistant(message) {
  	return message.stopReason === "toolUse" || (message.stopReason === "length" || message.stopReason === "stop") && message.content.some((block) => block.type === "toolCall");
-@@ -2424,22 +2431,44 @@ function supersededAssistantErrorEntryIds(conversation) {
+@@ -2424,22 +2431,47 @@ function supersededAssistantErrorEntryIds(conversation) {
  function projectConversationUi(conversation, streamOffset) {
  	const messages = [];
  	const byId = /* @__PURE__ */ new Map();
@@ -560,6 +560,9 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
 -		const projected = projectCompletedMessage(entry, supersededErrors.has(entry.id));
 +		const projected = projectCompletedMessage(entry);
  		if (projected) {
++			// [project-studio patch] A user correction splits the visible response,
++			// even when execution continues under the original submission.
++			if (projected.role === "user") responseBySubmission.clear();
  			if (projected.role === "assistant" && projected.submissionId) {
 +				// [project-studio patch] Failed attempts remain separate witnesses
 +				// of retries; a successful tool loop still forms one response.
@@ -583,7 +586,7 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  			}
  			messages.push(projected);
  			byId.set(projected.id, projected);
-@@ -2486,7 +2515,8 @@ function projectConversationUi(conversation, streamOffset) {
+@@ -2486,7 +2518,8 @@ function projectConversationUi(conversation, streamOffset) {
  	return {
  		conversationId: conversation.conversationId,
  		streamOffset,
@@ -593,7 +596,7 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  	};
  }
  /**
-@@ -2668,6 +2698,9 @@ function projectAgentConversationSnapshot(state) {
+@@ -2668,6 +2701,9 @@ function projectAgentConversationSnapshot(state) {
  		conversationId: conversation.conversationId,
  		offset: ui.streamOffset,
  		messages: ui.messages,
@@ -603,7 +606,94 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  		settlements: projectSettlements(state, conversation.conversationId)
  	};
  }
-@@ -2886,6 +2919,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
+@@ -2695,15 +2731,15 @@ function projectLiveMessageTargets(state) {
+ 	if (!conversation) return targets;
+ 	const settled = new Set(projectSettlements(state, conversation.conversationId).map((entry) => entry.submissionId));
+ 	const responseIds = buildResponseMessageIndex(conversation);
+-	for (const [submissionId, messageId] of responseIds) if (!settled.has(submissionId)) targets.add(messageId);
++	for (const [submissionId, messageId] of responseIds.bySubmission) if (!settled.has(submissionId)) targets.add(messageId);
+ 	for (const message of conversation.inProgressMessages.values()) {
+ 		targets.add(message.messageId);
+-		const response = message.submissionId ? responseIds.get(message.submissionId) : void 0;
++		const response = responseIds.byMessage.get(message.messageId);
+ 		if (response) targets.add(response);
+ 	}
+ 	if (hasUncommittedToolBatchAtLeaf(conversation) && conversation.activeLeafId) {
+ 		const leaf = conversation.entries.get(conversation.activeLeafId);
+-		const response = leaf?.type === "message" && leaf.submissionId ? responseIds.get(leaf.submissionId) : void 0;
++		const response = leaf?.type === "message" ? responseIds.byMessage.get(leaf.id) : void 0;
+ 		targets.add(response ?? conversation.activeLeafId);
+ 	}
+ 	return targets;
+@@ -2726,24 +2762,31 @@ function projectAgentConversationBatch(options) {
+ 	return withPositions(relevant.flatMap((record) => encodeRecord(record, conversationId, options.state, responseIds)), options.batchOrdinal);
+ }
+ /**
+-* Map each tracked submission to its response message id — the first
+-* assistant messageId recorded for the submission. Chunk encoding rewrites
+-* every assistant-scoped record onto this id so the live stream assembles the
+-* same one-message-per-response shape the snapshot projection produces (a
+-* later step's `message-started` then dedupes client-side and its parts
+-* accumulate on the open message).
++* Group assistant steps within a submission until a user message intervenes.
++* Keep both the latest group per submission and every message's original group:
++* live deltas and replay must agree with the snapshot without moving earlier
++* content across a correction.
+ */
+ function buildResponseMessageIndex(conversation) {
+ 	const first = /* @__PURE__ */ new Map();
++	const byMessage = /* @__PURE__ */ new Map();
++	const bySubmission = /* @__PURE__ */ new Map();
+ 	for (const entry of getActiveConversationPath(conversation)) {
++		// [project-studio patch] Preserve each message's group across later
++		// corrections so replay never redirects earlier deltas into a new group.
++		if (entry.type === "message" && entry.message.role === "user") first.clear();
+ 		if (entry.type !== "message" || entry.message.role !== "assistant" || !entry.submissionId) continue;
+ 		if (!first.has(entry.submissionId)) first.set(entry.submissionId, entry.id);
++		byMessage.set(entry.id, first.get(entry.submissionId));
++		bySubmission.set(entry.submissionId, first.get(entry.submissionId));
+ 	}
+ 	for (const message of conversation.inProgressMessages.values()) {
+-		if (!message.submissionId || first.has(message.submissionId)) continue;
+-		first.set(message.submissionId, message.messageId);
++		if (!message.submissionId) continue;
++		const response = message.parentId === conversation.activeLeafId ? first.get(message.submissionId) : void 0;
++		byMessage.set(message.messageId, response ?? message.messageId);
++		bySubmission.set(message.submissionId, response ?? message.messageId);
+ 	}
+-	return first;
++	return { byMessage, bySubmission };
+ }
+ /**
+ * Stamp each chunk with its position within the batch. Index is the chunk's
+@@ -2769,7 +2812,7 @@ function requiresSnapshotReset(record, state) {
+ 	return getActiveConversationPath(conversation).some((entry) => entry.type === "message" && entry.message.role === "assistant" && entry.submissionId === record.submissionId && superseded.has(entry.id));
+ }
+ function encodeRecord(record, conversationId, state, responseIds) {
+-	const uiMessageId = (messageId) => (record.submissionId ? responseIds.get(record.submissionId) : void 0) ?? messageId;
++	const uiMessageId = (messageId) => responseIds.byMessage.get(messageId) ?? messageId;
+ 	switch (record.type) {
+ 		case "user_message": return [{
+ 			type: "message-appended",
+@@ -2832,7 +2875,7 @@ function encodeRecord(record, conversationId, state, responseIds) {
+ 			...record.timestamp ? { timestamp: record.timestamp } : {}
+ 		}];
+ 		case "message_metadata": {
+-			const messageId = record.submissionId ? responseIds.get(record.submissionId) : void 0;
++			const messageId = record.submissionId ? responseIds.bySubmission.get(record.submissionId) : void 0;
+ 			return messageId ? [{
+ 				type: "message-metadata",
+ 				conversationId,
+@@ -2841,7 +2884,7 @@ function encodeRecord(record, conversationId, state, responseIds) {
+ 			}] : [];
+ 		}
+ 		case "message_data_write": {
+-			const messageId = record.submissionId ? responseIds.get(record.submissionId) : void 0;
++			const messageId = record.submissionId ? responseIds.bySubmission.get(record.submissionId) : void 0;
+ 			return messageId ? [{
+ 				type: "data-part",
+ 				conversationId,
+@@ -2886,6 +2929,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
  			if (assistant?.type !== "message" || assistant.message.role !== "assistant") return [];
  			return assistant.message.content.flatMap((block) => block.type === "toolCall" ? encodeToolResultEntry(conversation, record.assistantMessageId, block.id, conversationId) : []);
  		}
@@ -633,7 +723,7 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  		case "submission_settled": {
  			const answeredBy = typeof record.attemptId === "string" ? assistantSubmissionByAttempt(state).get(record.attemptId) : void 0;
  			return [{
-@@ -3182,10 +3238,25 @@ function assertThinkingLevel(value, label) {
+@@ -3182,10 +3248,25 @@ function assertThinkingLevel(value, label) {
  function assertCompaction(definition, label) {
  	if (definition === void 0 || definition === false) return;
  	if (typeof definition !== "object" || definition === null || Array.isArray(definition)) throw new Error(`[flue] ${label} compaction must be a configuration object or \`false\`.`);
@@ -660,7 +750,7 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  }
  function assertDurability(definition, label) {
  	if (definition === void 0) return;
-@@ -3226,6 +3297,7 @@ const DeliveredAttachmentSchema = v.variant("type", [DeliveredImageAttachmentSch
+@@ -3226,6 +3307,7 @@ const DeliveredAttachmentSchema = v.variant("type", [DeliveredImageAttachmentSch
  const DeliveredUserMessageSchema = v.object({
  	kind: v.literal("user"),
  	body: v.string(),
@@ -668,7 +758,7 @@ index 7274a8ed2f7a693bcf089743c29c847f079037c2..b33e7835b8bf91674bbc08b2bbb1ffef
  	attachments: v.optional(v.array(DeliveredAttachmentSchema))
  });
  const DeliveredSignalMessageSchema = v.object({
-@@ -3921,6 +3993,32 @@ async function getAgentInstance(agent, id) {
+@@ -3921,6 +4003,32 @@ async function getAgentInstance(agent, id) {
  	return readInstanceInfoFromStream(rt.conversationStreamStore, name, id);
  }
  /**
