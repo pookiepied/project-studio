@@ -23,7 +23,8 @@ vi.mock('@tauri-apps/plugin-autostart', () => ({
   disable: async () => undefined,
 }))
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: async () => null }))
+const native = vi.hoisted(() => ({ invoke: vi.fn(async (..._args: unknown[]) => 'ABC234') }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke: native.invoke }))
 
 vi.mock('@/platform/tauri', () => ({ isTauri: () => true }))
 
@@ -37,6 +38,13 @@ beforeEach(() => {
 })
 
 describe('the remembered switch', () => {
+  it('distinguishes reading a pairing code from explicit renewal', async () => {
+    const remote = await freshModule()
+    await remote.readPairingCode()
+    expect(native.invoke).toHaveBeenLastCalledWith('remote_pairing_code', { renew: false })
+    await remote.readPairingCode(true)
+    expect(native.invoke).toHaveBeenLastCalledWith('remote_pairing_code', { renew: true })
+  })
   it('is off until something was stored', async () => {
     const remote = await freshModule()
     expect(await remote.loadRemoteAccessPreference()).toBe(false)

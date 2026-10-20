@@ -1,5 +1,25 @@
 # Studio observability implementation tracker
 
+## Other-device pairing follow-up (2026-10-20)
+
+Pairing renewal uses the existing `remote_pairing_code` command with an optional
+renewal flag; no new native command or HTTP route is added. The existing command
+arrival registry remains applicable and does not claim command completion.
+QR submission uses the existing pairing endpoint, retains native authentication
+and verifies cookie acceptance before mounting the workspace. The code travels
+in a URL fragment removed before requests; no credential, code, raw user-agent
+or URL content is added to diagnostics. Device IDs remain unchanged; restored
+revocation channels retain the original device identity. Storage failures remain
+product failures rather than successful pairing/removal. UI refreshes do not
+replay failed pairing submissions. Existing remote HTTP observation gaps and
+capture policy are unchanged. Regression evidence and review limitations are in
+`report/other-device-pairing.md`.
+The sequential root gate passed 2,567 harness tests (28 skipped) and 1,602 client
+tests. Serial native library checks passed 154 tests, excluding the existing
+real-keyring self-test; Clippy with warnings denied, the production frontend
+build and the embedded desktop debug build passed. No physical remote-device
+verification or new diagnostic collection coverage is claimed.
+
 ## Steering transcript ordering follow-up (2026-10-20)
 
 The runtime's UI projection now splits assistant display groups at user messages,

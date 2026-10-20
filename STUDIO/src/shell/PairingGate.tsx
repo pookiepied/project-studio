@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { StudioMark } from '@/components/brand'
@@ -44,7 +44,7 @@ import { isTauri } from '@/platform/tauri'
 type Answer =
   | { kind: 'asking' }
   /** The page was served by Studio's listener, paired or not. */
-  | { kind: 'listener'; paired: boolean }
+  | { kind: 'listener'; paired: boolean; refusal?: string }
   /** The page was served by something else: `vite dev`, a static host. */
   | { kind: 'elsewhere' }
 
@@ -55,22 +55,45 @@ export function PairingGate({ children }: { children: ReactNode }) {
 
 function BrowserGate({ children }: { children: ReactNode }) {
   const [answer, setAnswer] = useState<Answer>({ kind: 'asking' })
+  const opening = useRef<Promise<Answer> | null>(null)
 
   useEffect(() => {
     let live = true
-    void readPairingState().then((paired) => {
-      if (live) setAnswer(answerFrom(paired))
+    // Keep one submission across StrictMode's effect replay: codes work once.
+    opening.current ??= openBrowser()
+    void opening.current.then((result) => {
+      if (live) setAnswer(result)
     })
     return () => {
       live = false
     }
   }, [])
 
+  const admitted = answer.kind === 'listener' && answer.paired
+  useEffect(() => {
+    if (!admitted) return
+    let live = true
+    const check = () => {
+      void readPairingState().then((paired) => {
+        if (live && paired === false) setAnswer({ kind: 'listener', paired: false })
+      })
+    }
+    const timer = window.setInterval(check, 4_000)
+    window.addEventListener('focus', check)
+    return () => {
+      live = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
+  }, [admitted])
+
   /** Asked again once a pairing code is accepted, below. */
   const askAgain = () => {
     setAnswer({ kind: 'asking' })
     void readPairingState().then((paired) => {
-      setAnswer(answerFrom(paired))
+      setAnswer(paired === true
+        ? { kind: 'listener', paired: true }
+        : { kind: 'listener', paired: false, refusal: 'Studio could not confirm pairing. Allow cookies and try a new code.' })
     })
   }
 
@@ -85,13 +108,38 @@ function BrowserGate({ children }: { children: ReactNode }) {
     )
   }
   if (answer.kind === 'listener' && !answer.paired) {
-    return <PairingScreen onPaired={askAgain} />
+    return <PairingScreen onPaired={askAgain} initialRefusal={answer.refusal} />
   }
   return <>{children}</>
 }
 
 function answerFrom(paired: boolean | null): Answer {
   return paired === null ? { kind: 'elsewhere' } : { kind: 'listener', paired }
+}
+
+async function openBrowser(): Promise<Answer> {
+  const fragment = new URLSearchParams(window.location.hash.slice(1))
+  const code = fragment.get('pair')
+  if (code !== null) {
+    fragment.delete('pair')
+    const rest = fragment.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`)
+  }
+  const paired = await readPairingState()
+  if (paired === null && code) return { kind: 'listener', paired: false, refusal: UNREACHABLE }
+  if (paired !== false || !code) return answerFrom(paired)
+  try {
+    const response = await fetch(SUBMIT_ROUTE, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+    if (!response.ok) return { kind: 'listener', paired: false, refusal: await refusalOf(response) }
+    if (await readPairingState() === true) return { kind: 'listener', paired: true }
+    return { kind: 'listener', paired: false, refusal: 'Allow cookies for Studio, then scan a new code.' }
+  } catch {
+    return { kind: 'listener', paired: false, refusal: UNREACHABLE }
+  }
 }
 
 /** The one route a device may pair itself through, on this page's origin. */
@@ -113,9 +161,9 @@ const UNREACHABLE =
  * lets the app through, and everything below mounts for the first time as a
  * paired device. A reload would boot the same tree the long way round.
  */
-function PairingScreen({ onPaired }: { onPaired: () => void }) {
+function PairingScreen({ onPaired, initialRefusal }: { onPaired: () => void; initialRefusal?: string }) {
   const [code, setCode] = useState('')
-  const [refusal, setRefusal] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<string | null>(initialRefusal ?? null)
   const [busy, setBusy] = useState(false)
 
   const submit = () => {
@@ -175,7 +223,7 @@ function PairingScreen({ onPaired }: { onPaired: () => void }) {
       {/* The listener's own sentence, verbatim: it writes these in the app's
           voice, and a second wording here would make two sources of the one
           truth. */}
-      {refusal !== null ? <p className="max-w-[60ch] text-ui text-danger">{refusal}</p> : null}
+      {refusal !== null ? <p role="alert" className="max-w-[60ch] break-words text-ui text-danger">{refusal}</p> : null}
     </div>
   )
 }

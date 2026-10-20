@@ -8,7 +8,7 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * It replaces the webview's own, which offers Back, Reload, View Source and
  * Inspect — commands from a document viewer, in an app with no address bar,
  * several of which do visible damage. `suppressWebviewChrome` blocks that menu
- * in every environment; this is what appears instead, styled like the rest of
+ * in desktop windows; this is what appears instead, styled like the rest of
  * the app and carrying app-native verbs.
  *
  * The contents change with what is under the pointer. In a text field it is

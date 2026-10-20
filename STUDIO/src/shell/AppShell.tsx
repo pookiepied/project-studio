@@ -21,6 +21,7 @@ import { useRail } from '@/stores/rail'
 import { useWorkspace } from '@/stores/workspace'
 import { Icons } from '@/components/icons'
 import { cn } from '@/lib/cn'
+import { isTauri } from '@/platform/tauri'
 
 /** The page handover, re-read from the move at play time (`surfaceVariants` explains why). */
 const SURFACE_VARIANTS = surfaceVariants()
@@ -327,12 +328,12 @@ export function AppShell() {
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
-      <ActionsMenu />
+      {isTauri() ? <ActionsMenu /> : null}
       {/* The same actions, offered the moment text is selected rather than
           after a right-click. Mounted beside `ActionsMenu` because the two
           share their verbs (`ActionItems`) and hand off to each other — a
           right-click closes this one; this one never opens over that one. */}
-      <SelectionMenu />
+      {isTauri() ? <SelectionMenu /> : null}
       </VoiceModeProvider>
     </div>
   )

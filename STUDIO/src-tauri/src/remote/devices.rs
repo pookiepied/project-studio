@@ -151,11 +151,16 @@ impl Devices {
             );
         }
 
+        // Restored cookies need the same revocation channel as newly paired ones.
+        let live = devices.keys().map(|id| {
+            let (sender, _) = watch::channel(false);
+            (id.clone(), sender)
+        }).collect();
         Devices {
             store,
             inner: Mutex::new(Inner {
                 devices,
-                live: HashMap::new(),
+                live,
             }),
         }
     }
@@ -188,20 +193,17 @@ impl Devices {
             last_seen_ms: now_ms,
         };
 
+        let mut inner = self.lock();
         self.persist_raw(&id, &record_snapshot(&record))?;
-        {
-            let mut inner = self.lock();
-            inner.devices.insert(id.clone(), record.clone());
-            let (sender, _) = watch::channel(false);
-            inner.live.insert(id.clone(), sender);
+        let mut ids: Vec<String> = inner.devices.keys().cloned().collect();
+        ids.push(id.clone());
+        if let Err(error) = self.write_index(ids) {
+            let _ = self.store.remove(&record_account(&id));
+            return Err(error);
         }
-        if let Err(error) = self.write_index() {
-            // The record is stored and the device is admitted; a failed index
-            // write means the device disappears at the next launch. Logged,
-            // because the person would otherwise see a device they paired
-            // vanish without a trace.
-            log::warn!("Remote access: could not update the device index: {error}");
-        }
+        inner.devices.insert(id.clone(), record);
+        let (sender, _) = watch::channel(false);
+        inner.live.insert(id.clone(), sender);
         log::info!("Remote access: paired a device ({id})");
 
         Ok(PairedDevice {
@@ -287,47 +289,35 @@ impl Devices {
         let Some(record) = inner.devices.get_mut(id) else {
             return Err("no such device.".to_owned());
         };
-        record.name = clean_name(name);
-        let snapshot = record_snapshot(record);
-        self.persist_raw(id, &snapshot)
+        let mut updated = record.clone();
+        updated.name = clean_name(name);
+        self.persist_raw(id, &record_snapshot(&updated))?;
+        *record = updated;
+        Ok(())
     }
 
     /// Removes a device, answering whether there was one to remove.
     ///
-    /// The order matters and is deliberate: memory first, signal second,
-    /// stored record third, index last. Refusal happens in memory before
-    /// anything else, so a removal that fails part-way still leaves the
-    /// device unable to talk; a failed index write is worse — it leaves the
-    /// device listed until the next mutation — but never leaves it able to
-    /// connect, because admission reads memory, not the store.
+    /// Persist the index exclusion before confirming removal. Then close live
+    /// requests and delete the now-unreferenced record on a best-effort basis.
     pub(crate) fn revoke(&self, id: &str) -> Result<bool, String> {
-        let name = {
-            let mut inner = self.lock();
-            let Some(record) = inner.devices.remove(id) else {
-                return Ok(false);
-            };
-            if let Some(sender) = inner.live.remove(id) {
-                let _ = sender.send(true);
-            }
-            record.name
-        };
-
-        if let Err(error) = self.store.remove(&record_account(id)) {
-            // Inert if it survives: nothing admits it again, because memory
-            // is the working set and the index no longer names it.
-            log::warn!("Remote access: could not delete a stored device record: {error}");
-        }
-        if let Err(error) = self.write_index() {
-            log::warn!("Remote access: could not update the device index: {error}");
-        }
-        log::info!("Remote access: removed a device ({id}), was '{}'", name);
+        let mut inner = self.lock();
+        if !inner.devices.contains_key(id) { return Ok(false); }
+        // Persist the exclusion first. A failed write leaves a visible device
+        // the person can retry, rather than a successful removal that revives.
+        self.write_index(inner.devices.keys().filter(|key| key.as_str() != id).cloned().collect())?;
+        inner.devices.remove(id);
+        if let Some(sender) = inner.live.remove(id) { let _ = sender.send(true); }
+        let _ = self.store.remove(&record_account(id));
+        log::info!("Remote access: removed a device ({id})");
         Ok(true)
     }
 
     /// Removes every device. Answers with how many there were.
-    pub(crate) fn revoke_all(&self) -> usize {
+    pub(crate) fn revoke_all(&self) -> Result<usize, String> {
         let ids: Vec<String> = {
             let mut inner = self.lock();
+            self.write_index(Vec::new())?;
             for (_, sender) in inner.live.drain() {
                 let _ = sender.send(true);
             }
@@ -342,11 +332,8 @@ impl Devices {
             inner.devices.clear();
             ids
         };
-        if let Err(error) = self.write_index() {
-            log::warn!("Remote access: could not update the device index: {error}");
-        }
         log::info!("Remote access: removed {} device(s)", ids.len());
-        ids.len()
+        Ok(ids.len())
     }
 
     fn persist_raw(&self, id: &str, record: &StoredRecord) -> Result<(), String> {
@@ -355,14 +342,9 @@ impl Devices {
         self.store.write(&record_account(id), &text)
     }
 
-    /// Writes the index from what is currently held in memory.
-    fn write_index(&self) -> Result<(), String> {
-        let ids: Vec<String> = {
-            let inner = self.lock();
-            let mut ids: Vec<String> = inner.devices.keys().cloned().collect();
-            ids.sort();
-            ids
-        };
+    /// Writes the prospective index while the caller holds the device lock.
+    fn write_index(&self, mut ids: Vec<String>) -> Result<(), String> {
+        ids.sort();
         let text = serde_json::to_string(&ids)
             .map_err(|_| "the device index could not be serialised.".to_owned())?;
         self.store.write(INDEX_ACCOUNT, &text)
@@ -472,6 +454,65 @@ pub(crate) fn now_ms() -> u64 {
 mod tests {
     use super::*;
 
+    struct FailingStore {
+        backing: Box<dyn SecretStore>,
+        fail_write: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        fail_delete: bool,
+        index_only: bool,
+    }
+
+    impl SecretStore for FailingStore {
+        fn read(&self, account: &str) -> Result<Option<String>, String> { self.backing.read(account) }
+        fn write(&self, account: &str, value: &str) -> Result<(), String> {
+            if self.fail_write.load(std::sync::atomic::Ordering::SeqCst) && (!self.index_only || account == INDEX_ACCOUNT) {
+                Err("The credential store refused the write.".to_owned())
+            } else { self.backing.write(account, value) }
+        }
+        fn remove(&self, account: &str) -> Result<(), String> {
+            if self.fail_delete { Err("The credential store refused the delete.".to_owned()) }
+            else { self.backing.remove(account) }
+        }
+    }
+
+    #[test]
+    fn persistence_failures_are_reported_and_do_not_fake_device_changes() {
+        let store = memory_store();
+        let failed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let devices = Devices::open(Box::new(FailingStore { backing: store.handle(), fail_write: failed.clone(), fail_delete: true, index_only: false }));
+        let paired = devices.pair("Phone", 1_000).unwrap();
+        let id = the_only_device(&devices);
+        let signal = devices.authorize(&paired.cookie, 1_100).unwrap();
+        failed.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(devices.rename(&id, "Changed").is_err());
+        assert_eq!(devices.list()[0].name, "Phone");
+        assert!(devices.revoke(&id).is_err());
+        assert!(devices.revoke_all().is_err());
+        assert!(!*signal.borrow());
+        assert_eq!(devices.list().len(), 1);
+        failed.store(false, std::sync::atomic::Ordering::SeqCst);
+        devices.revoke(&id).unwrap();
+        assert!(*signal.borrow());
+        // Even if record deletion fails, the persisted index excludes it.
+        let restored = Devices::open(store.handle());
+        assert!(restored.list().is_empty());
+        assert!(restored.authorize(&paired.cookie, 2_000).is_err());
+    }
+
+    #[test]
+    fn pairing_does_not_succeed_when_the_index_cannot_be_written() {
+        let store = memory_store();
+        let devices = Devices::open(Box::new(FailingStore {
+            backing: store.handle(),
+            fail_write: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            fail_delete: false,
+            index_only: true,
+        }));
+        assert!(devices.pair("Phone", 1_000).is_err());
+        assert!(devices.list().is_empty());
+        assert!(store.entries().is_empty(), "the unindexed record must be cleaned up");
+        assert!(Devices::open(store.handle()).list().is_empty());
+    }
+
     /// An empty store, for the tests that need only one Devices. The double
     /// itself lives beside the trait, since the gate's suites need it too.
     fn memory_store() -> crate::remote::secret_store::MemorySecretStore {
@@ -545,7 +586,7 @@ mod tests {
         let signal_a = devices.authorize(&a.cookie, 1_100).unwrap();
         let signal_b = devices.authorize(&b.cookie, 2_100).unwrap();
 
-        assert_eq!(devices.revoke_all(), 2);
+        assert_eq!(devices.revoke_all().unwrap(), 2);
         assert!(*signal_a.borrow());
         assert!(*signal_b.borrow());
         assert!(devices.list().is_empty());
@@ -556,9 +597,10 @@ mod tests {
     #[test]
     fn devices_survive_a_relaunch_of_the_process() {
         let store = memory_store();
+        let cookie;
         {
             let first = Devices::open(store.handle());
-            first.pair("Living-room tablet", 1_000).unwrap();
+            cookie = first.pair("Living-room tablet", 1_000).unwrap().cookie;
             let id = the_only_device(&first);
             first
                 .rename(&id, "Kitchen tablet")
@@ -571,6 +613,12 @@ mod tests {
         assert_eq!(devices.len(), 1);
         assert_eq!(devices[0].name, "Kitchen tablet");
         assert_eq!(devices[0].paired_at_ms, 1_000);
+        let signal = second.authorize(&cookie, 2_000).expect("restored cookie must still admit");
+        second.revoke(&devices[0].id).unwrap();
+        assert!(*signal.borrow());
+        assert!(second.authorize(&cookie, 3_000).is_err());
+        let third = Devices::open(store.handle());
+        assert!(third.authorize(&cookie, 4_000).is_err());
     }
 
     #[test]

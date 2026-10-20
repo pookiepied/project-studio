@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { StrictMode } from 'react'
 
 import { PairingGate } from './PairingGate'
 
@@ -44,6 +45,8 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
+  window.history.replaceState(null, '', '/')
 })
 
 function renderGate() {
@@ -55,6 +58,76 @@ function renderGate() {
 }
 
 describe('PairingGate', () => {
+  it('returns a revoked browser to pairing on focus', async () => {
+    isTauri.mockReturnValue(false)
+    readPairingState.mockResolvedValueOnce(true).mockResolvedValue(false)
+    renderGate()
+    expect(await screen.findByText('the studio')).toBeTruthy()
+    fireEvent.focus(window)
+    expect(await screen.findByText('Pair this device')).toBeTruthy()
+    expect(screen.queryByText('the studio')).toBeNull()
+  })
+
+  it('returns a revoked browser to pairing on its status poll', async () => {
+    vi.useFakeTimers()
+    isTauri.mockReturnValue(false)
+    readPairingState.mockResolvedValueOnce(true).mockResolvedValue(false)
+    renderGate()
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByText('the studio')).toBeTruthy()
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_000) })
+    expect(screen.getByText('Pair this device')).toBeTruthy()
+    expect(screen.queryByText('the studio')).toBeNull()
+  })
+
+  it('keeps the browser gated when a successful QR POST did not store its cookie', async () => {
+    isTauri.mockReturnValue(false)
+    readPairingState.mockResolvedValue(false)
+    window.history.replaceState(null, '', '/#pair=ABC234')
+    fetchMock.mockResolvedValue(aResponse({ ok: true, status: 200, json: { paired: true } }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderGate()
+    expect(await screen.findByText(/Allow cookies for Studio/)).toBeTruthy()
+    expect(screen.queryByText('the studio')).toBeNull()
+  })
+  it('submits a QR code once in StrictMode and removes it from the URL', async () => {
+    isTauri.mockReturnValue(false)
+    readPairingState.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    window.history.replaceState(null, '', '/?view=chat#pair=ABC234')
+    fetchMock.mockImplementation(async () => {
+      expect(window.location.hash).toBe('')
+      return aResponse({ ok: true, status: 200, json: { paired: true } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<StrictMode><PairingGate><div>the studio</div></PairingGate></StrictMode>)
+    expect(await screen.findByText('the studio')).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith('/api/pairing', expect.objectContaining({ body: JSON.stringify({ code: 'ABC234' }) }))
+    expect(window.location.search).toBe('?view=chat')
+  })
+
+  it('keeps an expired QR on the pairing screen with manual entry available', async () => {
+    isTauri.mockReturnValue(false)
+    readPairingState.mockResolvedValue(false)
+    window.history.replaceState(null, '', '/#pair=OLD234')
+    fetchMock.mockResolvedValue(aResponse({ ok: false, status: 401, json: { error: 'Use a new code.' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderGate()
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Use a new code.')
+    expect(screen.getByLabelText('Pairing code')).toBeTruthy()
+    expect(screen.queryByText('the studio')).toBeNull()
+  })
+
+  it('does not consume a QR when the browser is already paired', async () => {
+    isTauri.mockReturnValue(false)
+    readPairingState.mockResolvedValue(true)
+    window.history.replaceState(null, '', '/#pair=ABC234')
+    vi.stubGlobal('fetch', fetchMock)
+    renderGate()
+    expect(await screen.findByText('the studio')).toBeTruthy()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(window.location.hash).toBe('')
+  })
   it('in Tauri is a pass-through and never asks', () => {
     isTauri.mockReturnValue(true)
     renderGate()

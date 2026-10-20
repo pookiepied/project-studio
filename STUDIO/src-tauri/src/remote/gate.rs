@@ -105,6 +105,9 @@ where
     B: hyper::body::Body<Data = bytes::Bytes> + Send + 'static,
     B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
+    if authorize_request(request.headers(), devices).is_ok() {
+        return json_response(StatusCode::OK, serde_json::json!({ "paired": true }));
+    }
     let now = std::time::Instant::now();
     // The rate limit comes before anything else, and every attempt counts —
     // see `pairing::AttemptLimiter` for why refusals count too.
@@ -225,23 +228,37 @@ fn device_name_from(user_agent: Option<&HeaderValue>) -> String {
     let Some(ua) = user_agent.and_then(|value| value.to_str().ok()) else {
         return "Paired device".to_owned();
     };
-    if ua.contains("iPhone") {
-        "iPhone".to_owned()
+    let device = if ua.contains("iPhone") {
+        "iPhone"
     } else if ua.contains("iPad") {
-        "iPad".to_owned()
+        "iPad"
     } else if ua.contains("Android") {
-        "Android device".to_owned()
+        "Android"
     } else if ua.contains("CrOS") {
-        "Chromebook".to_owned()
+        "Chromebook"
     } else if ua.contains("Windows") {
-        "Windows PC".to_owned()
+        "Windows PC"
     } else if ua.contains("Macintosh") || ua.contains("Mac OS") {
-        "Mac".to_owned()
+        "Mac"
     } else if ua.contains("Linux") {
-        "Linux device".to_owned()
+        "Linux"
     } else {
-        "Paired device".to_owned()
-    }
+        "device"
+    };
+    let browser = if ua.contains("Edg/") || ua.contains("EdgA/") || ua.contains("EdgiOS/") {
+        "Edge"
+    } else if ua.contains("OPR/") || ua.contains("OPiOS/") {
+        "Opera"
+    } else if ua.contains("Firefox/") || ua.contains("FxiOS/") {
+        "Firefox"
+    } else if ua.contains("Chrome/") || ua.contains("CriOS/") {
+        "Chrome"
+    } else if ua.contains("Safari/") {
+        "Safari"
+    } else {
+        "Browser"
+    };
+    format!("{browser} on {device}")
 }
 
 fn json_response(status: StatusCode, body: serde_json::Value) -> Response<RemoteBody> {
@@ -250,6 +267,7 @@ fn json_response(status: StatusCode, body: serde_json::Value) -> Response<Remote
     response
         .headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    response.headers_mut().insert("cache-control", HeaderValue::from_static("no-store"));
     response
 }
 
@@ -334,19 +352,19 @@ mod tests {
             device_name_from(Some(&HeaderValue::from_static(
                 "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
             ))),
-            "iPhone"
+            "Browser on iPhone"
         );
         assert_eq!(
             device_name_from(Some(&HeaderValue::from_static(
                 "Mozilla/5.0 (Linux; Android 14; Pixel 8)"
             ))),
-            "Android device"
+            "Browser on Android"
         );
         assert_eq!(
             device_name_from(Some(&HeaderValue::from_static(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
             ))),
-            "Windows PC"
+            "Browser on Windows PC"
         );
         assert_eq!(
             device_name_from(None),
@@ -407,6 +425,7 @@ mod tests {
         )
         .await;
         assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get("cache-control").unwrap(), "no-store");
 
         // The cookie the response sets is the credential the device keeps,
         // and it is HttpOnly and SameSite=Strict.
@@ -425,7 +444,37 @@ mod tests {
         let value = cookie.split(';').next().unwrap().split_once('=').unwrap().1;
         assert!(authorize_request(&cookie_header(value), &devices).is_ok());
         // The device it created is on the list, named from its user agent.
-        assert_eq!(devices.list()[0].name, "Android device");
+        assert_eq!(devices.list()[0].name, "Browser on Android");
+    }
+
+    #[tokio::test]
+    async fn an_already_paired_browser_does_not_create_another_device_or_consume_a_code() {
+        let store = crate::remote::secret_store::MemorySecretStore::new();
+        let devices = Devices::open(store.handle());
+        let paired = devices.pair("Phone", now_ms()).unwrap();
+        let pairing_state = pairing();
+        let code = pairing_state.code(std::time::Instant::now(), false);
+        let mut request = submit_request(&code);
+        *request.headers_mut() = cookie_header(&paired.cookie);
+        let response = serve_pairing(&devices, &pairing_state, PairingRoute::Submit,
+            "192.168.1.50".parse().unwrap(), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(devices.list().len(), 1);
+        assert!(pairing_state.consume(&code, std::time::Instant::now()));
+    }
+
+    #[test]
+    fn browser_labels_distinguish_browser_families_before_chromium() {
+        for (agent, expected) in [
+            ("Windows Chrome/128 Safari/537 Edg/128", "Edge on Windows PC"),
+            ("Windows Chrome/128 Safari/537 OPR/114", "Opera on Windows PC"),
+            ("Windows Chrome/128 Safari/537", "Chrome on Windows PC"),
+            ("iPhone CriOS/128 Safari/604", "Chrome on iPhone"),
+            ("Macintosh Version/18 Safari/605", "Safari on Mac"),
+            ("Linux Firefox/132", "Firefox on Linux"),
+        ] {
+            assert_eq!(device_name_from(Some(&HeaderValue::from_static(agent))), expected);
+        }
     }
 
     #[tokio::test]

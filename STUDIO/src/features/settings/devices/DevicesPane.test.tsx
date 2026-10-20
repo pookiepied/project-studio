@@ -26,6 +26,10 @@ const desktop = vi.hoisted(() => ({
   code: 'ABC234',
   devices: [] as { id: string; name: string; pairedAtMs: number; lastSeenMs: number }[],
   preference: null as boolean | null,
+  codeRefusal: null as string | null,
+  renewDelay: null as Promise<void> | null,
+  renewCalls: 0,
+  mutationRefusal: null as string | null,
 }))
 
 vi.mock('@/platform/remote-access', () => ({
@@ -39,7 +43,15 @@ vi.mock('@/platform/remote-access', () => ({
   },
   readRemoteAccessStatus: async () => desktop.address,
   readRemoteAddresses: async () => (desktop.address === null ? null : desktop.addresses),
-  readPairingCode: async () => (desktop.address === null ? null : desktop.code),
+  readPairingCode: async (renew = false) => {
+    if (desktop.codeRefusal) throw new Error(desktop.codeRefusal)
+    if (renew) {
+      ++desktop.renewCalls
+      await desktop.renewDelay
+      desktop.code = 'NEW567'
+    }
+    return desktop.address === null ? null : desktop.code
+  },
   listPairedDevices: async () => desktop.devices,
   renamePairedDevice: async (id: string, name: string) => {
     desktop.devices = desktop.devices.map((device) =>
@@ -47,6 +59,7 @@ vi.mock('@/platform/remote-access', () => ({
     )
   },
   revokePairedDevice: async (id: string) => {
+    if (desktop.mutationRefusal) throw new Error(desktop.mutationRefusal)
     desktop.devices = desktop.devices.filter((device) => device.id !== id)
   },
   revokeAllPairedDevices: async () => {
@@ -59,6 +72,9 @@ vi.mock('@/platform/remote-access', () => ({
 }))
 
 vi.mock('@/lib/clipboard', () => ({ copyText: async () => true }))
+vi.mock('./QrCode', () => ({
+  QrCode: ({ value, label }: { value: string; label: string }) => <svg role="img" aria-label={label} data-value={value} />,
+}))
 
 function onDesktop() {
   Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true })
@@ -77,10 +93,15 @@ beforeEach(() => {
   desktop.code = 'ABC234'
   desktop.devices = []
   desktop.preference = null
+  desktop.codeRefusal = null
+  desktop.renewDelay = null
+  desktop.renewCalls = 0
+  desktop.mutationRefusal = null
 })
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
 })
 
@@ -121,8 +142,8 @@ describe('DevicesPane', () => {
     // The code carries the raw address, not the name, so a phone that
     // cannot resolve `.local` still lands somewhere.
     expect(
-      screen.getByRole('img', { name: 'QR code for http://192.168.1.47:4747' }),
-    ).not.toBeNull()
+      screen.getByRole('img', { name: 'Scan to pair this device' }).getAttribute('data-value'),
+    ).toBe('http://192.168.1.47:4747/#pair=ABC234')
     // No Tailscale on this machine: no away group, and one quiet line
     // instead of an advertisement.
     expect(screen.queryByText('Away from home')).toBeNull()
@@ -141,6 +162,64 @@ describe('DevicesPane', () => {
     expect(await screen.findByText('http://studio.local')).not.toBeNull()
     // The raw address keeps its port: it is the listener, not the name.
     expect(screen.getByText('http://192.168.1.47:4747')).not.toBeNull()
+  })
+
+  it('renews the code and the QR together only when asked', async () => {
+    onDesktop()
+    render(<DevicesPane />)
+    await turnOn()
+    expect(screen.getByLabelText('Pairing code').textContent).toBe('ABC234')
+    fireEvent.click(screen.getByRole('button', { name: 'New code' }))
+    await waitFor(() => expect(screen.getByLabelText('Pairing code').textContent).toBe('NEW567'))
+    expect(screen.getByRole('img').getAttribute('data-value')).toBe('http://192.168.1.47:4747/#pair=NEW567')
+  })
+
+  it('allows only one renewal while a request is pending', async () => {
+    onDesktop()
+    render(<DevicesPane />)
+    await turnOn()
+    let finish = () => {}
+    desktop.renewDelay = new Promise<void>((resolve) => { finish = resolve })
+    const button = screen.getByRole<HTMLButtonElement>('button', { name: 'New code' })
+    act(() => { fireEvent.click(button); fireEvent.click(button) })
+    expect(button.disabled).toBe(true)
+    expect(desktop.renewCalls).toBe(1)
+    await act(async () => { finish() })
+    expect(screen.getByLabelText('Pairing code').textContent).toBe('NEW567')
+    expect(button.disabled).toBe(false)
+  })
+
+  it('shows a failed removal and keeps the device available to retry', async () => {
+    onDesktop()
+    desktop.devices = [{ id: 'a', name: 'Phone', pairedAtMs: Date.now(), lastSeenMs: Date.now() }]
+    render(<DevicesPane />)
+    await turnOn()
+    desktop.mutationRefusal = 'The credential store refused the write.'
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(await screen.findByText(desktop.mutationRefusal)).toBeTruthy()
+    expect(screen.getByText('Phone')).toBeTruthy()
+  })
+
+  it('refreshes a consumed code on the next poll', async () => {
+    onDesktop()
+    desktop.address = '0.0.0.0:4747'
+    vi.useFakeTimers()
+    render(<DevicesPane />)
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByLabelText('Pairing code').textContent).toBe('ABC234')
+    desktop.code = 'FRESH7'
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_000) })
+    expect(screen.getByLabelText('Pairing code').textContent).toBe('FRESH7')
+  })
+
+  it('shows code renewal failures instead of leaving an apparently valid QR', async () => {
+    onDesktop()
+    render(<DevicesPane />)
+    await turnOn()
+    desktop.codeRefusal = 'The pairing code could not be read.'
+    fireEvent.click(screen.getByRole('button', { name: 'New code' }))
+    expect(await screen.findByText(desktop.codeRefusal)).not.toBeNull()
+    expect(screen.queryByRole('img')).toBeNull()
   })
 
   it('shows the Tailscale name as the away address when the machine has one', async () => {

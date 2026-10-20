@@ -50,10 +50,11 @@ export interface RemoteAccessView {
   readonly addresses: RemoteAddresses | null
   readonly code: string | null
   readonly devices: readonly PairedDevice[]
-  /** The desktop's own sentence when a start refused, until the next attempt. */
+  /** The desktop's own sentence when an operation fails, until the next attempt. */
   readonly failure: string | null
   /** A start or stop is in flight. */
   readonly switching: boolean
+  readonly codeLoading: boolean
 }
 
 export interface RemoteAccessActions {
@@ -72,30 +73,54 @@ export function useRemoteAccess(): RemoteAccessView & RemoteAccessActions {
   const [devices, setDevices] = useState<readonly PairedDevice[]>([])
   const [failure, setFailure] = useState<string | null>(null)
   const [switching, setSwitching] = useState(false)
+  const [codeLoading, setCodeLoading] = useState(false)
   const live = useRef(true)
+  const codeVersion = useRef(0)
+  const codeBusy = useRef(false)
+
+  const readCode = useCallback(async (renew = false) => {
+    if (codeBusy.current) return
+    codeBusy.current = true
+    if (live.current) setCodeLoading(true)
+    if (renew && live.current) setFailure(null)
+    const version = ++codeVersion.current
+    try {
+      const minted = await readPairingCode(renew)
+      if (live.current && version === codeVersion.current) setCode(minted)
+    } catch (error) {
+      if (live.current && version === codeVersion.current) {
+        setCode(null)
+        setFailure(error instanceof Error ? error.message : String(error))
+      }
+    } finally {
+      codeBusy.current = false
+      if (live.current) setCodeLoading(false)
+    }
+  }, [])
 
   const readState = useCallback(async () => {
     const [address, list] = await Promise.all([readRemoteAccessStatus(), listPairedDevices()])
     if (!live.current) return
     setReach(address === null ? 'off' : 'on')
     setDevices(list)
-  }, [])
+    if (address === null) {
+      ++codeVersion.current
+      setCode(null)
+    } else {
+      await readCode()
+    }
+  }, [readCode])
 
   const readAddresses = useCallback(async () => {
     const reading = await readRemoteAddresses()
     if (live.current) setAddresses(reading)
   }, [])
 
-  const readCode = useCallback(async () => {
-    const minted = await readPairingCode()
-    if (live.current) setCode(minted)
-  }, [])
-
   /** Everything, after a switch: the state, the addresses and the code. */
   const readAll = useCallback(async () => {
     await readState()
-    await Promise.all([readAddresses(), readCode()])
-  }, [readAddresses, readCode, readState])
+    await readAddresses()
+  }, [readAddresses, readState])
 
   useEffect(() => {
     live.current = true
@@ -131,6 +156,8 @@ export function useRemoteAccess(): RemoteAccessView & RemoteAccessActions {
     try {
       await stopRemoteAccess()
       await saveRemoteAccessPreference(false)
+    } catch (error) {
+      if (live.current) setFailure(error instanceof Error ? error.message : String(error))
     } finally {
       if (live.current) {
         setSwitching(false)
@@ -143,7 +170,10 @@ export function useRemoteAccess(): RemoteAccessView & RemoteAccessActions {
 
   const rename = useCallback(
     async (id: string, name: string) => {
-      await renamePairedDevice(id, name).catch(() => undefined)
+      setFailure(null)
+      await renamePairedDevice(id, name).catch((error: unknown) => {
+        if (live.current) setFailure(error instanceof Error ? error.message : String(error))
+      })
       await readState()
     },
     [readState],
@@ -151,14 +181,20 @@ export function useRemoteAccess(): RemoteAccessView & RemoteAccessActions {
 
   const remove = useCallback(
     async (id: string) => {
-      await revokePairedDevice(id).catch(() => undefined)
+      setFailure(null)
+      await revokePairedDevice(id).catch((error: unknown) => {
+        if (live.current) setFailure(error instanceof Error ? error.message : String(error))
+      })
       await readState()
     },
     [readState],
   )
 
   const removeAll = useCallback(async () => {
-    await revokeAllPairedDevices().catch(() => undefined)
+    setFailure(null)
+    await revokeAllPairedDevices().catch((error: unknown) => {
+      if (live.current) setFailure(error instanceof Error ? error.message : String(error))
+    })
     await readState()
   }, [readState])
 
@@ -169,9 +205,10 @@ export function useRemoteAccess(): RemoteAccessView & RemoteAccessActions {
     devices,
     failure,
     switching,
+    codeLoading,
     turnOn,
     turnOff,
-    newCode: readCode,
+    newCode: () => readCode(true),
     rename,
     remove,
     removeAll,

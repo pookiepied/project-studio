@@ -80,8 +80,8 @@ function DesktopPane() {
 
       {on ? (
         <>
-          <AddressSection addresses={remote.addresses} />
-          <CodeSection code={remote.code} onNewCode={() => void remote.newCode()} />
+          <AddressSection addresses={remote.addresses} code={remote.code} />
+          <CodeSection code={remote.code} loading={remote.codeLoading} onNewCode={() => void remote.newCode()} />
           <DevicesSection
             devices={remote.devices}
             onRename={(id, name) => void remote.rename(id, name)}
@@ -137,7 +137,7 @@ function Section({
 
 // ---- The address ----------------------------------------------------------
 
-function AddressSection({ addresses }: { addresses: RemoteAddresses | null }) {
+function AddressSection({ addresses, code }: { addresses: RemoteAddresses | null; code: string | null }) {
   if (addresses === null) {
     return (
       <Section title="Address">
@@ -147,14 +147,18 @@ function AddressSection({ addresses }: { addresses: RemoteAddresses | null }) {
   }
 
   const home = addresses.home.map((address) => url(address, addresses.port))
-  const scanned = scannedUrl(addresses)
+  const address = scannedUrl(addresses)
+  // Fragments stay in the browser and are removed before submitting the code.
+  const scanned = address !== null && code !== null
+    ? `${address}/#pair=${encodeURIComponent(code)}`
+    : null
 
   return (
-    <Section title="Address" hint="Scan the code, or type one of these into the browser.">
+    <Section title="Address" hint="Scan to pair automatically, or open an address and enter the pairing code.">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
         {scanned !== null ? (
           <div className="shrink-0 self-start rounded-lg border bg-white p-1.5">
-            <QrCode value={scanned} label={`QR code for ${scanned}`} />
+            <QrCode value={scanned} label="Scan to pair this device" />
           </div>
         ) : null}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -264,11 +268,11 @@ function CopyButton({ text }: { text: string }) {
 
 // ---- The pairing code -----------------------------------------------------
 
-function CodeSection({ code, onNewCode }: { code: string | null; onNewCode: () => void }) {
+function CodeSection({ code, loading, onNewCode }: { code: string | null; loading: boolean; onNewCode: () => void }) {
   return (
     <Section
       title="Pairing code"
-      hint="The other device asks for this after it opens the address. A code works once and expires after five minutes."
+      hint="Enter this when opening an address manually. Scanning pairs automatically. Each code works once and expires after five minutes."
     >
       <div className="flex items-center gap-3">
         <code
@@ -277,7 +281,7 @@ function CodeSection({ code, onNewCode }: { code: string | null; onNewCode: () =
         >
           {code ?? '——————'}
         </code>
-        <Button size="sm" onClick={onNewCode}>
+        <Button size="sm" disabled={loading} onClick={onNewCode}>
           New code
         </Button>
       </div>
@@ -301,11 +305,11 @@ function DevicesSection({
   return (
     <Section
       title="Paired devices"
-      hint="Removing a device signs it out at once; it has to pair again to get back in."
+      hint="Each entry is a browser profile at one address. Tabs share it. Removing it signs that browser out; other browsers or addresses may need their own pairing."
     >
       {devices.length === 0 ? (
         <p className="text-caption text-muted-foreground/80">
-          No devices yet. Scan the code with your phone and enter the pairing code.
+          No devices yet. Scan the QR code with your phone to pair it.
         </p>
       ) : (
         <>

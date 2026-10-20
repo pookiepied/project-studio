@@ -51,6 +51,22 @@ struct Active {
 }
 
 impl PairingState {
+    /// A read keeps a valid code; an explicit renewal always replaces it.
+    pub(crate) fn code(&self, now: Instant, renew: bool) -> String {
+        let mut inner = self.lock();
+        if !renew {
+            if let Some(active) = inner.as_ref().filter(|active| now < active.expires) {
+                return active.code.clone();
+            }
+        }
+        let mut code = generate_code();
+        while inner.as_ref().is_some_and(|active| active.code == code) {
+            code = generate_code();
+        }
+        *inner = Some(Active { code: code.clone(), expires: now + CODE_TTL });
+        code
+    }
+
     /// Mints a fresh code, replacing any previous one.
     ///
     /// Replacing rather than refusing: the desktop screen should always show
@@ -58,16 +74,11 @@ impl PairingState {
     /// or lost the paper they read it onto. The old code was single-use and
     /// short-lived anyway.
     pub(crate) fn mint(&self, now: std::time::Instant) -> String {
-        let code = generate_code();
-        let mut inner = self.lock();
-        *inner = Some(Active {
-            code: code.clone(),
-            expires: now + CODE_TTL,
-        });
-        code
+        self.code(now, true)
     }
 
     /// The code currently shown, if it is still valid.
+    #[cfg(test)]
     pub(crate) fn active(&self, now: std::time::Instant) -> Option<String> {
         let mut inner = self.lock();
         let active = inner.as_mut()?;
@@ -180,6 +191,21 @@ fn generate_code() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_keep_a_code_but_renewal_invalidates_it() {
+        let state = PairingState::default();
+        let now = Instant::now();
+        let first = state.code(now, false);
+        assert_eq!(state.code(now + Duration::from_secs(1), false), first);
+        let renewed = state.code(now + Duration::from_secs(2), true);
+        assert_ne!(first, renewed);
+        assert!(!state.consume(&first, now + Duration::from_secs(3)));
+        assert!(state.consume(&renewed, now + Duration::from_secs(4)));
+        let next = state.code(now + Duration::from_secs(5), false);
+        assert!(state.active(now + Duration::from_secs(5)).is_some());
+        assert_ne!(state.code(now + CODE_TTL + Duration::from_secs(6), false), next);
+    }
 
     fn minute(seconds: u64) -> std::time::Instant {
         std::time::Instant::now() + Duration::from_secs(seconds)

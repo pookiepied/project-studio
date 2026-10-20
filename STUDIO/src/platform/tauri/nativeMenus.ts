@@ -1,3 +1,5 @@
+import { isTauri } from './window'
+
 /**
  * Strip the webview's own chrome.
  *
@@ -9,7 +11,7 @@
  *
  * The two are split on purpose:
  *
- * - The right-click menu is blocked in **every** environment, including dev. A
+ * - The right-click menu is blocked in desktop windows, including dev. A
  *   native menu that offers Inspect or View Source is the one piece of browser
  *   chrome in the window, and showing it alongside `ActionsMenu`'s custom menu
  *   is two menus at once. The custom menu is what the app offers instead.
@@ -20,6 +22,7 @@
  *   exists to stop outside of it.
  */
 export function suppressWebviewChrome(): () => void {
+  if (!isTauri()) return () => {}
   const onContextMenu = (event: MouseEvent) => event.preventDefault()
 
   document.addEventListener('contextmenu', onContextMenu)

@@ -72,12 +72,11 @@ export async function readRemoteAddresses(): Promise<RemoteAddresses | null> {
 }
 
 /**
- * The pairing code to show. Asking replaces a code that was never used and
- * mints one when none is active, so what is shown is always one that works.
+ * Read the active code, or replace it when the person asks for a new one.
  */
-export async function readPairingCode(): Promise<string | null> {
+export async function readPairingCode(renew = false): Promise<string | null> {
   if (!isTauri()) return null
-  return invoke<string>('remote_pairing_code').catch(() => null)
+  return invoke<string>('remote_pairing_code', { renew })
 }
 
 export async function listPairedDevices(): Promise<readonly PairedDevice[]> {

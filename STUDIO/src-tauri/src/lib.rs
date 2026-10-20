@@ -533,22 +533,19 @@ fn remote_access_status(
 
 /// The pairing code the settings screen shows.
 ///
-/// Minting on view, when no code is active, is what keeps the screen honest:
-/// it always shows a code that works. Replacing a still-valid one costs
-/// nothing — codes are single-use and expire in minutes — and a person who
-/// asks again has lost the first one or waited past it. Refused while the
-/// feature is off: a code for a listener that is not running would send
-/// someone to a screen that can never accept it.
+/// Polling keeps a valid code; an explicit renewal replaces it. Refused while
+/// the listener is off, because no device could use the returned code.
 #[tauri::command]
 fn remote_pairing_code(
   remote: tauri::State<'_, remote::RemoteAccess>,
   pairing: tauri::State<'_, std::sync::Arc<remote::PairingState>>,
+  renew: Option<bool>,
 ) -> Result<String, String> {
   if remote.address().is_none() {
     return Err("Remote access is off, so there is no pairing code.".to_owned());
   }
   let now = std::time::Instant::now();
-  Ok(pairing.active(now).unwrap_or_else(|| pairing.mint(now)))
+  Ok(pairing.code(now, renew.unwrap_or(false)))
 }
 
 /// Every paired device, for the settings screen's list.
@@ -584,8 +581,7 @@ fn remote_device_revoke(
 fn remote_device_revoke_all(
   devices: tauri::State<'_, std::sync::Arc<remote::Devices>>,
 ) -> Result<(), String> {
-  devices.revoke_all();
-  Ok(())
+  devices.revoke_all().map(|_| ())
 }
 
 /// One seam for side systems: the webview names a service and a path, and
