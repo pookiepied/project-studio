@@ -33,7 +33,7 @@ import {
   RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Split,
   SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
-  Link2, Maximize2, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
+  Link2, Maximize2, MicOff, PictureInPicture2, Headphones, HeadphoneOff, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
   Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus, Bot,
   type LucideIcon,
 } from 'lucide-react'
@@ -243,6 +243,11 @@ const REGISTRY = {
   add: { mark: Plus, motion: CROSS },
   attach: { mark: Paperclip },
   dictate: { mark: Mic },
+  // The microphone held closed in voice mode: nothing is recorded or sent.
+  muted: { mark: MicOff },
+  // Hearing the voice, and not: deafen silences Studio's speech on a call.
+  listen: { mark: Headphones },
+  deafened: { mark: HeadphoneOff },
   send: { mark: ArrowUp, motion: LIFT },
   steer: { mark: CornerDownRight },
   queue: { mark: GalleryVerticalEnd },
@@ -326,6 +331,10 @@ const REGISTRY = {
      outward says the thing you are pointing at gets bigger, which is what
      happens. */
   openLarger: { mark: Maximize2 },
+  // Folding a surface into the corner player it keeps running in. The mark is
+  // that picture - a small window in a large one - rather than arrows, so it
+  // sits beside a "Leave" label without the two pointing different ways.
+  minimize: { mark: PictureInPicture2 },
 
   // — Confirmation and destructive ----------------------------------------
   check: { mark: Check },

@@ -26,6 +26,7 @@ import { AddConnectionDialog } from './AddConnectionDialog'
 import { AddModelDialog } from './AddModelDialog'
 import { ModelLibrary } from './ModelLibrary'
 import { DefaultsSection } from './DefaultsSection'
+import { VoiceModelSetting } from './VoiceModelSetting'
 import { useProviders, type Providers } from './useProviders'
 import { cn } from '@/lib/cn'
 
@@ -279,6 +280,7 @@ function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind:
           models={kindModels}
           onSet={(slot, ref) => void providers.setDefault(slot, ref)}
         />
+        {kind === 'language' ? <VoiceModelSetting models={kindModels} connections={connections} /> : null}
       </Section>
 
       <Section caption="Providers">

@@ -207,6 +207,7 @@ interface SubmittedTurn {
  * what is sent.
  */
 export interface TurnSettingsWire {
+  readonly voice?: boolean
   readonly deliveryMode?: 'queue' | 'steer'
   readonly modelId: string | null
   readonly reasoningLevel: string | null
@@ -534,7 +535,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
       const wire = settings ?? { modelId: null, reasoningLevel: null }
       const carried = images ?? []
       const sent = await request('POST', agentsPath(), JSON.stringify({
-        kind: 'user',
+        ...(wire.voice ? { kind: 'signal', type: 'voice_input', tagName: 'voice_input' } : { kind: 'user' }),
         body: message,
         ...(wire.deliveryMode === undefined ? {} : { deliveryMode: wire.deliveryMode }),
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),

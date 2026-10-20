@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SegmentCutter } from '@/features/voice/segments'
+import { voicedFrame } from '@/features/voice/speechDetector'
 
 /**
  * The microphone, as a measured signal.
@@ -82,8 +83,12 @@ const FLUSH_GUARD_MS = 2_000
 
 export type MicStatus = 'idle' | 'requesting' | 'live' | 'denied' | 'unavailable'
 
-/** One frame of measurement. `dtMs` lets callers integrate over real time. */
-export type MicFrameListener = (level: number, dtMs: number) => void
+/**
+ * One frame of measurement. `dtMs` lets callers integrate over real time;
+ * `voiced` says whether the frame's spectrum looks like a voice rather than
+ * a noise (see `speechDetector.ts`).
+ */
+export type MicFrameListener = (level: number, dtMs: number, voiced: boolean) => void
 
 /** What a recording collected, handed to the transcriber. */
 export interface VoiceNote {
@@ -92,6 +97,7 @@ export interface VoiceNote {
 }
 
 interface MicNodes {
+  take: (() => Promise<VoiceNote | null>) | null
   stream: MediaStream
   context: AudioContext
   analyser: AnalyserNode
@@ -134,6 +140,7 @@ export function useMicInput() {
   }, [])
 
   const start = useCallback(async (options?: {
+    processing?: boolean
     record?: boolean
     /** Receives each segment as it is cut; asks for cutting by being given. */
     onSegment?: (note: VoiceNote) => void
@@ -156,7 +163,7 @@ export function useMicInput() {
       // like a second, slower meter fighting the first. The waveform's job is
       // to report the room, so the room is what it gets.
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        audio: { echoCancellation: options?.processing ?? false, noiseSuppression: options?.processing ?? false, autoGainControl: options?.processing ?? false },
       })
 
       const context = new AudioContext()
@@ -208,6 +215,7 @@ export function useMicInput() {
       }
 
       const timeDomain = new Uint8Array(analyser.fftSize)
+      const spectrum = new Float32Array(analyser.frequencyBinCount)
       let last = performance.now()
 
       const step = (now: number) => {
@@ -237,12 +245,15 @@ export function useMicInput() {
         const rate = Math.min(1, (dtMs / 16.7) * (target > active.level ? ATTACK : RELEASE))
         active.level += (target - active.level) * rate
 
-        for (const listener of listeners.current) listener(active.level, dtMs)
+        analyser.getFloatFrequencyData(spectrum)
+        const voiced = voicedFrame(spectrum, context.sampleRate)
+        for (const listener of listeners.current) listener(active.level, dtMs, voiced)
         if (active.cutter?.observe(active.level, dtMs) === true) cut(active)
         active.frame = requestAnimationFrame(step)
       }
 
       nodes.current = {
+        take: null,
         stream,
         context,
         analyser,
@@ -255,6 +266,30 @@ export function useMicInput() {
         cutter: recording && options?.onSegment ? new SegmentCutter() : null,
         onSegment: recording ? (options?.onSegment ?? null) : null,
       }
+      const active = nodes.current
+      active.take = recording ? () => {
+        const previous = active.recorder
+        if (nodes.current !== active || previous === null || previous.state === 'inactive') return Promise.resolve(null)
+        const previousChunks = active.chunks
+        const durationMs = performance.now() - active.segmentStartedAt
+        const next = startRecorder()
+        active.recorder = next.recorder
+        active.chunks = next.chunks
+        active.segmentStartedAt = performance.now()
+        return new Promise((resolve) => {
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            window.clearTimeout(timer)
+            resolve({ blob: new Blob(previousChunks, { type: previous.mimeType || 'audio/webm' }), durationMs })
+          }
+          const timer = window.setTimeout(finish, FLUSH_GUARD_MS)
+          previous.onstop = finish
+          previous.onerror = finish
+          previous.stop()
+        })
+      } : null
       setStatus('live')
       return true
     } catch (error) {
@@ -322,5 +357,14 @@ export function useMicInput() {
     [stop],
   )
 
-  return { status, start, stop, onFrame }
+  const take = useCallback(() => nodes.current?.take?.() ?? Promise.resolve(null), [])
+  /**
+   * Holds the microphone closed without releasing it. A disabled track
+   * delivers silence to the analyser and the recorder alike, so a muted room
+   * is measured, recorded and sent as nothing at all.
+   */
+  const setMuted = useCallback((muted: boolean) => {
+    for (const track of nodes.current?.stream.getAudioTracks() ?? []) track.enabled = !muted
+  }, [])
+  return { status, start, stop, take, onFrame, setMuted }
 }

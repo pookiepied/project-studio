@@ -173,7 +173,7 @@ export function AppShell() {
           the stage is clipped by the same window corner everything else is
           and cannot paint outside it. It is the last child for the same
           reason: the stage covers the sidebar and the page on purpose. */}
-      <VoiceModeProvider>
+      <VoiceModeProvider insetRight={railShown ? railWidth : 0}>
         <Sidebar
           open={sidebarShown}
           compact={compact}

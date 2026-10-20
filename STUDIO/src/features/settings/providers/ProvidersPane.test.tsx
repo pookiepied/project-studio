@@ -727,7 +727,7 @@ describe('the featured shelf', () => {
     // are in the document - the connection's own, still finishing its exit -
     // so the picker is the one whose items are models. Its rows carry a
     // selected-check, which makes them radios, not plain items.
-    fireEvent.click(screen.getByText('Choose'))
+    fireEvent.click(screen.getAllByText('Choose')[0])
     const picker = screen
       .getAllByRole('menu')
       .find((menu) =>

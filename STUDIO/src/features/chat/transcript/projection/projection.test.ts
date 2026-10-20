@@ -48,6 +48,15 @@ function resetChunk(): unknown {
 }
 
 describe('seeding from history', () => {
+  it('renders voice transcriptions as user bubbles while retaining their canonical signal identity', () => {
+    const snapshot: ConversationSnapshotFacts = {
+      version: 1, conversationId: CONVERSATION, offset: '1', compactions: [], settlements: [],
+      messages: [{ id: 'voice-message', role: 'system', submissionId: SUBMISSION, timestamp: null, model: null, usage: null,
+        signal: { tagName: 'voice_input', attributes: {} }, parts: [{ kind: 'text', text: 'Not a circle. A square.', state: 'done' }] }],
+    }
+    expect(seededFrom(snapshot)).toMatchObject([{ kind: 'user', id: 'voice-message', submissionId: SUBMISSION, text: 'Not a circle. A square.' }])
+  })
+
   it('turns a whole snapshot into items, buckets included', () => {
     const items = seededFrom({
       version: 1,

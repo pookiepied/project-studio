@@ -26,6 +26,10 @@ export function openWebAudioSink(onEnded: () => void): AudioSink {
   // A context made outside a user gesture starts suspended; this one is made
   // in the click, and asking anyway costs nothing where it already runs.
   void context.resume()
+  // Every clip plays through one gain, so deafening silences what is already
+  // scheduled as well as what comes next, and the clock keeps running.
+  const output = context.createGain()
+  output.connect(context.destination)
   const sounding = new Set<AudioBufferSourceNode>()
   let nextAt = 0
   let finished = false
@@ -35,20 +39,21 @@ export function openWebAudioSink(onEnded: () => void): AudioSink {
     if (finished && sounding.size === 0 && !closed) onEnded()
   }
 
-  const enqueue = async (clip: Clip): Promise<void> => {
+  const enqueue = async (clip: Clip, onPlayed?: () => void): Promise<void> => {
     // decodeAudioData detaches the buffer it is given; the decoder owns
     // these bytes and nothing else reads them after.
     const buffer = await context.decodeAudioData(bytesOfBase64(clip.audio).buffer)
     if (closed) return
     const source = context.createBufferSource()
     source.buffer = buffer
-    source.connect(context.destination)
+    source.connect(output)
     const at = Math.max(context.currentTime, nextAt)
     source.start(at)
     nextAt = at + buffer.duration
     sounding.add(source)
     source.onended = () => {
       sounding.delete(source)
+      onPlayed?.()
       drained()
     }
   }
@@ -64,6 +69,9 @@ export function openWebAudioSink(onEnded: () => void): AudioSink {
     },
     resume() {
       void context.resume()
+    },
+    setMuted(muted: boolean) {
+      output.gain.value = muted ? 0 : 1
     },
     close() {
       closed = true

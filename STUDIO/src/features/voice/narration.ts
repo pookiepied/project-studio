@@ -47,11 +47,13 @@ export interface Clip {
  * pause between two.
  */
 export interface AudioSink {
-  enqueue(clip: Clip): Promise<void>
+  enqueue(clip: Clip, onPlayed?: () => void): Promise<void>
   finish(): void
   pause(): void
   resume(): void
   close(): void
+  /** Silences or restores playback without stopping it; optional for sinks that cannot. */
+  setMuted?(muted: boolean): void
 }
 
 export interface NarrationOptions {

@@ -27,6 +27,7 @@ const KIND_LABEL: Record<AgentRosterRecord['kind'], string> = {
   conversation: 'Conversation agent',
   delegate: 'Delegate',
   background: 'Background agent',
+  worker: 'Background worker',
 }
 
 const EFFECT_LABEL: Record<string, string> = {
@@ -85,7 +86,7 @@ export function AgentsPane() {
             <p className="mt-1 text-caption text-muted-foreground">
               {describePolicy(agent)}
             </p>
-          ) : agent.kind === 'conversation' ? (
+          ) : agent.kind === 'conversation' || agent.kind === 'worker' ? (
             <p className="mt-1 text-caption text-muted-foreground">
               Composes its tools, skills and permissions from each conversation's own state.
             </p>
@@ -114,7 +115,9 @@ function describePolicy(agent: AgentRosterRecord): string {
   parts.push(`Skills: ${skills.ids.length > 0 ? skills.ids.join(', ') : 'none'}`)
   const effects = permissions.maxEffects.map((effect) => EFFECT_LABEL[effect] ?? effect)
   parts.push(
-    `Its calls may ${effects.length > 0 ? effects.join(', ') : 'do nothing'} — anything unapproved stops and asks under this agent's name first (mode: ${permissions.mode}).`,
+    `Its calls may ${effects.length > 0 ? effects.join(', ') : 'do nothing'} — ${permissions.mode === 'inherit'
+      ? "it follows the chat's permission mode, and anything that still needs approval asks under this agent's name"
+      : `anything unapproved stops and asks under this agent's name first (mode: ${permissions.mode})`}.`,
   )
   return parts.join('. ')
 }

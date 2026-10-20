@@ -40,11 +40,12 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
     // one exception that is not an item either: the documents signal, which
     // the harness appends right after the user message that brought the
     // files, becomes that message's chips.
-    if (message.role === 'system') {
+    const voiceInput = message.role === 'system' && message.signal?.tagName === 'voice_input'
+    if (message.role === 'system' && !voiceInput) {
       attachDocuments(items, message)
       continue
     }
-    if (message.role === 'user') {
+    if (message.role === 'user' || voiceInput) {
       const texts: string[] = []
       const attachments: UserAttachmentView[] = []
       for (const part of message.parts) {

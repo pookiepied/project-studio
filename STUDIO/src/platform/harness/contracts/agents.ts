@@ -11,11 +11,12 @@ import { oneOf, text } from './guards'
  * conversation agent composes its surface per conversation and a
  * background agent holds none.
  */
-export const AGENT_KINDS = ['conversation', 'delegate', 'background'] as const
+export const AGENT_KINDS = ['conversation', 'delegate', 'background', 'worker'] as const
 
 export type AgentKind = (typeof AGENT_KINDS)[number]
 
-export const AGENT_MODES = ['ask', 'auto'] as const
+/** `inherit` follows the conversation's own permission mode. */
+export const AGENT_MODES = ['ask', 'auto', 'inherit'] as const
 
 export type AgentMode = (typeof AGENT_MODES)[number]
 

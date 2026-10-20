@@ -3,6 +3,9 @@ import { useCallback, useState } from 'react'
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer/Composer'
 import { useFirstTurn } from '@/features/chat/connection/first-turn'
+import { rememberFirstAdmission } from '@/features/chat/connection/first-attach'
+import { useVoiceModeContext } from '@/features/voice'
+import { newId } from '@/lib/id'
 import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { useNavigation } from '@/stores/navigation'
@@ -64,6 +67,22 @@ export function StartConversation({
     settings: () => turnSettingsToWire(effectiveTurnSettings(null, settings), projectId),
   })
 
+  // Voice from an empty page: the id is minted now, but nothing exists until
+  // the first utterance is admitted - then the conversation is recorded and
+  // opened exactly as a typed first turn's would be. Leaving without speaking
+  // leaves nothing behind.
+  const voice = useVoiceModeContext()
+  const onStartVoice = useCallback(() => {
+    const conversationId = newId('cnv')
+    voice.enter(conversationId, {
+      settings: turnSettingsToWire(effectiveTurnSettings(null, settings), projectId),
+      onAdmitted: (text, receipt) => {
+        rememberFirstAdmission(conversationId, { offset: receipt.offset, submissionId: receipt.submissionId, text })
+        onStarted(conversationId, text)
+      },
+    })
+  }, [onStarted, projectId, settings, voice])
+
   /** The send-time refusal for images a blind model cannot take. */
   const [attachRefusal, setAttachRefusal] = useState<SeamFailure | null>(null)
 
@@ -100,6 +119,7 @@ export function StartConversation({
         conversationId={null}
         placeholder={placeholder}
         onSend={onSend}
+        onStartVoice={onStartVoice}
       />
     </>
   )

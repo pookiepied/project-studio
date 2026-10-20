@@ -24,7 +24,7 @@ describe('image read previews', () => {
       { ...read('text'), output: present('plain text') }, read('four')]
     render(<ToolGroups conversationId="conv" groups={calls.map((call) => ({ id: call.toolCallId, file: null, calls: [call] }))} />)
     expect(screen.getByRole('button', { name: /Viewed 3 images/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Viewed 1 image/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Viewed an image/ })).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Viewed 3 images/ }))
     expect(screen.getAllByRole('img')).toHaveLength(3)
@@ -37,7 +37,7 @@ describe('image read previews', () => {
     render(<ImageReads conversationId="image-read-history" live={false}
       images={readImages(read('persisted', 'att_read_history_0'))} />)
     expect(transport).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: /Viewed 1 image/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Viewed an image/ }))
     await waitFor(() => expect(screen.getByAltText('persisted.png').getAttribute('src')).toBe('data:image/png;base64,aGk='))
     expect(transport).toHaveBeenCalledWith('/agents/studio/image-read-history/attachments/att_read_history_0')
     fireEvent.click(screen.getByRole('button', { name: 'Preview persisted.png' }))
@@ -52,7 +52,7 @@ describe('image read previews', () => {
     setAttachmentBytesTransport(transport)
     render(<ImageReads conversationId="image-read-missing" live={false}
       images={readImages(read('missing', 'att_read_missing_0'))} />)
-    fireEvent.click(screen.getByRole('button', { name: /Viewed 1 image/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Viewed an image/ }))
     await waitFor(() => expect(transport).toHaveBeenCalledTimes(1))
     expect(screen.getByText('Image preview unavailable: missing.png')).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
@@ -61,7 +61,7 @@ describe('image read previews', () => {
 
   it('replaces an undecodable image with its unavailable message', () => {
     render(<ImageReads conversationId="image-read-invalid" live={false} images={readImages(read('invalid'))} />)
-    fireEvent.click(screen.getByRole('button', { name: /Viewed 1 image/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Viewed an image/ }))
     fireEvent.error(screen.getByAltText('invalid.png'))
     expect(screen.getByText('Image preview unavailable: invalid.png')).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()

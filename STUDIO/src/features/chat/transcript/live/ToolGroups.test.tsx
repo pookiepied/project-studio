@@ -708,7 +708,7 @@ describe('the read that failed', () => {
         })}
       />,
     )
-    const row = screen.getByRole('button', { name: /Viewed 1 image/ })
+    const row = screen.getByRole('button', { name: /Viewed an image/ })
     expect(row.hasAttribute('disabled')).toBe(false)
     expect(container.querySelector('img')).toBeNull()
     fireEvent.click(row)

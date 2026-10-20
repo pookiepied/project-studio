@@ -129,8 +129,11 @@ export function Composer({
   queueFull = false,
   restoredMessage,
   onStop,
+  onStartVoice,
 }: {
   conversationId: string | null
+  /** Opens voice on a chat that does not exist yet; its first utterance creates it. */
+  onStartVoice?: () => void
   placeholder: string
   /**
    * Where a send goes. The answer is a receipt, not a fire-and-forget: the
@@ -1009,8 +1012,8 @@ export function Composer({
                 <IconButton
                   label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
                   size="md"
-                  disabled={!voiceAvailable}
-                  onClick={voice.enter}
+                  disabled={!voiceAvailable || (conversationId === null && onStartVoice === undefined) || busy}
+                  onClick={() => (conversationId === null ? onStartVoice?.() : voice.enter(conversationId))}
                 >
                   <Icons.voice size="md" />
                 </IconButton>

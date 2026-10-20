@@ -950,7 +950,7 @@ describe('reading the agent roster', () => {
     model: { inherit: true },
     tools: { natives: ['read', 'write'], mcpNamespaces: ['*'] },
     skills: { ids: [] },
-    permissions: { maxEffects: ['read', 'write'], mode: 'ask' },
+    permissions: { maxEffects: ['read', 'write'], mode: 'inherit' },
     durability: { maxAttempts: 3, timeoutMs: 600000 },
   }
   const conversation = {
@@ -967,7 +967,7 @@ describe('reading the agent roster', () => {
     expect(roster).toHaveLength(2)
     const general = roster[0]
     expect(general?.tools?.mcpNamespaces).toEqual(['*'])
-    expect(general?.permissions?.mode).toBe('ask')
+    expect(general?.permissions?.mode).toBe('inherit')
     // The honest absence: a conversation row carries no static policy.
     expect(roster[1]?.tools).toBeUndefined()
     expect(roster[1]?.skills).toBeUndefined()

@@ -46,7 +46,7 @@ export function ImageReads({ images, conversationId, live }: {
 }) {
   const [open, setOpen] = useState(false)
   return <DisclosureRow leading={<Icons.image />} entering={live}
-    label={`Viewed ${images.length} ${images.length === 1 ? 'image' : 'images'}`}
+    label={images.length === 1 ? 'Viewed an image' : `Viewed ${images.length} images`}
     open={open} onToggle={() => setOpen((value) => !value)} flush>
     <div className="flex flex-wrap gap-2 py-1">
       {images.map((image) => <ReadThumbnail key={`${conversationId}:${image.id}`} image={image} conversationId={conversationId} />)}
