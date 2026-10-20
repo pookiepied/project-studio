@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { openrouterMedia } from "../../src/gateway/media/adapters/openrouter.js";
 import type { DriverEndpoint } from "../../src/gateway/media/drivers/types.js";
+import { forgetOpenrouterListings } from "../../src/gateway/catalog/openrouter-media.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
+import { createRootExecutionContext, runWithExecutionContext } from "../../src/execution/context.js";
 
 /**
  * The OpenRouter adapter against a stand-in speaking OpenRouter's four media
@@ -76,15 +79,74 @@ function sentJson(seen: Seen): Record<string, unknown> {
 }
 
 beforeEach(async () => {
+  forgetOpenrouterListings();
   standIn = await startStandIn();
 });
 
 afterEach(() => {
+  diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+  diagnosticRecorder.clear();
   standIn.server.closeAllConnections();
   standIn.server.close();
 });
 
 describe("speech", () => {
+  it("keeps voice resolution under its execution parent without speech or credentials in diagnostics", async () => {
+    diagnosticRecorder.configure({ enabled: true, captureContent: false });
+    const parent = createRootExecutionContext();
+    standIn.answers.set("/api/v1/models", json({ data: [{ id: "future/voice-model", supported_voices: ["private-voice-id"] }] }));
+    standIn.answers.set("/api/v1/audio/speech", json({ error: { message: "private-refusal-text" } }, 400));
+    await expect(runWithExecutionContext(parent, async () => await openrouterMedia.speak?.({ text: "private-spoken-text", modelId: "future/voice-model" }, endpoint()))).rejects.toMatchObject({ kind: "provider-refused" });
+    const events = diagnosticRecorder.read().events;
+    const resolved = events.filter((event) => event.name === "media.voice.resolve");
+    expect(resolved).toHaveLength(2);
+    expect(resolved[0]?.identity.parentOperationId).toBe(parent.operationId);
+    expect(resolved[1]?.outcome).toBe("completed");
+    for (const secret of ["private-spoken-text", "private-voice-id", "private-refusal-text", "sk-or-test-1"]) {
+      expect(JSON.stringify(events)).not.toContain(secret);
+    }
+    expect(events.every((event) => event.content === undefined)).toBe(true);
+  });
+
+  it("uses an advertised built-in voice when the selected model requires one", async () => {
+    standIn.answers.set("/api/v1/models", json({ data: [{ id: "hexgrad/kokoro-82m", name: "Kokoro", supported_voices: [null, "", "af_alloy", "af_heart"] }] }));
+    standIn.answers.set("/api/v1/audio/speech", (seen) => sentJson(seen).voice === "af_alloy"
+      ? { status: 200, type: "audio/mpeg", body: Buffer.from([0xff, 0xfb]) }
+      : { status: 400, type: "application/json", body: JSON.stringify({ error: { message: "An explicit voice is required" } }) });
+    const result = await openrouterMedia.speak?.({ text: "Hello", modelId: "hexgrad/kokoro-82m" }, endpoint());
+    expect(result?.audio).toBe(Buffer.from([0xff, 0xfb]).toString("base64"));
+    const speech = standIn.seen.find((seen) => seen.path === "/api/v1/audio/speech");
+    if (!speech) throw new Error("Missing speech request");
+    expect(sentJson(speech).voice).toBe("af_alloy");
+    expect(standIn.seen.filter((seen) => seen.path.startsWith("/api/v1/models")).every((seen) => seen.headers.authorization === undefined)).toBe(true);
+    const count = standIn.seen.length;
+    await openrouterMedia.speak?.({ text: "Next passage", modelId: "hexgrad/kokoro-82m" }, endpoint());
+    expect(standIn.seen).toHaveLength(count + 1);
+  });
+
+  it("keeps an explicit voice and does not look up a replacement", async () => {
+    standIn.answers.set("/api/v1/audio/speech", () => ({ status: 200, type: "audio/mpeg", body: Buffer.from([1]) }));
+    await openrouterMedia.speak?.({ text: "Hello", modelId: "hexgrad/kokoro-82m", voiceId: "af_heart" }, endpoint());
+    expect(standIn.seen).toHaveLength(1);
+    const sent = standIn.seen[0];
+    if (!sent) throw new Error("Missing speech request");
+    expect(sentJson(sent).voice).toBe("af_heart");
+  });
+
+  it("changes voices with an unfamiliar selected model instead of reusing the previous model's default", async () => {
+    standIn.answers.set("/api/v1/models", json({ data: [
+      { id: "future/first", supported_voices: ["first-voice"] },
+      { id: "future/second", supported_voices: ["second-voice"] },
+      { id: "future/default" },
+    ] }));
+    standIn.answers.set("/api/v1/audio/speech", () => ({ status: 200, type: "audio/mpeg", body: Buffer.from([1]) }));
+    for (const modelId of ["future/first", "future/second", "future/default"]) {
+      await openrouterMedia.speak?.({ text: "Hello", modelId }, endpoint());
+    }
+    const speech = standIn.seen.filter((seen) => seen.path === "/api/v1/audio/speech").map(sentJson);
+    expect(speech.map((body) => body.voice)).toEqual(["first-voice", "second-voice", undefined]);
+    expect(Object.hasOwn(speech[2] ?? {}, "voice")).toBe(false);
+  });
   it("posts OpenAI's shape and answers mp3 bytes, base64", async () => {
     standIn.answers.set("/api/v1/audio/speech", () => ({
       status: 200,

@@ -2,6 +2,9 @@ import { HttpError, requestBinary, requestDirect } from "../../../net/http.js";
 import type { UrlAuthor } from "../../../net/destination.js";
 import { MediaError } from "../../../contracts/media.js";
 import type { DriverEndpoint, SpeechSlotInput, TranscriptionSlotInput } from "../drivers/types.js";
+import { openrouterMediaModels } from "../../catalog/openrouter-media.js";
+import { observeOperation } from "../../../observability/operation.js";
+import { audioFormat } from "../audio-format.js";
 import { pagesOfTranscript, transcriptionInstruction } from "./document-transcript.js";
 import type {
   DocumentReadingInput,
@@ -88,26 +91,6 @@ function dataUrl(image: MediaBytes): string {
   return `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`;
 }
 
-/** The audio format word OpenRouter wants, from the mime the recorder gave. */
-function formatOf(mimeType: string): string {
-  const subtype = mimeType.toLowerCase().split(";")[0]?.split("/")[1] ?? "";
-  const known: Readonly<Record<string, string>> = {
-    mpeg: "mp3",
-    mp3: "mp3",
-    wav: "wav",
-    "x-wav": "wav",
-    wave: "wav",
-    webm: "webm",
-    ogg: "ogg",
-    flac: "flac",
-    mp4: "m4a",
-    "x-m4a": "m4a",
-    m4a: "m4a",
-    aac: "aac",
-  };
-  return known[subtype] ?? subtype.replace(/[^a-zA-Z0-9+._-]/g, "");
-}
-
 interface OpenRouterError {
   readonly error?: { readonly message?: unknown };
 }
@@ -150,6 +133,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /* -------------------------------------------------------------------------- */
 
 async function speak(input: SpeechSlotInput, endpoint: DriverEndpoint) {
+  // Voices belong to the selected model. A universal fallback such as alloy
+  // would fail again as soon as the person selected another provider's model.
+  const voiceId = input.voiceId ?? await observeOperation("provider", "media.voice.resolve", async () => {
+    const models = await openrouterMediaModels(endpoint.baseUrl);
+    return models.find((model) => model.modelId === input.modelId)?.voiceIds?.[0];
+  }, { protocol: "openrouter", modelId: input.modelId });
   const answered = await requestBinary({
     url: `${origin(endpoint)}/audio/speech`,
     author: AUTHOR,
@@ -158,7 +147,7 @@ async function speak(input: SpeechSlotInput, endpoint: DriverEndpoint) {
     body: JSON.stringify({
       model: input.modelId,
       input: input.text,
-      ...(input.voiceId === undefined ? {} : { voice: input.voiceId }),
+      ...(voiceId === undefined ? {} : { voice: voiceId }),
       response_format: "mp3",
     }),
     timeoutMs: endpoint.timeoutMs ?? AUDIO_TIMEOUT_MS,
@@ -182,7 +171,7 @@ async function transcribe(input: TranscriptionSlotInput, endpoint: DriverEndpoin
       model: input.modelId,
       input_audio: {
         data: Buffer.from(input.audio).toString("base64"),
-        format: formatOf(input.mimeType),
+        format: audioFormat(input.mimeType),
       },
     }),
     timeoutMs: endpoint.timeoutMs ?? AUDIO_TIMEOUT_MS,

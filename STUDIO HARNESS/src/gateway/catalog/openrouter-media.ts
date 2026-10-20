@@ -43,6 +43,9 @@ function model(
   { earned, shape }: Earned,
 ): CatalogSourceModel | undefined {
   if (typeof entry.id !== "string" || entry.id.length === 0) return undefined;
+  const voiceIds = earned.speechGeneration === "supported" && Array.isArray(entry.supported_voices)
+    ? entry.supported_voices.filter((voice: unknown): voice is string => typeof voice === "string" && voice.trim().length > 0)
+    : [];
   return {
     modelId: entry.id,
     displayName: typeof entry.name === "string" && entry.name.length > 0 ? entry.name : entry.id,
@@ -53,6 +56,7 @@ function model(
     featured: false,
     shape,
     pricing: UNKNOWN_MODEL_PRICING,
+    ...(voiceIds.length === 0 ? {} : { voiceIds }),
   };
 }
 

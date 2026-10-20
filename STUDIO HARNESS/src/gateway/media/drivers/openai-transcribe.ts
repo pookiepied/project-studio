@@ -2,14 +2,15 @@ import { requestDirect, HttpError } from "../../../net/http.js";
 import { MediaError } from "../../../contracts/media.js";
 import type { UrlAuthor } from "../../../net/destination.js";
 import { multipartBody } from "../multipart.js";
+import { audioFormat } from "../audio-format.js";
 import type { DriverEndpoint, TranscriptionDriver, TranscriptionSlotInput } from "./types.js";
 
 /**
  * OpenAI's transcription endpoint: one multipart upload in, one text out.
  *
  * The webview's MediaRecorder produces `audio/webm;codecs=opus`; Whisper and
- * the transcribe models accept the container by its mime type, so what was
- * recorded is what is uploaded - no transcode on the way through. The
+ * the transcribe models accept the container by its mime type. Dictation
+ * normalizes browser recordings to WAV; other callers retain their format. The
  * response is JSON `{ "text": "..." }`.
  *
  * The credential travels in the `Authorization` header and nowhere else.
@@ -44,7 +45,7 @@ export const openaiTranscribe: TranscriptionDriver = async (
     {
       name: "file",
       value: input.audio,
-      filename: "dictation.webm",
+      filename: `dictation.${audioFormat(input.mimeType) || "audio"}`,
       contentType: input.mimeType,
     },
   ]);

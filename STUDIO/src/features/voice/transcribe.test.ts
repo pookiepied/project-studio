@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { HarnessResult } from '@/platform/harness'
 import type { VoiceNote } from './useMicInput'
@@ -8,13 +8,14 @@ import type { VoiceNote } from './useMicInput'
  * address is resolved by the real function, so the "no harness" exit still
  * runs against the real absence; only the call over the wire is replaced.
  */
-const transcribe = vi.fn<() => Promise<HarnessResult<{ text: string }>>>()
+const transcribe = vi.fn<(input: { audio: string; mimeType: string }) => Promise<HarnessResult<{ text: string }>>>()
+const decode = vi.fn<() => Promise<Pick<AudioBuffer, 'length' | 'sampleRate' | 'numberOfChannels' | 'getChannelData'>>>()
 
 vi.mock('@/platform/harness', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/platform/harness')>()
   return {
     ...actual,
-    createHarnessClient: () => ({ transcribe: () => transcribe() }),
+    createHarnessClient: () => ({ transcribe: (input: { audio: string; mimeType: string }) => transcribe(input) }),
   }
 })
 
@@ -52,13 +53,37 @@ const refused = (status: number, message: string): HarnessResult<{ text: string 
   error: { kind: 'harness-error', status, message },
 })
 
+beforeEach(() => {
+  decode.mockResolvedValue({ length: 2, sampleRate: 16_000, numberOfChannels: 1, getChannelData: () => new Float32Array([0.5, -0.5]) })
+  vi.stubGlobal('OfflineAudioContext', class { decodeAudioData = decode })
+})
+
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+  decode.mockReset()
   transcribe.mockReset()
   vi.useRealTimers()
 })
 
 describe('the dictation seam', () => {
+  it('uploads real WAV bytes and MIME after decoding a browser recording', async () => {
+    withHarness()
+    transcribe.mockResolvedValueOnce(ok('Hello'))
+    expect(await transcribeRecording(note(new Blob([new Uint8Array([1, 2])], { type: 'audio/webm' })))).toEqual({ kind: 'ok', text: 'Hello' })
+    const input = transcribe.mock.calls[0]?.[0]
+    expect(input?.mimeType).toBe('audio/wav')
+    expect(atob(input?.audio ?? '').slice(0, 4)).toBe('RIFF')
+    expect(atob(input?.audio ?? '').slice(8, 12)).toBe('WAVE')
+  })
+
+  it('reports a local decode failure without uploading mislabeled bytes', async () => {
+    withHarness()
+    decode.mockRejectedValueOnce(new Error('Invalid recording'))
+    const result = await transcribeRecording(note(new Blob(['broken'], { type: 'audio/webm' })))
+    expect(result.kind === 'note' && result.note).toContain('could not be decoded')
+    expect(transcribe).not.toHaveBeenCalled()
+  })
   it('says what happened when nothing was recorded', async () => {
     const outcome = await transcribeRecording(note(null))
     expect(outcome.kind).toBe('note')

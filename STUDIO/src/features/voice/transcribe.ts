@@ -2,6 +2,7 @@ import { base64OfBytes } from '@/lib/base64'
 import { createHarnessClient, resolveHarnessAddress, type HarnessFailure } from '@/platform/harness'
 import { formatClock } from '@/features/voice/waveform'
 import type { VoiceNote } from '@/features/voice/useMicInput'
+import { recordingAudio } from '@/features/voice/recordingAudio'
 
 /**
  * Speech to text. The seam, filled.
@@ -60,22 +61,22 @@ export async function transcribeRecording(
     }
   }
 
-  let bytes: Uint8Array
-  try {
-    bytes = new Uint8Array(await blob.arrayBuffer())
-  } catch {
-    return { kind: 'note', note: 'The recording could not be read - try again' }
-  }
-
   const address = await resolveHarnessAddress()
   if (address === null) {
     return { kind: 'note', note: 'The harness is not running - start it below, then dictate again' }
   }
 
+  let bytes: Uint8Array
+  try {
+    bytes = await recordingAudio(blob)
+  } catch {
+    return { kind: 'note', note: 'The recording could not be decoded - try recording again' }
+  }
+
   const client = createHarnessClient(address)
   const recording = {
     audio: base64OfBytes(bytes),
-    mimeType: blob.type === '' ? 'audio/webm' : blob.type,
+    mimeType: 'audio/wav',
   }
   let sent = await client.transcribe(recording)
   if (!sent.ok && worthRetrying(sent.error)) {

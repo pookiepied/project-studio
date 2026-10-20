@@ -57,6 +57,8 @@ export interface CatalogSourceModel {
   readonly featured: boolean;
   readonly shape: InvocationShape;
   readonly pricing: ModelPricing;
+  /** Built-in voice IDs advertised by this model, not a provider-wide guess. */
+  readonly voiceIds?: readonly string[];
 }
 
 export interface LibraryProviderEntry {

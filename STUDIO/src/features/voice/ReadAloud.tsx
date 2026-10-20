@@ -8,6 +8,7 @@ import { narrate, type Narration, type NarrationState } from '@/features/voice/n
 import { openWebAudioSink } from '@/features/voice/webAudioSink'
 import { cn } from '@/lib/cn'
 import { WorkingDots } from '@/components/state'
+import { VoiceFailure } from '@/features/voice/VoiceFailure'
 
 /**
  * Read aloud, as one control that grows into the player it needs.
@@ -106,7 +107,7 @@ export function ReadAloud({ text }: { text: string }) {
   }
 
   return (
-    <span className="relative inline-flex items-center">
+    <div className="relative inline-flex max-w-full items-center">
       <AnimatePresence initial={false} mode="popLayout">
         {state.stage === 'idle' ? (
           <motion.span
@@ -121,13 +122,13 @@ export function ReadAloud({ text }: { text: string }) {
             </IconButton>
           </motion.span>
         ) : (
-          <motion.span
+          <motion.div
             key="pill"
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.94 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-            className="flex items-center gap-1.5 rounded-full bg-surface-raised py-0.5 pr-1 pl-2.5 shadow-raised"
+            className="flex max-w-full items-center gap-1.5 rounded-full bg-surface-raised py-0.5 pr-1 pl-2.5 shadow-raised"
           >
             {state.stage === 'loading' ? (
               <>
@@ -138,11 +139,7 @@ export function ReadAloud({ text }: { text: string }) {
               </>
             ) : state.stage === 'failed' ? (
               <>
-                {/* The refusal never types itself into the transcript: it
-                    lives in the pill, with the one remedy a pill can offer. */}
-                <span role="status" className="whitespace-nowrap text-caption text-muted-foreground">
-                  {state.note}
-                </span>
+                <VoiceFailure label="Read-aloud failed" note={state.note ?? 'The voice provider could not finish this request.'} />
                 <PillButton label="Try again" onClick={begin}>
                   <Icons.reload size="sm" />
                 </PillButton>
@@ -158,10 +155,10 @@ export function ReadAloud({ text }: { text: string }) {
             <PillButton label="Stop reading aloud" onClick={stop}>
               <Icons.close size="sm" />
             </PillButton>
-          </motion.span>
+          </motion.div>
         )}
       </AnimatePresence>
-    </span>
+    </div>
   )
 }
 
@@ -179,7 +176,7 @@ function PillButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
+      className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
     >
       {children}
     </button>

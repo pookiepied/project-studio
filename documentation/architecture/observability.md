@@ -101,6 +101,14 @@ Media dispatch events name the resolved model, protocol and capability slot;
 `media.binding` also names the selected connection ID. Media job events retain
 model/slot/shape across their detached lifetime, with the provider's opaque
 `externalJobId` separate from Studio's `jobId` for polled generations.
+OpenRouter speech without an explicit voice resolves the selected model's
+advertised voice IDs through the existing public catalog cache. The
+`media.voice.resolve` operation retains the execution parent and records only
+protocol/model identity and outcome; speech text, voice IDs and credentials are
+excluded. Catalog HTTP reads retain their existing transport observations.
+Browser dictation decodes locally to mono PCM WAV before the existing media
+transport. This adds no upload boundary or capture setting; provider errors
+remain product results, with bounded UI details outside the control row.
 HTTP admission also indexes direct invocations for every agent route, including
 new agents. Only the Studio agent's instance names a product conversation;
 other direct agents retain separate instance identity without gaining content

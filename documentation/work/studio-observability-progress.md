@@ -15,6 +15,18 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ### Active follow-up checklist, 2026-10-20
 
+Audio compatibility follow-up: retain OpenRouter's model-advertised voices,
+resolve a missing voice under `media.voice.resolve`, and keep explicit voices
+unchanged. Browser dictation now encodes real mono PCM WAV; OpenAI multipart
+filenames match the supplied MIME type. Read-aloud and dictation errors use a
+bounded details popover. Parent/privacy and provider-wire regressions cover the
+changed boundary. Browser proof confirms WebM/Opus decoding to 16 kHz PCM and a
+long error contained within a 360-by-480 viewport. Sequential full gates passed:
+harness typecheck/lint/build and 2,567 tests (28 skipped), then client
+typecheck/lint and 1,587 tests. Client production build passed as well. Detailed
+results are in `report/audio-provider-compatibility.md`; live paid provider calls
+remain outside the automated proof.
+
 - [x] Finish live steering: interrupt the provider request, join the durable
   correction once, preserve ordinary queued work and give Stop priority.
 - [x] Use one composer action slot: Stop while running with an empty draft;
@@ -230,7 +242,7 @@ later repairs supersede the open findings in earlier checkpoints.
 | MCP | Connection/RPC IDs, request/notification/connection facts and registry server links. Supervision keeps one logical operation with new attempt IDs on actual restarts; incoming shared notifications deliberately have no conversation/content owner. Connection, wire-frame, duplicate-reply and supervisor fixtures pass. Captured JSON-RPC frames are not transport byte archives; unsupported wire evidence stays explicit. |
 | Client delivery/UI | Submission/stream/delivery/projection and first/final paced DOM commits join request/conversation/submission/stream/message/block IDs. Bounded uploads, epoch policy, registry parity and persistent outage-aware badge. Real paced-text and badge fixtures pass. DOM commit is not screen paint; historical remounts are display observations, not new executions. |
 | Native host | Separate bounded 2,000-event ring, host-only ingestion, verified device provenance, request/stream/byte/lifecycle IDs and command-arrival IDs. Real loopback receipt fixture and source-ingest tests pass. Diagnostic/service arrivals avoid recursive recording. Detached-browser creation/focus has separate start/end outcomes. Other window/clipboard/remote-management completion and generic IPC-to-transport parent joins are unsupported; plugin-managed OS UI calls are outside custom IPC capture. |
-| Background commands/media/retrieval/hooks/skills/snapshots | Detached process/media lifetimes; invocation/submission/request links for title/improve/describe; title retry scope distinct from authorization; resolved media targets and retrieval fallback attempts; snapshot, command expansion and skill packaging boundaries. New tools/MCP/agents through these registries inherit their boundaries. Per-storage-row and arbitrary internal function tracing are intentionally excluded. |
+| Background commands/media/retrieval/hooks/skills/snapshots | Detached process/media lifetimes; invocation/submission/request links for title/improve/describe; title retry scope distinct from authorization; resolved media targets, model-advertised OpenRouter voice resolution and retrieval fallback attempts; snapshot, command expansion and skill packaging boundaries. New tools/MCP/agents through these registries inherit their boundaries. Per-storage-row and arbitrary internal function tracing are intentionally excluded. |
 | Configuration/user control | Enable/stop/scope/delete/copy, bounded retention, capture epochs, optimistic policy guards, serialized native reconciliation and persistent status. Stale receipt, deletion, outage and policy-race fixtures pass. Synchronization polls every three seconds; it is not an instantaneous distributed consent transaction. Retention is count/bytes and process lifetime; no time-based expiry or durable content storage. |
 | Extensibility | Operation/job/provider helpers and shared AGENTS/CLAUDE contract. Client event vocabulary and native command policy have registry parity tests. Unsupported content/clock/delivery evidence is explicit. |
 | Performance/failure safety | Opaque bounded-source handles, JSON input bounds, fixed projections, Flue snapshot key reuse, privacy/error/proxy/accessor guards, byte/count caps and local benchmark measurements. Added capture overhead measured separately from mandatory Flue snapshot work. Measured acceptance budget met; final review, full checks and source-hash audit passed. |

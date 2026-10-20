@@ -51,6 +51,16 @@ beforeEach(() => {
 });
 
 describe("OpenRouter's live media listing", () => {
+  it("retains valid built-in voice IDs without inventing a voice for other models", async () => {
+    const models = await openrouterMediaModels("https://voices.test/api/v1", { fetch: async (url) => JSON.stringify({
+      data: url.endsWith("=speech") ? [
+        { id: "hexgrad/kokoro-82m", supported_voices: [null, "", "af_alloy", 3, "af_heart"] },
+        { id: "provider/default-voice", supported_voices: null },
+      ] : [],
+    }) });
+    expect(models.find((model) => model.modelId === "hexgrad/kokoro-82m")).toMatchObject({ voiceIds: ["af_alloy", "af_heart"] });
+    expect(models.find((model) => model.modelId === "provider/default-voice")).not.toHaveProperty("voiceIds");
+  });
   it("reads the five listings and tags each model with the slot it serves", async () => {
     const models = await openrouterMediaModels("https://openrouter.ai/api/v1/", { fetch: fetchListing });
     expect(fetched).toHaveLength(5);

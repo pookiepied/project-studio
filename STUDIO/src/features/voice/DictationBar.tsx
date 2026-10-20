@@ -6,6 +6,7 @@ import type { MicFrameListener } from '@/features/voice/useMicInput'
 import type { DictationStage } from '@/features/voice/useDictation'
 import { cn } from '@/lib/cn'
 import { WorkingDots } from '@/components/state'
+import { VoiceFailure } from '@/features/voice/VoiceFailure'
 
 /**
  * The composer while it is being spoken to.
@@ -139,7 +140,7 @@ export function DictationBar({
     // role rather than this row's `caption`, because the height has to match
     // the *field*, and `1lh` here would measure the caption text inside it.
     <div
-      className="flex w-full items-center gap-3 px-1 text-caption text-muted-foreground"
+      className="flex w-full min-w-0 items-center gap-3 px-1 text-caption text-muted-foreground"
       style={{ minHeight: 'calc(var(--text-ui) * var(--leading-ui))' }}
     >
       <AnimatePresence initial={false} mode="wait">
@@ -185,20 +186,20 @@ export function DictationBar({
             <span>Asking for the microphone</span>
           </motion.div>
         ) : (
-          <motion.p
+          <motion.div
             key="blocked"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-            className="truncate"
+            className="min-w-0 truncate"
           >
             {note !== null
-              ? note
+              ? <VoiceFailure label="Dictation failed" note={note} />
               : denied
                 ? 'Microphone blocked — allow it in Windows privacy settings, then try again'
                 : 'No microphone available right now'}
-          </motion.p>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

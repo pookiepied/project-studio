@@ -63,7 +63,10 @@ describe('the read-aloud pill', () => {
     begin()
     act(() => report?.({ stage: 'failed', note: 'No read-aloud model is connected' }))
 
-    expect(screen.getByRole('status').textContent).toBe('No read-aloud model is connected')
+    expect(screen.getByRole('status').textContent).toBe('Read-aloud failed')
+    expect(screen.queryByText('No read-aloud model is connected')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Read-aloud failed details' }))
+    expect(screen.getByText('No read-aloud model is connected')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(narrate).toHaveBeenCalledTimes(2)

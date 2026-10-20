@@ -227,6 +227,21 @@ describe("media routes", () => {
     expect(sent).not.toContain("sk-openai-route-secret-9f27");
   });
 
+  it("keeps WAV bytes, MIME type and filename consistent through the transcription route", async () => {
+    await connectOpenAi();
+    const audio = Buffer.from("RIFF-test-WAVE", "ascii");
+    const response = await authorized("/api/media/transcribe", {
+      method: "POST",
+      body: JSON.stringify({ audio: audio.toString("base64"), mimeType: "audio/wav" }),
+    });
+    expect(response.status).toBe(200);
+    const sent = provider.bodies[0]?.toString("latin1") ?? "";
+    expect(sent).toContain('filename="dictation.wav"');
+    expect(sent).toContain("Content-Type: audio/wav");
+    expect(sent).toContain(audio.toString("latin1"));
+    expect(sent).not.toContain("dictation.webm");
+  });
+
   it("speaks: JSON in, audio bytes out, base64 on the way home", async () => {
     await connectOpenAi();
     provider.audio = Buffer.from([0xff, 0xf3, 0x40, 0xc4, 0x00, 0x00, 0x00, 0x01]);
