@@ -872,18 +872,15 @@ export const TOOLS: readonly ToolDefinition[] = [
   {
     name: "studio_computer_stop",
     description:
-      "End computer control for this conversation now: releases any held button or key and closes the driver. " +
+      "Stop new computer input for this conversation. Let the active call finish within its deadline, then release held input and close the driver. " +
       "Rarely needed - an idle driver closes itself, and the next tool call starts another.",
     inputSchema: object({}),
     run: async (session) => {
       const was = session.running;
-      if (was) {
-        // Anything left held would stay held after the driver dies, which is
-        // the one state worse than a stuck pointer.
-        await session.request("button", { action: "up", button: "left" }).catch(() => undefined);
-        await session.request("button", { action: "up", button: "right" }).catch(() => undefined);
-      }
-      await session.close();
+      // Closing stdin fences queued actions immediately. The driver's finally
+      // releases all Studio-held buttons/modifiers after the active call ends.
+      const clean = await session.close();
+      if (!clean) return { isError: true, content: [{ type: "text", text: "Computer stop was requested, but orderly driver exit and held-input cleanup were not confirmed. Check the desktop before continuing; do not repeat an uncertain action." }] };
       return answer(was ? "Computer control has stopped." : "Computer control was not running.");
     },
   },

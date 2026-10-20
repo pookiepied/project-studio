@@ -24,6 +24,9 @@ describe.skipIf(process.platform !== "win32")("native physical input policy with
     expect(checks["drained"]).toMatchObject({ Moves: 0, Buttons: 0, Wheels: 0, Keys: 0 });
     expect(checks["overlayAbsent"]).toBe(true);
   });
+  it("draws the browser-style arrow and custom rounded badge, including at screen edges", () => {
+    expect(checks).toMatchObject({ arrowPainted: true, badgePainted: true, badgeRounded: true, edgeBadgeVisible: true });
+  });
 });
 
 describe("physical input product updates", () => {

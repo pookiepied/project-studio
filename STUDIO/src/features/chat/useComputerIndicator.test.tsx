@@ -94,6 +94,39 @@ describe('useComputerIndicator', () => {
     expect(hide).not.toHaveBeenCalled()
   })
 
+  it('lets chat Stop cancel the run and request driver cleanup together', () => {
+    const stopTurn = vi.fn()
+    const { result } = renderHook(() =>
+      useComputerIndicator('cnv_1', turnWith('mcp__15_studio-computer__3_studio_computer_type'), true, stopTurn),
+    )
+    act(() => result.current())
+    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
+    expect(stopTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops a normal chat without starting a computer driver', () => {
+    const stopTurn = vi.fn()
+    const { result } = renderHook(() => useComputerIndicator('cnv_1', [], true, stopTurn))
+    act(() => result.current())
+    expect(stopComputer).not.toHaveBeenCalled()
+    expect(stopTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the native Stop listener attached while streamed content changes', async () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const { rerender } = renderHook(({ stopTurn }) =>
+      useComputerIndicator('cnv_1', [], true, stopTurn), { initialProps: { stopTurn: first } },
+    )
+    await act(async () => { await Promise.resolve() })
+    const listener = stopHandler
+    rerender({ stopTurn: latest })
+    expect(stopHandler).toBe(listener)
+    act(() => stopHandler?.('cnv_1'))
+    expect(first).not.toHaveBeenCalled()
+    expect(latest).toHaveBeenCalledTimes(1)
+  })
+
   it("answers the pill's Stop for this conversation only", async () => {
     const stopTurn = vi.fn()
     renderHook(() =>

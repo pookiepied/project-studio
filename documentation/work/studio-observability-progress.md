@@ -13,6 +13,31 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Active follow-up checklist, 2026-10-20
+
+- [x] Finish live steering: interrupt the provider request, join the durable
+  correction once, preserve ordinary queued work and give Stop priority.
+- [x] Use one composer action slot: Stop while running with an empty draft;
+  Send to queue while a draft is present. Keep voice controls and layout stable.
+- [x] Verify the three-message queue limit in the client and harness.
+- [x] Verify computer mouse position/activity updates and keyboard activity
+  without key values or typed text. Separate automated proof from desktop tests.
+- [x] Match computer cursor and custom hint styling to Studio browser.
+- [x] Review active-tool Stop cleanup and document cancellation boundaries.
+- [x] Run full harness/client checks sequentially, commit and push only main,
+  and remove other branches only when proven safe.
+
+Live steering regression tests now prove provider interruption, conversation
+isolation, preserved queued work, Stop priority and content-free diagnostics.
+Computer protocol fixtures prove active-call draining, queue refusal and an
+honest failure result for unconfirmed cleanup. Native drawing is tested offscreen;
+physical mouse/keyboard hooks, overlay focus and multiple monitors still require
+hands-on verification. Full sequential gates passed: harness typecheck/lint/build
+and 2,561 tests (28 skipped); client typecheck/lint and 1,579 tests. The client
+production build also passed. Hash-verified mutation controls were restored;
+main is the only local and remote branch. Detailed evidence and the Stop policy
+are tracked in `report/live-steering.md`.
+
 ### Queue promotion delivery, 2026-10-20
 
 The composer queues follow-ups through one send icon. Successful queue promotion

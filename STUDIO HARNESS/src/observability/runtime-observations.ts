@@ -55,6 +55,10 @@ export function recordFlueObservation(event: FlueObservation): void {
       const value = raw[key];
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") attributes[key] = value;
     }
+    if (event.type === "log" && typeof raw.attributes === "object" && raw.attributes !== null && "stage" in raw.attributes) {
+      const stage = raw.attributes.stage;
+      if (stage === "steering_requested" || stage === "steering_context_ready") attributes.stage = stage;
+    }
     // Only allowlisted summaries enter operational capture. Requests/results stay gated.
     const response = raw.response as Record<string, unknown> | undefined;
     if (response && typeof response === "object") {

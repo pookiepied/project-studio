@@ -1,4 +1,4 @@
-param([string]$Source)
+param([string]$Source, [string]$Preview)
 $ErrorActionPreference = "Stop"
 # Compile the shipped helper, but never start its thread, hooks or marker.
 Add-Type -Path $Source -ReferencedAssemblies System.Drawing, System.Windows.Forms
@@ -23,4 +23,18 @@ $checks.drained = $activity.Read()
 $checks.fields = @([Studio.InputSummary].GetFields() | ForEach-Object { $_.Name })
 $checks.overlayAbsent = -not $activity.IsOverlay(100)
 $activity.Dispose()
+# Exercise the shipped drawing without a form, hooks or desktop input.
+$bitmap = New-Object System.Drawing.Bitmap(92, 56)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+try {
+  $graphics.Clear([System.Drawing.Color]::White)
+  [Studio.Activity]::PaintCursor($graphics, (New-Object System.Drawing.Point(2, 2)), $bitmap.Size)
+  $checks.arrowPainted = $bitmap.GetPixel(8, 10).R -lt 100
+  $checks.badgePainted = $bitmap.GetPixel(25, 38).R -lt 100
+  $checks.badgeRounded = $bitmap.GetPixel(14, 28).R -eq 255
+  if ($Preview) { $bitmap.Save($Preview, [System.Drawing.Imaging.ImageFormat]::Png) }
+  $graphics.Clear([System.Drawing.Color]::White)
+  [Studio.Activity]::PaintCursor($graphics, (New-Object System.Drawing.Point(91, 55)), $bitmap.Size)
+  $checks.edgeBadgeVisible = $bitmap.GetPixel(42, 40).R -lt 100
+} finally { $graphics.Dispose(); $bitmap.Dispose() }
 ConvertTo-Json $checks -Compress -Depth 5

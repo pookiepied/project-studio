@@ -406,7 +406,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
   // The sign on the desktop that Studio is at the keyboard, up for exactly as
   // long as this turn is driving the computer. Its Stop ends the run here.
-  useComputerIndicator(conversation.id, live.items, running, stopTurn)
+  const stopWithComputerCleanup = useComputerIndicator(conversation.id, live.items, running, stopTurn)
 
   return (
     <div data-attachment-drop-zone className="relative flex h-full flex-col">
@@ -670,7 +670,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
               // length. Reading `streaming` alone is what left the composer
               // idle for six of a seven-second turn.
               busy={isTurnRunning(live.phase)}
-              onStop={stopTurn}
+              onStop={stopWithComputerCleanup}
             />
           </div>
         )}

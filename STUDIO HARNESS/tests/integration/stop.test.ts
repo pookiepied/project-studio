@@ -9,6 +9,7 @@ import { createFlueClient } from "@flue/sdk";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient, type AcceptedRun } from "../../src/application/harness-client.js";
+import type { DiagnosticPage } from "../../src/contracts/diagnostics.js";
 
 // Reuse the same harness boot as harness.test but with execution-context awareness.
 async function availablePort(): Promise<number> {
@@ -88,6 +89,112 @@ async function stopHarness(child: ChildProcess): Promise<void> {
 }
 
 describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
+  it("interrupts streamed output on promotion and makes the model answer the correction before queued work", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "studio-live-steer-"));
+    toClean.push(() => rm(dir, { recursive: true, force: true }));
+    const h = await startHarness(join(dir, "flue.db"));
+    toClean.push(() => stopHarness(h.process));
+    const id = "live-steer";
+    const url = `${h.baseUrl}/agents/studio/${id}`;
+    const client = createFlueClient({ url, token: h.token });
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${h.token}` };
+    expect((await fetch(`${h.baseUrl}/api/diagnostics/policy`, { method: "PUT", headers, body: JSON.stringify({ enabled: true, captureContent: false }) })).status).toBe(200);
+    const first = await client.send({ message: { kind: "user", body: `[pace] ${"OLD_RESPONSE ".repeat(120)}` } });
+    const textOf = (message: Awaited<ReturnType<typeof client.history>>["messages"][number]) =>
+      message.parts.flatMap((part) => part.type === "text" ? [part.text] : []).join("");
+    await waitUntil(async () => (await client.history()).messages.some((message) =>
+      message.role === "assistant" && textOf(message).includes("OLD_RESPONSE")));
+    const enqueue = async (body: string) => {
+      const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ kind: "user", body, deliveryMode: "queue" }) });
+      expect(response.status).toBe(202);
+      const receipt: unknown = await response.json();
+      if (typeof receipt !== "object" || receipt === null || !("submissionId" in receipt) || typeof receipt.submissionId !== "string") throw new Error("Missing receipt.");
+      return receipt.submissionId;
+    };
+    const queued = await enqueue("PRESERVED_FOLLOW_UP");
+    const steered = await enqueue("CORRECTED_DIRECTION");
+    const promotion = await fetch(`${h.baseUrl}/api/conversations/${id}/queue/${steered}/steer`, { method: "POST", headers });
+    expect(promotion.status).toBe(204);
+    // The obsolete stream takes over twenty seconds. A correction must finish
+    // promptly instead of merely appearing in history after that stream ends.
+    await waitUntil(async () => (await client.history()).settlements.some((item) =>
+      item.submissionId === first.submissionId && item.outcome === "completed"), 5000);
+    await client.read(queued);
+    const history = await client.history();
+    const hostReplies = history.messages.filter((message) => message.role === "assistant" && message.submissionId === first.submissionId);
+    const reply = hostReplies.map(textOf).join("");
+    expect(reply).toMatch(/Echo: CORRECTED_DIRECTION$/);
+    expect(reply.split("OLD_RESPONSE").length - 1).toBeLessThan(120);
+    expect(history.messages.filter((message) => message.role === "user" && message.submissionId === steered)).toHaveLength(1);
+    expect(history.messages.some((message) => message.role === "assistant" && message.submissionId === steered)).toBe(false);
+    expect(history.messages.some((message) => message.role === "assistant" && message.submissionId === queued && textOf(message) === "Echo: PRESERVED_FOLLOW_UP")).toBe(true);
+    expect(history.settlements.filter((item) => [first.submissionId, queued, steered].includes(item.submissionId)).map((item) => item.outcome)).toEqual(["completed", "completed", "completed"]);
+    const diagnostics: DiagnosticPage = await (await fetch(`${h.baseUrl}/api/diagnostics/events?limit=500`, { headers })).json();
+    for (const stage of ["steering_requested", "steering_context_ready"]) {
+      const event = diagnostics.events.find((item) => item.attributes.stage === stage);
+      expect(event?.identity).toMatchObject({ conversationId: id, submissionId: first.submissionId });
+      expect(event?.content).toBeUndefined();
+    }
+    expect(JSON.stringify(diagnostics.events.map((event) => event.attributes))).not.toContain("CORRECTED_DIRECTION");
+    expect(diagnostics.events.some((event) => event.name === "runtime.turn" && event.outcome === "cancelled" && event.identity.submissionId === first.submissionId)).toBe(true);
+  }, 30_000);
+  it("leaves ordinary queued input and another conversation's stream uninterrupted", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "studio-steer-isolation-"));
+    toClean.push(() => rm(dir, { recursive: true, force: true }));
+    const h = await startHarness(join(dir, "flue.db"));
+    toClean.push(() => stopHarness(h.process));
+    const ordinary = createFlueClient({ url: `${h.baseUrl}/agents/studio/ordinary`, token: h.token });
+    const other = createFlueClient({ url: `${h.baseUrl}/agents/studio/other`, token: h.token });
+    const originalText = "UNCHANGED ".repeat(12).trim();
+    const first = await ordinary.send({ message: { kind: "user", body: `[pace] ${originalText}` } });
+    const second = await other.send({ message: { kind: "user", body: `[pace] ${"CHANGE_ME ".repeat(120)}` } });
+    await waitUntil(async () => (await other.history()).messages.some((message) => message.role === "assistant"));
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${h.token}` };
+    const deliver = async (id: string, body: string, deliveryMode: "queue" | "steer") => {
+      const response = await fetch(`${h.baseUrl}/agents/studio/${id}`, { method: "POST", headers, body: JSON.stringify({ kind: "user", body, deliveryMode }) });
+      expect(response.status).toBe(202);
+      const receipt: unknown = await response.json();
+      if (typeof receipt !== "object" || receipt === null || !("submissionId" in receipt) || typeof receipt.submissionId !== "string") throw new Error("Missing receipt.");
+      return receipt.submissionId;
+    };
+    const queued = await deliver("ordinary", "AFTER_ORDINARY", "queue");
+    const correction = await deliver("other", "ONLY_OTHER_CORRECTION", "steer");
+    await other.read(correction);
+    await ordinary.read(first);
+    await ordinary.read(queued);
+    const history = await ordinary.history();
+    const reply = history.messages.filter((message) => message.role === "assistant" && message.submissionId === first.submissionId)
+      .flatMap((message) => message.parts.flatMap((part) => part.type === "text" ? [part.text] : [])).join("");
+    expect(reply).toBe(`Echo: ${originalText}`);
+    expect(history.settlements.find((item) => item.submissionId === first.submissionId)?.outcome).toBe("completed");
+    expect((await other.history()).settlements.find((item) => item.submissionId === second.submissionId)?.outcome).toBe("completed");
+    expect(JSON.stringify(history.messages)).not.toContain("ONLY_OTHER_CORRECTION");
+    expect(await (await fetch(`${h.baseUrl}/api/conversations/ordinary/queue`, { headers })).json()).toEqual([]);
+  }, 30_000);
+  it("honors Stop during a steering continuation without reviving the response", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "studio-steer-stop-"));
+    toClean.push(() => rm(dir, { recursive: true, force: true }));
+    const h = await startHarness(join(dir, "flue.db"));
+    toClean.push(() => stopHarness(h.process));
+    const id = "steer-stop";
+    const url = `${h.baseUrl}/agents/studio/${id}`;
+    const client = createFlueClient({ url, token: h.token });
+    const first = await client.send({ message: { kind: "user", body: `[pace] ${"OBSOLETE ".repeat(100)}` } });
+    await waitUntil(async () => (await client.history()).messages.some((message) => message.role === "assistant"));
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${h.token}` };
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ kind: "user", body: "[slow] MUST_NOT_COMPLETE", deliveryMode: "steer" }) });
+    expect(response.status).toBe(202);
+    const receipt: unknown = await response.json();
+    if (typeof receipt !== "object" || receipt === null || !("submissionId" in receipt) || typeof receipt.submissionId !== "string") throw new Error("Missing receipt.");
+    await waitUntil(async () => (await client.history()).messages.some((message) => message.submissionId === receipt.submissionId), 5000);
+    const control = new FlueHarnessClient({ baseUrl: h.baseUrl, token: h.token });
+    expect(await control.cancel(id)).toBe(true);
+    await waitUntil(async () => (await client.history()).settlements.some((item) => item.submissionId === first.submissionId && item.outcome === "aborted"), 5000);
+    const history = await client.history();
+    expect(history.settlements.find((item) => item.submissionId === receipt.submissionId)?.outcome).toBe("aborted");
+    expect(history.messages.filter((message) => message.role === "assistant").flatMap((message) =>
+      message.parts.flatMap((part) => part.type === "text" ? [part.text] : [])).join("")).not.toContain("MUST_NOT_COMPLETE");
+  }, 30_000);
   it("caps the durable queue and promotes or removes only messages that have not started", async () => {
     const dir = await mkdtemp(join(tmpdir(), "studio-queue-controls-"));
     toClean.push(() => rm(dir, { recursive: true, force: true }));

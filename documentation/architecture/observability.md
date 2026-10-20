@@ -123,8 +123,26 @@ HTTP request. After success, `client.projection` records the
 `queued_message_promoted` stage with conversation/submission identity and no
 message content. The transcript shows the admitted message while its reader
 resumes from the retained offset; this is delivery recovery, not another
-submission or an execution retry. Steering still joins at the runtime's next
-safe step. Refused promotions keep the queued message and surface the error.
+submission or an execution retry. Refused promotions keep the queued message
+and surface the error.
+
+During an active model request, a metadata-only check for explicit steering is
+scoped to the running host submission, attempt and session. It requests provider
+cancellation, joins the correction through the existing durable input path, then
+rebuilds context and continues the same host submission. It never aborts or
+replays a running tool; steering during a tool waits for the tool batch boundary.
+Ordinary queued follow-ups do not interrupt. Stop and the original deadline take
+priority over continuation. Providers must acknowledge their cancellation signal;
+a cancellation request alone does not prove the provider stopped.
+
+Existing `runtime.log` observations expose only the allowlisted stages
+`steering_requested` and `steering_context_ready`, retaining host submission and
+conversation identity. Context readiness does not prove model consumption: the
+next `runtime.turn_request` records the new request, and settlement records its
+outcome. The interrupted model turn can be cancelled while the host submission
+later completes. No prompt, queue payload, image data or key contents enter these
+operational attributes. Polling lasts only for the active request and does not
+claim queue rows or hydrate attachments. Existing capture policy remains in force.
 
 The owner is `STUDIO HARNESS/src/contracts/diagnostics.ts`, format version 1.
 `StudioObservation` has event/boot IDs, local sequence, wall and monotonic time,
@@ -346,6 +364,13 @@ Studio-tracked held keys/buttons. The shared server serializes desktop tools and
 refuses competing input while another conversation's driver owns the desktop,
 including its release interval. Stop bypasses these queues; queue epochs still
 fence stale continuations. Ownership is coordination, not a permission grant.
+Chat Stop and the desktop pill both request driver cleanup and model cancellation.
+Closing the driver refuses new input immediately. An active native request may
+finish within its original deadline, followed by a two-second shutdown margin;
+stdin closure then reaches the driver's held-input cleanup. This does not grant
+a fresh request budget. A forced or nonzero exit reports unconfirmed cleanup,
+and an unconfirmed kill retains the ownership fence until actual process exit.
+Steering does not run this Stop path or replay an active computer tool.
 It is local to one computer MCP server, not OS-wide arbitration between independent
 harness processes. A wedged or force-killed driver cannot guarantee held-input
 cleanup; an already-running native call can delay the driver's cleanup requests.
@@ -376,6 +401,10 @@ physical human attribution or secure-desktop/elevated-window coverage. Cursor
 styles within child frames remain best effort; no native marker/focus, physical
 input or multi-monitor hands-on verification is claimed. Tests compile the helper
 without starting hooks and exercise controlled browser sessions.
+The desktop marker paints the browser's arrow geometry and a rounded custom
+Studio badge. Screen-edge placement keeps the badge visible and arrow hotspot
+aligned. It does not replace the OS-wide cursor. Offscreen drawing tests exercise
+the shipped renderer; these are not evidence of live desktop focus or hook delivery.
 
 All window kinds share appearance updates through the existing preference-store
 subscription (browser windows use storage events). Receiving an update emits

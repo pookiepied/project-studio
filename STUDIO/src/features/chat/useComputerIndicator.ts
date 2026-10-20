@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { computerAction } from '@/features/chat/transcript/live/computerCall'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 import {
@@ -30,10 +30,18 @@ export function useComputerIndicator(
   items: readonly TranscriptItem[],
   running: boolean,
   stopTurn: () => void,
-): void {
+): () => void {
   const { computer } = useWorkspace()
   const driving = running && drivesComputer(items)
   const shown = useRef(false)
+  // Chat and desktop Stop share cleanup. Cancelling the model alone cannot
+  // release input already sent to the separate computer MCP process.
+  const stop = useCallback(() => {
+    if (drivesComputer(items)) void computer.stop(conversationId)
+    stopTurn()
+  }, [computer, conversationId, items, stopTurn])
+  const stopRef = useRef(stop)
+  stopRef.current = stop
 
   useEffect(() => {
     if (driving) {
@@ -59,8 +67,7 @@ export function useComputerIndicator(
     let live = true
     void onComputerStopRequested((stopped) => {
       if (stopped !== conversationId) return
-      void computer.stop(conversationId)
-      stopTurn()
+      stopRef.current()
     }).then((stop) => {
       if (live) unlisten = stop
       else stop()
@@ -69,7 +76,8 @@ export function useComputerIndicator(
       live = false
       unlisten?.()
     }
-  }, [conversationId, computer, stopTurn])
+  }, [conversationId])
+  return stop
 }
 
 /** Whether the newest assistant item - the running turn - has a computer call. */

@@ -151,6 +151,15 @@ minimumReleaseAgeExclude:
 #       callback failures are ignored and public/persisted event shapes stay
 #       unchanged. Re-anchor at admission immediately before submission_queued.
 #
+#   13. conversation-stream-store-*.mjs, emitTurnRequestAndStream and
+#       runModelTurnWithRecovery; sql-agent-execution-store-*.mjs,
+#       hasSteeringSubmission - poll scheduling metadata only while a model
+#       request runs. Explicit steering cancels that request, durably joins
+#       once at turn_end, rebuilds context and continues the same submission.
+#       Tools are never aborted or replayed by steering; Stop still wins.
+#       stop.test.ts and live-steering-store.test.ts pin delivery, scoping,
+#       queued work, Stop and content-free observation stages.
+#
 #   How to re-derive at the next upgrade: every hunk carries its own recipe
 #   in a `[project-studio patch]` comment, and every recipe says to anchor
 #   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of

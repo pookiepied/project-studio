@@ -953,12 +953,6 @@ export function Composer({
               flow, the leaving face fades where it stood and the row never
               changes width. */}
           {!dictating && (
-          <>
-          {turnRunning && onQueue !== undefined ? (
-            <IconButton label="Stop" size="md" onClick={halt}>
-              <Icons.stop size="md" />
-            </IconButton>
-          ) : null}
           <AnimatePresence initial={false} mode="popLayout">
             {canSend || busy || pendingAttachments > 0 ? (
               <motion.div
@@ -968,22 +962,11 @@ export function Composer({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: DURATION.fast, ease: EASE_OUT }}
               >
-                {turnRunning && onQueue !== undefined ? (
-                  <IconButton
-                    label="Queue message"
-                    size="md"
-                    tone="solid"
-                    disabled={!canSend || queueFull}
-                    onClick={() => submit()}
-                  >
-                    <Icons.send size="md" />
-                  </IconButton>
-                ) : (
                 <IconButton
-                  label={busy ? 'Stop' : 'Send'}
+                  label={canSend ? (turnRunning ? 'Queue message' : 'Send') : busy ? 'Stop' : 'Send'}
                   size="md"
                   tone="solid"
-                  disabled={pendingAttachments > 0 && !busy}
+                  disabled={(pendingAttachments > 0 && !busy) || (canSend && turnRunning && queueFull)}
                   onClick={canSend ? () => submit() : halt}
                 >
                   {busy && !canSend ? (
@@ -1004,7 +987,6 @@ export function Composer({
                     <Icons.send size="md" />
                   )}
                 </IconButton>
-                )}
               </motion.div>
             ) : (
               <motion.div
@@ -1035,7 +1017,6 @@ export function Composer({
               </motion.div>
             )}
           </AnimatePresence>
-          </>
           )}
         </motion.div>
       </div>

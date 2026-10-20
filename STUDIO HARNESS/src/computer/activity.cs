@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -97,8 +98,7 @@ namespace Studio {
                         Point point;
                         if (show && GetCursorPos(out point)) {
                             Rectangle area = Screen.FromPoint(point).Bounds;
-                            view.Location = new Point(Math.Max(area.Left, Math.Min(area.Right - view.Width, point.X - 11)),
-                                Math.Max(area.Top, Math.Min(area.Bottom - view.Height, point.Y - 11)));
+                            view.Follow(point, area);
                             if (!view.Visible) view.Show();
                         } else if (view.Visible) view.Hide();
                     };
@@ -114,12 +114,46 @@ namespace Studio {
         }
         public void Dispose() { lock (gate) { stopped = true; showUntil = 0; } if (thread != null) thread.Join(1000); }
 
+        // Same arrow geometry and rounded Studio badge as BrowserWindow.tsx.
+        // Paint our own badge, never a native tooltip or a global cursor change.
+        public static void PaintCursor(Graphics graphics, Point hotspot, Size size) {
+            GraphicsState state = graphics.Save();
+            try {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Brush fill = new SolidBrush(Color.FromArgb(30, 30, 30)))
+                using (Brush ink = new SolidBrush(Color.White))
+                using (Pen outline = new Pen(Color.White, 1.5f))
+                using (Font font = new Font("Segoe UI", 8, FontStyle.Regular, GraphicsUnit.Point))
+                using (GraphicsPath arrow = new GraphicsPath())
+                using (GraphicsPath badge = new GraphicsPath()) {
+                    arrow.AddPolygon(new Point[] { new Point(hotspot.X, hotspot.Y), new Point(hotspot.X + 17, hotspot.Y + 13),
+                        new Point(hotspot.X + 9, hotspot.Y + 14), new Point(hotspot.X + 5, hotspot.Y + 21) });
+                    outline.LineJoin = LineJoin.Round;
+                    graphics.FillPath(fill, arrow); graphics.DrawPath(outline, arrow);
+                    int x = Math.Max(0, Math.Min(size.Width - 56, hotspot.X + 12));
+                    int y = hotspot.Y + 26 + 20 <= size.Height ? hotspot.Y + 26 : Math.Max(0, hotspot.Y - 24);
+                    badge.AddArc(x, y, 20, 20, 90, 180);
+                    badge.AddArc(x + 36, y, 20, 20, 270, 180); badge.CloseFigure();
+                    graphics.FillPath(fill, badge);
+                    graphics.DrawString("Studio", font, ink, x + 9, y + 2);
+                }
+            } finally { graphics.Restore(state); }
+        }
+
         private sealed class Marker : Form {
             public readonly IntPtr NativeHandle;
+            private Point hotspot = new Point(2, 2);
             public Marker() {
                 FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
                 BackColor = Color.Magenta; TransparencyKey = Color.Magenta;
-                ClientSize = new Size(92, 32); DoubleBuffered = true; NativeHandle = Handle;
+                ClientSize = new Size(92, 56); DoubleBuffered = true; NativeHandle = Handle;
+            }
+            public void Follow(Point point, Rectangle area) {
+                Point location = new Point(Math.Max(area.Left, Math.Min(area.Right - Width, point.X - 2)),
+                    Math.Max(area.Top, Math.Min(area.Bottom - Height, point.Y - 2)));
+                Point next = new Point(point.X - location.X, point.Y - location.Y);
+                if (hotspot != next) { hotspot = next; Invalidate(); }
+                Location = location;
             }
             protected override bool ShowWithoutActivation { get { return true; } }
             protected override CreateParams CreateParams {
@@ -131,13 +165,7 @@ namespace Studio {
                 base.WndProc(ref message);
             }
             protected override void OnPaint(PaintEventArgs args) {
-                using (Pen ring = new Pen(Color.FromArgb(155, 135, 245), 2))
-                using (Brush fill = new SolidBrush(Color.FromArgb(49, 42, 72)))
-                using (Brush ink = new SolidBrush(Color.White)) {
-                    args.Graphics.DrawEllipse(ring, 1, 1, 20, 20);
-                    args.Graphics.FillRectangle(fill, 27, 5, 62, 23);
-                    args.Graphics.DrawString("Studio", SystemFonts.MessageBoxFont, ink, 32, 8);
-                }
+                PaintCursor(args.Graphics, hotspot, ClientSize);
             }
         }
     }

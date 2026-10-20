@@ -48,6 +48,7 @@ interface Pending {
   readonly resolve: (value: unknown) => void;
   readonly reject: (error: Error) => void;
   readonly timer: NodeJS.Timeout;
+  readonly deadlineAt: number;
   readonly input: InputUpdates | undefined;
 }
 
@@ -98,7 +99,7 @@ export function unsupportedMessage(): string {
 export class ComputerSession {
   #child: ChildProcessWithoutNullStreams | undefined;
   #ready: Promise<void> | undefined;
-  #closing: Promise<void> | undefined;
+  #closing: Promise<boolean> | undefined;
   readonly #pending = new Map<number, Pending>();
   #next = 1;
   #idle: NodeJS.Timeout | undefined;
@@ -271,7 +272,9 @@ export class ComputerSession {
   async request(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
     const context = this.#toolContext.getStore();
     const epoch = context?.epoch;
-    if (this.#closing !== undefined) await this.#closing;
+    if (this.#closing !== undefined && !await this.#closing) {
+      throw new ComputerError("refused", { message: "The previous driver has not confirmed orderly shutdown. Wait for it to exit and observe the desktop again before sending input." });
+    }
     if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control was stopped or replaced. Observe status before continuing." });
     const child = await this.#launch();
     if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control changed while the driver started. Observe status again." });
@@ -285,14 +288,17 @@ export class ComputerSession {
         }));
         void this.close();
       }, REQUEST_MS);
-      this.#pending.set(id, { resolve, reject, timer, input: context?.input });
+      this.#pending.set(id, { resolve, reject, timer, deadlineAt: Date.now() + REQUEST_MS, input: context?.input });
       child.stdin.write(`${JSON.stringify({ id, op, args: { ...args, observationId: createStudioUuid() } })}\n`);
     });
   }
 
-  /** Ends the driver now. Safe when nothing is running. */
-  async close(): Promise<void> {
+  /** Refuse new input now; let the active call reach the driver's cleanup. */
+  async close(): Promise<boolean> {
     const child = this.#child;
+    // Reuse the active request's deadline, rather than granting another minute
+    // or killing a healthy drag/hold before its finally block releases input.
+    const drainMs = Math.max(2000, ...[...this.#pending.values()].map((waiting) => waiting.deadlineAt - Date.now() + 2000));
     this.#forget();
     for (const waiting of this.#pending.values()) {
       clearTimeout(waiting.timer);
@@ -300,23 +306,28 @@ export class ComputerSession {
     }
     this.#pending.clear();
     if (this.#closing !== undefined) return this.#closing;
-    if (child === undefined) return;
-    const closing = new Promise<void>((resolve) => {
+    if (child === undefined) return true;
+    const closing = new Promise<boolean>((resolve) => {
       const done = (): void => {
         clearTimeout(force);
-        resolve();
+        if (this.#closing === closing) this.#closing = undefined;
+        resolve(child.exitCode === 0);
       };
       const force = setTimeout(() => {
         child.kill();
-        resolve();
-      }, 2000);
+        resolve(false);
+      }, drainMs);
       child.once("exit", done);
       // Closing stdin is the driver's signal to leave its loop; a kill is
       // only for one that does not.
       child.stdin.end();
     });
     this.#closing = closing;
-    try { await closing; } finally { if (this.#closing === closing) this.#closing = undefined; }
+    try { return await closing; } finally {
+      // A kill request is not confirmed exit. Keep ownership fenced until the
+      // exit callback, even when the bounded shutdown wait already returned.
+      if (this.#closing === closing && (child.exitCode !== null || child.signalCode !== null)) this.#closing = undefined;
+    }
   }
 
   #forget(): void {

@@ -181,7 +181,7 @@ index 63c9b95ea0a8333a7109fce9084ad4068711506d..85da42199a1e998f64fe4b12f0914980
  		attachmentStore
  	};
 diff --git a/dist/conversation-stream-store-CXrgv-b0.mjs b/dist/conversation-stream-store-CXrgv-b0.mjs
-index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf91447ff1a72 100644
+index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b3d967939 100644
 --- a/dist/conversation-stream-store-CXrgv-b0.mjs
 +++ b/dist/conversation-stream-store-CXrgv-b0.mjs
 @@ -442,14 +442,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
@@ -226,7 +226,83 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf914
  		if (env.directoryListing && env.directoryListing.length > 0) parts.push("", "Directory structure:", env.directoryListing.join("\n"));
  	}
  	return parts.join("\n");
-@@ -4146,20 +4166,77 @@ var Session = class {
+@@ -1204,8 +1224,15 @@ var Session = class {
+ 	activeJoinSignal;
+ 	/** The active submission's canonical input entry id (delivery-cursor floor). */
+ 	activeInputEntryId;
++	// [project-studio patch] Interrupt only the provider request, never a tool
++	// or the host submission. The durable join remains the delivery authority.
++	steeringInterrupted = false;
++	steeringPollError;
+ 	emitTurnRequestAndStream = async (model, requestContext, requestOptions) => {
+ 		const { context, options } = prepareDocumentRequest(model, requestContext, requestOptions);
++		const source = this.activeJoinSource;
++		const interruption = source?.hasSteering ? new AbortController() : void 0;
++		const streamOptions = interruption ? { ...options, signal: options?.signal ? AbortSignal.any([options.signal, interruption.signal]) : interruption.signal } : options;
+ 		if (this.activeTurnId === void 0) this.activeTurnId = generateTurnId();
+ 		const turnId = this.activeTurnId;
+ 		const operationId = this.activeOperationId ?? generateOperationId();
+@@ -1218,7 +1245,37 @@ var Session = class {
+ 			operationId,
+ 			turnId
+ 		});
+-		return interceptExecution(operation, executionContext, async () => wrapProviderStream(getRuntimeModels().streamSimple(model, context, options), operation, executionContext));
++		const stream = await interceptExecution(operation, executionContext, async () => wrapProviderStream(getRuntimeModels().streamSimple(model, context, streamOptions), operation, executionContext));
++		if (interruption) {
++			let finished = false;
++			let timer;
++			const finish = () => { finished = true; clearTimeout(timer); };
++			const check = async () => {
++				try {
++					const pending = await source.hasSteering();
++					if (finished || streamOptions.signal.aborted) return;
++					if (pending) {
++						this.steeringInterrupted = true;
++						this.internalLog("info", "[flue:steering] Model interruption requested", { stage: "steering_requested" });
++						interruption.abort(new DOMException("Response interrupted by steering", "AbortError"));
++						return;
++					}
++				} catch (error) {
++					if (finished) return;
++					this.steeringPollError = error;
++					interruption.abort(error);
++					return;
++				}
++				if (!finished && !streamOptions.signal.aborted) {
++					// Active requests only: no background poll survives a result.
++					timer = setTimeout(check, 100);
++					timer.unref?.();
++				}
++			};
++			void stream.result().then(finish, finish);
++			void check();
++		}
++		return stream;
+ 	};
+ 	canonicalEnvelope(type, id = generateConversationRecordId()) {
+ 		return {
+@@ -4143,23 +4200,98 @@ var Session = class {
+ 			const messages = this.agentLoop.state.messages;
+ 			const latest = messages[messages.length - 1];
+ 			assistant = latest?.role === "assistant" ? latest : void 0;
++			if (this.steeringPollError !== void 0) {
++				const error = this.steeringPollError;
++				this.steeringPollError = void 0;
++				throw error;
++			}
++			const interrupted = this.steeringInterrupted;
++			this.steeringInterrupted = false;
++			if (interrupted && (assistant?.stopReason === "aborted" || assistant?.stopReason === "error")) {
++				throwIfHalted();
++				// turn_end has durably joined the correction. Rebuild once so the
++				// aborted output is omitted and the steering queue cannot repeat it.
++				await this.rebuildCanonicalContext();
++				this.agentLoop.clearSteeringQueue();
++				this.internalLog("info", "[flue:steering] Continuing with joined input", { stage: "steering_context_ready" });
++				assistant = void 0;
++				turnCompleted = false;
++				start = continueRebuilt;
++			}
  		}
  	}
  	async waitForTransientModelRetry(assistant, attempt) {
@@ -307,7 +383,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf914
  			delayMs,
  			error: assistant.errorMessage
  		});
-@@ -4230,6 +4307,8 @@ var Session = class {
+@@ -4230,6 +4362,8 @@ var Session = class {
  				estimatedTokens
  			});
  			terminalPending = true;
@@ -316,7 +392,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf914
  			const result = await compact(preparation, summarizationModel, this.compactionAbortController.signal, {
  				start: (purpose, model, context, options) => {
  					const handle = { turnId: generateTurnId() };
-@@ -4249,7 +4328,7 @@ var Session = class {
+@@ -4249,7 +4383,7 @@ var Session = class {
  					this.emitTurn(handle.turnId, purpose, response, request.info, error);
  					this.modelRequests.delete(handle.turnId);
  				}
@@ -325,7 +401,16 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf914
  			if (this.compactionAbortController.signal.aborted) {
  				const abortError = abortErrorFor(this.compactionAbortController.signal);
  				this.emit({
-@@ -5017,6 +5096,7 @@ async function materializeSubmissionAttachments(input, conversationId, attachmen
+@@ -4626,6 +4760,8 @@ var Session = class {
+ 				this.activeSubmissionAttemptId = void 0;
+ 				this.activeJoinSource = void 0;
+ 				this.activeJoinSignal = void 0;
++				this.steeringInterrupted = false;
++				this.steeringPollError = void 0;
+ 				this.activeInputEntryId = void 0;
+ 				this.activeTimeoutAt = void 0;
+ 			}
+@@ -5017,6 +5153,7 @@ async function materializeSubmissionAttachments(input, conversationId, attachmen
  		});
  	}
  }
@@ -333,11 +418,12 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..a76562b3d6f4ff6bdbe1234243eaf914
  function createAgentSubmissionSessionHandler(agent, input, execute) {
  	return async (ctx) => {
  		return execute(await openAgentSubmissionSession(ctx, agent, input));
-@@ -5161,7 +5241,16 @@ async function processSubmission(opts) {
+@@ -5161,7 +5298,17 @@ async function processSubmission(opts) {
  		maxAttempts: submission.maxAttempts
  	});
  	const joinSource = {
 -		claim: () => submissions.claimJoinableSubmissions(attempt, input.agent),
++		hasSteering: () => submissions.hasSteeringSubmission?.(attempt, input.agent) ?? false,
 +		claim: async () => {
 +			const claimed = await submissions.claimJoinableSubmissions(attempt, input.agent);
 +			const steering = [];
@@ -671,7 +757,7 @@ index 3bb3d2fbb1be44c40f6621b53b430a692e886e8d..c67ed35c29a8e4a80940bfacdda445a1
  type FlueExecutionInterceptor = <T>(operation: FlueExecutionOperation, ctx: FlueExecutionContext, next: () => Promise<T>) => Promise<T>;
  //#endregion
 diff --git a/dist/sql-agent-execution-store-LqbFqydc.mjs b/dist/sql-agent-execution-store-LqbFqydc.mjs
-index 9fdf8f303561d680212644471b225f044955186a..64bf501b2cbcaf77c55bafdb8055467f95a21789 100644
+index 9fdf8f303561d680212644471b225f044955186a..9d8f16d71f383c76a5df1b1d7afbd7f9e18f7375 100644
 --- a/dist/sql-agent-execution-store-LqbFqydc.mjs
 +++ b/dist/sql-agent-execution-store-LqbFqydc.mjs
 @@ -1,3 +1,4 @@
@@ -704,7 +790,28 @@ index 9fdf8f303561d680212644471b225f044955186a..64bf501b2cbcaf77c55bafdb8055467f
  	async getSubmission(submissionId) {
  		const row = this.readSubmissionRow(submissionId);
  		return row ? this.parseSubmission(row) : null;
-@@ -584,6 +603,7 @@ var AgentSubmissionStoreImpl = class {
+@@ -564,6 +583,20 @@ var AgentSubmissionStoreImpl = class {
+ 			 WHERE submission_id = ? AND status = 'queued'
+ 			 RETURNING submission_id`, Date.now(), message, submissionId);
+ 	}
++	// [project-studio patch] Read only scheduling metadata. Polling must neither
++	// hydrate image chunks nor claim a message while an assistant is streaming.
++	async hasSteeringSubmission(host, agentName) {
++		return this.transactionSync(() => {
++			const hostRow = this.sql.exec(`SELECT session_key FROM flue_agent_submissions WHERE submission_id = ? AND status = 'running' AND attempt_id = ? AND abort_requested_at IS NULL LIMIT 1`, host.submissionId, host.attemptId).toArray()[0];
++			if (!hostRow) return false;
++			const rows = this.sql.exec(`SELECT canonical_ready_at, abort_requested_at, json_extract(payload, '$.agent') AS agent, json_extract(payload, '$.message.deliveryMode') AS mode FROM flue_agent_submissions WHERE session_key = ? AND status = 'queued' ORDER BY sequence ASC`, String(hostRow.session_key)).toArray();
++			for (const row of rows) {
++				if (row.canonical_ready_at === null || row.abort_requested_at !== null || row.agent !== agentName) return false;
++				if (row.mode === "steer") return true;
++			}
++			return false;
++		});
++	}
+ 	async claimJoinableSubmissions(host, agentName) {
+ 		return this.transactionSync(() => {
+ 			const hostRow = this.sql.exec(`SELECT session_key FROM flue_agent_submissions
+@@ -584,6 +617,7 @@ var AgentSubmissionStoreImpl = class {
  					break;
  				}
  				if (submission.input.agent !== agentName) break;
@@ -712,7 +819,7 @@ index 9fdf8f303561d680212644471b225f044955186a..64bf501b2cbcaf77c55bafdb8055467f
  				this.sql.exec(`UPDATE flue_agent_submissions
  					 SET status = 'joining', joined_into = ?
  					 WHERE submission_id = ? AND status = 'queued'`, host.submissionId, submission.submissionId);
-@@ -642,6 +662,10 @@ var AgentSubmissionStoreImpl = class {
+@@ -642,6 +676,10 @@ var AgentSubmissionStoreImpl = class {
  			const chunkStore = createSqlSubmissionChunkStore(this.sql);
  			const admission = admitSubmissionWithBackend(input, {
  				insertIfAbsent: (row) => {
