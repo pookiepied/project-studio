@@ -84,7 +84,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
-  const queue = useQueuedMessages(conversation.id, isTurnRunning(live.phase))
+  const queue = useQueuedMessages(conversation.id, isTurnRunning(live.phase), live.followQueued)
   // Built once per gallery visit: the list is fixed, and a fresh array each
   // render would re-key the memoized rows for nothing.
   const [shown] = useState(() => (gallery ? galleryItems() : null))
@@ -658,10 +658,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                 approvals.questions.length > 0 || questions.rows.length > 0
                   ? 'Answer above, or queue a follow-up'
                   : isTurnRunning(live.phase)
-                    ? 'Add a correction or change direction'
+                    ? 'Queue a follow-up'
                     : 'Reply'
               }
-              allowSteering={live.pending === null && approvals.questions.length === 0 && questions.rows.length === 0}
               onSend={sendTurn}
               onQueue={(text, images, documents) => sendTurn(text, images, documents, 'queue')}
               // Admitted counts. A turn the harness has taken but not yet

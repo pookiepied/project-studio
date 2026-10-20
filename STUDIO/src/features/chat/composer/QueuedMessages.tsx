@@ -30,7 +30,7 @@ function QueueRow({ message, disabled, onAction }: {
       <Icons.queue size="sm" className="shrink-0 text-muted-foreground" />
       <p title={message.text} className="min-w-0 flex-1 truncate">{message.text || 'Attached images'}</p>
       <button type="button" disabled={disabled} className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-tint disabled:opacity-40" title="Use in the active response at its next safe step" onClick={() => onAction(message, 'steer')}>
-        <Icons.steer size="sm" /> Steer
+        <Icons.steer size="sm" /> Steer now
       </button>
       <IconButton label="Delete queued message" size="sm" disabled={disabled} onClick={() => onAction(message, 'remove')}><Icons.delete size="sm" /></IconButton>
       <Popover open={open} onOpenChange={setOpen} side="top" align="end" trigger={<IconButton label="Queued message options" size="sm" disabled={disabled} onClick={() => setOpen(!open)}><Icons.more size="sm" /></IconButton>}>

@@ -139,6 +139,8 @@ export interface ConversationView {
    * is live rather than stacking on it.
    */
   resume: () => void
+  /** Follow an existing submission after the runtime accepts queue promotion. */
+  followSubmission: (submissionId: string) => void
   /**
    * Submits one user turn through the harness, carrying the turn's settings.
    * Never retried here: an identical resend would be a SECOND turn, so a
@@ -628,6 +630,17 @@ export function useConversation(
     attach()
   }, [attach])
 
+  const followSubmission = useCallback((submissionId: string) => {
+    if (!liveRef.current) return
+    if (!settledIdsRef.current.has(submissionId)) {
+      outstandingRef.current.add(submissionId)
+      setPhase((current) => isTurnRunning(current) ? current : { status: 'submitted', submissionId })
+    }
+    // Promotion has no admission offset. Resume the retained reader so no
+    // content produced while the queue request was pending can be skipped.
+    attach({ announce: false })
+  }, [attach])
+
   const submit = useCallback(
     async (message: string, settings: TurnSettingsWire, images?: readonly TurnImageWire[]) => {
       const client = clientRef.current
@@ -698,5 +711,5 @@ export function useConversation(
     return client.abortRun()
   }, [])
 
-  return { phase, offset, resume, submit, abort, refused, dismissRefusal }
+  return { phase, offset, resume, followSubmission, submit, abort, refused, dismissRefusal }
 }

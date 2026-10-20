@@ -118,6 +118,14 @@ conversation identity but do not register new invocations.
 
 ## Event and capture contract
 
+Queue promotion reuses the runtime's existing submission ID and queue-control
+HTTP request. After success, `client.projection` records the
+`queued_message_promoted` stage with conversation/submission identity and no
+message content. The transcript shows the admitted message while its reader
+resumes from the retained offset; this is delivery recovery, not another
+submission or an execution retry. Steering still joins at the runtime's next
+safe step. Refused promotions keep the queued message and surface the error.
+
 The owner is `STUDIO HARNESS/src/contracts/diagnostics.ts`, format version 1.
 `StudioObservation` has event/boot IDs, local sequence, wall and monotonic time,
 stable name, phase/outcome, causal identity, operational attributes, and optional

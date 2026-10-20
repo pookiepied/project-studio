@@ -4,7 +4,7 @@ import type { QueuedMessage } from '@/platform/harness/client/queued-messages'
 import { forgetQueued } from './queued-messages'
 
 /** Read the runtime's queue; cached receipts never authorize a mutation. */
-export function useQueuedMessages(conversationId: string, running: boolean) {
+export function useQueuedMessages(conversationId: string, running: boolean, onSteered?: (message: QueuedMessage) => void) {
   const currentId = useRef(conversationId)
   currentId.current = conversationId
   const [state, setState] = useState<{ id: string; messages: readonly QueuedMessage[] }>({ id: conversationId, messages: [] })
@@ -13,14 +13,19 @@ export function useQueuedMessages(conversationId: string, running: boolean) {
   const [changing, setChanging] = useState(false)
   const lock = useRef(false)
   const revision = useRef(0)
+  const readSequence = useRef(0)
+  const steered = useRef(onSteered)
+  steered.current = onSteered
 
   const refresh = useCallback(async () => {
     const at = revision.current
+    const read = ++readSequence.current
     const address = await resolveHarnessAddress()
     if (!address) return
     const result = await createHarnessClient(address).queuedMessages(conversationId)
-    if (currentId.current !== conversationId || at !== revision.current) return
+    if (currentId.current !== conversationId || at !== revision.current || read !== readSequence.current) return
     if (result.ok) setState({ id: conversationId, messages: result.value })
+    else setError(result.error.message)
   }, [conversationId])
 
   useEffect(() => {
@@ -52,11 +57,14 @@ export function useQueuedMessages(conversationId: string, running: boolean) {
       forgetQueued(conversationId, new Set([message.submissionId]))
       setState((previous) => ({ id: conversationId, messages: previous.messages.filter((item) => item.submissionId !== message.submissionId) }))
       if (result.value) setRestored({ id: conversationId, message: result.value })
+      if (action === 'steer') steered.current?.(message)
     } finally {
       lock.current = false
       setChanging(false)
-      revision.current += 1
-      await refresh()
+      if (currentId.current === conversationId) {
+        revision.current += 1
+        await refresh()
+      }
     }
   }
 

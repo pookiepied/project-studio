@@ -10,7 +10,7 @@ it('provides steer, delete, and an edit menu for each queued message', () => {
   const onAction = vi.fn()
   render(<QueuedMessages messages={[message]} disabled={false} onAction={onAction} />)
   expect(screen.getByText('ROADMAP')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Steer' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Steer now' }))
   expect(onAction).toHaveBeenLastCalledWith(message, 'steer')
   fireEvent.click(screen.getByRole('button', { name: 'Delete queued message' }))
   expect(onAction).toHaveBeenLastCalledWith(message, 'remove')

@@ -125,7 +125,6 @@ export function Composer({
   placeholder,
   onSend,
   busy: turnRunning = false,
-  allowSteering = false,
   onQueue,
   queueFull = false,
   restoredMessage,
@@ -149,7 +148,6 @@ export function Composer({
   ) => Promise<{ readonly ok: boolean }>
   /** The harness has a turn of ours: admitted, not yet settled. */
   busy?: boolean
-  allowSteering?: boolean
   queueFull?: boolean
   restoredMessage?: { readonly submissionId: string; readonly text: string; readonly images: readonly TurnImageWire[] } | null
   onQueue?: (text: string, images: readonly TurnImageWire[], documents: readonly File[]) => Promise<{ readonly ok: boolean }>
@@ -394,12 +392,11 @@ export function Composer({
     return false
   }
 
-  // Admission still locks duplicate sends. A running response instead offers
-  // queue and steer, which have different delivery semantics in the harness.
+  // A busy conversation accepts drafts through the queue. Steering belongs
+  // to the admitted message, so the composer never has two send actions.
   const busy = turnRunning || sending
   const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) &&
-    !sending && pendingAttachments === 0 && (!turnRunning || allowSteering || onQueue !== undefined)
-  const steering = turnRunning && allowSteering && canSend
+    !sending && pendingAttachments === 0 && (!turnRunning || onQueue !== undefined)
   const dictating = dictation.stage !== 'idle'
 
   /**
@@ -505,13 +502,13 @@ export function Composer({
 
   const draggingFiles = useFileDrop(frame, ingestFiles)
 
-  const submit = (mode: 'queue' | 'steer' = 'queue') => {
+  const submit = () => {
     if (!canSend) return
     if (slash.isAction(text)) {
       runAction(text)
       return
     }
-    if (turnRunning && mode === 'queue' && onQueue !== undefined && queueFull) return
+    if (turnRunning && onQueue !== undefined && queueFull) return
     const outgoing = text
     const carried = images
     const papers = documents
@@ -520,7 +517,7 @@ export function Composer({
     // Words go straight out. A command is resolved first: an action runs
     // here and the field clears; a prompt command sends its expansion in
     // place of the words.
-    const deliver = turnRunning && mode === 'queue' && onQueue !== undefined ? onQueue : onSend
+    const deliver = turnRunning && onQueue !== undefined ? onQueue : onSend
     const dispatched = !slash.isCommand(outgoing)
       ? deliver(outgoing, carried, papers)
       : slash.resolve(outgoing).then((outcome) => {
@@ -957,17 +954,10 @@ export function Composer({
               changes width. */}
           {!dictating && (
           <>
-          {turnRunning && canSend ? (
+          {turnRunning && onQueue !== undefined ? (
             <IconButton label="Stop" size="md" onClick={halt}>
               <Icons.stop size="md" />
             </IconButton>
-          ) : null}
-          {steering && onQueue !== undefined ? (
-            <button type="button" onClick={() => submit('steer')}
-              title="Apply at the next safe step"
-              className="rounded-full px-3 py-2 text-sm text-muted-foreground hover:bg-tint hover:text-foreground">
-              Steer
-            </button>
           ) : null}
           <AnimatePresence initial={false} mode="popLayout">
             {canSend || busy || pendingAttachments > 0 ? (
@@ -978,21 +968,19 @@ export function Composer({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: DURATION.fast, ease: EASE_OUT }}
               >
-                {turnRunning && canSend && onQueue !== undefined ? (
-                  <button
-                    type="button"
-                    aria-label="Queue message"
-                    title={queueFull ? 'Queue full (3/3). Edit, delete, or steer a message first.' : 'Send after the current response finishes'}
-                    disabled={queueFull}
+                {turnRunning && onQueue !== undefined ? (
+                  <IconButton
+                    label="Queue message"
+                    size="md"
+                    tone="solid"
+                    disabled={!canSend || queueFull}
                     onClick={() => submit()}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-2 text-sm text-primary-foreground hover:opacity-85 disabled:opacity-40 [&_.studio-icon]:text-primary-foreground"
                   >
-                    Queue
                     <Icons.send size="md" />
-                  </button>
+                  </IconButton>
                 ) : (
                 <IconButton
-                  label={steering ? 'Steer' : busy ? 'Stop' : 'Send'}
+                  label={busy ? 'Stop' : 'Send'}
                   size="md"
                   tone="solid"
                   disabled={pendingAttachments > 0 && !busy}

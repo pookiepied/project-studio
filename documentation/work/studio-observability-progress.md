@@ -13,6 +13,18 @@ historical checkpoints, including failed or deliberately interrupted runs.
 
 ## Implemented foundation
 
+### Queue promotion delivery, 2026-10-20
+
+The composer queues follow-ups through one send icon. Successful queue promotion
+retains its submission ID, records `client.projection` /
+`queued_message_promoted` without content, displays the pending user message and
+reattaches the existing conversation reader from its retained offset. No new
+submission, retry owner, permission or capture setting is introduced. Client
+fixtures cover failed promotion, stale queue reads, immediate pending display,
+echo deduplication, retained-offset recovery and already-settled promotion.
+Existing real-harness queue/steering fixtures verify safe-step joining and
+persisted user messages with no separate assistant turn for the correction.
+
 ### MCP discovery browsing and explicit loading, 2026-10-20
 
 `native/discover` retains the existing tool gate and conversation adoption set.

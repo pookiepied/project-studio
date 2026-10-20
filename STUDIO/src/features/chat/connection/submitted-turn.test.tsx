@@ -172,6 +172,22 @@ beforeEach(() => {
 })
 
 describe('what the receipt licenses the page to say', () => {
+  it('follows a promoted submission from the retained offset without sending it again', async () => {
+    const script = turnScript()
+    const channels = recordingChannels()
+    const rendered = mount({ script, channels })
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
+    act(() => channels.feeds[0]?.({ kind: 'up-to-date', offset: '7_0' }))
+    act(() => rendered.result.current.followSubmission('promoted'))
+    await waitFor(() => expect(channels.feeds).toHaveLength(2))
+    expect(script.streamOffsets()).toEqual(['4_2', '7_0'])
+    expect(script.calls.filter(call => call.command === 'service_fetch' && isRecord(call.args['init']) && call.args['init']['method'] === 'POST')).toHaveLength(0)
+    expect(rendered.result.current.phase).toEqual({ status: 'submitted', submissionId: 'promoted' })
+    act(() => channels.feeds[1]?.(dataFrame('8_0', [{ type: 'submission-settled', submissionId: 'promoted', outcome: 'completed', position: { batch: 8, index: 0 } }])))
+    expect(rendered.result.current.phase.status).toBe('idle')
+    act(() => rendered.result.current.followSubmission('promoted'))
+    expect(rendered.result.current.phase.status).toBe('idle')
+  })
   it('does not revive a response that settled before its steering receipt arrived', async () => {
     const script = turnScript()
     const channels = recordingChannels()

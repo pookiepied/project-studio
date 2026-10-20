@@ -79,6 +79,7 @@ export function useConversationTranscript(conversationId: string): {
   phase: ReturnType<typeof useConversation>['phase']
   offset: string | null
   resume: () => void
+  followQueued: (message: PendingSubmission) => void
   submit: (
     message: string,
     settings: TurnSettingsWire,
@@ -141,6 +142,14 @@ export function useConversationTranscript(conversationId: string): {
     phase: conversation.phase,
     offset: conversation.offset,
     resume: conversation.resume,
+    followQueued: (message) => {
+      if (seededFor.current !== conversationId) return
+      recordClientObservation({ name: 'client.projection', phase: 'progress', identity: { conversationId, submissionId: message.submissionId },
+        attributes: { stage: 'queued_message_promoted' } })
+      setProjection((current) => withPendingSubmission(current, message))
+      setQueued(queuedMessages(conversationId))
+      conversation.followSubmission(message.submissionId)
+    },
     submit: async (message, settings, images) => {
       const sent = await conversation.submit(message, settings, images)
       if (seededFor.current !== conversationId) return { ok: sent.ok }

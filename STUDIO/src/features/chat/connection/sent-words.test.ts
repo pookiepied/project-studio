@@ -56,6 +56,7 @@ vi.mock('@/features/chat/connection/useConversation', async (importOriginal) => 
         phase: connection.phase,
         offset: null,
         resume: () => {},
+        followSubmission: followed,
         submit: connection.submit,
         abort: async () => ({ ok: true, value: true }),
         refused: null,
@@ -66,6 +67,7 @@ vi.mock('@/features/chat/connection/useConversation', async (importOriginal) => 
 })
 
 const { useConversationTranscript } = await import('@/features/chat/connection/useConversationTranscript')
+const followed = vi.fn()
 
 const WORDS = 'what did you make of it?'
 
@@ -102,9 +104,24 @@ function echo(submissionId: string, text: string): ChunkFacts[] {
 afterEach(() => {
   forgetFirstAdmission('cnv_1')
   connection.submit.mockReset()
+  followed.mockReset()
 })
 
 describe('a message between the composer and the log', () => {
+  it('shows a promoted queue message immediately and replaces it with its echo once', () => {
+    const view = renderHook(() => useConversationTranscript('cnv_1'))
+    const message = { submissionId: 'promoted', text: 'Use this correction' }
+    act(() => view.result.current.followQueued(message))
+    expect(view.result.current.pending).toEqual(message)
+    expect(followed).toHaveBeenCalledExactlyOnceWith('promoted')
+    expect(connection.submit).not.toHaveBeenCalled()
+    act(() => connection.deliver({ kind: 'chunks', replaying: false, chunks: echo('promoted', message.text) }))
+    expect(view.result.current.pending).toBeNull()
+    expect(view.result.current.items).toHaveLength(1)
+    act(() => view.result.current.followQueued(message))
+    expect(view.result.current.pending).toBeNull()
+    expect(view.result.current.items).toHaveLength(1)
+  })
   it('is on the page as soon as the harness says it has it', async () => {
     connection.submit.mockImplementation(admits('sub_1'))
     const view = renderHook(() => useConversationTranscript('cnv_1'))

@@ -186,8 +186,8 @@ describe('LibraryPane', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search the library' }), {
       key: 'Escape',
     })
-    await waitFor(() => expect(screen.queryByText('Nothing matches.')).toBeNull())
-    expect(screen.getByRole('button', { name: 'Edit Bruno' })).toBeTruthy()
+    await screen.findByRole('button', { name: 'Edit Bruno' })
+    expect(screen.queryByText('Nothing matches.')).toBeNull()
   })
 
   it('narrows by kind on the wire', async () => {
