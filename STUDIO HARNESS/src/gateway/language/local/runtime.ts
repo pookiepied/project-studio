@@ -170,6 +170,8 @@ export interface LocalRuntime {
    * empty.
    */
   supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
+  /** See `ModelProviderAdapter.quietThinkingLevel`. */
+  quietThinkingLevel?(modelId: string | null): ReasoningLevel | "off";
 }
 
 /**
@@ -223,7 +225,33 @@ export function createLocalRuntime(
     target: targetFor,
     listModels: () => models.getModels(),
     supportedReasoningLevels: (modelId) => supportedLevelsForReference(models, targetFor, modelId),
+    quietThinkingLevel: (modelId) => {
+      const model = modelForReference(models, targetFor, modelId);
+      return model === undefined ? "off" : quietThinkingLevelForPiModel(model);
+    },
   };
+}
+
+/**
+ * Pi sends managed-effort Claude models adaptive thinking at effort "high"
+ * whenever reasoning is off, so for them "off" is the loudest choice, not the
+ * quietest. Asking for the lowest level Pi supports is what lowers the effort.
+ */
+export function quietThinkingLevelForPiModel(model: Model<Api>): ReasoningLevel | "off" {
+  const compat = (model as { readonly compat?: { readonly supportsMidConvoEffort?: boolean } }).compat;
+  if (compat?.supportsMidConvoEffort !== true) return "off";
+  return reasoningLevelsForPiModel(model)[0] ?? "low";
+}
+
+function modelForReference(
+  models: MutableModels,
+  target: () => Model<Api> | undefined,
+  modelId: string | null,
+): Model<Api> | undefined {
+  if (modelId === null) return target();
+  const separator = modelId.indexOf("/");
+  if (separator <= 0 || separator === modelId.length - 1) return undefined;
+  return models.getModel(modelId.slice(0, separator), modelId.slice(separator + 1));
 }
 
 /**

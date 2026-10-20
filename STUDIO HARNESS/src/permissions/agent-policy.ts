@@ -38,12 +38,11 @@ export interface ActingAgentPolicy {
    * The delegate's own consent default — what a default `ask` does under
    * this agent when no grant and no rule has spoken — or undefined for the
    * conversation agent, whose posture (the conversation's settled mode)
-   * already speaks. Consumed by the kernel's posture composition in the
-   * runtime: a delegate's calls resolve the definition's mode, so a
-   * delegated task asks before it changes or runs something even when the
-   * parent conversation runs in Auto.
+   * already speaks. `inherit` resolves the same way the conversation agent
+   * does, so Auto reaches the delegates the person's conversation started.
+   * Consumed by the kernel's posture composition in the runtime.
    */
-  readonly mode: ExecutionMode | undefined;
+  readonly mode: ExecutionMode | "inherit" | undefined;
 }
 
 /** The conversation agent's policy: it composes its surface from live state. */

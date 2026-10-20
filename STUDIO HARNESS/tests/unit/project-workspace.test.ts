@@ -109,6 +109,28 @@ async function makeDirectory(path: string): Promise<string> {
 }
 
 describe("a project conversation stands in the project's folders", () => {
+  it("refuses coordination of another conversation's worker before dispatch", async () => {
+    const state = await harness();
+    try {
+      state.runtime.tasks.record({ id: "worker", agentName: "voice-work", parentConversationId: "owner" });
+      await expect(state.runtime.coordinateTask("other", "worker", "steer", "Change it")).rejects.toThrow(/not an independently addressable worker/);
+      expect(state.runtime.tasks.get("worker")?.status).toBe("running");
+    } finally { await stop(state); }
+  });
+
+  it("exposes only scoped image observation in the voice sandbox", async () => {
+    const state = await harness();
+    try {
+      state.conversations.record({ id: "voice", firstMessage: "Hello" });
+      const factory = state.runtime.createAgentSandbox({ agentId: "voice", conversationId: "voice", voiceOnly: true });
+      const environment = await factory.createSandbox({ id: "voice" });
+      const tools = factory.tools?.(environment, { subagents: {} });
+      expect(tools?.map((tool) => tool.name)).toEqual(["read"]);
+      const reader = tools?.find((tool) => tool.name === "read");
+      await expect(reader?.execute("call", { path: join(conversationWorkspaceDirectory("voice"), "private.txt") })).rejects.toThrow(/only images/);
+    } finally { await stop(state); }
+  });
+
   it("runs with the first folder as its sandbox root, so the kind comparison answers project", async () => {
     const state = await harness();
     try {

@@ -187,6 +187,47 @@ export function capabilityInventoryBlock(
   return lines.join("\n");
 }
 
+/**
+ * What the voice agent is told the working agent can use, by count.
+ *
+ * The voice agent calls none of these: it starts tasks, and the Studio agent
+ * a task runs does the work. So this is names and counts rather than the
+ * text agent's discover instructions, short enough that it never needs
+ * cutting. Studio's own servers keep the first clause of their purpose;
+ * a person's installed servers are named only, so nobody else's words
+ * reach this prompt.
+ */
+export function voiceCapabilityOverview(
+  entries: readonly CapabilityInventoryEntry[],
+  nativeNames: readonly string[],
+): string {
+  const sorted = [...entries].sort((a, b) => a.id.localeCompare(b.id));
+  const builtIn = sorted.filter((entry) => entry.builtIn === true);
+  const extensions = sorted.filter((entry) => entry.builtIn !== true);
+  const tools = (count: number): string => (count === 1 ? "1 tool" : `${count} tools`);
+  const server = (entry: CapabilityInventoryEntry): string => entry.id.replace(/^mcp:/, "");
+  const lines = [
+    "# What the working agent can use",
+    "",
+    "You cannot call any of these. They belong to the Studio agent a voice_work",
+    "task runs; work that needs them is a task to start.",
+    "",
+    `- Native tools (${nativeNames.length}): ${nativeNames.join(", ")}.`,
+  ];
+  if (builtIn.length > 0) {
+    const named = builtIn.map((entry) => {
+      const purpose = safeLine(entry.description.split(/[:.]/)[0] ?? "", 90);
+      return `${server(entry)} (${purpose === "" ? "" : `${purpose}; `}${tools(entry.toolNames.length)})`;
+    });
+    lines.push(`- Studio MCP servers, shipped with Studio (${builtIn.length}): ${named.join("; ")}.`);
+  }
+  if (extensions.length > 0) {
+    const named = extensions.map((entry) => `${safeLine(server(entry), TOOL_NAME_LIMIT)} (${tools(entry.toolNames.length)})`);
+    lines.push(`- Connected MCP servers the person installed (${extensions.length}): ${named.join(", ")}.`);
+  }
+  return lines.join("\n");
+}
+
 /** One capability's line, and its names under it. */
 function entryLines(entry: CapabilityInventoryEntry): readonly string[] {
   const description = safeLine(entry.description, DESCRIPTION_LIMIT);
@@ -305,6 +346,14 @@ export class CapabilityInventory {
   readonly #announced = new Map<string, string>();
 
   /**
+   * The entries the voice overview was written from, held still on the same
+   * terms as the text block: within a run every ask answers the same bytes,
+   * and only an unsettled answer or a changed set is re-asked, at the
+   * submission boundary.
+   */
+  readonly #voice = new Map<string, { readonly entries: readonly CapabilityInventoryEntry[]; readonly settled: boolean }>();
+
+  /**
    * @param settled Whether one build's answer is one worth keeping. Read
    *   from the live sources - the supervisor's states and the catalog's
    *   completed reads - and never inferred from the entries themselves: "0
@@ -366,6 +415,10 @@ export class CapabilityInventory {
    * set and whose block stays byte-identical.
    */
   reopen(conversationId: string): void {
+    const voice = this.#voice.get(conversationId);
+    if (voice !== undefined && (!voice.settled || this.#signature(this.#build(conversationId)) !== this.#signature(voice.entries))) {
+      this.#voice.delete(conversationId);
+    }
     if (!this.#blocks.has(conversationId)) return;
     if (this.#pending.has(conversationId)) {
       this.#pending.delete(conversationId);
@@ -416,6 +469,18 @@ export class CapabilityInventory {
     // than against a set read at some other moment.
     this.#announced.set(conversationId, this.#signature(entries));
     return block;
+  }
+
+  /** The voice agent's overview of the same capabilities; see `voiceCapabilityOverview`. */
+  voiceOverviewFor(conversationId: string, nativeNames: readonly string[]): string {
+    let held = this.#voice.get(conversationId);
+    if (held === undefined) {
+      const entries = this.#build(conversationId);
+      held = { entries, settled: this.#settled(entries) };
+      this.#voice.set(conversationId, held);
+    }
+    const overview = voiceCapabilityOverview(held.entries, nativeNames);
+    return held.settled ? overview : `${overview}\nSome connected servers are still starting; their tools are not counted yet.`;
   }
 
   /**

@@ -32,6 +32,8 @@ import { Improve } from "../../src/agents/improve.js";
 import { Plan } from "../../src/agents/plan.js";
 import { Studio } from "../../src/agents/studio.js";
 import { Title } from "../../src/agents/title.js";
+import { VoiceWork } from "../../src/agents/voice-work.js";
+import { voiceWorkDefinition } from "../../src/agents/definitions/voice-work.js";
 import { STUDIO_SYSTEM_PROMPT } from "../../src/context/system-prompt.js";
 import { TITLE_PROMPT } from "../../src/context/title-prompt.js";
 import { IMPROVE_PROMPT } from "../../src/context/improve-prompt.js";
@@ -62,7 +64,7 @@ function validDelegateInput(): Record<string, unknown> {
 }
 
 describe("the agent registry", () => {
-  it("holds the seven live agents under their contract ids", () => {
+  it("holds the live agents under their contract ids", () => {
     expect(agentRegistry.get(STUDIO_AGENT_ID)?.definition).toBe(studioDefinition);
     expect(agentRegistry.get(TITLE_AGENT_ID)?.definition).toBe(titleDefinition);
     expect(agentRegistry.get(IMPROVE_AGENT_ID)?.definition).toBe(improveDefinition);
@@ -70,6 +72,7 @@ describe("the agent registry", () => {
     expect(agentRegistry.get(EXPLORE_AGENT_ID)?.definition).toBe(exploreDefinition);
     expect(agentRegistry.get(GENERAL_AGENT_ID)?.definition).toBe(generalDefinition);
     expect(agentRegistry.get(PLAN_AGENT_ID)?.definition).toBe(planDefinition);
+    expect(agentRegistry.get("voice-work")?.definition).toBe(voiceWorkDefinition);
   });
 
   it("pairs each definition with the same function object Flue registers", () => {
@@ -86,6 +89,7 @@ describe("the agent registry", () => {
     expect(agentRegistry.get(EXPLORE_AGENT_ID)?.agent).toBe(Explore);
     expect(agentRegistry.get(GENERAL_AGENT_ID)?.agent).toBe(General);
     expect(agentRegistry.get(PLAN_AGENT_ID)?.agent).toBe(Plan);
+    expect(agentRegistry.get("voice-work")?.agent).toBe(VoiceWork);
   });
 
   it("hands out exactly one conversation agent", () => {
@@ -111,6 +115,7 @@ describe("the agent registry", () => {
       PLAN_AGENT_ID,
       STUDIO_AGENT_ID,
       TITLE_AGENT_ID,
+      "voice-work",
     ]);
   });
 
@@ -228,7 +233,9 @@ describe("the registry is the one roster (architecture)", () => {
       // is not an agent module at all (definitions/ has none).
       if (!source.startsWith("'use agent'")) continue;
       for (const match of source.matchAll(/^export function ([A-Z]\w*)\(/gm)) {
-        const name = match[1]!.toLowerCase();
+        const functionName = match[1]!;
+        const pinned = new RegExp(`${functionName}\\.agentName\\s*=\\s*["']([^"']+)["']`).exec(source);
+        const name = pinned?.[1] ?? functionName.toLowerCase();
         found.push(name);
         expect(registered.has(name), `the agent ${name} must be in the registry`).toBe(true);
       }

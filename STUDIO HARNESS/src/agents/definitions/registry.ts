@@ -86,7 +86,7 @@ export class AgentRegistryError extends StudioError {
  * `task` is deliberately absent: it is Flue's framework tool, present in
  * every tool array, not a native capability a definition allowlists.
  */
-const NATIVE_TOOL_NAMES: ReadonlySet<string> = new Set([
+export const NATIVE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "read",
   "write",
   "edit",
@@ -138,6 +138,9 @@ const BUNDLED_SKILL_IDS: ReadonlySet<string> = new Set(["create-skill", "customi
  *   mandatory: a delegate without a tool allowlist would inherit the
  *   parent's whole array (the Stage 0 measurement), which is exactly the
  *   visibility/authority gap D4 exists to close.
+ * - A **worker** composes its sandbox and model from its admitted parent
+ *   conversation. It has a distinct instance and agent authority; it shares
+ *   the conversation kind's live-policy shape, not the background no-tools rule.
  */
 function assertKindPolicy(definition: StudioAgentDefinitionInput): void {
   const staticPolicyFields = [

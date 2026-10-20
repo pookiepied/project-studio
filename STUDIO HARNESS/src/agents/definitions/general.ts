@@ -47,9 +47,10 @@ import { validateAgentDefinition } from "./registry.js";
  * `["read"]` and is the point: general's permission story is ask-based, not
  * refusal-based. Nothing it holds is refused outright — the dangerous pair
  * is withheld by the allowlist above — and everything reachable stops at
- * the kernel, under this agent's own id, because `mode: "ask"` is the
- * delegate's own consent default: a delegated task asks before it changes
- * or runs anything even when the parent conversation runs in Auto. Writes
+ * the kernel, under this agent's own id. `mode: "inherit"` resolves a
+ * default ask under the conversation's mode: in Ask the delegated task asks
+ * before it changes or runs anything, in Auto it proceeds as the
+ * conversation would, and policy rules ask in either. Writes
  * and executes alike are reachable (the D11 row's "`write` allowed,
  * `execute` asks" — allowed meaning in scope and approvable, as against
  * `explore`, where a write is refused at the ceiling whatever the grants).
@@ -82,12 +83,12 @@ export const generalDefinition = validateAgentDefinition({
   permissions: {
     maxEffects: ["read", "write", "execute", "network"],
     // The delegate's own consent default (the contract's words): when no
-    // grant and no rule has spoken, a default `ask` asks — under this
-    // agent's id, even in an Auto conversation. A delegated task is work
-    // the person handed off, not attention they withdrew.
-    mode: "ask",
+    // grant and no rule has spoken, a default `ask` resolves under the
+    // conversation's mode. A person who chose Auto chose it for the work
+    // they hand off, too.
+    mode: "inherit",
   },
-  // The human-wait ceiling, not the explore one: `mode: "ask"` means a run
+  // The human-wait ceiling, not the explore one: an Ask conversation means a run
   // legitimately parks on an approval, which is Studio.durability's exact
   // reasoning for its hour — what this bound covers is waiting for a
   // person, and every tool call is bounded far more tightly beside it.

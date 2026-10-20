@@ -105,6 +105,7 @@ function toRecord(row: TaskRow): AgentTaskRecord {
 
 export class TaskStore {
   readonly #db: StudioDatabase;
+  readonly #settledListeners: (() => void)[] = [];
 
   constructor(db: StudioDatabase) {
     this.#db = db;
@@ -216,6 +217,11 @@ export class TaskStore {
    * settlement twice (recovery replay), and the second write is the same
    * answer the first wrote.
    */
+  /** Called after any task settles, which is when a running slot frees. */
+  onSettled(listener: () => void): void {
+    this.#settledListeners.push(listener);
+  }
+
   setStatus(
     id: string,
     status: AgentTaskStatus,
@@ -234,7 +240,13 @@ export class TaskStore {
       .run(
         ...(settled ? [status, Date.now(), resultSummary ?? null, id] : [status, id]),
       );
-    return Number(result.changes) > 0;
+    const changed = Number(result.changes) > 0;
+    if (changed && settled) {
+      for (const listener of this.#settledListeners) {
+        try { listener(); } catch { /* A listener's fault never undoes the settlement. */ }
+      }
+    }
+    return changed;
   }
 
   /**
@@ -257,7 +269,7 @@ function assertDispatchable(
   registered: RegisteredAgent | undefined,
   agentName: string,
 ): asserts registered is RegisteredAgent {
-  if (registered === undefined || registered.definition.kind !== "background") {
+  if (registered === undefined || (registered.definition.kind !== "background" && registered.definition.kind !== "worker")) {
     throw new AgentRegistryError(
       "invalid",
       `No background agent named "${agentName}" is registered; a task row can only index a background agent.`,

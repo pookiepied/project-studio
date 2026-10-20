@@ -67,6 +67,7 @@ import type { ConversationStore } from "../../../conversations/store.js";
  * again, so both readers get their own view of the same bytes.
  */
 export interface TurnSettingsMiddlewareOptions {
+  readonly voiceModel?: () => string | null;
   /** The conversation index: read for existence, written for the settings. */
   readonly conversations: ConversationStore;
   /**
@@ -140,6 +141,12 @@ export function createTurnSettingsMiddleware(
     }
     if (body === null || typeof body !== "object" || Array.isArray(body)) {
       return next();
+    }
+    if ("kind" in body && body.kind === "signal" && "type" in body && body.type === "voice_input") {
+      const voiceModel = options.voiceModel?.();
+      if (!voiceModel || !(await options.isModelServed(voiceModel))) {
+        return refusal(context, "Choose a connected voice conversation model in Settings - Models.");
+      }
     }
 
     const parsed = v.safeParse(submissionTurnSettingsSchema, body);
@@ -259,7 +266,10 @@ function readSettings(output: SubmissionTurnSettings): {
  */
 function readMessage(body: object): string | undefined {
   const record = body as Record<string, unknown>;
-  if (record["kind"] !== "user") return undefined;
+  // A spoken first turn opens a conversation exactly as a typed one does:
+  // the transcription is the first message the title derives from.
+  const spoken = record["kind"] === "signal" && record["type"] === "voice_input";
+  if (record["kind"] !== "user" && !spoken) return undefined;
   const candidate = record["body"];
   return typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
 }

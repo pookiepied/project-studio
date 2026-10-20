@@ -44,10 +44,10 @@ export const planDefinition = validateAgentDefinition({
   skills: { ids: [] },
   permissions: {
     maxEffects: ["read"],
-    // Same consent default as every delegate: when no grant has spoken, its
-    // default asks ask under its own id. Reads default-allow anyway, so
-    // this is the honest declaration rather than a live gate.
-    mode: "ask",
+    // Same consent default as every delegate: the conversation's mode. Reads
+    // default-allow anyway, so this is the honest declaration rather than a
+    // live gate.
+    mode: "inherit",
   },
   durability: { maxAttempts: 3, timeoutMs: 600_000 },
 });

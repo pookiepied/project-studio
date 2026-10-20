@@ -69,6 +69,13 @@ import {
 
 /** How much of a task's final message the summary keeps. */
 const MAX_SUMMARY_CHARS = 200;
+/**
+ * How much of a voice worker's final message reaches the voice agent. A voice
+ * task's result is the answer the voice agent speaks, not news about it: a
+ * first-line summary handed it a heading where a weather report should be.
+ */
+const MAX_VOICE_RESULT_CHARS = 6_000;
+const LIFECYCLE_EVENTS = new Set(["agent_start", "agent_end", "task_start", "task", "tool_start", "tool", "turn_start", "submission_settled"]);
 
 /**
  * One running agent task, as a line for the turn's environment block.
@@ -80,7 +87,7 @@ const MAX_SUMMARY_CHARS = 200;
  * ending arrives through the ping, not here.
  */
 export function taskRunningLine(record: AgentTaskRecord): string {
-  return `Task "${record.title}" is running in the background.`;
+  return `Task "${record.title}" is running in the background.${record.agentName === "voice-work" ? ` Task id: ${record.id}.` : ""}`;
 }
 
 /**
@@ -93,6 +100,11 @@ export function taskRunningLine(record: AgentTaskRecord): string {
  * task's own stream is where the answer lives.
  */
 export function taskEndedLine(record: AgentTaskRecord): string {
+  // A voice result is multi-line by nature; it rides as a block after the
+  // sentence rather than inside it.
+  if (record.agentName === "voice-work" && record.status === "completed" && record.resultSummary !== undefined) {
+    return `Task "${record.title}" completed. Task id: ${record.id}. Result:\n${record.resultSummary}`;
+  }
   const how =
     record.status === "completed"
       ? record.resultSummary === undefined
@@ -105,7 +117,7 @@ export function taskEndedLine(record: AgentTaskRecord): string {
         : record.status === "cancelled"
           ? "was stopped"
           : "settled";
-  return `Task "${record.title}" ${how}.`;
+  return `Task "${record.title}" ${how}.${record.agentName === "voice-work" ? ` Task id: ${record.id}.` : ""}`;
 }
 
 /**
@@ -115,6 +127,15 @@ export function taskEndedLine(record: AgentTaskRecord): string {
  */
 function summaryFromReply(reply: string): string | undefined {
   return truncateSummary(reply.trim().split(/\r?\n/, 1)[0]?.trim() ?? "");
+}
+
+/** A voice worker's whole reply, bounded, with any shortening said out loud. */
+function voiceResultFromReply(reply: string): string | undefined {
+  const text = reply.trim();
+  if (text === "") return undefined;
+  return text.length > MAX_VOICE_RESULT_CHARS
+    ? `${text.slice(0, MAX_VOICE_RESULT_CHARS)}\n[Result shortened; the full text is in the task's details.]`
+    : text;
 }
 
 /** The cap, shared with the error path: a settlement's reason is bounded the
@@ -160,6 +181,17 @@ export interface TaskProjectorOptions {
   readonly subscribe?: (handler: (observation: FlueObservation) => void) => () => void;
 }
 
+export interface TaskActivity {
+  readonly id: string;
+  readonly agentName: string;
+  readonly parentConversationId: string;
+  readonly stage: "working" | "using_tool" | "waiting_for_model" | "completed" | "failed" | "cancelled";
+  readonly updatedAt: number;
+  readonly createdAt: number;
+  /** A voice task's short name, the one its voice agent uses. */
+  readonly name?: string;
+}
+
 export class TaskProjector {
   readonly #tasks: TaskStore;
   readonly #pings: JobPings | undefined;
@@ -173,6 +205,7 @@ export class TaskProjector {
    * settles without a summary.
    */
   readonly #replies = new Map<string, string>();
+  readonly #activity = new Map<string, TaskActivity>();
   #unsubscribe: (() => void) | undefined;
 
   constructor(options: TaskProjectorOptions) {
@@ -209,11 +242,43 @@ export class TaskProjector {
     const unsubscribe = this.#unsubscribe;
     this.#unsubscribe = undefined;
     unsubscribe?.();
+    this.#activity.clear();
+  }
+
+  /** Product lifecycle facts only; prompts, arguments and private reasoning never enter this view. */
+  activity(conversationId: string): readonly TaskActivity[] {
+    return [...this.#activity.values()].filter((task) => task.parentConversationId === conversationId).slice(-64);
   }
 
   #onObservation(observation: FlueObservation): void {
+    if (!LIFECYCLE_EVENTS.has(observation.type)) return;
     const instanceId = observation.instanceId;
     if (typeof instanceId !== "string" || instanceId === "") return;
+
+    const indexed = this.#tasks.get(instanceId);
+    // A steered delivery has its own receipt, but only the host submission
+    // settling proves that the worker's execution has ended.
+    if (observation.type === "submission_settled" && indexed?.originSubmissionId !== undefined && indexed.originSubmissionId !== observation.submissionId) return;
+    const id = observation.taskId ?? (indexed === undefined ? undefined : instanceId);
+    const activityParent = indexed?.parentConversationId ?? (observation.taskId === undefined ? undefined : instanceId);
+    if (id !== undefined && activityParent !== undefined) {
+      const stage = observation.type === "task_start" || observation.type === "agent_start" ? "working"
+        : observation.type === "tool_start" ? "using_tool"
+        : observation.type === "tool" || observation.type === "turn_start" ? "waiting_for_model"
+        : observation.type === "task" ? (observation.isError ? "failed" : "completed")
+        : observation.type === "submission_settled" ? (observation.outcome === "aborted" ? "cancelled" : observation.outcome)
+        : undefined;
+      if (stage !== undefined) {
+        const previous = this.#activity.get(id);
+        if (previous !== undefined && ["completed", "failed", "cancelled"].includes(previous.stage)) return;
+        const now = Date.now();
+        this.#activity.set(id, { id, parentConversationId: activityParent,
+          agentName: indexed?.agentName ?? (observation.type === "task_start" ? observation.agent : undefined) ?? previous?.agentName ?? "delegate",
+          stage, updatedAt: now, createdAt: previous?.createdAt ?? now,
+          ...(indexed?.agentName === "voice-work" ? { name: indexed.title } : {}) });
+        if (this.#activity.size > 512) this.#activity.delete(this.#activity.keys().next().value ?? "");
+      }
+    }
 
     if (observation.type === "agent_end") {
       // Only indexed tasks are stashed for: every conversation turn also
@@ -252,7 +317,7 @@ export class TaskProjector {
     switch (observation.outcome) {
       case "completed":
         status = "completed";
-        summary = reply === undefined ? undefined : summaryFromReply(reply);
+        summary = reply === undefined ? undefined : row.agentName === "voice-work" ? voiceResultFromReply(reply) : summaryFromReply(reply);
         break;
       case "failed":
         status = "failed";

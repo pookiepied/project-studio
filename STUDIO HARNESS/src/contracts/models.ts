@@ -273,6 +273,13 @@ export interface ModelProviderAdapter {
    */
   supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
   /**
+   * The least thinking a short spoken reply can ask of one reference: "off",
+   * except for a model whose wire ignores "off" (Claude's managed-effort
+   * models run adaptive thinking at high effort unless told a lower effort),
+   * which answers its lowest supported level instead.
+   */
+  quietThinkingLevel?(modelId: string | null): ReasoningLevel | "off";
+  /**
    * The model a background job may run on, as a specifier this source can
    * resolve at run time, or undefined when the source cannot name one.
    *

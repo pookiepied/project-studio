@@ -15,6 +15,8 @@ vi.mock("@flue/runtime", async (original) => ({
   useSandbox: vi.fn(),
   useSkill: vi.fn(),
   useSubagent: vi.fn(),
+  useTool: vi.fn(),
+  usePersistentState: (_key: string, initial: unknown) => [initial, vi.fn()],
   useDelivery: () => ({ kind: "user", body: "Build the new Next.js project." }),
   useAgentStart: (hook: (context: { append: (message: unknown) => void }) => unknown) => {
     fixture.starts.push(hook);

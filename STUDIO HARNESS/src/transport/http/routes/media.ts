@@ -15,6 +15,8 @@ import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { MediaAdministration } from "../../../gateway/media/service.js";
 import { ImproveError, type TextImproverPort } from "../../../application/text-improver.js";
 import { conversationArtifactsDirectory } from "../../../platform/paths.js";
+import type { VoiceSettings } from "../../../gateway/language/voice-settings.js";
+import { observeOperation } from "../../../observability/operation.js";
 
 /**
  * The media routes: dictation and read-aloud, the app's own voice features.
@@ -111,10 +113,24 @@ export function createMediaRoutes(
      * wired, which is also what a harness built without one would say.
      */
     readonly improver?: TextImproverPort;
+    readonly voiceSettings?: VoiceSettings;
+    readonly isModelServed?: (modelId: string) => Promise<boolean>;
   } = {},
 ): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.PROJECT));
+
+  routes.get("/voice-model", (context) => context.json({ modelId: options.voiceSettings?.get() ?? null }));
+  routes.put("/voice-model", async (context) => {
+    try {
+      const parsed = v.safeParse(v.object({ modelId: v.nullable(v.string()) }), await body(context));
+      if (!parsed.success || options.voiceSettings === undefined) throw new MediaRouteError("Choose a connected voice conversation model.");
+      const modelId = parsed.output.modelId;
+      if (modelId !== null && !(await options.isModelServed?.(modelId))) throw new MediaRouteError("That voice model is not connected.");
+      await observeOperation("provider", "voice.settings", async () => { options.voiceSettings?.set(modelId); });
+      return context.json({ modelId });
+    } catch (error) { return context.json(failure(error), statusOf(error)); }
+  });
 
   routes.post("/improve", async (context) => {
     try {

@@ -21,6 +21,7 @@ import {
   bootstrappedModelRegistry,
   bootstrappedModelLimits,
   bootstrappedSupportedReasoningLevels,
+  bootstrappedQuietThinkingLevel,
 } from "../gateway/language/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
 import type { BrowserInteraction } from "../browser/interaction.js";
@@ -60,6 +61,9 @@ import {
   visibleToAgent,
 } from "../permissions/agent-policy.js";
 import { agentRegistry } from "../agents/definitions/index.js";
+import { NATIVE_TOOL_NAMES } from "../agents/definitions/registry.js";
+import { agentLimitReached, DelegateCounter, type AgentSlotCounts } from "../agents/agent-slots.js";
+import { voiceTaskName } from "../agents/voice-names.js";
 import { currentExecutionContext } from "../execution/context.js";
 import { requiresUndo, type ExecutionMode } from "../permissions/mode.js";
 import { posture, WorkspaceTrustStore } from "../permissions/trust.js";
@@ -109,7 +113,28 @@ import { ModelCatalog } from "../gateway/connections/model-catalog.js";
 import { mediaFinishedNotice, mediaJobLines } from "../tools/media/index.js";
 import type { LibraryStore } from "../library/store.js";
 import { ConversationStore } from "../conversations/store.js";
+import { VoiceSettings } from "../gateway/language/voice-settings.js";
+import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
+import { init } from "@flue/runtime";
+import { steerTask } from "../agents/task-control.js";
+import { voiceImagePath } from "../conversations/voice-policy.js";
+import { ProviderConfigurationError } from "../contracts/models.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
+
+/** Voice tasks one conversation may hold in its queue, behind the running ones. */
+const MAX_QUEUED_VOICE_TASKS = 24;
+
+interface QueuedVoiceTask { readonly id: string; readonly conversationId: string; readonly name: string; body: string }
+
+/** What a voice task's Studio agent is handed: the voice agent's context, then the user's words. */
+function voiceTaskBody(context: string | undefined, source: string): string {
+  return ["Work requested by the user in the parent conversation.",
+    "Your final message is handed to a voice agent who tells the user the result. End with the answer itself: lead with the key result, keep supporting detail brief, and leave out your working notes.",
+    "Relevant preceding context, supplied by the conversational model (a fallible summary):",
+    context ?? "No additional context supplied.",
+    "Original user transcription follows verbatim. Preserve its constraints; clarify ambiguity rather than guessing:",
+    source].join("\n\n");
+}
 
 export interface StudioRuntimeOptions {
   /**
@@ -191,6 +216,7 @@ export interface StudioRuntimeOptions {
 }
 
 export interface StudioAgentSandboxOptions {
+  readonly voiceOnly?: boolean;
   /** The agent, not the thread - see `contracts/agents.ts`. */
   readonly agentId: string;
   /**
@@ -458,6 +484,16 @@ export interface AgentHost {
     readonly modelId: string | null;
     readonly reasoningLevel: string | null;
   };
+  voiceModel?(): string | null;
+  taskActivity?(conversationId: string): readonly import("../agents/task-projector.js").TaskActivity[];
+  coordinateTask?(conversationId: string, taskId: string, action: "steer" | "cancel", text?: string, admissionKey?: string): Promise<string>;
+  voiceWorkParent?(instanceId: string): string | undefined;
+  voiceWork?(conversationId: string, source: string, request: {
+    readonly action: "start" | "steer" | "status" | "cancel";
+    readonly taskId?: string | undefined;
+    readonly context?: string | undefined;
+    readonly admissionKey?: string | undefined;
+  }): Promise<{ status: string; taskId: string; text: string }>;
   /**
    * The reasoning levels one stored reference supports, in Pi's order, empty
    * for a model that does not reason.
@@ -469,6 +505,8 @@ export interface AgentHost {
    * `runThinkingLevelForChoice` so a stored "default" rests on medium.
    */
   supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
+  /** The least thinking a spoken reply can ask of a model; see the adapter contract. */
+  quietThinkingLevel?(modelId: string | null): ReasoningLevel | "off";
   /**
    * The window and output cap of one stored reference, read the same way
    * and for the same reason: the render feeds them to the compaction policy,
@@ -552,6 +590,8 @@ export interface AgentHost {
    * satisfies the host.
    */
   conversationCapabilityInventory?(conversationId: string): string;
+  /** The voice agent's names-and-counts view of what a task's agent can use. */
+  voiceCapabilityOverview?(conversationId: string): string;
   /**
    * The skills switched on for one conversation, ready for `useSkill`.
    *
@@ -772,6 +812,8 @@ export class StudioRuntime implements AgentHost {
    * and the routes read it through `tasks`.
    */
   readonly #tasks: TaskStore;
+  readonly #delegates = new DelegateCounter();
+  readonly #voiceQueue: QueuedVoiceTask[] = [];
   /**
    * The finished-job hub, when this composition can deliver. Held so the
    * task projector can announce through the same hub the other sources use —
@@ -810,6 +852,7 @@ export class StudioRuntime implements AgentHost {
 
     this.#db = options.database;
     this.#tasks = new TaskStore(this.#db);
+    this.#tasks.onSettled(() => this.#drainVoiceQueue());
     this.#mediaJobs = options.mediaJobs;
     this.#library = options.library;
     this.#documents = new ConversationDocumentStore(this.#db);
@@ -1155,6 +1198,152 @@ export class StudioRuntime implements AgentHost {
     return bootstrappedSupportedReasoningLevels(modelId);
   }
 
+  quietThinkingLevel(modelId: string | null): ReasoningLevel | "off" {
+    return bootstrappedQuietThinkingLevel(modelId);
+  }
+
+  voiceModel(): string | null {
+    return new VoiceSettings(this.#db).get();
+  }
+
+  taskActivity(conversationId: string) { return this.#taskProjector.activity(conversationId); }
+
+  async coordinateTask(conversationId: string, taskId: string, action: "steer" | "cancel", text?: string, admissionKey?: string): Promise<string> {
+    const task = this.#tasks.get(taskId);
+    if (task === undefined || task.parentConversationId !== conversationId) {
+      throw new ProviderConfigurationError("That task is not an independently addressable worker in this conversation. Inline delegates expose progress but cannot receive separate steering.");
+    }
+    if (action === "steer") return steerTask(task, text ?? "", admissionKey);
+    return observeOperation("subagent", "task.cancel", async () => {
+      const registered = agentRegistry.get(task.agentName);
+      if (registered === undefined || isSettledTaskStatus(task.status)) return "The task has already settled.";
+      await init(registered.agent, { id: task.id }).abort();
+      return "Cancellation requested; settlement is not yet confirmed.";
+    }, { agentInstanceId: task.id }, conversationId);
+  }
+
+  voiceWorkParent(instanceId: string): string | undefined {
+    const task = this.#tasks.get(instanceId);
+    return task?.agentName === "voice-work" ? task.parentConversationId : undefined;
+  }
+
+  async voiceWork(conversationId: string, source: string, request: {
+    readonly action: "start" | "steer" | "status" | "cancel";
+    readonly taskId?: string | undefined;
+    readonly context?: string | undefined;
+    readonly admissionKey?: string | undefined;
+  }): Promise<{ status: string; taskId: string; text: string }> {
+    return observeOperation("subagent", "voice.work", async () => {
+      if (this.#conversations.get(conversationId) === undefined) {
+        throw new ProviderConfigurationError("Open an existing conversation before starting voice work.");
+      }
+      if (request.action === "start") {
+        if (source.trim() === "") throw new ProviderConfigurationError("No user transcription is available for this task.");
+        const id = request.taskId;
+        if (id === undefined) throw new ProviderConfigurationError("No durable task identity is available.");
+        const previous = this.#tasks.get(id);
+        if (previous !== undefined) {
+          if (previous.parentConversationId !== conversationId || previous.agentName !== "voice-work") throw new ProviderConfigurationError("That task belongs to another conversation.");
+          return { status: previous.status, taskId: id, text: "This task attempt is already indexed. It was not resent; inspect its state before continuing." };
+        }
+        const queued = this.#voiceQueue.find((entry) => entry.id === id);
+        if (queued !== undefined) return { status: "queued", taskId: id, text: `${queued.name} is already queued. It was not resent.` };
+        const taken = [
+          ...this.#tasks.list({ parentConversationId: conversationId, agentName: "voice-work" }).map((task) => task.title),
+          ...this.#voiceQueue.filter((entry) => entry.conversationId === conversationId).map((entry) => entry.name),
+        ];
+        const entry: QueuedVoiceTask = { id, conversationId, name: voiceTaskName(id, taken), body: voiceTaskBody(request.context, source) };
+        const full = agentLimitReached(this.#agentCounts(conversationId));
+        const ahead = this.#voiceQueue.filter((item) => item.conversationId === conversationId).length;
+        if (full === undefined && ahead === 0) {
+          await this.#dispatchVoiceTask(entry);
+          const others = this.#agentCounts(conversationId).conversation - 1;
+          return { status: "admitted", taskId: id, text: `Started as ${entry.name} on the conversation's working model${others > 0 ? `, beside ${others} other running agent${others === 1 ? "" : "s"}` : ""}.` };
+        }
+        if (ahead >= MAX_QUEUED_VOICE_TASKS) return { status: "refused", taskId: id, text: `${ahead} voice tasks are already waiting in this chat's queue, its limit. Wait for some to start, or cancel one.` };
+        this.#voiceQueue.push(entry);
+        return { status: "queued", taskId: id, text: `Queued as ${entry.name}. ${full ?? "Earlier tasks are waiting first."} It starts by itself when a running agent finishes${ahead > 0 ? `, after ${ahead} queued ahead of it` : ""}.` };
+      }
+      const entry = this.#voiceQueue.find((item) => item.id === request.taskId && item.conversationId === conversationId);
+      if (entry !== undefined) {
+        if (request.action === "cancel") {
+          this.#voiceQueue.splice(this.#voiceQueue.indexOf(entry), 1);
+          return { status: "cancelled", taskId: entry.id, text: `${entry.name} was taken out of the queue before it started.` };
+        }
+        if (request.action === "steer") {
+          if (source.trim() === "") throw new ProviderConfigurationError("No correction was transcribed.");
+          entry.body = `${entry.body}\n\nCorrection from the user, before the task started, verbatim:\n\n${source}`;
+          return { status: "steering_admitted", taskId: entry.id, text: `${entry.name} has not started yet; the correction will be part of its instructions.` };
+        }
+        return { status: "queued", taskId: entry.id, text: `${entry.name} is queued and has not started.` };
+      }
+      const task = request.taskId === undefined ? undefined : this.#tasks.get(request.taskId);
+      if (task === undefined || task.agentName !== "voice-work" || task.parentConversationId !== conversationId) {
+        throw new ProviderConfigurationError("That voice task does not belong to this conversation.");
+      }
+      const registered = agentRegistry.get("voice-work");
+      if (registered === undefined) throw new ProviderConfigurationError("Voice work is unavailable.");
+      const handle = init(registered.agent, { id: task.id });
+      if (request.action === "steer") {
+        if (isSettledTaskStatus(task.status)) return { status: task.status, taskId: task.id, text: "The task has already settled. Ask whether to start a continuation." };
+        if (source.trim() === "") throw new ProviderConfigurationError("No correction was transcribed.");
+        await steerTask(task, source, request.admissionKey);
+        return { status: "steering_admitted", taskId: task.id, text: "The correction was delivered to the existing task. An active tool may finish before it takes effect." };
+      }
+      if (request.action === "cancel" && !isSettledTaskStatus(task.status)) {
+        await handle.abort();
+        return { status: "cancellation_requested", taskId: task.id, text: "Cancellation was requested; termination is not yet confirmed." };
+      }
+      const reply = task.status === "completed" && task.originSubmissionId !== undefined
+        ? await handle.read(task.originSubmissionId) : undefined;
+      const activity = this.taskActivity(conversationId).find((item) => item.id === task.id);
+      return { status: task.status, taskId: task.id, text: `${task.title}: ${reply?.text ?? task.resultSummary ?? (activity === undefined ? "No live progress evidence is available. The task has not produced a final result." : `Latest observed stage: ${activity.stage}. The task has not produced a final result.`)}` };
+    }, { conversationId, stage: request.action }, conversationId);
+  }
+
+  /** Running agents for the shared limit: unsettled voice tasks plus live delegates. */
+  #agentCounts(conversationId: string): AgentSlotCounts {
+    const running = this.#tasks.list({ agentName: "voice-work" }).filter((task) => !isSettledTaskStatus(task.status));
+    return {
+      conversation: running.filter((task) => task.parentConversationId === conversationId).length + this.#delegates.count(conversationId),
+      machine: running.length + this.#delegates.total,
+    };
+  }
+
+  async #dispatchVoiceTask(entry: QueuedVoiceTask): Promise<void> {
+    await dispatchBackgroundAgent("voice-work", entry.id, { kind: "user", body: entry.body },
+      { tasks: this.#tasks, parentConversationId: entry.conversationId, title: entry.name });
+  }
+
+  /**
+   * Starts queued voice tasks that now fit, oldest first, each chat in its
+   * own order. Runs when a task settles and when a delegate ends - the two
+   * moments a slot frees. A start that fails is reported on its own
+   * operation; the rest of the queue still moves.
+   */
+  #drainVoiceQueue(): void {
+    for (const entry of [...this.#voiceQueue]) {
+      const first = this.#voiceQueue.find((item) => item.conversationId === entry.conversationId);
+      if (first !== entry || agentLimitReached(this.#agentCounts(entry.conversationId)) !== undefined) continue;
+      this.#voiceQueue.splice(this.#voiceQueue.indexOf(entry), 1);
+      void observeOperation("subagent", "voice.work.dequeue", () => this.#dispatchVoiceTask(entry),
+        { agentInstanceId: entry.id }, entry.conversationId).catch(() => undefined);
+    }
+  }
+
+  /**
+   * The patched Flue runtime asks here before a `task` call starts a
+   * delegate (see `installAgentSlots`). A refusal is a sentence for the
+   * parent model; an admission is counted until its release.
+   */
+  admitDelegate(sessionConversationId: string): { readonly release: () => void } | { readonly refused: string } {
+    const conversationId = this.voiceWorkParent(sessionConversationId) ?? sessionConversationId;
+    const full = agentLimitReached(this.#agentCounts(conversationId));
+    if (full !== undefined) return { refused: `The delegate did not start. ${full} Do this part yourself, or wait for a running agent to finish.` };
+    const leave = this.#delegates.enter(conversationId);
+    return { release: () => { leave(); this.#drainVoiceQueue(); } };
+  }
+
   modelLimits(modelId: string | null): {
     readonly contextWindow: number | "unknown";
     readonly maxOutputTokens: number | "unknown";
@@ -1392,6 +1581,10 @@ export class StudioRuntime implements AgentHost {
    */
   conversationCapabilityInventory(conversationId: string): string {
     return this.#capabilities.blockFor(conversationId);
+  }
+
+  voiceCapabilityOverview(conversationId: string): string {
+    return this.#capabilities.voiceOverviewFor(conversationId, [...NATIVE_TOOL_NAMES]);
   }
 
   /**
@@ -1659,7 +1852,7 @@ export class StudioRuntime implements AgentHost {
    * refuse". A guessed refusal would block models the catalog simply has not
    * described; only a catalog that says *no* gets a no.
    */
-  #modelAcceptsImages(conversationId: string): boolean | undefined {
+  #modelAcceptsImages(conversationId: string, override?: string | null): boolean | undefined {
     const record = this.#conversations.get(conversationId);
 
     const registry = bootstrappedModelRegistry();
@@ -1671,7 +1864,7 @@ export class StudioRuntime implements AgentHost {
     const reference = {
       source: "local",
       provider: DEFAULT_MODEL_PROVIDER,
-      model: record?.modelId ?? DEFAULT_MODEL_NAME,
+      model: override ?? record?.modelId ?? DEFAULT_MODEL_NAME,
     } as const;
     try {
       const vision = registry.resolveDescriptor(reference).capability.vision;
@@ -1860,12 +2053,12 @@ export class StudioRuntime implements AgentHost {
     const mode = (): ExecutionMode => this.#conversationMode(options.conversationId);
     // The mode a default `ask` resolves under, per acting agent. The
     // conversation's calls ride `mode()` — the person's own choice for the
-    // conversation. A delegate's calls ride its definition's `mode` instead
-    // (the contract's "the delegate's own consent default"): a delegated
-    // task asks before it changes or runs something even in an Auto
-    // conversation, because the person handed off work, not attention — and
-    // the ask arrives under the delegate's own agent id, so answering it
-    // grants the delegate, not the conversation (S5.1). Read per ask rather
+    // conversation. A delegate's calls ride its definition's `mode` (the
+    // contract's "the delegate's own consent default"); the roster's
+    // delegates say `inherit`, so Auto reaches the agents a conversation
+    // delegated to. Whatever does ask still arrives under the delegate's own
+    // agent id, so answering it grants the delegate, not the conversation
+    // (S5.1), and the policy rules that ask even in Auto ask here too. Read per ask rather
     // than per submission: the same kernel decides the parent's and the
     // child's calls, and the frame is current whenever a decision is being
     // made. `requiresUndo` above deliberately stays on the conversation's
@@ -1876,7 +2069,7 @@ export class StudioRuntime implements AgentHost {
         currentExecutionContext()?.flueSubagentName,
         agentRegistry,
       );
-      return acting.mode ?? mode();
+      return acting.mode === undefined || acting.mode === "inherit" ? mode() : acting.mode;
     };
     // Per project, and only per project. The undo history is one shadow
     // repository per workspace root — `SnapshotStore` derives its `gitDir` from
@@ -1955,7 +2148,7 @@ export class StudioRuntime implements AgentHost {
     registerNativeTools(gate, {
       database: this.#db,
       credentials: this.#credentials,
-      acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
+      acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId, options.voiceOnly ? this.voiceModel() : undefined),
       accessLog: this.#accessLogFor(options.conversationId),
       imageBudget: this.#imageBudget,
       jobs: this.#jobs,
@@ -2176,6 +2369,7 @@ export class StudioRuntime implements AgentHost {
         );
         const names = new Set<string>();
         return gate.list().flatMap((descriptor) => {
+          if (options.voiceOnly && (descriptor.id.namespace !== "native" || descriptor.id.name !== "read")) return [];
           // The per-acting-agent filter, applied before the name-conflict
           // check so a hidden tool never claims its name in this assembly.
           // Visibility is authority's mirror, not authority itself: what
@@ -2203,6 +2397,9 @@ export class StudioRuntime implements AgentHost {
               input: unknown,
               signal?: AbortSignal,
             ): Promise<ModelToolResult> => {
+              if (options.voiceOnly) {
+                voiceImagePath(input, [attachmentsRoot, artifactsRoot]);
+              }
               // Who is acting, answered again at call time rather than read
               // from the assembly: the assembly's answer named the session
               // this tool was offered to, and the call's frame is the one

@@ -115,6 +115,36 @@ function hubWith(tasks: TaskStore): Hub {
 }
 
 describe("the task projector", () => {
+  it("does not settle a worker when a separate steering receipt settles", () => {
+    let emit: ((observation: FlueObservation) => void) | undefined;
+    const projector = new TaskProjector({ tasks, subscribe: (handler) => { emit = handler; return () => undefined; } });
+    projector.start();
+    tasks.record({ id: "worker", agentName: "voice-work", parentConversationId: "parent", originSubmissionId: "host" });
+    emit?.({ type: "submission_settled", instanceId: "worker", submissionId: "correction", outcome: "completed" } as FlueObservation);
+    expect(tasks.get("worker")?.status).toBe("running");
+    expect(projector.activity("parent")).toEqual([]);
+    emit?.({ type: "submission_settled", instanceId: "worker", submissionId: "host", outcome: "completed" } as FlueObservation);
+    expect(tasks.get("worker")?.status).toBe("completed");
+    projector.stop();
+  });
+
+  it("exposes scoped live delegate stages without copying prompts, tool arguments or reasoning", () => {
+    let emit: ((observation: FlueObservation) => void) | undefined;
+    const projector = new TaskProjector({ tasks, subscribe: (handler) => { emit = handler; return () => undefined; } });
+    projector.start();
+    const event = (payload: object) => emit?.({ instanceId: "conversation", ...payload } as FlueObservation);
+    event({ type: "task_start", taskId: "child", agent: "explore", prompt: "PRIVATE USER CONTENT" });
+    expect(projector.activity("other")).toEqual([]);
+    expect(projector.activity("conversation")[0]).toMatchObject({ id: "child", agentName: "explore", stage: "working" });
+    event({ type: "tool_start", taskId: "child", toolCallId: "call", toolName: "read", args: { path: "PRIVATE PATH" } });
+    expect(projector.activity("conversation")[0]?.stage).toBe("using_tool");
+    expect(JSON.stringify(projector.activity("conversation"))).not.toContain("PRIVATE");
+    event({ type: "task", taskId: "child", isError: false, durationMs: 1 });
+    expect(projector.activity("conversation")[0]?.stage).toBe("completed");
+    projector.stop();
+    expect(projector.activity("conversation")).toEqual([]);
+  });
+
   it("settles completed with the captured final text as the summary", () => {
     const delivered: ((observation: FlueObservation) => void)[] = [];
     const projector = new TaskProjector({
@@ -136,6 +166,30 @@ describe("the task projector", () => {
     expect(row?.status).toBe("completed");
     expect(row?.resultSummary).toBe("Refactoring the sandbox factory");
     expect(row?.settledAt).toBeTypeOf("number");
+  });
+
+  it("keeps a voice worker's whole result and hands it to the parent", () => {
+    const delivered: ((observation: FlueObservation) => void)[] = [];
+    const projector = new TaskProjector({
+      tasks,
+      subscribe: (handler) => {
+        delivered.push(handler);
+        return () => undefined;
+      },
+    });
+    projector.start();
+
+    const days = "Monday: one\nTuesday: two\nWednesday: three";
+    tasks.record({ id: "voice_1", agentName: "voice-work", parentConversationId: "cnv_p" });
+    for (const handler of delivered) {
+      handler(agentEnd("voice_1", days));
+      handler(settled("voice_1", "completed"));
+    }
+
+    const row = tasks.get("voice_1");
+    expect(row?.resultSummary).toBe(days);
+    if (row === undefined) throw new Error("The voice task row is missing.");
+    expect(taskEndedLine(row)).toBe(`Task "${row.title}" completed. Task id: voice_1. Result:\n${days}`);
   });
 
   it("maps aborted to cancelled and failed to the settlement's error", () => {

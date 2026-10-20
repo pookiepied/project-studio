@@ -1,5 +1,31 @@
 # Identity and observations: developer contract
 
+Voice conversations reuse the Studio conversation and canonical submission
+stream. `voice_input` is a user transcription carried as a typed signal, not a
+second chat store. Voice settings changes use `voice.settings`; worker admission
+uses `voice.work` and the existing observed background dispatcher; a task
+queued behind the shared agent limit starts later under `voice.work.dequeue`
+with the id it was admitted under. The queue is process memory: a restart
+drops queued tasks, which never started and are not resent. Worker IDs are
+minted through the central UUID generator in a durable step, then reused on
+recovery without an automatic resend. `task.steer` retains the initiating
+execution parent, consent epoch and admission receipt through the existing
+invocation index. Durable coordination retains a separate admission key for
+steering deduplication; correlation IDs alone do not provide this guarantee.
+Steering admission and cancellation requests are not proof of
+application or confirmed termination. The original host submission's settlement,
+not a steering receipt's settlement, ends an indexed worker.
+
+`task_activity` and `/api/tasks/activity` expose a bounded, process-local product
+projection for inline delegates and independently addressable workers. Only task
+identity, registered agent identity, parent conversation, timestamps and fixed
+lifecycle stages are retained. No prompts, arguments, results or reasoning enter
+this projection. It is not diagnostic capture, a durable task journal, an
+execution authority or proof of completion when evidence is absent. Restart,
+eviction and missing events can make progress unavailable. Existing HTTP,
+framework-tool, runtime lifecycle and media gateway boundaries observe these
+paths; audio frames and microphone levels do not enter diagnostic attributes.
+
 This contract applies to all current and new Project Studio features. The harness
 owns execution. Observations explain execution without changing it. The external
 inspector will consume this contract later; it is not implemented here.

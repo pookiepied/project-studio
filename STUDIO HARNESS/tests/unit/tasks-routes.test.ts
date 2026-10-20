@@ -78,6 +78,17 @@ function harnessApp(session: ReturnType<typeof createAdmissionSession>) {
 }
 
 describe("the background tasks' routes", () => {
+  it("requires a conversation for live progress and protects it with admission", async () => {
+    const session = createAdmissionSession();
+    const app = harnessApp(session);
+    expect((await app.request("http://harness.test/api/tasks/activity?parentConversationId=c")).status).toBe(401);
+    const headers = { authorization: `Bearer ${session.credential}` };
+    expect((await app.request("http://harness.test/api/tasks/activity", { headers })).status).toBe(400);
+    const result = await app.request("http://harness.test/api/tasks/activity?parentConversationId=c", { headers });
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ tasks: [], evidence: "live_process" });
+  });
+
   it("refuse a request without and with wrong credentials", async () => {
     const session = createAdmissionSession();
     const app = harnessApp(session);

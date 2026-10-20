@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { MediaService } from "../../src/gateway/media/service.js";
+import { MediaService, type MediaAdministration } from "../../src/gateway/media/service.js";
+import { VoiceSettings } from "../../src/gateway/language/voice-settings.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { ConnectionStore } from "../../src/gateway/connections/connection-store.js";
 import { ModelCatalog } from "../../src/gateway/connections/model-catalog.js";
@@ -152,6 +153,20 @@ afterEach(() => {
 });
 
 describe("media routes", () => {
+  it("stores an independently selected connected voice model and refuses unavailable choices", async () => {
+    const setting = new VoiceSettings(db);
+    const scoped = new Hono<AdmissionEnv>();
+    scoped.use("*", createAdmissionMiddleware(session.verifier));
+    scoped.route("/api/media", createMediaRoutes({} as MediaAdministration, { voiceSettings: setting, isModelServed: async (id) => id === "openrouter/example/fast" }));
+    const put = (modelId: string | null) => scoped.request("http://harness.test/api/media/voice-model", { method: "PUT", headers: { authorization: `Bearer ${session.credential}`, "content-type": "application/json" }, body: JSON.stringify({ modelId }) });
+    expect((await put("missing/model")).status).toBe(400);
+    expect(setting.get()).toBeNull();
+    expect((await put("openrouter/example/fast")).status).toBe(200);
+    expect(setting.get()).toBe("openrouter/example/fast");
+    expect((await put(null)).status).toBe(200);
+    expect(setting.get()).toBeNull();
+  });
+
   it("requires the project scope", async () => {
     const limited = createAdmissionSession({ scopes: [ADMISSION_SCOPES.PROVIDER_MANAGEMENT] });
     const credentials = new InMemoryCredentialStore();

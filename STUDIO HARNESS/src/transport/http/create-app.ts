@@ -40,6 +40,7 @@ import { createDiagnosticRoutes } from "./routes/diagnostics.js";
 import { createObservationRoutes } from "./routes/observations.js";
 import { createMediaRoutes } from "./routes/media.js";
 import type { TextImproverPort } from "../../application/text-improver.js";
+import type { VoiceSettings } from "../../gateway/language/voice-settings.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 import { createGrantsRoutes } from "./routes/grants.js";
@@ -93,6 +94,7 @@ export interface CreateHttpAppOptions {
   readonly media: MediaAdministration;
   /** Tidies a dictated passage on the default model; optional for tests. */
   readonly improver?: TextImproverPort;
+  readonly voiceSettings?: VoiceSettings;
   /**
    * Site icons for the transcript's search results and page reads. Optional
    * the way `improver` is: a composition without it answers no icon routes
@@ -266,7 +268,11 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route(
     "/api/media",
-    createMediaRoutes(options.media, options.improver === undefined ? {} : { improver: options.improver }),
+    createMediaRoutes(options.media, {
+      ...(options.improver === undefined ? {} : { improver: options.improver }),
+      ...(options.voiceSettings === undefined ? {} : { voiceSettings: options.voiceSettings }),
+      isModelServed: options.isModelServed,
+    }),
   );
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
   app.route("/api/permissions/grants", createGrantsRoutes(options.grants));
@@ -313,6 +319,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
     createTurnSettingsMiddleware({
       conversations: options.conversations,
       isModelServed: options.isModelServed,
+      ...(options.voiceSettings === undefined ? {} : { voiceModel: () => options.voiceSettings?.get() ?? null }),
       ...(options.titling === undefined ? {} : { titling: options.titling }),
       ...(options.reopenCapabilityNote === undefined
         ? {}

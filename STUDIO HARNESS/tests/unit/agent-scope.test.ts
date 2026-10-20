@@ -155,19 +155,18 @@ describe("the studio agent's identity and model contracts", () => {
     // conversation id it will be given is the render's own props id, which
     // is what the source names.
     expect(STUDIO_SOURCE).toContain("conversationId: id,");
-    expect(STUDIO_SOURCE).toContain("agentId: STUDIO_AGENT_ID,");
+    expect(STUDIO_SOURCE).toContain("renderStudio(id, STUDIO_AGENT_ID)");
+    expect(STUDIO_SOURCE).toContain("agentId,");
     // The scope the factory builds from those arguments is covered against
     // a real runtime in conversation-mode.test.ts, which asserts that two
     // conversations of one agent are two scopes.
   });
 
-  it("mounts no tool hooks: the gate's tools ride the sandbox factory", () => {
-    // Studio's tools are the CallGate's, exposed through the factory's own
-    // `tools` member (studio-runtime.ts). A second path - `useTool` here -
-    // would be ungated capability reach; its absence is a security property,
-    // and the runtime ships no render harness, so the module's shape is the
-    // check.
-    expect(STUDIO_SOURCE).not.toMatch(/useTool\(/);
+  it("mounts only coordination hooks: executable capabilities still ride the gated sandbox factory", () => {
+    // Framework coordination can admit a worker or inspect its lifecycle.
+    // Executable filesystem/MCP capabilities must still come from CallGate,
+    // including the voice role's image-only sandbox surface.
+    expect([...STUDIO_SOURCE.matchAll(/name: "([a-z_]+)"/g)].map((match) => match[1]).sort()).toEqual(["task_activity", "voice_work"]);
     expect(STUDIO_SOURCE).toContain("useSandbox(");
   });
 

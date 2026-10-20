@@ -273,6 +273,10 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     return this.#runtime.supportedReasoningLevels(modelId);
   }
 
+  quietThinkingLevel(modelId: string | null): ReasoningLevel | "off" {
+    return this.#runtime.quietThinkingLevel?.(modelId) ?? "off";
+  }
+
   /**
    * The cheapest model this source can honestly reach, priced from Pi's own
    * listed rates.

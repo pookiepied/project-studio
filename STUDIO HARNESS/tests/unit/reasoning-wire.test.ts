@@ -5,7 +5,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { PiCredentialStore } from "../../src/gateway/language/local/credential-bridge.js";
-import { createLocalRuntime } from "../../src/gateway/language/local/runtime.js";
+import { createLocalRuntime, quietThinkingLevelForPiModel } from "../../src/gateway/language/local/runtime.js";
 import { languageCatalogModels } from "../../src/gateway/language/pi-catalog.js";
 import { runThinkingLevelForChoice } from "../../src/contracts/models.js";
 
@@ -214,5 +214,39 @@ describe("the synchronous supported-levels lookup", () => {
       credentials,
     });
     expect(runtime.supportedReasoningLevels(null)).toEqual(["medium"]);
+  });
+});
+
+describe("the quietest thinking a spoken reply can ask for", () => {
+  /** Every effort the payload names: its output config and any managed-effort system messages. */
+  function efforts(payload: unknown): string[] {
+    if (!isRecord(payload)) return [];
+    const found: string[] = [];
+    const config = payload["output_config"];
+    if (isRecord(config) && typeof config["effort"] === "string") found.push(config["effort"]);
+    const messages = Array.isArray(payload["messages"]) ? payload["messages"] : [];
+    for (const message of messages) {
+      const inner = isRecord(message) ? message["output_config"] : undefined;
+      if (isRecord(inner) && typeof inner["effort"] === "string") found.push(inner["effort"]);
+    }
+    return found;
+  }
+
+  it("lowers a managed-effort Claude model below the high effort that off sends", async () => {
+    const model = languageCatalogModels("anthropic").find(
+      (candidate) => (candidate as { compat?: { supportsMidConvoEffort?: boolean } }).compat?.supportsMidConvoEffort === true,
+    );
+    if (model === undefined) throw new Error("No managed-effort Anthropic model in the catalog.");
+    const quiet = quietThinkingLevelForPiModel(model);
+    expect(quiet).not.toBe("off");
+    // "off" is not off on this wire: the effort the voice turn used to carry.
+    expect(efforts(await capturePayload(model, {}))).toContain("high");
+    expect(efforts(await capturePayload(model, { reasoning: quiet }))).toContain("low");
+  });
+
+  it("stays off for a model that honours off", () => {
+    const model = firstReasoningModel("openai");
+    if (model === undefined) throw new Error("No reasoning OpenAI model in the catalog.");
+    expect(quietThinkingLevelForPiModel(model)).toBe("off");
   });
 });

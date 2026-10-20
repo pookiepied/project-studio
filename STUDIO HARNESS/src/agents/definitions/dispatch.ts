@@ -84,7 +84,7 @@ export async function dispatchBackgroundAgent(
     const conversationId = context.diagnosticConversationId ?? context.parentConversationId;
     const record = createObservationWriter();
     const registered = agentRegistry.get(agentName);
-    if (registered === undefined || registered.definition.kind !== "background") {
+    if (registered === undefined || (registered.definition.kind !== "background" && registered.definition.kind !== "worker")) {
       // Names are pinned literals shared with the caller's module, so this is
       // a build-time authoring failure showing up at dispatch time - the
       // registry's own error vocabulary, not a generic "unknown agent".

@@ -5,6 +5,8 @@ import { Improve } from "../improve.js";
 import { Plan } from "../plan.js";
 import { Studio } from "../studio.js";
 import { Title } from "../title.js";
+import { VoiceWork } from "../voice-work.js";
+import { voiceWorkDefinition } from "./voice-work.js";
 
 import { AgentRegistry, type RegisteredAgent } from "./registry.js";
 import { studioDefinition } from "./studio.js";
@@ -40,6 +42,7 @@ export const agentRegistry = new AgentRegistry([
   { definition: titleDefinition, agent: Title },
   { definition: improveDefinition, agent: Improve },
   { definition: describeDefinition, agent: Describe },
+  { definition: voiceWorkDefinition, agent: VoiceWork },
   // The delegates. Resolving by name here is what the `useSubagent` mount
   // in `agents/studio.ts` reads (the mount needs the function object, and
   // this is the cycle-free site that holds it beside the definition), and

@@ -73,7 +73,7 @@ describe("the acting-agent policy", () => {
     // never run was the old ceiling's own lie.
     expect(policy.maxEffects).toEqual(["read", "network"]);
     // The delegate's own consent default, carried for the kernel's posture.
-    expect(policy.mode).toBe("ask");
+    expect(policy.mode).toBe("inherit");
   });
 
   it("resolves the general delegate's allowlist: the working set, no destructive pair", () => {
@@ -94,7 +94,7 @@ describe("the acting-agent policy", () => {
     // refusal-based — the destructive pair is withheld by the allowlist,
     // and everything reachable stops at the kernel under its own id.
     expect(policy.maxEffects).toEqual(["read", "write", "execute", "network"]);
-    expect(policy.mode).toBe("ask");
+    expect(policy.mode).toBe("inherit");
     // The wildcard: "the namespaces this conversation has adopted".
     expect(policy.allowedMcpNamespaces?.has("*")).toBe(true);
   });

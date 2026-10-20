@@ -47,6 +47,7 @@ number.
 | 8 | Outbound HTTP — `src/net/http.ts` | none; every call carries a ceiling and a deadline | — | Yes — errors surface through tool results. Note: failures are *classified* `retryable` or not, but no caller loops on the flag; treat any future loop as a new authority under this rule |
 | 9 | Test-harness startup — `tests/integration/harness.test.ts` (Task 28) | one replacement for a wedged silent child, only while over half the startup budget remains | test-local | n/a — test infrastructure |
 | 10 | Detached browser address/frame reads — `features/browser/useLiveBrowser.ts` | five retries for unavailable addresses or transport failures, delays 500ms through 2500ms; success resets the budget; refused/malformed replies end recovery | viewer-local bounded schedule | Yes — Reconnecting, then the precise failure with Reconnect; input is never replayed |
+| 11 | Voice/task coordination — Flue durable tool steps | No application retry loop. A worker uses one attempt; an indexed start is never automatically resent. Steering retains a UUID admission key in a preceding durable step so recovery cannot duplicate that correction. HTTP steering has no automatic retry. | Flue durable steps and dispatch idempotency | Yes — admission, unavailable/settled state and cancellation request are distinct from actual execution/settlement |
 
 Corrections the code forced on the working version of this table:
 

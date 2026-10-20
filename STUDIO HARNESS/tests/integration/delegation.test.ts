@@ -406,13 +406,12 @@ describe.sequential("the Explore delegate, end to end", () => {
 
 describe.sequential("the broader roster, end to end", () => {
   it(
-    "asks the general delegate's write under its own agent id, even in Auto",
+    "asks the general delegate's write under its own agent id in an Ask conversation",
     async () => {
-      // S5.1's gate, live: the conversation runs in Auto (the submission
-      // carries `permissionMode: "auto"`), so the PARENT's own default
-      // asks would proceed — but the delegate's consent default is its
-      // definition's `mode: "ask"`, so the child's write parks anyway,
-      // and the pending approval names `general` in its scope. Answering
+      // S5.1's gate, live: the conversation runs in Ask (the submission
+      // carries `permissionMode: "ask"`), the delegate's consent default
+      // is `inherit`, so the child's write parks, and the pending approval
+      // names `general` in its scope. Answering
       // it grants the delegate, not the conversation: the grant row is
       // keyed `agentId: "general"`, which is the isolation property the
       // store-level suite asserts, seen here from the side a person
@@ -421,7 +420,7 @@ describe.sequential("the broader roster, end to end", () => {
       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
       const authorization = { authorization: `Bearer ${running.token}` };
 
-      // The raw submission, because the Auto consent rides the body's
+      // The raw submission, because the mode rides the body's
       // turn settings — the middleware settles it before the run reads
       // anything, which is exactly the proof this test needs.
       const admitted = await fetch(`${running.baseUrl}/agents/studio/delegate-general-1`, {
@@ -430,7 +429,7 @@ describe.sequential("the broader roster, end to end", () => {
         body: JSON.stringify({
           kind: "user",
           body: "[delegate-general] create the file",
-          permissionMode: "auto",
+          permissionMode: "ask",
         }),
       });
       expect([200, 202]).toContain(admitted.status);
@@ -492,6 +491,41 @@ describe.sequential("the broader roster, end to end", () => {
       const rows = (await grants.json()) as { agentId: string; capabilityKey: string }[];
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((row) => row.agentId === "general")).toBe(true);
+    },
+    90_000,
+  );
+
+  it(
+    "lets the general delegate's write proceed in an Auto conversation",
+    async () => {
+      // The other half of `inherit`: the person chose Auto for the
+      // conversation, so the work it delegated proceeds as the
+      // conversation's own would. Nothing parks, and nothing is granted.
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+      const authorization = { authorization: `Bearer ${running.token}` };
+      const admitted = await fetch(`${running.baseUrl}/agents/studio/delegate-general-auto-1`, {
+        method: "POST",
+        headers: { ...authorization, "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "user",
+          body: "[delegate-general] create the file",
+          permissionMode: "auto",
+        }),
+      });
+      expect([200, 202]).toContain(admitted.status);
+      const receipt = (await admitted.json()) as { submissionId?: string };
+      const result = await client.wait({
+        threadId: "delegate-general-auto-1",
+        submissionId: receipt.submissionId ?? "",
+        streamUrl: "",
+        offset: "0",
+      });
+      expect(result.text).toContain("write ran");
+      const pending = await fetch(`${running.baseUrl}/api/permissions/pending`, { headers: authorization });
+      expect(await pending.json()).toEqual([]);
+      const grants = await fetch(`${running.baseUrl}/api/permissions/grants?agentId=general`, { headers: authorization });
+      expect(await grants.json()).toEqual([]);
     },
     90_000,
   );

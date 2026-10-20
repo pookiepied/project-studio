@@ -7,6 +7,8 @@ import type {
 } from "../../../agents/definitions/task-store.js";
 import { isSettledTaskStatus } from "../../../contracts/agents.js";
 import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
+import { steerTask } from "../../../agents/task-control.js";
+import { toErrorReport } from "../../../observability/error-reporter.js";
 
 /**
  * The background agent tasks' routes (ADR 0058 D5, S4.1).
@@ -25,6 +27,7 @@ import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admissio
  * the same one.
  */
 export interface TaskControlPort {
+  readonly activity?: (conversationId: string) => readonly import("../../../agents/task-projector.js").TaskActivity[];
   /**
    * Stops one task's durable work, answering whether there was something to
    * stop. Resolves once the abort intent is recorded; the settlement lands
@@ -57,6 +60,12 @@ export function createTaskRoutes(
     );
   });
 
+  routes.get("/activity", (context) => {
+    const conversationId = context.req.query("parentConversationId");
+    if (!conversationId) return context.json({ error: "Choose a conversation to inspect." }, 400);
+    return context.json({ tasks: control.activity?.(conversationId) ?? [], evidence: "live_process" });
+  });
+
   routes.get("/:id", (context) => {
     const record = tasks.get(context.req.param("id"));
     return record === undefined
@@ -77,6 +86,19 @@ export function createTaskRoutes(
     }
     const cancelled = await control.cancel(record);
     return context.json({ cancelled });
+  });
+
+  routes.post("/:id/steer", async (context) => {
+    const task = tasks.get(context.req.param("id"));
+    if (task === undefined) return context.json({ error: "That task does not exist." }, 404);
+    try {
+      const body: unknown = await context.req.json();
+      if (typeof body !== "object" || body === null || !("text" in body) || typeof body.text !== "string") {
+        return context.json({ error: "Provide the correction as text." }, 400);
+      }
+      const submissionId = await steerTask(task, body.text);
+      return context.json({ submissionId, status: "steering_admitted" });
+    } catch (error) { return context.json({ error: toErrorReport(error).message }, 400); }
   });
 
   return routes;

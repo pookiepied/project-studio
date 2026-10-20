@@ -44,6 +44,7 @@ import {
 import { createHttpApp } from "./transport/http/create-app.js";
 import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
 import { Studio } from "./agents/studio.js";
+import { agentLimitLine, installAgentSlots } from "./agents/agent-slots.js";
 import { agentRegistry } from "./agents/definitions/index.js";
 import { compactConversation, compactionReadiness } from "./conversations/compaction.js";
 import { manageQueuedMessages } from "./conversations/queued-messages.js";
@@ -67,6 +68,7 @@ import { RetrievalSettingsStore } from "./gateway/retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
 import { ConversationTitler } from "./conversations/titling.js";
 import { TextImprover } from "./application/text-improver.js";
+import { VoiceSettings } from "./gateway/language/voice-settings.js";
 import { ContextUsageTracker } from "./conversations/context-usage.js";
 import { ProjectStore } from "./projects/store.js";
 import { WorkspaceTrustStore } from "./permissions/trust.js";
@@ -237,6 +239,9 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
           message: { kind: "signal", type: "studio.jobs.finished", body },
         }).then(() => undefined),
     });
+    // The shared agent limit reaches Flue's `task` tool through the same
+    // globalThis seam as the retry policy; see src/agents/agent-slots.ts.
+    installAgentSlots({ limitLine: agentLimitLine(), admitDelegate: ({ conversationId }) => runtime.admitDelegate(conversationId) });
     studioRuntime = runtime;
     configureStudioRuntime(runtime);
     registerFlueTurnBoundary(() => runtime.prepareModelTurn());
@@ -395,6 +400,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       retrieval,
       media,
       improver,
+      voiceSettings: new VoiceSettings(database),
       // Site icons, fetched by the harness once per host and kept in the
       // cache directory; the window asks here and never the site.
       favicons: new FaviconStore({ directory: studioPath("cache", "favicons") }),
@@ -447,6 +453,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       // outcome. A settled row never reaches here; the route refuses first.
       tasks: runtime.tasks,
       taskControl: {
+        activity: (conversationId) => runtime.taskActivity(conversationId),
         cancel: async (task) => {
           const registered = agentRegistry.get(task.agentName);
           if (registered === undefined) return false;

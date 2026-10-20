@@ -181,10 +181,10 @@ index 63c9b95ea0a8333a7109fce9084ad4068711506d..85da42199a1e998f64fe4b12f0914980
  		attachmentStore
  	};
 diff --git a/dist/conversation-stream-store-CXrgv-b0.mjs b/dist/conversation-stream-store-CXrgv-b0.mjs
-index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b3d967939 100644
+index 28be2fc98bba07dfc9628da831dbbe6a029ba970..7dfe1f85c94c08e049347258966537dadad588ee 100644
 --- a/dist/conversation-stream-store-CXrgv-b0.mjs
 +++ b/dist/conversation-stream-store-CXrgv-b0.mjs
-@@ -442,14 +442,34 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
+@@ -442,14 +442,41 @@ function composeSystemPrompt(agentsMd, catalog, agentCatalog, env, instructions)
  			parts.push(`- **${agent.name}**${desc}`);
  		}
  	} else pushSection("## Available Agents", "", "None. No subagents are currently declared, so the `task` tool has no valid `agent` value — do not call it unless an agent is introduced later in the conversation.");
@@ -194,6 +194,13 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
 -		month: "short",
 -		day: "numeric"
 -	})}`);
++	// [project-studio patch] How many agents may run at once, said where the
++	// agents are listed so no model has to learn it from a refusal. The
++	// sentence is Studio's (src/agents/agent-slots.ts, agentLimitLine), read
++	// off the same globalThis gate the task tool consults; it is constant for
++	// the process, so it never moves the cached prefix. Absent gate, no line.
++	const agentLimitLine = globalThis.__projectStudioAgentSlots?.limitLine;
++	if (typeof agentLimitLine === "string" && agentLimitLine !== "") parts.push("", agentLimitLine);
  	if (env) {
 -		parts.push(`Working directory: ${env.cwd}`);
 +		// [project-studio patch] The two lines removed here -- the `Date:` line
@@ -226,7 +233,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  		if (env.directoryListing && env.directoryListing.length > 0) parts.push("", "Directory structure:", env.directoryListing.join("\n"));
  	}
  	return parts.join("\n");
-@@ -1204,8 +1224,15 @@ var Session = class {
+@@ -1204,8 +1231,15 @@ var Session = class {
  	activeJoinSignal;
  	/** The active submission's canonical input entry id (delivery-cursor floor). */
  	activeInputEntryId;
@@ -242,7 +249,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  		if (this.activeTurnId === void 0) this.activeTurnId = generateTurnId();
  		const turnId = this.activeTurnId;
  		const operationId = this.activeOperationId ?? generateOperationId();
-@@ -1218,7 +1245,37 @@ var Session = class {
+@@ -1218,7 +1252,37 @@ var Session = class {
  			operationId,
  			turnId
  		});
@@ -281,7 +288,68 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  	};
  	canonicalEnvelope(type, id = generateConversationRecordId()) {
  		return {
-@@ -4143,23 +4200,98 @@ var Session = class {
+@@ -3643,16 +3707,50 @@ var Session = class {
+ 				}
+ 			};
+ 		}
+-		const attachmentIds = [...new Set((params.attachments ?? []).map((attachment) => attachment.id))];
+-		const images = await this.resolveCanonicalImages(attachmentIds);
+-		const result = await this.executeTask(params.prompt, {
+-			agent: params.agent,
+-			inheritedModel,
+-			inheritedThinkingLevel,
+-			cwd: params.cwd,
+-			images,
+-			toolCallId
+-		}, signal);
++		// [project-studio patch] The shared agent limit lives OUTSIDE this
++		// bundle: src/agents/agent-slots.ts publishes a gate on
++		// globalThis.__projectStudioAgentSlots, consulted (not imported) the
++		// same way the transient-retry policy is. A refusal is answered as a
++		// factual miss the parent can act on; an admission is released when
++		// the delegate ends, however it ends. An absent or throwing gate
++		// admits the delegate, as upstream would.
++		const slots = globalThis.__projectStudioAgentSlots;
++		let admission;
++		if (slots && typeof slots.admitDelegate === "function") try {
++			admission = slots.admitDelegate({ conversationId: this.conversationId, agent: params.agent });
++		} catch {
++			admission = void 0;
++		}
++		if (admission && typeof admission.refused === "string") return {
++			content: [{
++				type: "text",
++				text: admission.refused
++			}],
++			details: {
++				agent: params.agent,
++				refused: true
++			}
++		};
++		const release = () => {
++			try {
++				if (admission && typeof admission.release === "function") admission.release();
++			} catch {}
++		};
++		let result;
++		try {
++			const attachmentIds = [...new Set((params.attachments ?? []).map((attachment) => attachment.id))];
++			const images = await this.resolveCanonicalImages(attachmentIds);
++			result = await this.executeTask(params.prompt, {
++				agent: params.agent,
++				inheritedModel,
++				inheritedThinkingLevel,
++				cwd: params.cwd,
++				images,
++				toolCallId
++			}, signal);
++		} finally {
++			release();
++		}
+ 		return {
+ 			content: [{
+ 				type: "text",
+@@ -4143,23 +4241,98 @@ var Session = class {
  			const messages = this.agentLoop.state.messages;
  			const latest = messages[messages.length - 1];
  			assistant = latest?.role === "assistant" ? latest : void 0;
@@ -383,7 +451,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  			delayMs,
  			error: assistant.errorMessage
  		});
-@@ -4230,6 +4362,8 @@ var Session = class {
+@@ -4230,6 +4403,8 @@ var Session = class {
  				estimatedTokens
  			});
  			terminalPending = true;
@@ -392,7 +460,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  			const result = await compact(preparation, summarizationModel, this.compactionAbortController.signal, {
  				start: (purpose, model, context, options) => {
  					const handle = { turnId: generateTurnId() };
-@@ -4249,7 +4383,7 @@ var Session = class {
+@@ -4249,7 +4424,7 @@ var Session = class {
  					this.emitTurn(handle.turnId, purpose, response, request.info, error);
  					this.modelRequests.delete(handle.turnId);
  				}
@@ -401,7 +469,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  			if (this.compactionAbortController.signal.aborted) {
  				const abortError = abortErrorFor(this.compactionAbortController.signal);
  				this.emit({
-@@ -4626,6 +4760,8 @@ var Session = class {
+@@ -4626,6 +4801,8 @@ var Session = class {
  				this.activeSubmissionAttemptId = void 0;
  				this.activeJoinSource = void 0;
  				this.activeJoinSignal = void 0;
@@ -410,7 +478,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  				this.activeInputEntryId = void 0;
  				this.activeTimeoutAt = void 0;
  			}
-@@ -5017,6 +5153,7 @@ async function materializeSubmissionAttachments(input, conversationId, attachmen
+@@ -5017,6 +5194,7 @@ async function materializeSubmissionAttachments(input, conversationId, attachmen
  		});
  	}
  }
@@ -418,7 +486,7 @@ index 28be2fc98bba07dfc9628da831dbbe6a029ba970..467d1f34b72e0e96a5408b552c0f341b
  function createAgentSubmissionSessionHandler(agent, input, execute) {
  	return async (ctx) => {
  		return execute(await openAgentSubmissionSession(ctx, agent, input));
-@@ -5161,7 +5298,17 @@ async function processSubmission(opts) {
+@@ -5161,7 +5339,17 @@ async function processSubmission(opts) {
  		maxAttempts: submission.maxAttempts
  	});
  	const joinSource = {

@@ -356,6 +356,15 @@ export function bootstrappedSupportedReasoningLevels(
   return ["medium"];
 }
 
+/** See `ModelProviderAdapter.quietThinkingLevel`; "off" when no source can say. */
+export function bootstrappedQuietThinkingLevel(
+  modelId: string | null,
+): ReasoningLevel | "off" {
+  const registry = productionCoordinator.current?.registry;
+  const adapter = registry?.getAdapter("local") ?? registry?.getAdapter("test");
+  return adapter?.quietThinkingLevel?.(modelId) ?? "off";
+}
+
 function firstNumber(values: readonly (number | "unknown")[]): number | undefined {
   for (const value of values) {
     if (typeof value === "number") return value;

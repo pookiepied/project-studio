@@ -68,13 +68,11 @@ export const exploreDefinition = validateAgentDefinition({
   skills: { ids: [] },
   permissions: {
     // A delegate never inherits an approval (ADR 0038's grant-isolation
-    // property, #49): the child asks, under its own agent id, and the
-    // honest default for that is `ask` — an explore run is not the thing
-    // Full Auto should silently widen. `git`'s write options and the web
-    // readers' network calls both stop at the kernel first when the
-    // conversation would not.
+    // property, #49): what asks, asks under its own agent id. The default
+    // follows the conversation's mode, so Auto is not stopped by its own
+    // explorer; the read ceiling above is what keeps this agent read-only.
     maxEffects: ["read", "network"],
-    mode: "ask",
+    mode: "inherit",
   },
   durability: { maxAttempts: 3, timeoutMs: 600_000 },
 });

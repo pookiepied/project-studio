@@ -1,6 +1,10 @@
 'use agent';
 
-import { useAgentStart, useDelivery, useModel, useSandbox, useSkill, useSubagent, type AgentProps } from "@flue/runtime";
+import { useAgentStart, useDelivery, useModel, usePersistentState, useSandbox, useSkill, useSubagent, useTool, type AgentProps } from "@flue/runtime";
+import * as v from "valibot";
+import { VOICE_PROMPT } from "../context/voice-prompt.js";
+import { createStudioUuid } from "../contracts/uuid.js";
+import { ProviderConfigurationError } from "../contracts/models.js";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
@@ -178,6 +182,71 @@ export function delegateMount(entry: {
  * mistakes.
  */
 export function Studio({ id }: AgentProps) {
+  const delivery = useDelivery();
+  const [voice, setVoice] = usePersistentState("voice_mode", false);
+  const [source, setSource] = usePersistentState("voice_source", "");
+  const spoken = delivery.kind === "signal" && delivery.type === "voice_input";
+  const voiceMode = spoken || (delivery.kind !== "user" && voice);
+  useTaskCoordination(id, voiceMode);
+  useAgentStart(() => {
+    if (spoken) { setVoice(true); setSource(delivery.body); }
+    else if (delivery.kind === "user") setVoice(false);
+  });
+  if (voiceMode) {
+    const runtime = getStudioRuntime();
+    const modelId = runtime.voiceModel?.();
+    if (!modelId) throw new ProviderConfigurationError("Choose a voice conversation model in Settings - Models.");
+    // Spoken replies want the least thinking the model honours; for Claude's
+    // managed-effort models "off" would mean adaptive thinking at high effort.
+    useModel(studioModelSpecifier({ modelId }), { thinkingLevel: runtime.quietThinkingLevel?.(modelId) ?? "off" });
+    useTool({
+      name: "voice_work",
+      description: "Start work from the exact user transcription, or read/cancel an existing voice task. Does not wait for completion.",
+      input: v.object({ action: v.picklist(["start", "steer", "status", "cancel"]), taskId: v.optional(v.string()), context: v.optional(v.pipe(v.string(), v.maxLength(16_000))) }),
+      durable: true,
+      run: async ({ data, step }) => {
+        const admissionKey = await step.do("voice-coordination-identity", async () => createStudioUuid());
+        const taskId = data.action === "start" ? await step.do("voice-work-identity", async () => `voice_${createStudioUuid()}`) : data.taskId;
+        return { output: await step.do("voice-work", async () => {
+        if (runtime.voiceWork === undefined) throw new ProviderConfigurationError("Voice work is unavailable.");
+        if ((data.action === "start" || data.action === "steer") && !spoken) throw new ProviderConfigurationError("New instructions need a new user utterance.");
+        return runtime.voiceWork(id, spoken ? delivery.body : source, { ...data, taskId, admissionKey });
+      }) };
+      },
+    });
+    const folders = runtime.conversationProjectFolders?.(id) ?? [];
+    useSandbox(runtime.createAgentSandbox({ agentId: "voice", conversationId: id,
+      projectRoot: folders[0] ?? conversationWorkspaceDirectory(id), voiceOnly: true }));
+    // Names and counts only, never cut: the text agent's discover
+    // instructions describe tools this agent cannot call.
+    const capabilities = runtime.voiceCapabilityOverview?.(id) ?? "No capability overview is available.";
+    return `${VOICE_PROMPT}\n\n${capabilities}`;
+  }
+  return renderStudio(id, STUDIO_AGENT_ID);
+}
+
+/** The same scoped coordination surface belongs to text and voice conversations. */
+function useTaskCoordination(conversationId: string, voice: boolean) {
+  const runtime = getStudioRuntime();
+  useTool({
+    name: "task_activity",
+    description: "Inspect observed delegate/worker progress without private reasoning or tool contents. Steer or cancel independently addressable workers in this conversation; inline task delegates support inspection only. A correction is not permission to bypass approval.",
+    input: v.object({ action: v.picklist(["status", "steer", "cancel"]), taskId: v.optional(v.string()), text: v.optional(v.pipe(v.string(), v.maxLength(16_000))) }),
+    durable: true,
+    run: async ({ data, step }) => {
+      const admissionKey = await step.do("task-coordination-identity", async () => createStudioUuid());
+      return { output: await step.do("task-coordination", async () => {
+      if (data.action === "status") return JSON.stringify({ tasks: runtime.taskActivity?.(conversationId) ?? [], evidence: "Live lifecycle projection; missing after restart or eviction. No evidence is not completion." });
+      if (voice) throw new ProviderConfigurationError("Use voice_work to preserve the exact user utterance when steering or cancelling voice work.");
+      if (runtime.coordinateTask === undefined || data.taskId === undefined) throw new ProviderConfigurationError("Choose an independently addressable task to steer or cancel.");
+      return runtime.coordinateTask(conversationId, data.taskId, data.action, data.text, admissionKey);
+    }) };
+    },
+  });
+}
+
+/** Workers retain the parent's workspace/context, with their own agent authority. */
+export function renderStudio(id: string, agentId: string) {
   const runtime = getStudioRuntime();
   const settings = runtime.conversationTurnSettings(id);
   const supported = runtime.supportedReasoningLevels(settings.modelId);
@@ -201,7 +270,7 @@ export function Studio({ id }: AgentProps) {
       // `id` is the agent *instance* - one per conversation thread, measured
       // rather than assumed - so under Flue 2.0 it IS the conversation id,
       // and the agent is named separately. Feeding it to `agentId` was #69.
-      agentId: STUDIO_AGENT_ID,
+      agentId,
       conversationId: id,
       // Per conversation, always. Passing these explicitly is the whole
       // reason this conversation cannot read the host's build directory by
@@ -349,7 +418,7 @@ export function Studio({ id }: AgentProps) {
   // for the whole conversation should not sit in the middle of one whose
   // content is not.
   const capabilities = runtime.conversationCapabilityInventory?.(id) ?? "";
-  return `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
+  return `${STUDIO_SYSTEM_PROMPT}${agentId === STUDIO_AGENT_ID ? "\nUse task_activity to inspect observed delegate progress. Independently addressable workers can receive steering or cancellation through it. Inline task delegates expose progress only; never promise live steering or private reasoning access for them." : ""}\n${environmentBlock(
     environmentFacts(
       workspace,
       new Date(),

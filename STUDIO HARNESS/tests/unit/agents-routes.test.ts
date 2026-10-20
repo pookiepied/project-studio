@@ -101,6 +101,7 @@ describe("the agent roster route", () => {
       "plan",
       "studio",
       "title",
+      "voice-work",
     ]);
     const delegates = roster.filter((entry) => entry.kind === "delegate");
     expect(delegates.map((entry) => entry.agentName)).toEqual(["explore", "general", "plan"]);
@@ -122,7 +123,7 @@ describe("the agent roster route", () => {
     });
     expect(general?.["permissions"]).toMatchObject({
       maxEffects: ["read", "write", "execute", "network"],
-      mode: "ask",
+      mode: "inherit",
     });
 
     const studio = roster.find((entry) => entry["agentName"] === "studio");

@@ -156,6 +156,9 @@ export type SubmissionTurnSettings = v.InferOutput<typeof submissionTurnSettings
  * - `background` — the `title` / `improve` / `describe` pattern generalized:
  *   dispatch-only, one-shot, addressed by a task instance id the product
  *   mints, never mounted on the HTTP surface.
+ * - `worker` — independently addressable work with a conversation-owned
+ *   sandbox, model and permission gate. Its lifecycle is indexed like
+ *   background work; it is allowed to perform approved tool actions.
  * - `delegate` — a subagent declared by a conversation agent and reached
  *   through Flue's `task` tool (ADR 0058 D2). None exists yet; the shape
  *   below is what Stage 3's `explore` will fill in.
@@ -164,7 +167,7 @@ export type SubmissionTurnSettings = v.InferOutput<typeof submissionTurnSettings
  * read it: a new kind is a new runtime path, and it must fail the typecheck
  * until the registry knows what it means.
  */
-export type AgentKind = "conversation" | "background" | "delegate";
+export type AgentKind = "conversation" | "background" | "worker" | "delegate";
 
 /**
  * What a definition may say about tools, per kind.
@@ -216,9 +219,11 @@ export interface AgentSkillPolicy {
  *
  * `conversation` reads its mode from the settled turn settings. `background`
  * agents hold no tools, so no permission applies to them. A `delegate` has
- * its own consent default — `ask` for every delegate in the initial roster,
- * because a delegate never inherits an approval (ADR 0038's grant-isolation
- * property, #49) and the honest default is the child asks.
+ * its own consent default. Every delegate in the initial roster says
+ * `inherit`: a default `ask` resolves under the conversation's mode, so a
+ * person who chose Auto is not stopped by the agents that conversation
+ * delegated to. A delegate still never inherits an *approval* (ADR 0038's
+ * grant-isolation property, #49): its asks and grants carry its own agent id.
  */
 export interface AgentPermissionPolicy {
   /**
@@ -229,8 +234,11 @@ export interface AgentPermissionPolicy {
    * must all say the same thing before a Stage 3 delegate runs.
    */
   readonly maxEffects: readonly CapabilityEffect[];
-  /** The delegate's own consent default when the person has not answered. */
-  readonly mode: ExecutionMode;
+  /**
+   * The delegate's own consent default when the person has not answered, or
+   * `inherit` for the conversation's mode.
+   */
+  readonly mode: ExecutionMode | "inherit";
 }
 
 /**
@@ -355,7 +363,7 @@ const agentPermissionPolicySchema = v.object({
     // ceiling ∩ kernel) only works when every layer says something.
     v.minLength(1),
   ),
-  mode: executionModeSchema,
+  mode: v.union([executionModeSchema, v.literal("inherit")]),
 });
 
 const agentModelPolicySchema = v.union([
@@ -378,7 +386,7 @@ export const studioAgentDefinitionSchema = v.object({
     title: v.pipe(v.string(), v.nonEmpty()),
     description: v.pipe(v.string(), v.nonEmpty()),
   }),
-  kind: v.picklist(["conversation", "background", "delegate"]),
+  kind: v.picklist(["conversation", "background", "worker", "delegate"]),
   instructions: v.pipe(v.string(), v.nonEmpty()),
   model: agentModelPolicySchema,
   tools: v.optional(agentToolPolicySchema),

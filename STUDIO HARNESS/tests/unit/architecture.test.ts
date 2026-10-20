@@ -633,18 +633,20 @@ describe("modular monolith — 008.3 gate", () => {
         if (/\bStudioRuntime\b|\bgetStudioRuntime\b/.test(source)) offenders.push(rel);
       }
 
-      // Three exceptions, and they are framework boundaries rather than
+      // Four exceptions, and they are framework boundaries rather than
       // debt. `agents/studio.ts`, `agents/general.ts` and `agents/plan.ts`
       // are loaded by Flue's own module resolution and never constructed by
       // us, so nothing can be injected into them; each reads the locator,
       // which returns `AgentHost` and not the class (ADR 0035 §6). The two
       // delegates join when their renders started resolving the S5.3
       // skills intersection through the host — the same boundary, one more
-      // Flue-loaded module.
+      // Flue-loaded module. VoiceWork likewise resolves its admitted parent
+      // through the host before building a worker sandbox; it has no injected
+      // constructor and is a registered framework entry point.
       //
       // Transport is gone from this list: it takes the `McpAdministration`
-      // port. A fourth agent file appearing here is a real regression.
-      expect(offenders.sort()).toEqual(["agents/general.ts", "agents/plan.ts", "agents/studio.ts"]);
+      // port. Another agent file requires an explicit framework-boundary review.
+      expect(offenders.sort()).toEqual(["agents/general.ts", "agents/plan.ts", "agents/studio.ts", "agents/voice-work.ts"]);
     });
 
     it("does not grow the runtime's public surface", async () => {

@@ -1,5 +1,30 @@
 # Studio observability implementation tracker
 
+## OpenRouter-first voice and task progress (2026-10-21)
+
+The voice role shares Studio's canonical conversation, with a separately selected
+language model and existing media transcription/speech transports. Speech replay
+is suppressed; local playback interruption is distinct from model abort and
+worker cancellation. `voice-work` is a registered worker kind with its own
+instance and agent authority, using its admitted parent's workspace, selected
+working model and existing CallGate. It does not inherit a grant from a voice
+model's decision. Conversation-owned image reads remain gated and bounded to
+image paths in attachments/artifacts.
+
+New operation boundaries are `voice.settings`, `voice.work`,
+`voice.work.dequeue` (a queued voice task starting once a running agent
+settles; it reuses the task id minted at admission), `task.steer` and
+`task.cancel`; the existing dispatcher, invocation receipt map, HTTP and Flue
+boundaries cover the surrounding transport and runtime lifetimes. Steering uses
+the original worker instance and binds its admission writer before the async
+dispatch. Worker settlement follows the original host submission. The bounded
+product progress projection retains no tool bodies or private reasoning.
+
+Verification results and implementation limits are recorded in
+`report/studio-voice-implementation.md`. This entry does not claim measured
+microphone latency, native speech-to-speech, complete Studio readiness, or live
+steering of framework-inline delegates.
+
 ## Other-device pairing follow-up (2026-10-20)
 
 Pairing renewal uses the existing `remote_pairing_code` command with an optional

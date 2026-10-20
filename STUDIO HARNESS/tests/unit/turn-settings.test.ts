@@ -40,13 +40,14 @@ function titlingPort(): ConversationTitlingPort {
   };
 }
 
-function composeApp(withTitling: boolean): Hono {
+function composeApp(withTitling: boolean, voiceModel?: () => string | null): Hono {
   const app = new Hono();
   app.use(
     "*",
     createTurnSettingsMiddleware({
       conversations: store,
       isModelServed: async (modelId) => served.has(modelId),
+      ...(voiceModel === undefined ? {} : { voiceModel }),
       ...(withTitling ? { titling: titlingPort() } : {}),
     }),
   );
@@ -80,6 +81,43 @@ beforeEach(() => {
   served = new Set([MODEL, "google/gemini-3.5-flash"]);
   downstream = "admits";
   titlingCalls = [];
+});
+
+describe("voice admission", () => {
+  const voiceBody = (body: string, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ kind: "signal", type: "voice_input", tagName: "voice_input", body, ...extra });
+  const request = (model: string | null, id: string, body = voiceBody("Make it a square."), withTitling = false) =>
+    composeApp(withTitling, () => model).request(`http://harness.test/agents/studio/${id}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body,
+    });
+
+  it("requires a connected voice model without changing the working model", async () => {
+    store.record({ id: "voice", firstMessage: "Hello", modelId: MODEL, createdAt: Date.now() });
+    expect((await request(null, "voice")).status).toBe(400);
+    expect((await request("unserved/model", "voice")).status).toBe(400);
+    expect((await request("google/gemini-3.5-flash", "voice")).status).toBe(202);
+    expect(store.get("voice")?.modelId).toBe(MODEL);
+  });
+
+  it("opens a conversation from a first spoken turn, titled from the transcription", async () => {
+    const project = new ProjectStore(db).create({ name: "Alpha", icon: "arc" });
+    const response = await request("google/gemini-3.5-flash", "cnv_spoken",
+      voiceBody("Draw a circle in Paint. Then save it.", { modelId: MODEL, projectId: project.id }), true);
+    expect(response.status).toBe(202);
+    const record = store.get("cnv_spoken");
+    expect(record?.title).toBe("Draw a circle in Paint");
+    expect(record?.modelId).toBe(MODEL);
+    expect(record?.projectId).toBe(project.id);
+    expect(titlingCalls).toEqual([{ conversationId: "cnv_spoken", message: "Draw a circle in Paint. Then save it." }]);
+  });
+
+  it("creates nothing when a first spoken turn is refused", async () => {
+    expect((await request(null, "cnv_no_voice_model")).status).toBe(400);
+    expect(store.get("cnv_no_voice_model")).toBeUndefined();
+    downstream = "refuses";
+    expect((await request("google/gemini-3.5-flash", "cnv_refused")).status).toBe(400);
+    expect(store.get("cnv_refused")).toBeUndefined();
+  });
 });
 
 describe("the turn settings a submission carries", () => {
