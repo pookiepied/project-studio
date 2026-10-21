@@ -2,7 +2,35 @@
 
 Status: items 1-3 implemented 2026-10-21 (`studio_computer_batch`, references
 that survive Studio's input, adaptive settle in `Observe-Action`). Item 4 is
-superseded; item 5 is not started. Not yet timed live on a real task.
+superseded; item 5 is not started.
+
+## Measured live (2026-10-21, this machine, Windows 11 Notepad)
+
+Task: new tab, type a line, open Save as, cancel it, close the tab with
+Don't save (by reference). Same task through the real MCP server bundle,
+before (commit 9d5cccb7) and after (b348732e), two runs each:
+
+| | Tool calls (= model turns) | Tool time | Pictures added to context |
+|---|---|---|---|
+| Before | 10 | 9.6-9.7 s | 8 |
+| After | 4 (two batches, read_ui, act) | 6.4-6.5 s | 3 |
+| With dialog adoption | 3 (one batch, read_ui, act) | 5.0-5.1 s | 2 |
+
+One input step went from about 1.05-1.25 s to 0.7 s (the settle). The larger
+gain is the seven model turns not taken, each several seconds of model time,
+which tool time does not include.
+
+Found on the first "after" run: keys to a dialog found by `wait_for_window`
+were refused until it was focused by handle (the target rule), so "open the
+dialog, then type into it" took two batches. Fixed the same day: a window
+`wait_for_window` finds becomes the target when it is in front, owned (through
+its owner chain) by the target, and of the target's own process run. A window
+of the same app that the target does not own (the person's own Notepad) or one
+owned by it from another process is never adopted. When the adopted dialog
+closes, the target returns to the window that raised it, if that window still
+has the same identity; an explicit focus or click elsewhere in between wins.
+Covered by the driver contract test (adoption, both refusals, hand-back,
+replaced owner) and the live run above.
 
 Input: `computer-use-perception-research.md` (a model-written survey; useful
 direction, overstated in places) and the current Studio driver.

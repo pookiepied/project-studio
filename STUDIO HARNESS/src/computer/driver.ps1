@@ -41,6 +41,7 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
 [DllImport("user32.dll")] public static extern bool IsChild(IntPtr parent, IntPtr hWnd);
+[DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, uint cmd);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder s, int n);
 [DllImport("user32.dll")] public static extern int GetWindowTextLengthW(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
@@ -616,12 +617,60 @@ function Get-Apps {
 
 $script:Target = [int64]0
 $script:TargetIdentity = ""
+# The window an adopted dialog came from, to work in again once it closes.
+$script:Owner = [int64]0
+$script:OwnerIdentity = ""
+$script:ResumedTo = [int64]0
 
 function Set-Target($handle) {
   if ($null -ne $handle -and [int64]$handle -ne 0) {
+    # A click inside an adopted dialog keeps its owner to return to.
+    if ([int64]$handle -ne $script:Target) { $script:Owner = [int64]0; $script:OwnerIdentity = "" }
     $script:Target = [int64]$handle
     $script:TargetIdentity = Window-Identity (Window-Row $handle)
   }
+}
+
+# A dialog the target raised - Save as, a "save changes?" prompt - is part of
+# the work, not a stranger in front. Measured on 2026-10-21: Notepad's Save as
+# found by wait_for_window refused every key until it was focused by a handle
+# the model could not know in advance, so "open the dialog, then type into
+# it" took a second batch. Adopted only when it is in front, owned (directly
+# or through its owner chain) by the target, and of the target's own process
+# run; a window that merely shares the app is never adopted, because the
+# person's own Notepad does.
+function Owned-ByTarget($window) {
+  if ($script:Target -eq 0 -or $null -eq $window -or -not $window.foreground) { return $false }
+  if ([int64]$window.handle -eq $script:Target) { return $false }
+  $target = Window-Row $script:Target
+  if ((Window-Identity $target) -ne $script:TargetIdentity) { return $false }
+  if ($window.pid -ne $target.pid -or $window.processStarted -ne $target.processStarted) { return $false }
+  $h = [IntPtr][int64]$window.handle
+  for ($i = 0; $i -lt 8; $i++) {
+    $h = [Studio.Native]::GetWindow($h, 4)
+    if ($h -eq [IntPtr]::Zero) { return $false }
+    if ((Root-Of ([int64]$h)) -eq $script:Target) { return $true }
+  }
+  return $false
+}
+
+function Adopt-Dialog($handle) {
+  $owner = $script:Target; $ownerIdentity = $script:TargetIdentity
+  Set-Target $handle
+  $script:Owner = $owner; $script:OwnerIdentity = $ownerIdentity
+}
+
+# Once an adopted dialog has closed, its owner is the target again - the
+# window the work was in before the dialog, unchanged in identity. Nothing
+# else is chosen in its place.
+function Resume-Owner {
+  if ($script:Owner -eq 0) { return }
+  if ($script:Target -ne 0 -and (Window-Identity (Window-Row $script:Target)) -eq $script:TargetIdentity) { return }
+  $owner = $script:Owner; $identity = $script:OwnerIdentity
+  $script:Owner = [int64]0; $script:OwnerIdentity = ""
+  if ((Window-Identity (Window-Row $owner)) -ne $identity) { return }
+  $script:Target = $owner; $script:TargetIdentity = $identity
+  $script:ResumedTo = $owner
 }
 
 # The top-level window a handle belongs to: what `windows` would list.
@@ -655,6 +704,7 @@ function Same-Window($front, $target) {
 
 # Called before anything that goes to the keyboard focus.
 function Assert-Target($what) {
+  Resume-Owner
   if ($script:Target -eq 0) {
     throw "Nothing has been chosen to $what into yet. Open or focus a window, read it and focus a control, or click where the input should go, and then $what."
   }
@@ -677,6 +727,7 @@ function Assert-Target($what) {
 # refusal, because a chord is often meant to change the front: Alt+F4 closes
 # the target, Ctrl+N opens a second window, Return dismisses a dialog.
 function Front-Note {
+  Resume-Owner
   $fg = [int64][Studio.Native]::GetForegroundWindow()
   if (Same-Window $fg $script:Target) { return $null }
   $mine = Describe-Window $script:Target
@@ -832,6 +883,9 @@ function Observe-Action($before, $beforeWindows, $observationId) {
   $closed = @($beforeWindows | Where-Object { -not $newIdentities.ContainsKey((Window-Identity $_)) })
   $previous = $before.target
   $gone = $null -ne $previous -and (Window-Identity (Window-Row $previous.handle)) -ne (Window-Identity $previous)
+  # An adopted dialog that closed hands the work back to its owner.
+  $returned = $gone -and $null -ne $after.target -and [int64]$after.target.handle -eq $script:ResumedTo
+  if ($returned) { $gone = $false }
   $candidates = @()
   if ($gone) {
     $candidates = @($now | Where-Object { $_.app -eq $previous.app -and -not $_.minimized })
@@ -839,7 +893,7 @@ function Observe-Action($before, $beforeWindows, $observationId) {
   return [ordered]@{
     observationId = $observationId; available = $true; waitedMs = [int][Math]::Max($clock.ElapsedMilliseconds, $slept)
     previousTarget = $previous; target = $after.target; front = $after.front
-    targetGone = $gone; targetInFront = $after.targetInFront
+    targetGone = $gone; targetInFront = $after.targetInFront; returnedToOwner = $returned
     newWindows = @($opened | Select-Object -First 20)
     closedWindows = @($closed | Select-Object -First 20)
     candidates = @($candidates | Select-Object -First 20)
@@ -904,6 +958,7 @@ function Window-Row($handle) {
 }
 
 function Get-Status {
+  Resume-Owner
   $fg = [int64][Studio.Native]::GetForegroundWindow()
   $target = Window-Row $script:Target
   $gone = ($script:Target -ne 0 -and ($null -eq $target -or (Window-Identity $target) -ne $script:TargetIdentity))
@@ -979,7 +1034,9 @@ function Wait-ForWindow($text, $seconds) {
     $found = @(Get-TopWindows $null | Where-Object { -not $_.minimized -and ($_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*") })
     if ($found.Count -gt 0) {
       $pick = Select-UniqueWindow $found
-      return [ordered]@{ found = $true; handle = $pick.handle; title = $pick.title; app = $pick.app; display = $pick.display; foreground = $pick.foreground }
+      $adopted = Owned-ByTarget $pick
+      if ($adopted) { Adopt-Dialog $pick.handle }
+      return [ordered]@{ found = $true; handle = $pick.handle; title = $pick.title; app = $pick.app; display = $pick.display; foreground = $pick.foreground; adopted = $adopted }
     }
     if ([DateTime]::UtcNow -ge $deadline) { return [ordered]@{ found = $false; waited = $limit } }
     Start-Sleep -Milliseconds 250
@@ -1256,6 +1313,7 @@ try { while ($true) {
       elseif ($script:MonitorUnavailable) { $script:InputPending = @{ available = $false; moves = 0; buttons = 0; wheels = 0; keys = 0 } }
       # Failure to read the pre-action state must refuse before sending input.
       $script:ActionBefore = Get-Status
+      $script:ResumedTo = [int64]0
       $script:ActionWindows = @(Get-TopWindows $null)
     }
     switch ($req.op) {

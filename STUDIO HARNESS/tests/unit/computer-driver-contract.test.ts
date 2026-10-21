@@ -83,6 +83,22 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     expect(checks["monitorReadyWithoutInput"]).toBe(true);
     expect(checks["monitorFailure"]).toMatchObject({ available: false, moves: 2, stateAvailable: true });
   });
+  it("adopts a dialog the target raised, never a same-app or foreign window, and returns to the owner", () => {
+    expect(checks["adopted"]).toBe(true);
+    expect(checks["adoptedTarget"]).toBe(41);
+    expect(checks["dialogTakesKeys"]).toBe(true);
+    // A click inside the dialog kept its owner; the dialog closing hands keys back.
+    expect(checks["ownerTakesKeys"]).toBe(true);
+    expect(checks["returnedTarget"]).toBe(40);
+    expect(checks["personalAdopted"]).toBe(false);
+    expect(checks["personalTarget"]).toBe(40);
+    expect(checks["strangerAdopted"]).toBe(false);
+    expect(checks["strangerTarget"]).toBe(40);
+    expect(checks["explicitChoiceKept"]).toBe(30);
+    // An owner whose handle now belongs to another process is not worked in again.
+    expect(checks["replacedOwnerNotResumed"]).toBe(41);
+    expect(checks["returnObservation"]).toMatchObject({ targetGone: false, returnedToOwner: true, target: { handle: 40 }, candidates: [] });
+  });
   it("keeps a picture within its budget: a PNG too large becomes a JPEG, then a smaller one, and says so", () => {
     // A PNG over the MCP line limit was dropped whole and the model waited out
     // the request deadline (2026-10-21); the picture must arrive instead.

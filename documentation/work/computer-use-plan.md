@@ -74,7 +74,9 @@ being worked in; `status` says where the work is in one call (the target,
 whether it is in front, what is in front if not, the pointer, the displays);
 `arrange` does what the title bar does (maximize on a chosen display,
 minimize, restore, move, resize, close by WM_CLOSE); `wait_for_window`
-waits for a dialog or a slow app by title and names it by handle; and
+waits for a dialog or a slow app by title and names it by handle (since
+2026-10-21 a dialog the target itself raised, in front, becomes the target
+until it closes; see `computer-use-speed-plan.md`); and
 `screenshot { window }` pictures one window wherever it is. With no
 `display` given, every picture and every pointer action now follows the
 window being worked in, then the pointer, then the primary - not the primary

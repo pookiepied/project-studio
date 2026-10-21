@@ -6,14 +6,22 @@ if ($parseErrors.Count -ne 0) { throw $parseErrors[0].Message }
 
 # Load only the actual pure policy functions. The driver's top-level native
 # initialization and input loop must never run on the user's desktop in tests.
-foreach ($name in @("Window-Identity", "Same-Window", "Set-Target", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Encoded-Bytes", "Encode-Picture")) {
+foreach ($name in @("Window-Identity", "Same-Window", "Root-Of", "Set-Target", "Owned-ByTarget", "Adopt-Dialog", "Resume-Owner", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Encoded-Bytes", "Encode-Picture")) {
   $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
   if ($null -eq $function) { throw "Missing production function $name" }
   . ([scriptblock]::Create($function.Extent.Text))
 }
 # A managed test double, with no P/Invoke or input capability. If the target
 # identity guard is broken, foreground equality must succeed rather than throw.
-[void](Add-Type -Namespace Studio -Name Native -MemberDefinition 'public static System.IntPtr GetForegroundWindow() { return new System.IntPtr(10); }')
+# The front window and window owners are whatever the scenario sets.
+[void](Add-Type -Namespace Studio -Name Native -MemberDefinition @'
+public static long Front = 10;
+public static System.Collections.Generic.Dictionary<long, long> Owners = new System.Collections.Generic.Dictionary<long, long>();
+public static System.IntPtr GetForegroundWindow() { return new System.IntPtr(Front); }
+public static System.IntPtr GetAncestor(System.IntPtr h, uint flags) { return System.IntPtr.Zero; }
+public static bool IsChild(System.IntPtr parent, System.IntPtr h) { return false; }
+public static System.IntPtr GetWindow(System.IntPtr h, uint cmd) { long o; return Owners.TryGetValue(h.ToInt64(), out o) ? new System.IntPtr(o) : System.IntPtr.Zero; }
+'@)
 function Window-Row($handle) { return $script:Rows[[string]$handle] }
 function Get-Displays { return @(@{ index = 0; x = 0; y = 0 }, @{ index = 1; x = 1920; y = 0 }, @{ index = 2; x = -1280; y = -400 }) }
 function Display-Of($x, $y) { if ($x -lt 0) { return 2 }; if ($x -ge 1920) { return 1 }; return 0 }
@@ -137,6 +145,47 @@ function Press-Button($button, $direction) { $script:releasedButtons += "$button
 function Send-Key($key, $down) { $script:releasedKeys += "$key/$down" }
 Release-HeldInput
 $checks.releasedButtons = $script:releasedButtons; $checks.releasedKeys = $script:releasedKeys
+# A dialog the target raised is adopted; the person's own window of the same
+# app, and a window of another process, are not; a closed dialog hands the
+# work back to its owner, unchanged in identity.
+$notepad = @{ handle = 40; pid = 400; processStarted = "4"; app = "Notepad"; title = "Untitled - Notepad" }
+$dialog = @{ handle = 41; pid = 400; processStarted = "4"; app = "Notepad"; title = "Save as"; foreground = $true }
+$personal = @{ handle = 42; pid = 400; processStarted = "4"; app = "Notepad"; title = "Save as notes - Notepad"; foreground = $true }
+$stranger = @{ handle = 43; pid = 500; processStarted = "5"; app = "Helper"; title = "Save as"; foreground = $true }
+[Studio.Native]::Owners[41] = 40; [Studio.Native]::Owners[43] = 40
+$script:Rows = @{ "40" = $notepad; "41" = $dialog; "42" = $personal; "43" = $stranger }
+function Get-TopWindows($app) { return @($script:Shown) }
+$script:Target = 0; Set-Target 40
+$script:Shown = @($dialog)
+$checks.adopted = (Wait-ForWindow "Save as" 0).adopted
+$checks.adoptedTarget = $script:Target
+[Studio.Native]::Front = 41
+$checks.dialogTakesKeys = -not (Rejected { Assert-Target "type" })
+Set-Target 41
+$script:Rows.Remove("41"); [Studio.Native]::Front = 40
+$checks.ownerTakesKeys = -not (Rejected { Assert-Target "type" })
+$checks.returnedTarget = $script:Target
+foreach ($case in @(@{ name = "personal"; window = $personal }, @{ name = "stranger"; window = $stranger })) {
+  Set-Target 40; $script:Shown = @($case.window); [Studio.Native]::Front = $case.window.handle
+  $checks["$($case.name)Adopted"] = (Wait-ForWindow "Save as" 0).adopted
+  $checks["$($case.name)Target"] = $script:Target
+}
+$script:Rows["41"] = $dialog; Set-Target 40; Adopt-Dialog 41
+Set-Target 30
+$script:Rows.Remove("41")
+Resume-Owner
+$checks.explicitChoiceKept = $script:Target
+$script:Rows["41"] = $dialog; Set-Target 40; Adopt-Dialog 41; $script:ResumedTo = [int64]0
+$script:Rows["40"] = @{ handle = 40; pid = 401; processStarted = "6" }
+$script:Rows.Remove("41")
+Resume-Owner
+$checks.replacedOwnerNotResumed = $script:Target
+$script:Rows["40"] = $notepad; $script:Rows["41"] = $dialog; Set-Target 40; Adopt-Dialog 41; $script:ResumedTo = [int64]0
+$script:Rows.Remove("41")
+function Get-Status { Resume-Owner; return @{ target = (Window-Row $script:Target); front = $notepad; targetInFront = $true } }
+$checks.returnObservation = Observe-Action @{ target = $dialog } @($notepad, $dialog) $second
+[Studio.Native]::Front = 10
+
 # Pictures: a screen that would be a large PNG arrives within budget, and says how.
 Add-Type -AssemblyName System.Drawing
 $noise = New-Object System.Drawing.Bitmap 800, 600, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)

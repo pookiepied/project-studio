@@ -152,7 +152,12 @@ describe("bearings: the tools that keep a model from getting lost", () => {
       withPictures({ wait_window: { found: true, handle: 7, title: "Save As", app: "Notepad", display: 0, foreground: true } }),
       { text: "Save As" },
     );
-    expect(said(found)).toBe('"Save As" (window 7) (Notepad) is on display 0. It is in front.');
+    expect(said(found)).toBe('"Save As" (window 7) (Notepad) is on display 0. It is in front; focus it by handle before keys.');
+    const adopted = await toolByName("studio_computer_wait_for_window")!.run(
+      withPictures({ wait_window: { found: true, handle: 7, title: "Save As", app: "Notepad", display: 0, foreground: true, adopted: true } }),
+      { text: "Save As" },
+    );
+    expect(said(adopted)).toMatch(/now the one being worked in; keys go to it, and once it closes the work returns to the window that raised it\.$/);
     const none = await toolByName("studio_computer_wait_for_window")!.run(withPictures({ wait_window: { found: false, waited: 10 } }), { text: "Save As" });
     expect(said(none)).toBe('No window matching "Save As" appeared within 10 seconds.');
   });

@@ -124,6 +124,7 @@ function actionAnswer(body: string, result: unknown): ToolAnswer {
       const row = observation[field];
       if (isRecord(row)) lines.push(`${label}: ${windowLine(row)}.`);
     }
+    if (observation["returnedToOwner"] === true) lines.push("The dialog being worked in has closed; the work is back in the window that raised it.");
     if (observation["targetGone"] === true) lines.push("The previous target has closed or changed identity. Choose the intended replacement explicitly; foreground alone is not authority to continue.");
     for (const [field, label] of [["newWindows", "Opened"], ["closedWindows", "Closed"], ["candidates", "Recovery candidate"]] as const) {
       const rows = observation[field];
@@ -753,7 +754,9 @@ export const TOOLS: readonly ToolDefinition[] = [
     name: "studio_computer_wait_for_window",
     description:
       "Wait for a window whose title or app contains some text to appear - a dialog a click raises, a " +
-      "file that takes a moment to open - and get its handle. Better than a fixed wait and a guess.",
+      "file that takes a moment to open - and get its handle. Better than a fixed wait and a guess. " +
+      "A dialog the window being worked in raised, now in front, becomes the window being worked in, so the next keys " +
+      "in a batch reach it without a focus step; when it closes, the work returns to the window that raised it.",
     inputSchema: object(
       {
         text: { type: "string", description: 'Part of the title or app name: "Save As", "Notepad".' },
@@ -767,7 +770,9 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (!isRecord(result) || result["found"] !== true) {
         return answer(`No window matching "${text}" appeared within ${String(isRecord(result) ? result["waited"] : "")} seconds.`);
       }
-      const front = result["foreground"] === true ? " It is in front." : " It is not in front; focus it before keys.";
+      const front = result["adopted"] === true
+        ? " It is in front and was raised by the window being worked in, so it is now the one being worked in; keys go to it, and once it closes the work returns to the window that raised it."
+        : result["foreground"] === true ? " It is in front; focus it by handle before keys." : " It is not in front; focus it before keys.";
       return answer(`${windowName(result)} (${String(result["app"])}) is on display ${String(result["display"])}.${front}`);
     },
   },
