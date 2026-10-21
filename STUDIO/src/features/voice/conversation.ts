@@ -122,6 +122,9 @@ export class VoiceConversation {
       }
     }
     if (result.ok && epoch !== this.#epoch) this.#ignoredSubmissions.add(result.value.submissionId)
+    // Known before its first chunk, so an interrupt in between still fences
+    // it off once speaking is allowed again.
+    else if (result.ok) this.#activeSubmissions.add(result.value.submissionId)
     if (!this.#closed && epoch === this.#epoch && !result.ok) this.options.onFailure(result.error.message)
   }
 
@@ -153,7 +156,7 @@ export class VoiceConversation {
     this.#holding = false
     const cancelGeneration = this.#ownsGeneration
     this.#ownsGeneration = false
-    this.#epoch++
+    const epoch = ++this.#epoch
     this.#accepting = false
     this.#messageIds.clear()
     for (const id of this.#activeSubmissions) this.#ignoredSubmissions.add(id)
@@ -172,6 +175,10 @@ export class VoiceConversation {
       const result = await this.options.client.abortRun()
       if (!this.#closed && !result.ok) this.options.onFailure(result.error.message)
     }).catch(() => { if (!this.#closed) this.options.onFailure('Speech stopped locally, but model cancellation could not be confirmed.') })
+      // Once the interrupted reply is fenced off, Studio may speak again
+      // without being spoken to: a task finishing is its own new reply, and
+      // waiting for the next utterance left that news silent until then.
+      .finally(() => { if (epoch === this.#epoch) this.#accepting = true })
   }
 
   close(): void {

@@ -76,6 +76,23 @@ describe('voice conversation delivery', () => {
     f.voice.close()
   })
 
+  it('speaks a finished task reported after an interrupt without waiting for the next utterance', async () => {
+    const f = fixture()
+    await f.voice.send('Check the weather.')
+    f.voice.interrupt()
+    await flush()
+    // The interrupted reply stays silent even when its chunks arrive late.
+    f.receive([{ type: 'message-started', messageId: 'old', submissionId: 'submission' }, { type: 'message-delta', messageId: 'old', kind: 'text', delta: 'Stale.' }])
+    await flush()
+    expect(f.speak).not.toHaveBeenCalled()
+    // The harness wakes the conversation with the task's result.
+    f.receive([{ type: 'message-started', messageId: 'news', submissionId: 'ping' }, { type: 'message-delta', messageId: 'news', kind: 'text', delta: 'Twelve degrees and clear.' }, { type: 'submission-settled', submissionId: 'ping', outcome: 'completed' }])
+    await flush()
+    expect(f.speak).toHaveBeenCalledOnce()
+    expect(f.client.submitTurn).toHaveBeenCalledOnce()
+    f.voice.close()
+  })
+
   it('never speaks replayed history or submits replay as work', async () => {
     const f = fixture()
     f.receive([f.start, f.delta], true)

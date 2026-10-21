@@ -27,6 +27,7 @@ import { ExtendError } from "../extend/errors.js";
 import type { BrowserInteraction } from "../browser/interaction.js";
 import { BrowserError } from "../browser/errors.js";
 import { observeOperation } from "../observability/operation.js";
+import { recordObservation } from "../observability/recorder.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
 import {
@@ -102,6 +103,7 @@ import {
   TaskProjector,
   taskEndedLine,
   taskRunningLine,
+  type TaskInspection,
 } from "../agents/task-projector.js";
 import { isSettledTaskStatus, type StudioAgentDefinition } from "../contracts/agents.js";
 import { MediaService } from "../gateway/media/service.js";
@@ -486,6 +488,7 @@ export interface AgentHost {
   };
   voiceModel?(): string | null;
   taskActivity?(conversationId: string): readonly import("../agents/task-projector.js").TaskActivity[];
+  inspectTask?(conversationId: string, taskId: string, options: { readonly after?: number | undefined; readonly limit?: number | undefined }): Promise<import("../agents/task-projector.js").TaskInspection>;
   coordinateTask?(conversationId: string, taskId: string, action: "steer" | "cancel", text?: string, admissionKey?: string): Promise<string>;
   voiceWorkParent?(instanceId: string): string | undefined;
   voiceWork?(conversationId: string, source: string, request: {
@@ -1207,6 +1210,21 @@ export class StudioRuntime implements AgentHost {
   }
 
   taskActivity(conversationId: string) { return this.#taskProjector.activity(conversationId); }
+
+  /**
+   * A parent's detailed look at one of its tasks. Its own operation so the
+   * read is visible beside steering and cancellation; counts only in the
+   * attributes, while the steps travel as the tool result the existing
+   * gated capture already governs.
+   */
+  inspectTask(conversationId: string, taskId: string, options: { readonly after?: number | undefined; readonly limit?: number | undefined }): Promise<TaskInspection> {
+    return observeOperation("subagent", "task.inspect", async () => {
+      const view = this.#taskProjector.inspect(conversationId, taskId, options);
+      recordObservation({ name: "task.inspect.read", phase: "progress",
+        attributes: { available: view.available, entries: view.entries.length, earlierDropped: view.earlierDropped, more: view.more } });
+      return view;
+    }, { agentInstanceId: taskId }, conversationId);
+  }
 
   async coordinateTask(conversationId: string, taskId: string, action: "steer" | "cancel", text?: string, admissionKey?: string): Promise<string> {
     const task = this.#tasks.get(taskId);

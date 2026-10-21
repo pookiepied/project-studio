@@ -4,6 +4,7 @@ import { useAgentStart, useDelivery, useModel, usePersistentState, useSandbox, u
 import * as v from "valibot";
 import { VOICE_PROMPT } from "../context/voice-prompt.js";
 import { createStudioUuid } from "../contracts/uuid.js";
+import { taskActivitySurface, type TaskCoordinationRole } from "./task-control.js";
 import { ProviderConfigurationError } from "../contracts/models.js";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
@@ -187,7 +188,7 @@ export function Studio({ id }: AgentProps) {
   const [source, setSource] = usePersistentState("voice_source", "");
   const spoken = delivery.kind === "signal" && delivery.type === "voice_input";
   const voiceMode = spoken || (delivery.kind !== "user" && voice);
-  useTaskCoordination(id, voiceMode);
+  useTaskCoordination(id, voiceMode ? "voice" : "conversation");
   useAgentStart(() => {
     if (spoken) { setVoice(true); setSource(delivery.body); }
     else if (delivery.kind === "user") setVoice(false);
@@ -201,7 +202,7 @@ export function Studio({ id }: AgentProps) {
     useModel(studioModelSpecifier({ modelId }), { thinkingLevel: runtime.quietThinkingLevel?.(modelId) ?? "off" });
     useTool({
       name: "voice_work",
-      description: "Start work from the exact user transcription, or read/cancel an existing voice task. Does not wait for completion.",
+      description: "The one tool that starts, steers or cancels voice tasks. start hands work to a task; steer delivers a correction to a running task with the user's exact transcription; status reads its result; cancel stops it. Does not wait for completion.",
       input: v.object({ action: v.picklist(["start", "steer", "status", "cancel"]), taskId: v.optional(v.string()), context: v.optional(v.pipe(v.string(), v.maxLength(16_000))) }),
       durable: true,
       run: async ({ data, step }) => {
@@ -225,19 +226,32 @@ export function Studio({ id }: AgentProps) {
   return renderStudio(id, STUDIO_AGENT_ID);
 }
 
-/** The same scoped coordination surface belongs to text and voice conversations. */
-function useTaskCoordination(conversationId: string, voice: boolean) {
+/**
+ * One scoped coordination surface for every parent: text and voice
+ * conversations, and a voice task's worker over its own delegates. The role
+ * narrows the actions in the schema itself (see `taskActivitySurface`).
+ */
+export function useTaskCoordination(conversationId: string, role: TaskCoordinationRole) {
   const runtime = getStudioRuntime();
+  const surface = taskActivitySurface(role);
   useTool({
     name: "task_activity",
-    description: "Inspect observed delegate/worker progress without private reasoning or tool contents. Steer or cancel independently addressable workers in this conversation; inline task delegates support inspection only. A correction is not permission to bypass approval.",
-    input: v.object({ action: v.picklist(["status", "steer", "cancel"]), taskId: v.optional(v.string()), text: v.optional(v.pipe(v.string(), v.maxLength(16_000))) }),
+    description: surface.description,
+    input: v.object({ action: v.picklist(surface.actions), taskId: v.optional(v.string()), text: v.optional(v.pipe(v.string(), v.maxLength(16_000))),
+      after: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))), limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(32))) }),
     durable: true,
     run: async ({ data, step }) => {
       const admissionKey = await step.do("task-coordination-identity", async () => createStudioUuid());
       return { output: await step.do("task-coordination", async () => {
       if (data.action === "status") return JSON.stringify({ tasks: runtime.taskActivity?.(conversationId) ?? [], evidence: "Live lifecycle projection; missing after restart or eviction. No evidence is not completion." });
-      if (voice) throw new ProviderConfigurationError("Use voice_work to preserve the exact user utterance when steering or cancelling voice work.");
+      if (data.action === "inspect") {
+        if (runtime.inspectTask === undefined || data.taskId === undefined) throw new ProviderConfigurationError("Choose a task from status to inspect.");
+        const view = await runtime.inspectTask(conversationId, data.taskId, { after: data.after, limit: data.limit });
+        return JSON.stringify({ ...view, evidence: view.available
+          ? "Observed steps from this process, bounded and redacted. A gap or a missing step is not proof that nothing happened."
+          : "No live record of that task in this conversation: it may belong elsewhere, have been evicted, or predate a restart." });
+      }
+      if (role !== "conversation") throw new ProviderConfigurationError(role === "voice" ? "Use voice_work to preserve the exact user utterance when steering or cancelling voice work." : "A task cannot steer or cancel other tasks.");
       if (runtime.coordinateTask === undefined || data.taskId === undefined) throw new ProviderConfigurationError("Choose an independently addressable task to steer or cancel.");
       return runtime.coordinateTask(conversationId, data.taskId, data.action, data.text, admissionKey);
     }) };
@@ -418,7 +432,7 @@ export function renderStudio(id: string, agentId: string) {
   // for the whole conversation should not sit in the middle of one whose
   // content is not.
   const capabilities = runtime.conversationCapabilityInventory?.(id) ?? "";
-  return `${STUDIO_SYSTEM_PROMPT}${agentId === STUDIO_AGENT_ID ? "\nUse task_activity to inspect observed delegate progress. Independently addressable workers can receive steering or cancellation through it. Inline task delegates expose progress only; never promise live steering or private reasoning access for them." : ""}\n${environmentBlock(
+  return `${STUDIO_SYSTEM_PROMPT}${agentId === STUDIO_AGENT_ID ? "\nUse task_activity status to see delegate progress, and inspect for a task's recent steps when you need detail mid-run. Independently addressable workers can receive steering or cancellation through it. Inline task delegates can be inspected but not steered; never promise live steering or private reasoning access for them." : ""}\n${environmentBlock(
     environmentFacts(
       workspace,
       new Date(),

@@ -18,9 +18,14 @@ not a steering receipt's settlement, ends an indexed worker.
 
 `task_activity` and `/api/tasks/activity` expose a bounded, process-local product
 projection for inline delegates and independently addressable workers. Only task
-identity, registered agent identity, parent conversation, timestamps and fixed
-lifecycle stages are retained. No prompts, arguments, results or reasoning enter
-this projection. It is not diagnostic capture, a durable task journal, an
+identity, registered agent identity, parent conversation, timestamps, fixed
+lifecycle stages and whether the task has driven the computer are retained. No
+prompts, arguments, results or reasoning enter this projection. The separate
+`inspect` action (operation `task.inspect`, counts-only attributes) returns one
+task's recent steps to its owning conversation's agents only, never over HTTP:
+assistant text, tool names and redacted, bounded arguments and results, with
+reasoning, image bytes and typed text or keys excluded. It is model-facing tool
+content under existing gated capture. It is not diagnostic capture, a durable task journal, an
 execution authority or proof of completion when evidence is absent. Restart,
 eviction and missing events can make progress unavailable. Existing HTTP,
 framework-tool, runtime lifecycle and media gateway boundaries observe these

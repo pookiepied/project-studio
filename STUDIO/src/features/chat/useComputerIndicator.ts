@@ -7,6 +7,7 @@ import {
   showComputerIndicator,
 } from '@/platform/tauri'
 import { useWorkspace } from '@/stores/workspace'
+import type { DelegatedComputerUse } from './useDelegatedComputerUse'
 
 /**
  * Puts the "Studio is using your computer" pill up while this conversation's
@@ -24,22 +25,30 @@ import { useWorkspace } from '@/stores/workspace'
  * The pill's Stop comes back here as a native event carrying the conversation
  * id. The window showing that conversation stops the driver and the run; the
  * pill goes down with the turn, by the same rule as above.
+ *
+ * Any agent of the conversation raises it, not only the main turn: a
+ * delegate or a voice task at the desktop is the same hand on the same
+ * mouse. Their calls are not in this transcript, so `delegated` - the
+ * harness's task activity - names them, and Stop also cancels the voice
+ * tasks among them; an inline delegate ends with the turn `stopTurn` ends.
  */
 export function useComputerIndicator(
   conversationId: string,
   items: readonly TranscriptItem[],
   running: boolean,
   stopTurn: () => void,
+  delegated: readonly DelegatedComputerUse[] = [],
 ): () => void {
-  const { computer } = useWorkspace()
-  const driving = running && drivesComputer(items)
+  const { computer, tasks } = useWorkspace()
+  const driving = (running && drivesComputer(items)) || delegated.length > 0
   const shown = useRef(false)
   // Chat and desktop Stop share cleanup. Cancelling the model alone cannot
   // release input already sent to the separate computer MCP process.
   const stop = useCallback(() => {
-    if (drivesComputer(items)) void computer.stop(conversationId)
+    if (drivesComputer(items) || delegated.length > 0) void computer.stop(conversationId)
+    for (const task of delegated) if (task.agentName === 'voice-work') void tasks.cancel(task.id)
     stopTurn()
-  }, [computer, conversationId, items, stopTurn])
+  }, [computer, tasks, conversationId, items, delegated, stopTurn])
   const stopRef = useRef(stop)
   stopRef.current = stop
 

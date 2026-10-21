@@ -10,6 +10,7 @@ import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import { IMPROVE_AGENT_ID, TITLE_AGENT_ID } from "../../src/contracts/agents.js";
 import { ConversationStore } from "../../src/conversations/store.js";
 import { openDatabase } from "../../src/storage/database.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
 
 /**
  * A background task's settlement, end to end within this runtime (ADR 0058
@@ -186,6 +187,36 @@ describe("a background task's settlement", () => {
           'Task "Summarize the folder" was stopped.',
         );
       } finally {
+        await harness.cleanup();
+      }
+    },
+    30_000,
+  );
+
+  it(
+    "tells the voice conversation a worker's result in the same tick it settles, and its parent can inspect the steps",
+    async () => {
+      const harness = await harnessWith();
+      diagnosticRecorder.configure({ enabled: true, captureContent: false, conversations: [] });
+      try {
+        harness.tasks.record({ id: "voice_1", agentName: "voice-work", parentConversationId: "cnv_task", originSubmissionId: "sub_1", title: "Hazel" });
+        harness.emit({ type: "agent_start", instanceId: "voice_1" } as unknown as FlueObservation);
+        harness.emit({ type: "tool_start", instanceId: "voice_1", toolCallId: "c", toolName: "read", args: { path: "PRIVATE_PATH" } } as unknown as FlueObservation);
+        const view = await harness.runtime.inspectTask("cnv_task", "voice_1", {});
+        expect(view.entries.map((entry) => entry.kind)).toEqual(["started", "tool_call"]);
+        expect((await harness.runtime.inspectTask("cnv_other", "voice_1", {})).available).toBe(false);
+        const reads = diagnosticRecorder.read().events.filter((event) => event.name.startsWith("task.inspect"));
+        expect(reads.some((event) => event.name === "task.inspect.read" && event.attributes.entries === 2)).toBe(true);
+        expect(JSON.stringify(reads)).not.toContain("PRIVATE_PATH");
+
+        // The announcement is not batched or polled: the deliver port has
+        // the result before anything else gets to run.
+        harness.emit(agentEnd("voice_1", "It is twelve degrees and clear."));
+        harness.emit(settled("voice_1", "completed"));
+        expect(harness.deliveries).toHaveLength(1);
+        expect(harness.deliveries[0]?.body).toContain("It is twelve degrees and clear.");
+      } finally {
+        diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
         await harness.cleanup();
       }
     },

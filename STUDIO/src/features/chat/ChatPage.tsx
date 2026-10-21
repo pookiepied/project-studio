@@ -25,6 +25,7 @@ import { PlanPill, usePlan } from '@/features/plans'
 import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
 import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
+import { useDelegatedComputerUse } from '@/features/chat/useDelegatedComputerUse'
 import { GALLERY_CONVERSATION_ID } from '@/domain/conversation/gallery'
 import { contextReport } from '@/domain/turn/context'
 import {
@@ -405,8 +406,10 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   useBrowserPreview(conversation.id, conversation.title ?? 'Conversation', live.items)
 
   // The sign on the desktop that Studio is at the keyboard, up for exactly as
-  // long as this turn is driving the computer. Its Stop ends the run here.
-  const stopWithComputerCleanup = useComputerIndicator(conversation.id, live.items, running, stopTurn)
+  // long as this turn, or one of its delegates or voice tasks, is driving the
+  // computer. Its Stop ends the run here.
+  const delegatedComputerUse = useDelegatedComputerUse(conversation.id)
+  const stopWithComputerCleanup = useComputerIndicator(conversation.id, live.items, running, stopTurn, delegatedComputerUse)
 
   return (
     <div data-attachment-drop-zone className="relative flex h-full flex-col">

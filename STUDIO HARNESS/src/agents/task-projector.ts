@@ -5,6 +5,7 @@ import {
   type AgentTaskStatus,
 } from "../contracts/agents.js";
 import type { Logger } from "../observability/logger.js";
+import { redactGenAiContent, redactSensitiveString } from "../observability/redaction.js";
 import type { JobPings } from "../process/job-pings.js";
 import {
   TaskStore,
@@ -75,7 +76,25 @@ const MAX_SUMMARY_CHARS = 200;
  * first-line summary handed it a heading where a weather report should be.
  */
 const MAX_VOICE_RESULT_CHARS = 6_000;
-const LIFECYCLE_EVENTS = new Set(["agent_start", "agent_end", "task_start", "task", "tool_start", "tool", "turn_start", "submission_settled"]);
+const LIFECYCLE_EVENTS = new Set(["agent_start", "agent_end", "task_start", "task", "tool_start", "tool", "turn_start", "message_end", "submission_settled"]);
+/**
+ * The trail's bounds. A parent reads where a task is, not its whole history:
+ * the task's own stream holds that. Per entry, per task, and how many tasks
+ * keep one, so the worst case stays a few megabytes of process memory.
+ */
+const TRAIL_ENTRY_CHARS = 600;
+const TRAIL_ENTRIES_PER_TASK = 48;
+const TRAIL_TASKS = 64;
+const TRAIL_READ_DEFAULT = 12;
+const TRAIL_READ_MAX = 32;
+/** The model-facing names of Studio's computer tools end in the action. */
+const COMPUTER_TOOL = /studio_computer_[a-z_]+$/;
+/**
+ * Tools whose arguments are text or keys typed for the person: a password
+ * the task was given travels this way, and an argument field has no name a
+ * key-based redaction could catch.
+ */
+const TYPED_ARGUMENTS = /(?:_type|_key|_hold_key|_clipboard|_fill|_set_value)$/;
 
 /**
  * One running agent task, as a line for the turn's environment block.
@@ -190,6 +209,75 @@ export interface TaskActivity {
   readonly createdAt: number;
   /** A voice task's short name, the one its voice agent uses. */
   readonly name?: string;
+  /**
+   * The task has driven the desktop during this run. Sticky until it
+   * settles, for the main turn's reason: between two computer calls the
+   * agent is still deciding what to do to the same desktop.
+   */
+  readonly computer?: true;
+}
+
+/** One step of a task's recent work, as a parent may read it. */
+export interface TaskTrailEntry {
+  /** Process-local order, and the cursor a later read resumes after. */
+  readonly sequence: number;
+  readonly at: number;
+  readonly kind: "started" | "said" | "tool_call" | "tool_result" | "ended";
+  readonly tool?: string;
+  readonly isError?: boolean;
+  readonly durationMs?: number;
+  /** Bounded and redacted; reasoning never enters it. */
+  readonly text?: string;
+}
+
+export interface TaskInspection {
+  readonly available: boolean;
+  readonly task?: TaskActivity;
+  readonly entries: readonly TaskTrailEntry[];
+  /** Pass as `after` to read only what happened since this read. */
+  readonly cursor: number;
+  /** Steps after the requested cursor that the bounded trail already dropped. */
+  readonly earlierDropped: boolean;
+  /** More retained steps follow the last one returned. */
+  readonly more: boolean;
+}
+
+/** Shortens one trail text, saying so, after redaction has run on the whole. */
+function bounded(text: string): string | undefined {
+  const redacted = redactSensitiveString(text.trim());
+  if (redacted === "") return undefined;
+  return redacted.length > TRAIL_ENTRY_CHARS ? `${redacted.slice(0, TRAIL_ENTRY_CHARS)}... [shortened]` : redacted;
+}
+
+/** A tool call's arguments, without typed text and without secret-named fields. */
+function argumentText(toolName: string, args: unknown): string | undefined {
+  if (args === undefined) return undefined;
+  if (TYPED_ARGUMENTS.test(toolName)) return "[arguments omitted: typed text or keys]";
+  try {
+    // The JSON is cut before redaction so an enormous argument is never
+    // serialized whole twice; key-named secrets are dropped before either.
+    return bounded(JSON.stringify(redactGenAiContent(args)).slice(0, TRAIL_ENTRY_CHARS * 2));
+  } catch {
+    return "[arguments unavailable]";
+  }
+}
+
+/** A tool result's text parts; images are named, never copied. */
+function resultText(result: unknown): string | undefined {
+  if (typeof result === "string") return bounded(result);
+  const content: unknown = typeof result === "object" && result !== null && "content" in result ? result.content : undefined;
+  if (!Array.isArray(content)) return undefined;
+  const parts: readonly unknown[] = content;
+  const texts: string[] = [];
+  let images = 0;
+  for (const part of parts) {
+    if (typeof part !== "object" || part === null || !("type" in part)) continue;
+    if (part.type === "image") images += 1;
+    else if (part.type === "text" && "text" in part && typeof part.text === "string") texts.push(part.text);
+    if (texts.join("\n").length > TRAIL_ENTRY_CHARS * 2) break;
+  }
+  const note = images === 0 ? "" : `\n[${images} image${images === 1 ? "" : "s"} omitted]`;
+  return bounded(`${texts.join("\n").slice(0, TRAIL_ENTRY_CHARS * 2)}${note}`);
 }
 
 export class TaskProjector {
@@ -206,6 +294,13 @@ export class TaskProjector {
    */
   readonly #replies = new Map<string, string>();
   readonly #activity = new Map<string, TaskActivity>();
+  /**
+   * Each task's recent steps, keyed like `#activity`. Process memory only:
+   * a restart, an eviction or an unobserved event leaves a gap, and a read
+   * says so rather than inventing the missing steps.
+   */
+  readonly #trails = new Map<string, { entries: TaskTrailEntry[]; dropped: number }>();
+  #sequence = 0;
   #unsubscribe: (() => void) | undefined;
 
   constructor(options: TaskProjectorOptions) {
@@ -243,11 +338,92 @@ export class TaskProjector {
     this.#unsubscribe = undefined;
     unsubscribe?.();
     this.#activity.clear();
+    this.#trails.clear();
   }
 
   /** Product lifecycle facts only; prompts, arguments and private reasoning never enter this view. */
   activity(conversationId: string): readonly TaskActivity[] {
     return [...this.#activity.values()].filter((task) => task.parentConversationId === conversationId).slice(-64);
+  }
+
+  /**
+   * One task's recent steps, for the conversation that owns it and nobody
+   * else. A read of what was observed, never a replay: nothing here runs,
+   * resends or reaches the task. Bounded per entry and per read, redacted,
+   * and without reasoning, because the reader is a model's context.
+   */
+  inspect(conversationId: string, taskId: string, options: { readonly after?: number | undefined; readonly limit?: number | undefined } = {}): TaskInspection {
+    const task = this.#activity.get(taskId);
+    if (task === undefined || task.parentConversationId !== conversationId) {
+      return { available: false, entries: [], cursor: options.after ?? 0, earlierDropped: false, more: false };
+    }
+    const trail = this.#trails.get(taskId);
+    const after = options.after ?? 0;
+    const limit = Math.max(1, Math.min(TRAIL_READ_MAX, Math.floor(options.limit ?? TRAIL_READ_DEFAULT)));
+    const newer = (trail?.entries ?? []).filter((entry) => entry.sequence > after);
+    // Without a cursor a parent wants where the task is now, so the newest
+    // steps win; with one, it wants what follows the cursor, oldest first.
+    const entries = options.after === undefined ? newer.slice(-limit) : newer.slice(0, limit);
+    const last = entries.at(-1)?.sequence ?? after;
+    return {
+      available: true,
+      task,
+      entries,
+      cursor: last,
+      earlierDropped: trail === undefined || trail.dropped > after,
+      more: newer.some((entry) => entry.sequence > last),
+    };
+  }
+
+  #trail(id: string, entry: Omit<TaskTrailEntry, "sequence" | "at">): void {
+    let trail = this.#trails.get(id);
+    if (trail === undefined) {
+      trail = { entries: [], dropped: 0 };
+      this.#trails.set(id, trail);
+      if (this.#trails.size > TRAIL_TASKS) this.#trails.delete(this.#trails.keys().next().value ?? "");
+    }
+    trail.entries.push({ sequence: ++this.#sequence, at: Date.now(), ...entry });
+    if (trail.entries.length > TRAIL_ENTRIES_PER_TASK) trail.dropped = trail.entries.shift()?.sequence ?? trail.dropped;
+  }
+
+  #recordStep(id: string, observation: FlueObservation): void {
+    switch (observation.type) {
+      case "task_start":
+        this.#trail(id, { kind: "started", ...(observation.agent === undefined ? {} : { tool: observation.agent }) });
+        return;
+      case "agent_start":
+        if (!this.#trails.has(id)) this.#trail(id, { kind: "started" });
+        return;
+      case "message_end": {
+        const message = observation.message;
+        if (message.role !== "assistant") return;
+        // Text parts only: thinking is the provider's private reasoning, and
+        // tool calls arrive on their own `tool_start` with their arguments.
+        const text = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+        const said = bounded(text);
+        if (said !== undefined) this.#trail(id, { kind: "said", text: said });
+        return;
+      }
+      case "tool_start": {
+        const args = argumentText(observation.toolName, observation.args);
+        this.#trail(id, { kind: "tool_call", tool: observation.toolName, ...(args === undefined ? {} : { text: args }) });
+        return;
+      }
+      case "tool": {
+        const text = resultText(observation.result);
+        this.#trail(id, { kind: "tool_result", tool: observation.toolName, isError: observation.isError,
+          durationMs: observation.durationMs, ...(text === undefined ? {} : { text }) });
+        return;
+      }
+      case "task":
+        this.#trail(id, { kind: "ended", isError: observation.isError, text: observation.isError ? "failed" : "completed" });
+        return;
+      case "submission_settled":
+        this.#trail(id, { kind: "ended", isError: observation.outcome === "failed", text: observation.outcome === "aborted" ? "cancelled" : observation.outcome });
+        return;
+      default:
+        return;
+    }
   }
 
   #onObservation(observation: FlueObservation): void {
@@ -268,16 +444,20 @@ export class TaskProjector {
         : observation.type === "task" ? (observation.isError ? "failed" : "completed")
         : observation.type === "submission_settled" ? (observation.outcome === "aborted" ? "cancelled" : observation.outcome)
         : undefined;
+      const previous = this.#activity.get(id);
+      const ended = previous !== undefined && ["completed", "failed", "cancelled"].includes(previous.stage);
       if (stage !== undefined) {
-        const previous = this.#activity.get(id);
-        if (previous !== undefined && ["completed", "failed", "cancelled"].includes(previous.stage)) return;
+        if (ended) return;
         const now = Date.now();
+        const computer = previous?.computer === true || (observation.type === "tool_start" && COMPUTER_TOOL.test(observation.toolName));
         this.#activity.set(id, { id, parentConversationId: activityParent,
           agentName: indexed?.agentName ?? (observation.type === "task_start" ? observation.agent : undefined) ?? previous?.agentName ?? "delegate",
           stage, updatedAt: now, createdAt: previous?.createdAt ?? now,
-          ...(indexed?.agentName === "voice-work" ? { name: indexed.title } : {}) });
+          ...(indexed?.agentName === "voice-work" ? { name: indexed.title } : {}),
+          ...(computer ? { computer: true as const } : {}) });
         if (this.#activity.size > 512) this.#activity.delete(this.#activity.keys().next().value ?? "");
       }
+      if (!ended && this.#activity.has(id)) this.#recordStep(id, observation);
     }
 
     if (observation.type === "agent_end") {

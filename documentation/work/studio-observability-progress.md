@@ -1,5 +1,31 @@
 # Studio observability implementation tracker
 
+## Sub-agent inspection and delegated computer presence (2026-10-21)
+
+`task_activity` gains `inspect`, a read of one task's recent steps through the
+new `task.inspect` operation (child of the tool's execution parent, scoped to the
+owning conversation). Its `task.inspect.read` progress event carries only
+availability, entry count and the dropped/more flags. The steps themselves are a
+bounded product projection held by the task projector: assistant text, tool
+names, arguments and result text, never reasoning, image bytes or typed text and
+keys, redacted with the shipped rules and cut at 600 characters an entry, 48
+entries a task and 64 tasks. They reach the model as the tool result, under the
+existing gated tool capture. The trail is process memory: restart, eviction and
+unobserved events are reported as unavailable or dropped, never filled in. A read
+re-runs and resends nothing. The voice agent and voice workers get a read-only
+surface (`status`, `inspect`); steering stays with `voice_work` and the text
+conversation. Workers now mount `task_activity` over their own delegates.
+
+Task activity also carries a sticky `computer` flag once a delegate or worker
+calls a Studio computer tool. The client raises the existing desktop indicator
+from that projection, read on the call stage's existing 1.5s activity cadence,
+and the indicator's Stop also cancels voice tasks driving the desktop. No new
+route, permission, collection policy or native command is added. Inline
+delegates are inspected through parallel calls or after their `task` returns;
+live inline steering remains unsupported. Coverage: `task-projector.test.ts`,
+`task-control.test.ts`, `task-settlements.test.ts`, `useComputerIndicator.test.tsx`,
+`useDelegatedComputerUse.test.ts`, `conversation.test.ts` (voice).
+
 ## OpenRouter-first voice and task progress (2026-10-21)
 
 The voice role shares Studio's canonical conversation, with a separately selected

@@ -31,8 +31,9 @@ vi.mock('@/platform/tauri', () => ({
     })
   },
 }))
+const cancelTask = vi.fn<(taskId: string) => Promise<unknown>>().mockResolvedValue({})
 vi.mock('@/stores/workspace', () => ({
-  useWorkspace: () => ({ computer: { stop: stopComputer } }),
+  useWorkspace: () => ({ computer: { stop: stopComputer }, tasks: { cancel: cancelTask } }),
 }))
 
 function turnWith(toolName: string): TranscriptItem[] {
@@ -68,6 +69,7 @@ afterEach(() => {
   show.mockClear()
   hide.mockClear()
   stopComputer.mockClear()
+  cancelTask.mockClear()
   stopHandler = null
 })
 
@@ -125,6 +127,30 @@ describe('useComputerIndicator', () => {
     act(() => stopHandler?.('cnv_1'))
     expect(first).not.toHaveBeenCalled()
     expect(latest).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the pill while a delegate or voice task drives the computer, with no main turn running', () => {
+    const { rerender } = renderHook(
+      ({ delegated }: { delegated: { id: string; agentName: string }[] }) =>
+        useComputerIndicator('cnv_1', [], false, () => undefined, delegated),
+      { initialProps: { delegated: [{ id: 'voice_1', agentName: 'voice-work' }] } },
+    )
+    expect(show).toHaveBeenCalledWith('cnv_1')
+    rerender({ delegated: [] })
+    expect(hide).toHaveBeenCalledTimes(1)
+  })
+
+  it("stops a voice task's computer use from the pill: driver cleanup and the task's cancellation", async () => {
+    const stopTurn = vi.fn()
+    renderHook(() =>
+      useComputerIndicator('cnv_1', [], false, stopTurn, [{ id: 'voice_1', agentName: 'voice-work' }, { id: 'child', agentName: 'general' }]),
+    )
+    await act(async () => { await Promise.resolve() })
+    act(() => stopHandler?.('cnv_1'))
+    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
+    // An inline delegate ends with its parent's turn; only the worker has a task to cancel.
+    expect(cancelTask.mock.calls).toEqual([['voice_1']])
+    expect(stopTurn).toHaveBeenCalledTimes(1)
   })
 
   it("answers the pill's Stop for this conversation only", async () => {

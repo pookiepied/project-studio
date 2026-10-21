@@ -145,6 +145,80 @@ describe("the task projector", () => {
     expect(projector.activity("conversation")).toEqual([]);
   });
 
+  it("marks a delegate or worker that drives the computer until it settles", () => {
+    let emit: ((observation: FlueObservation) => void) | undefined;
+    const projector = new TaskProjector({ tasks, subscribe: (handler) => { emit = handler; return () => undefined; } });
+    projector.start();
+    tasks.record({ id: "worker", agentName: "voice-work", parentConversationId: "conversation", originSubmissionId: "host", title: "Hazel" });
+    const event = (payload: object) => emit?.(payload as FlueObservation);
+    event({ type: "agent_start", instanceId: "worker" });
+    event({ type: "tool_start", instanceId: "worker", toolCallId: "a", toolName: "read" });
+    expect(projector.activity("conversation")[0]?.computer).toBeUndefined();
+    event({ type: "tool_start", instanceId: "worker", toolCallId: "b", toolName: "mcp__15_studio-computer__20_studio_computer_open" });
+    event({ type: "tool", instanceId: "worker", toolCallId: "b", toolName: "mcp__15_studio-computer__20_studio_computer_open", isError: false, durationMs: 1 });
+    // Between two computer calls the task is still at the desktop.
+    expect(projector.activity("conversation")[0]).toMatchObject({ id: "worker", stage: "waiting_for_model", computer: true });
+    // A worker's own inline delegate is the conversation's too, and its mark is its own.
+    event({ type: "task_start", instanceId: "worker", taskId: "child", agent: "general", prompt: "x" });
+    event({ type: "tool_start", instanceId: "worker", taskId: "child", toolCallId: "c", toolName: "mcp__15_studio-computer__21_studio_computer_click" });
+    expect(projector.activity("conversation").find((task) => task.id === "child")).toMatchObject({ computer: true, stage: "using_tool" });
+    event({ type: "submission_settled", instanceId: "worker", submissionId: "host", outcome: "completed" });
+    expect(projector.activity("conversation").find((task) => task.id === "worker")?.stage).toBe("completed");
+    projector.stop();
+  });
+
+  it("lets the owning conversation inspect a task's recent steps, bounded, redacted and without reasoning", () => {
+    let emit: ((observation: FlueObservation) => void) | undefined;
+    const projector = new TaskProjector({ tasks, subscribe: (handler) => { emit = handler; return () => undefined; } });
+    projector.start();
+    const event = (payload: object) => emit?.({ instanceId: "conversation", taskId: "child", ...payload } as FlueObservation);
+    event({ type: "task_start", agent: "explore", prompt: "PROMPT" });
+    event({ type: "message_end", turnId: "t", message: { role: "assistant", content: [
+      { type: "thinking", thinking: "PRIVATE REASONING" },
+      { type: "text", text: `Opening the report.${"x".repeat(2_000)}` },
+    ] } });
+    event({ type: "tool_start", toolCallId: "1", toolName: "read", args: { path: "notes.md", apiKey: "sk-live-SECRET" } });
+    event({ type: "tool", toolCallId: "1", toolName: "read", isError: false, durationMs: 12,
+      result: { content: [{ type: "text", text: "line one" }, { type: "image", data: "BYTES" }] } });
+    event({ type: "tool_start", toolCallId: "2", toolName: "mcp__15_studio-computer__20_studio_computer_type", args: { text: "hunter2" } });
+
+    expect(projector.inspect("other", "child")).toMatchObject({ available: false, entries: [] });
+    const view = projector.inspect("conversation", "child");
+    expect(view.available).toBe(true);
+    expect(view.entries.map((entry) => entry.kind)).toEqual(["started", "said", "tool_call", "tool_result", "tool_call"]);
+    const text = JSON.stringify(view);
+    expect(text).not.toContain("PRIVATE REASONING");
+    expect(text).not.toContain("SECRET");
+    expect(text).not.toContain("hunter2");
+    expect(text).not.toContain("BYTES");
+    expect(text).toContain("1 image omitted");
+    expect(view.entries[1]?.text?.length).toBeLessThan(700);
+    expect(view.entries[3]).toMatchObject({ tool: "read", isError: false, durationMs: 12 });
+
+    // A cursor reads only what followed it; nothing earlier is repeated.
+    event({ type: "task", isError: false, durationMs: 5 });
+    const later = projector.inspect("conversation", "child", { after: view.cursor });
+    expect(later.entries.map((entry) => entry.kind)).toEqual(["ended"]);
+    expect(later.earlierDropped).toBe(false);
+    projector.stop();
+  });
+
+  it("says when a bounded trail dropped steps after the reader's cursor", () => {
+    let emit: ((observation: FlueObservation) => void) | undefined;
+    const projector = new TaskProjector({ tasks, subscribe: (handler) => { emit = handler; return () => undefined; } });
+    projector.start();
+    const event = (payload: object) => emit?.({ instanceId: "conversation", taskId: "child", ...payload } as FlueObservation);
+    event({ type: "task_start", agent: "explore", prompt: "x" });
+    const start = projector.inspect("conversation", "child").cursor;
+    for (let index = 0; index < 60; index += 1) event({ type: "tool_start", toolCallId: String(index), toolName: "read", args: { index } });
+    const view = projector.inspect("conversation", "child", { after: start, limit: 5 });
+    expect(view.earlierDropped).toBe(true);
+    expect(view.entries).toHaveLength(5);
+    expect(view.more).toBe(true);
+    expect(projector.inspect("conversation", "child", { limit: 500 }).entries).toHaveLength(32);
+    projector.stop();
+  });
+
   it("settles completed with the captured final text as the summary", () => {
     const delivered: ((observation: FlueObservation) => void)[] = [];
     const projector = new TaskProjector({

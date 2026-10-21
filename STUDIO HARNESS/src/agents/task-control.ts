@@ -8,6 +8,33 @@ import { currentExecutionContext } from "../execution/context.js";
 import { forgetProvisionalInvocation, rememberInvocation } from "../observability/invocations.js";
 import { createObservationWriter } from "../observability/recorder.js";
 
+/**
+ * Who is asking through `task_activity`, which decides what it may do.
+ *
+ * The voice agent's corrections must carry the user's exact words, which only
+ * `voice_work` has, and a voice task's worker must not steer its siblings. So
+ * both read and never steer here. Offering an action the role then refuses
+ * is what sent the voice model to the wrong tool first: the schema itself is
+ * the routing.
+ */
+export type TaskCoordinationRole = "conversation" | "voice" | "worker";
+
+export function taskActivitySurface(role: TaskCoordinationRole): {
+  readonly actions: readonly ["status", "inspect"] | readonly ["status", "inspect", "steer", "cancel"];
+  readonly description: string;
+} {
+  const read = "status lists this conversation's delegates and workers with their live stage. inspect reads one task's recent steps - what it said, its tool calls and their results, bounded and without private reasoning - either the latest few, or only what followed `after` (the cursor a previous inspect returned). Reading never re-runs or resends anything.";
+  if (role === "conversation") {
+    return { actions: ["status", "inspect", "steer", "cancel"], description: `${read} steer and cancel reach independently addressable workers only; inline task delegates can be inspected but not steered. A correction is not permission to bypass approval.` };
+  }
+  return {
+    actions: ["status", "inspect"],
+    description: role === "voice"
+      ? `${read} Read-only: steer or cancel a voice task with voice_work, which carries the user's exact words.`
+      : `${read} Read-only: this task cannot steer or cancel other tasks.`,
+  };
+}
+
 /** Existing durable workers accept corrections without starting another worker. */
 export async function steerTask(task: AgentTaskRecord, text: string, admissionKey?: string): Promise<string> {
   return observeOperation("subagent", "task.steer", async () => {
