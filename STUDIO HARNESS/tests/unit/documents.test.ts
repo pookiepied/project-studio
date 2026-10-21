@@ -180,6 +180,107 @@ describe("reading a document as pages", () => {
     expect(document.pages).toEqual(["Budget\nItem\tCost\nChair\t42.5\nDesk\t85"]);
   });
 
+  it("counts a hard page break and the rendered break Word writes after it as one page ending", async () => {
+    const words = (text: string) => `<w:p><w:r><w:t>${text}, with enough words to be a page</w:t></w:r></w:p>`;
+    const hard = (spelling: string) => `<w:p><w:r>${spelling}</w:r></w:p>`;
+    const rendered = (text: string) =>
+      `<w:p><w:r><w:lastRenderedPageBreak/><w:t>${text}, with enough words to be a page</w:t></w:r></w:p>`;
+    const document = await extractDocument(
+      zipOf({
+        "word/document.xml":
+          `<w:document><w:body>${words("One")}${hard('<w:br w:type="page"/>')}${rendered("Two")}` +
+          `${hard("<w:br w:clear=\"all\" w:type='page' />")}${rendered("Three")}</w:body></w:document>`,
+      }),
+      "docx",
+    );
+    expect(document.pages).toEqual([
+      "One, with enough words to be a page",
+      "Two, with enough words to be a page",
+      "Three, with enough words to be a page",
+    ]);
+    expect(document.emptyPages).toEqual([]);
+  });
+
+  it("keeps the blank page two hard breaks in a row make, and reads tab stops as properties, not tabs", async () => {
+    const document = await extractDocument(
+      zipOf({
+        "word/document.xml":
+          '<w:document><w:body><w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs></w:pPr>' +
+          "<w:r><w:t>Before</w:t><w:tab/><w:t>after</w:t><w:br/><w:t>next line</w:t></w:r></w:p>" +
+          '<w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p>' +
+          "<w:p><w:r><w:t>Last</w:t></w:r></w:p></w:body></w:document>",
+      }),
+      "docx",
+    );
+    expect(document.pages).toEqual(["Before\tafter\nnext line", "", "Last"]);
+  });
+
+  it("reads a reordered deck in the order presentation.xml lists, not by file number", async () => {
+    const document = await extractDocument(
+      zipOf({
+        "ppt/presentation.xml":
+          '<p:presentation><p:sldIdLst><p:sldId id="256" r:id="rId7"/><p:sldId r:id="rId2" id="257"/></p:sldIdLst></p:presentation>',
+        "ppt/_rels/presentation.xml.rels":
+          '<Relationships><Relationship Id="rId2" Type="slide" Target="slides/slide1.xml"/>' +
+          '<Relationship Id="rId7" Type="slide" Target="/ppt/slides/slide2.xml"/></Relationships>',
+        "ppt/slides/slide1.xml": "<p:sld><a:p><a:r><a:t>Moved to second</a:t></a:r></a:p></p:sld>",
+        "ppt/slides/slide2.xml": "<p:sld><a:p><a:r><a:t>Moved to first</a:t></a:r></a:p></p:sld>",
+      }),
+      "pptx",
+    );
+    expect(document.pages).toEqual(["Moved to first", "Moved to second"]);
+  });
+
+  it("reads a rich-text shared string as one string, so later cells keep their own text", async () => {
+    const document = await extractDocument(
+      zipOf({
+        "xl/workbook.xml": '<workbook><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/sharedStrings.xml":
+          '<sst><si><r><rPr><b/></rPr><t>Bold</t></r><r><t xml:space="preserve"> tail</t></r></si>' +
+          "<si><t>東京</t><rPh sb=\"0\" eb=\"2\"><t>トウキョウ</t></rPh></si><si/><si><t>Third</t></si></sst>",
+        "xl/worksheets/sheet1.xml":
+          '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>' +
+          '<c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c></row></sheetData></worksheet>',
+      }),
+      "xlsx",
+    );
+    expect(document.pages).toEqual(["S\nBold tail\t東京\t\tThird"]);
+  });
+
+  it("puts each cell in the column it names, with empty and formatted-empty cells between", async () => {
+    const document = await extractDocument(
+      zipOf({
+        "xl/workbook.xml": '<workbook><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/worksheets/sheet1.xml":
+          '<worksheet><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c></row>' +
+          '<row r="2"><c r="A2"><v>10</v></c><c r="C2"><v>30</v></c></row>' +
+          '<row r="3" spans="1:3"/>' +
+          '<row r="4"><c r="A4" s="1"/><c r="B4"><v>20</v></c><c r="AB4" s="2"/></row>' +
+          '<row r="5"><c r="ZZZ5"><v>far</v></c><c r="A5"><v>near</v></c></row></sheetData></worksheet>',
+      }),
+      "xlsx",
+    );
+    expect(document.pages).toEqual(["S\n1\t2\t3\n10\t\t30\n\n\t20\nnear\n[columns past 1024 are not shown]"]);
+  });
+
+  it("names each sheet by the workbook's own mapping, skipping chart sheets", async () => {
+    const document = await extractDocument(
+      zipOf({
+        "xl/workbook.xml":
+          '<workbook><sheets><sheet name="Summary &amp; totals" sheetId="3" r:id="rId3"/>' +
+          '<sheet name="Chart" sheetId="4" r:id="rId4"/><sheet name="Data" sheetId="1" ns2:id="rId1"/></sheets></workbook>',
+        "xl/_rels/workbook.xml.rels":
+          '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/>' +
+          '<Relationship Id="rId3" Target="worksheets/sheet2.xml"/><Relationship Id="rId4" Target="chartsheets/sheet1.xml"/></Relationships>',
+        "xl/chartsheets/sheet1.xml": "<chartsheet/>",
+        "xl/worksheets/sheet1.xml": '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>data rows</t></is></c></row></sheetData></worksheet>',
+        "xl/worksheets/sheet2.xml": '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>summary rows</t></is></c></row></sheetData></worksheet>',
+      }),
+      "xlsx",
+    );
+    expect(document.pages).toEqual(["Summary & totals\nsummary rows", "Data\ndata rows"]);
+  });
+
   it("refuses an Office file that is not a ZIP, or lacks its part", async () => {
     await expect(extractDocument(Buffer.from("plain"), "docx")).rejects.toMatchObject({ kind: "malformed" });
     await expect(extractDocument(zipOf({ "a.txt": "x" }), "docx")).rejects.toMatchObject({
@@ -451,6 +552,33 @@ describe("a conversation's documents", () => {
     expect(same.path).toBe(one.path);
     expect(other.fileName).toBe("a-2.txt");
   });
+
+  it("keeps a shared file while another document names it, and refuses to take back an announced one", async () => {
+    const sent = await store.add("conv-1", { fileName: "a.txt", mimeType: "text/plain", bytes: Buffer.from("same") });
+    store.announce("conv-1");
+    const resent = await store.add("conv-1", { fileName: "a.txt", mimeType: "text/plain", bytes: Buffer.from("same") });
+    const pending = await store.add("conv-1", { fileName: "a.txt", mimeType: "text/plain", bytes: Buffer.from("same") });
+    expect(resent.path).toBe(sent.path);
+
+    expect(store.remove("conv-1", resent.id)).toBe(true);
+    expect(readdirSync(join(root, "conv-1", "attachments"))).toEqual(["a.txt"]);
+    expect(() => store.remove("conv-1", sent.id)).toThrow(expect.objectContaining({ kind: "conflict" }));
+    expect(store.get("conv-1", sent.id)).toBeDefined();
+
+    // The last pending copy may go; the announced document still names the file.
+    expect(store.remove("conv-1", pending.id)).toBe(true);
+    expect(readdirSync(join(root, "conv-1", "attachments"))).toEqual(["a.txt"]);
+    expect(store.list("conv-1").map((document) => document.id)).toEqual([sent.id]);
+  });
+
+  it("deletes the file with the last pending document that names it", async () => {
+    const one = await store.add("conv-1", { fileName: "a.txt", mimeType: "text/plain", bytes: Buffer.from("same") });
+    const two = await store.add("conv-1", { fileName: "a.txt", mimeType: "text/plain", bytes: Buffer.from("same") });
+    expect(store.remove("conv-1", one.id)).toBe(true);
+    expect(readdirSync(join(root, "conv-1", "attachments"))).toEqual(["a.txt"]);
+    expect(store.remove("conv-1", two.id)).toBe(true);
+    expect(readdirSync(join(root, "conv-1", "attachments"))).toEqual([]);
+  });
 });
 
 describe("the documents route", () => {
@@ -508,6 +636,23 @@ describe("the documents route", () => {
     const removed = await request(`/api/conversations/conv-9/documents/${String(document.id)}`, { method: "DELETE" });
     expect(removed.status).toBe(204);
     expect((await request(`/api/conversations/conv-9/documents/${String(document.id)}`, { method: "DELETE" })).status).toBe(404);
+  });
+
+  it("answers a conflict, and keeps the document, when it was already announced", async () => {
+    const posted = await request("/api/conversations/conv-9/documents", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ fileName: "a.txt", mimeType: "text/plain", data: Buffer.from("hello").toString("base64") }),
+    });
+    const { document } = (await posted.json()) as { document: { id: string } };
+    new ConversationDocumentStore(db).announce("conv-9");
+    const refused = await request(`/api/conversations/conv-9/documents/${document.id}`, { method: "DELETE" });
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toContain("already sent");
+    const listed = await request("/api/conversations/conv-9/documents");
+    expect(((await listed.json()) as { documents: { announced: boolean }[] }).documents).toEqual([
+      expect.objectContaining({ id: document.id, announced: true }),
+    ]);
   });
 
   it("refuses a body outside the contract, and a file it cannot read, with the sentence", async () => {

@@ -59,6 +59,12 @@ const COVERAGE_MIN_RATIO = 0.2;
 const COVERAGE_ABSOLUTE_EMPTY = 10;
 /** A sheet past this many rows is a data file; the model searches it or asks for a range. */
 const MAX_SHEET_ROWS = 5_000;
+/**
+ * Cells are placed by their column, so one stray cell far to the right
+ * would pad every row it sits in with thousands of tabs. Past this column
+ * the cells are cut and the sheet says so.
+ */
+const MAX_SHEET_COLUMNS = 1_024;
 
 const FORMAT_BY_EXTENSION: Readonly<Record<string, DocumentFormat>> = {
   pdf: "pdf",
@@ -254,11 +260,58 @@ function textsOf(xml: string, tag: string): string[] {
   return found;
 }
 
+/** The attributes of one start tag, by name, either quote style accepted. */
+function attributesOf(tag: string): ReadonlyMap<string, string> {
+  const attributes = new Map<string, string>();
+  for (const match of tag.matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+    attributes.set(match[1] ?? "", decodeEntities(match[2] ?? match[3] ?? ""));
+  }
+  return attributes;
+}
+
+/**
+ * A package's relationships part as id to part name. Targets are relative
+ * to the folder of the part that owns them (`xl/`, `ppt/`), or absolute
+ * from the package root when they start with a slash.
+ */
+function relationshipsOf(archive: ZipArchive, relsPath: string, baseFolder: string): ReadonlyMap<string, string> {
+  const targets = new Map<string, string>();
+  for (const match of (archive.text(relsPath) ?? "").matchAll(/<Relationship\b[^>]*>/g)) {
+    const attributes = attributesOf(match[0]);
+    const id = attributes.get("Id");
+    const target = attributes.get("Target");
+    if (id === undefined || target === undefined) continue;
+    targets.set(id, partName(baseFolder, target));
+  }
+  return targets;
+}
+
+function partName(baseFolder: string, target: string): string {
+  const segments = target.startsWith("/") ? [] : baseFolder.split("/").filter((part) => part !== "");
+  for (const segment of target.replace(/^\/+/, "").split("/")) {
+    if (segment === "..") segments.pop();
+    else if (segment !== "." && segment !== "") segments.push(segment);
+  }
+  return segments.join("/");
+}
+
+/** Private-use marks for the two kinds of page ending a Word body carries. */
+const HARD_PAGE_BREAK = "\uE000";
+const RENDERED_PAGE_BREAK = "\uE001";
+
 /**
  * A Word document's text, cut into the pages Word last laid it out on:
  * `lastRenderedPageBreak` is where Word saved a page ending, and a hard
  * break the author inserted counts the same. A document saved without
  * either is one page, which is still the truth of what the reader gets.
+ *
+ * Word marks the page after a hard break twice - the break itself, then a
+ * `lastRenderedPageBreak` at the start of the next page's first run - so a
+ * rendered mark with nothing but markup between it and a hard break is the
+ * same page ending, not a blank page. Counted twice, every hard break gave
+ * an empty page, and two of them were enough to tell the model a Word file
+ * needed OCR. Two hard breaks in a row are still two: that blank page is
+ * the author's.
  */
 function docxPages(archive: ZipArchive): readonly string[] {
   const xml = archive.text("word/document.xml");
@@ -266,13 +319,18 @@ function docxPages(archive: ZipArchive): readonly string[] {
     throw new DocumentError("malformed", "The file has no word/document.xml, so it is not a Word document.");
   }
   const body = xml
-    .replace(/<w:lastRenderedPageBreak\/>/g, "\u000c")
-    .replace(/<w:br w:type="page"\/>/g, "\u000c")
-    .replace(/<w:tab\/>/g, "\t")
-    .replace(/<w:br\/>/g, "\n")
+    .replace(/<w:lastRenderedPageBreak\s*\/>/g, RENDERED_PAGE_BREAK)
+    .replace(/<w:br\b[^>]*\bw:type\s*=\s*["']page["'][^>]*\/>/g, HARD_PAGE_BREAK)
+    .replace(new RegExp(`(${HARD_PAGE_BREAK}(?:<[^>]*>|\\s)*)${RENDERED_PAGE_BREAK}`, "g"), "$1")
+    // Only the bare run tab: `<w:tab w:val=... w:pos=...>` is a tab stop
+    // definition in paragraph properties, not a character.
+    .replace(/<w:tab\s*\/>/g, "\t")
+    .replace(/<w:br\b[^>]*\/>/g, "\n")
     .replace(/<\/w:p>/g, "\n")
     .replace(/<\/w:tc>/g, "\t");
-  return body.split("\u000c").map((page) => textOfMarkup(page).trim());
+  return body
+    .split(new RegExp(`[${HARD_PAGE_BREAK}${RENDERED_PAGE_BREAK}]`))
+    .map((page) => textOfMarkup(page).trim());
 }
 
 /** Markup to its text: every tag dropped, entities decoded, blank runs squeezed. */
@@ -282,18 +340,73 @@ function textOfMarkup(markup: string): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-/** One page per slide, in the deck's own order, each starting with its title text. */
-function pptxSlides(archive: ZipArchive): readonly string[] {
-  const slides = archive
+/**
+ * The parts a container lists, in the container's own order: each start
+ * tag's relationship id resolved through the owner's relationships part.
+ * Undefined when the order cannot be read - no list, no relationships, or
+ * an entry naming a part the package does not hold - so the caller falls
+ * back to the parts' numbering rather than reading a partial list.
+ */
+function partsInOrder(
+  archive: ZipArchive,
+  listXml: string,
+  entryTag: RegExp,
+  relsPath: string,
+  baseFolder: string,
+): readonly { readonly part: string; readonly attributes: ReadonlyMap<string, string> }[] | undefined {
+  const relationships = relationshipsOf(archive, relsPath, baseFolder);
+  if (relationships.size === 0) return undefined;
+  const present = new Set(archive.names());
+  const parts: { part: string; attributes: ReadonlyMap<string, string> }[] = [];
+  for (const match of listXml.matchAll(entryTag)) {
+    const attributes = attributesOf(match[0]);
+    const part = relationships.get(relationshipIdOf(attributes) ?? "");
+    if (part === undefined || !present.has(part)) return undefined;
+    parts.push({ part, attributes });
+  }
+  return parts.length === 0 ? undefined : parts;
+}
+
+/**
+ * The relationship id on a list entry. The namespace prefix is the
+ * generator's choice - `r:` from Office, others from some libraries - and
+ * an unprefixed `id` is the entry's own number (`sldId id="256"`), not one.
+ */
+function relationshipIdOf(attributes: ReadonlyMap<string, string>): string | undefined {
+  for (const [name, value] of attributes) if (name.endsWith(":id")) return value;
+  return undefined;
+}
+
+/** The parts matching `pattern`, by the number in their names - the order when nothing better is written down. */
+function numberedParts(archive: ZipArchive, pattern: RegExp): readonly string[] {
+  return archive
     .names()
-    .map((name) => /^ppt\/slides\/slide(\d+)\.xml$/.exec(name))
+    .map((name) => pattern.exec(name))
     .filter((match): match is RegExpExecArray => match !== null)
-    .sort((a, b) => Number.parseInt(a[1] ?? "0", 10) - Number.parseInt(b[1] ?? "0", 10));
+    .sort((a, b) => Number.parseInt(a[1] ?? "0", 10) - Number.parseInt(b[1] ?? "0", 10))
+    .map((match) => match[0]);
+}
+
+/**
+ * One page per slide, in the deck's own order, each starting with its title
+ * text. The order is `presentation.xml`'s slide list, not the slide files'
+ * numbers: PowerPoint keeps a moved slide's file name, so a reordered deck
+ * numbered by file would put the wrong slide under `[slide N]`.
+ */
+function pptxSlides(archive: ZipArchive): readonly string[] {
+  const listed = partsInOrder(
+    archive,
+    archive.text("ppt/presentation.xml") ?? "",
+    /<p:sldId\b[^>]*>/g,
+    "ppt/_rels/presentation.xml.rels",
+    "ppt",
+  );
+  const slides = listed?.map((entry) => entry.part) ?? numberedParts(archive, /^ppt\/slides\/slide(\d+)\.xml$/);
   if (slides.length === 0) {
     throw new DocumentError("malformed", "The file has no slides, so it is not a PowerPoint deck.");
   }
-  return slides.map((match) => {
-    const xml = archive.text(match[0]) ?? "";
+  return slides.map((part) => {
+    const xml = archive.text(part) ?? "";
     // A paragraph's runs join without a break; paragraphs end one.
     const paragraphs = xml.split(/<\/a:p>/).map((paragraph) => textsOf(paragraph, "a:t").join(""));
     return paragraphs.join("\n").trim();
@@ -301,55 +414,105 @@ function pptxSlides(archive: ZipArchive): readonly string[] {
 }
 
 /**
+ * The shared string table, one entry per `<si>`. A rich-text entry holds a
+ * `<t>` per formatted run, and those runs are one string - reading every
+ * `<t>` as its own entry shifted every later index, so cells silently showed
+ * their neighbours' text. Phonetic guides (`<rPh>`) are annotations on the
+ * string, not part of it.
+ */
+function sharedStringsOf(xml: string): readonly string[] {
+  const strings: string[] = [];
+  for (const match of xml.matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)) {
+    const inner = (match[1] ?? "").replace(/<rPh\b[\s\S]*?<\/rPh>/g, "");
+    strings.push(textsOf(inner, "t").join(""));
+  }
+  return strings;
+}
+
+/** "C" is 3, "AA" is 27: a cell reference's column, one-based; undefined when it has none. */
+function columnOf(reference: string | undefined): number | undefined {
+  const letters = /^([A-Z]+)\d*$/i.exec(reference ?? "")?.[1];
+  if (letters === undefined) return undefined;
+  let column = 0;
+  for (const letter of letters.toUpperCase()) column = column * 26 + (letter.charCodeAt(0) - 64);
+  return column;
+}
+
+/** The worksheets in the workbook's own order with their names, or by file number when that order is unreadable. */
+function worksheetsOf(archive: ZipArchive, workbook: string): readonly { readonly part: string; readonly name: string }[] {
+  const listed = partsInOrder(archive, workbook, /<sheet\b[^>]*>/g, "xl/_rels/workbook.xml.rels", "xl");
+  if (listed !== undefined) {
+    // A chart sheet is listed among the sheets but holds no cells.
+    return listed
+      .filter((entry) => entry.part.startsWith("xl/worksheets/"))
+      .map((entry, index) => ({ part: entry.part, name: entry.attributes.get("name") ?? `Sheet ${String(index + 1)}` }));
+  }
+  const names = [...workbook.matchAll(/<sheet\b[^>]*>/g)].map((match) => attributesOf(match[0]).get("name"));
+  return numberedParts(archive, /^xl\/worksheets\/sheet(\d+)\.xml$/).map((part, index) => ({
+    part,
+    name: names[index] ?? `Sheet ${String(index + 1)}`,
+  }));
+}
+
+/**
  * One page per sheet, each as tab-separated rows with the sheet's name on
  * the first line. Shared strings are resolved; formulas give their cached
  * value, which is what the person sees in the cell.
+ *
+ * A cell sits in the column its reference names. Excel writes no element
+ * for an empty cell, so joining the cells it did write moved every value
+ * after a gap one column left - under the wrong header, with nothing to
+ * show it had moved. A formatted empty cell is written self-closed, and is
+ * read as the empty cell it is rather than as the start of its neighbour.
  */
 function xlsxSheets(archive: ZipArchive): readonly string[] {
   const workbook = archive.text("xl/workbook.xml");
   if (workbook === undefined) {
     throw new DocumentError("malformed", "The file has no xl/workbook.xml, so it is not an Excel workbook.");
   }
-  const shared = textsOf(archive.text("xl/sharedStrings.xml") ?? "", "t");
-  const names: string[] = [];
-  for (const match of workbook.matchAll(/<sheet\s[^>]*name="([^"]*)"[^>]*\/?>/g)) {
-    names.push(decodeEntities(match[1] ?? ""));
-  }
-  const sheets = archive
-    .names()
-    .map((name) => /^xl\/worksheets\/sheet(\d+)\.xml$/.exec(name))
-    .filter((match): match is RegExpExecArray => match !== null)
-    .sort((a, b) => Number.parseInt(a[1] ?? "0", 10) - Number.parseInt(b[1] ?? "0", 10));
+  const shared = sharedStringsOf(archive.text("xl/sharedStrings.xml") ?? "");
+  const sheets = worksheetsOf(archive, workbook);
   if (sheets.length === 0) {
     throw new DocumentError("malformed", "The workbook has no sheets.");
   }
-  return sheets.map((match, index) => {
-    const xml = archive.text(match[0]) ?? "";
+  return sheets.map((sheet) => {
+    const xml = archive.text(sheet.part) ?? "";
     const rows: string[] = [];
-    let cut = false;
-    for (const row of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+    let cutRows = false;
+    let cutColumns = false;
+    for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       if (rows.length >= MAX_SHEET_ROWS) {
-        cut = true;
+        cutRows = true;
         break;
       }
       const cells: string[] = [];
-      for (const cell of (row[1] ?? "").matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
-        const attributes = cell[1] ?? "";
+      for (const cell of (row[1] ?? "").matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const attributes = attributesOf(cell[1] ?? "");
         const inner = cell[2] ?? "";
-        const value = /<v>([^<]*)<\/v>/.exec(inner)?.[1];
-        const isShared = /\bt="s"/.test(attributes);
-        if (isShared && value !== undefined) {
-          cells.push(shared[Number.parseInt(value, 10)] ?? "");
-        } else if (/\bt="inlineStr"/.test(attributes)) {
-          cells.push(textsOf(inner, "t").join(""));
-        } else {
-          cells.push(value === undefined ? "" : decodeEntities(value));
+        const column = columnOf(attributes.get("r")) ?? cells.length + 1;
+        if (column > MAX_SHEET_COLUMNS) {
+          cutColumns = true;
+          continue;
         }
+        const value = /<v>([^<]*)<\/v>/.exec(inner)?.[1];
+        const type = attributes.get("t");
+        let text: string;
+        if (type === "s" && value !== undefined) {
+          text = shared[Number.parseInt(value, 10)] ?? "";
+        } else if (type === "inlineStr") {
+          text = textsOf(inner.replace(/<rPh\b[\s\S]*?<\/rPh>/g, ""), "t").join("");
+        } else {
+          text = value === undefined ? "" : decodeEntities(value);
+        }
+        while (cells.length < column - 1) cells.push("");
+        cells[column - 1] = text;
       }
+      while (cells.length > 0 && cells.at(-1) === "") cells.pop();
       rows.push(cells.join("\t"));
     }
-    const title = names[index] ?? `Sheet ${String(index + 1)}`;
-    const trailer = cut ? `\n[only the first ${String(MAX_SHEET_ROWS)} rows are shown]` : "";
-    return `${title}\n${rows.join("\n")}${trailer}`.trim();
+    const trailer =
+      (cutColumns ? `\n[columns past ${String(MAX_SHEET_COLUMNS)} are not shown]` : "") +
+      (cutRows ? `\n[only the first ${String(MAX_SHEET_ROWS)} rows are shown]` : "");
+    return `${sheet.name}\n${rows.join("\n")}${trailer}`.trim();
   });
 }

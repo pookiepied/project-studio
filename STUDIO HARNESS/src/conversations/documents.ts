@@ -217,12 +217,30 @@ export class ConversationDocumentStore {
     return document;
   }
 
-  /** Removes a document the person took back before sending; the file goes with it. */
+  /**
+   * Removes a document the person took back before sending; the file goes
+   * with it unless another of the conversation's documents still names it.
+   *
+   * Two documents share one file when the same bytes are attached twice
+   * (`vacantPath` keeps the one copy), so deleting the file with the row
+   * took it from the other document too - including one the model had
+   * already been told to read. And an announced document is part of what
+   * the model was told: removing it would leave a path in the transcript
+   * that points at nothing, so it is refused as a conflict, not a miss.
+   */
   remove(conversationId: string, id: string): boolean {
     const document = this.get(conversationId, id);
     if (document === undefined) return false;
+    if (document.announcedAt !== null) {
+      throw new StorageError("conflict", {
+        message: "That document was already sent with a message, so it can no longer be taken back.",
+      });
+    }
     this.#db.prepare("DELETE FROM conversation_document WHERE id = ?").run(id);
-    rmSync(document.path, { force: true });
+    const stillNamed = this.#db
+      .prepare("SELECT 1 FROM conversation_document WHERE conversation_id = ? AND path = ? LIMIT 1")
+      .get(conversationId, document.path);
+    if (stillNamed === undefined) rmSync(document.path, { force: true });
     return true;
   }
 

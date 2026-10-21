@@ -432,7 +432,8 @@ export function createConversationRoutes(
   // fifty-megabyte file is the cost, named in the plan's parked storage
   // work. The upload reads the document once and answers what the model
   // will be told; the announcement itself waits for the next user message.
-  // A document taken back before that is deleted here with its file.
+  // A document taken back before that is deleted here, with its file when
+  // no other document shares it; one already announced is a conflict.
   routes.get("/:id/documents", (context) => {
     try {
       return context.json({ documents: documents.list(context.req.param("id")).map(publicDocument) });
