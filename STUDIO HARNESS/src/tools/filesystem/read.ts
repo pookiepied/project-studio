@@ -10,11 +10,15 @@ import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { hashContent, type FileAccessLog } from "./access-log.js";
 import { DocumentError } from "../../documents/errors.js";
+import { decodeTextBytes } from "../../documents/text-encoding.js";
+import { dimensionsPhrase, imageDimensions } from "../../documents/image-dimensions.js";
 import {
   coverageNote,
   documentFormatOf,
   extractDocument,
   MAX_DOCUMENT_BYTES,
+  pageRanges,
+  parsePageRanges,
   renderPages,
 } from "../../documents/extract.js";
 import {
@@ -108,6 +112,8 @@ export interface ReadInput {
   /** 1-based first line to return. */
   readonly offset: number;
   readonly limit: number;
+  /** A document's pages to read, as "3-5,9"; documents only. */
+  readonly pages?: string;
 }
 
 /**
@@ -158,14 +164,20 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
     `accepts image input, up to ${Math.round(MAX_IMAGE_BYTES / 1_000_000)} MB each and ` +
     `${MAX_IMAGES_PER_CONVERSATION} per conversation. A PDF, Word, PowerPoint or Excel ` +
     "file comes back as its text, page after page under [page N] markers, numbered and " +
-    "paged like any text file; a note at the top names any pages with no text layer, " +
-    "which the ocr tool can read.",
+    "paged like any text file; pass pages as \"3-5,9\" to read only those pages of a " +
+    "long one. A note at the top names any pages with no text layer, which the ocr tool " +
+    "can read. Grep cannot search inside these files; read them.",
   inputSchema: {
     type: "object",
     properties: {
       path: { type: "string", minLength: 1 },
       offset: { type: "integer", minimum: 1 },
       limit: { type: "integer", minimum: 1 },
+      pages: {
+        type: "string",
+        minLength: 1,
+        description: 'PDF, Word, PowerPoint or Excel only: the pages (slides, sheets) to read, one-based, as "3-5,9".',
+      },
     },
     required: ["path"],
     additionalProperties: false,
@@ -389,6 +401,12 @@ type SniffedImageKind =
   | { readonly verdict: "showable"; readonly mimeType: string }
   | { readonly verdict: "unshowable"; readonly mimeType: string };
 
+/** ", WxH px" from the picture's header, with the downscale warning when large. */
+function pixelSize(bytes: Uint8Array): string {
+  const phrase = dimensionsPhrase(imageDimensions(bytes));
+  return phrase === "" ? "" : `, ${phrase}`;
+}
+
 function sniffImageKind(head: Buffer, extension: string): SniffedImageKind | undefined {
   // The strong signatures, believed on the bytes alone: a text file does not
   // plausibly begin with any of these.
@@ -456,10 +474,14 @@ export function createReadTool(
       if (typeof value.path !== "string" || value.path.trim() === "") {
         throw new ToolError("invalid_input", { message: "path is required." });
       }
+      if (value.pages !== undefined && (typeof value.pages !== "string" || value.pages.trim() === "")) {
+        throw new ToolError("invalid_input", { message: 'pages must be text such as "3-5,9".' });
+      }
       return {
         path: value.path,
         offset: positiveInteger(value.offset, "offset", 1),
         limit: positiveInteger(value.limit, "limit", DEFAULT_LINE_LIMIT),
+        ...(value.pages === undefined ? {} : { pages: value.pages }),
       };
     },
 
@@ -532,11 +554,28 @@ export function createReadTool(
           }
           throw error;
         }
+        let only: readonly number[] | undefined;
+        try {
+          only = input.pages === undefined ? undefined : parsePageRanges(input.pages, document.pages.length);
+        } catch (error) {
+          if (error instanceof DocumentError) throw new ToolError("invalid_input", { message: error.message });
+          throw error;
+        }
+        // Said in front, like the coverage note: lines are numbered within
+        // what was selected, so the model must know it is not the whole.
+        const selection = only === undefined
+          ? ""
+          : `[${document.unit}s ${pageRanges(only)} of ${String(document.pages.length)}]\n\n`;
         return formatNumbered(
-          `${coverageNote(document, input.path)}${renderPages(document)}`,
+          `${selection}${coverageNote(document, input.path)}${renderPages(document, only)}`,
           input.offset,
           input.limit,
         );
+      }
+      if (input.pages !== undefined) {
+        throw new ToolError("invalid_input", {
+          message: "pages applies to PDF, Word, PowerPoint and Excel files. Use offset and limit for this file.",
+        });
       }
 
       // The kind is decided from the bytes first and the name second. Reading
@@ -643,7 +682,7 @@ export function createReadTool(
 
         return {
           content: [
-            { type: "text", text: `Attached: ${input.path} (${mimeType}).` +
+            { type: "text", text: `Attached: ${input.path} (${mimeType}${pixelSize(bytes)}).` +
               (options.imageBudget === undefined ? "" : `\n${options.imageBudget.statusMessage(context.scope.conversationId)}`) },
             { type: "image", data: bytes.toString("base64"), mimeType },
           ],
@@ -651,13 +690,22 @@ export function createReadTool(
       }
 
       const content = await context.sandbox.readFile(input.path);
+      let shown = content;
 
       if (content.includes("\0")) {
-        // Returning binary as text produces plausible-looking nonsense, which
-        // is worse than refusing: the model reasons about it as if it were real.
-        throw new ToolError("invalid_input", {
-          message: "This file is not text and cannot be read.",
-        });
+        // UTF-16 - what Notepad's "Unicode", PowerShell's Out-File and
+        // Excel's Unicode export write - is all NULs read as UTF-8, and is
+        // text all the same. Anything still holding NULs once decoded is
+        // refused: returning binary as text produces plausible-looking
+        // nonsense, which is worse, because the model reasons about it as if
+        // it were real.
+        const decoded = decodeTextBytes(await readFile(absolute));
+        if (decoded === undefined) {
+          throw new ToolError("invalid_input", {
+            message: "This file is not text and cannot be read.",
+          });
+        }
+        shown = decoded.text;
       }
 
       // Recorded against the resolved path, so a later edit naming the same
@@ -670,7 +718,7 @@ export function createReadTool(
         contentHash: hashContent(content),
       });
 
-      return formatNumbered(content, input.offset, input.limit);
+      return formatNumbered(shown, input.offset, input.limit);
     },
   });
 }

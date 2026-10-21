@@ -14,16 +14,17 @@ import type { SeamFailure, TurnImageWire } from '@/platform/harness'
  * time, before a byte is encoded, so what is rejected is rejected with the
  * file still in hand.
  *
- * ---- Why bytes, never paths ----------------------------------------------
+ * ---- Why bytes, not only a path ------------------------------------------
  *
- * An attachment is deliberately outside the conversation sandbox's read
- * roots, the file tools only read text, and every tool call is permissioned:
- * there is no path the model could follow to see the picture. So the picture
- * travels itself — read at pick time, base64 in the submission, persisted by
- * the harness, and re-sent to the provider on every later turn, because a
- * stateless API has no other way of seeing an image twice. The `<attachments>`
- * manifest the harness appends to the message gives the model stable image
- * ids to refer to, but the pixels arrive with the message.
+ * The picture travels itself — read at pick time, base64 in the submission,
+ * persisted by the harness, and re-sent to the provider on every later turn,
+ * because a stateless API has no other way of seeing an image twice, and a
+ * model should see what it was shown without first spending a tool call.
+ * The harness also files a copy in the conversation's attachments folder,
+ * which the conversation's read tool may open, and its `attached_images` note
+ * names that path so the model can open the file again or hand it to a tool.
+ * The `<attachments>` manifest gives stable image ids to refer to; the pixels
+ * still arrive with the message.
  *
  * ---- Why one rule and not one per provider -------------------------------
  *

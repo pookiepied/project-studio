@@ -158,6 +158,8 @@ describe("provider probe", () => {
 
     expect(probe.ok).toBe(true);
     expect(probe.modelCount).toBe(3);
+    // The screen wants the count; the ids stay in the catalog.
+    expect(probe).not.toHaveProperty("servedIds");
     expect(typeof probe.reachedAt).toBe("number");
     expect(probe.failure).toBeUndefined();
     expect(probe.status).toBe(200);

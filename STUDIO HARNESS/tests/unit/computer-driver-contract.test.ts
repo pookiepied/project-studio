@@ -78,6 +78,13 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     expect(checks["monitorReadyWithoutInput"]).toBe(true);
     expect(checks["monitorFailure"]).toMatchObject({ available: false, moves: 2, stateAvailable: true });
   });
+  it("keeps a picture within its budget: a PNG too large becomes a JPEG, then a smaller one, and says so", () => {
+    // A PNG over the MCP line limit was dropped whole and the model waited out
+    // the request deadline (2026-10-21); the picture must arrive instead.
+    expect(checks["fallback"]).toMatchObject({ mime: "image/jpeg", underBudget: true });
+    expect(String((checks["fallback"] as Record<string, unknown>)["note"])).toMatch(/JPEG/);
+    expect(checks["keptPng"]).toMatchObject({ mime: "image/png", width: 400, note: null });
+  });
   it("releases only the buttons and keys recorded as Studio-held during cleanup", () => {
     expect(checks["releasedButtons"]).toEqual(["middle/up"]);
     expect(checks["releasedKeys"]).toEqual(["16/False"]);

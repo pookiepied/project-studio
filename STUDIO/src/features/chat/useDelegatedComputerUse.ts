@@ -7,6 +7,8 @@ import { isRecord } from '@/lib/guards'
 export interface DelegatedComputerUse {
   readonly id: string
   readonly agentName: string
+  /** The voice task an inline delegate runs inside; cancelling it is what stops the delegate. */
+  readonly owner?: string
 }
 
 const SETTLED = ['completed', 'failed', 'cancelled']
@@ -15,7 +17,8 @@ export function parseDelegatedComputerUse(value: unknown): DelegatedComputerUse[
   if (!isRecord(value) || !Array.isArray(value.tasks)) return []
   return value.tasks.flatMap((row: unknown) => {
     if (!isRecord(row) || typeof row.id !== 'string' || typeof row.agentName !== 'string' || typeof row.stage !== 'string') return []
-    return row.computer === true && !SETTLED.includes(row.stage) ? [{ id: row.id, agentName: row.agentName }] : []
+    if (row.computer !== true || SETTLED.includes(row.stage)) return []
+    return [{ id: row.id, agentName: row.agentName, ...(typeof row.owner === 'string' ? { owner: row.owner } : {}) }]
   })
 }
 

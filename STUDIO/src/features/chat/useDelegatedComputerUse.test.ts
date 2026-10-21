@@ -8,7 +8,8 @@ describe('delegated computer use', () => {
       { id: 'child', agentName: 'explore', stage: 'using_tool' },
       { id: 'done', agentName: 'general', stage: 'completed', computer: true },
       { id: 7, agentName: 'general', stage: 'working', computer: true },
-    ] })).toEqual([{ id: 'voice_1', agentName: 'voice-work' }])
+      { id: 'inner', agentName: 'general', stage: 'using_tool', computer: true, owner: 'voice_2' },
+    ] })).toEqual([{ id: 'voice_1', agentName: 'voice-work' }, { id: 'inner', agentName: 'general', owner: 'voice_2' }])
     expect(parseDelegatedComputerUse(null)).toEqual([])
   })
 })

@@ -415,6 +415,33 @@ describe("the tools", () => {
     expect(await call("native/read", { path: "budget.xlsx" })).toContain("Chair\t42.5");
   });
 
+  it("read takes a document's pages, keeping their real numbers, and says the selection is not the whole", async () => {
+    // The long-document note told the model to "read by page range" before
+    // read had any way to choose a page.
+    writeFileSync(join(workspace, "long.pdf"), pdfOf(["First page words, enough to count", "Second page words, enough to count", "Third page words, enough to count", "Fourth page words, enough to count"]));
+    const output = await call("native/read", { path: "long.pdf", pages: "2,4" });
+    expect(output).toContain("[pages 2,4 of 4]");
+    expect(output).toContain("[page 2]");
+    expect(output).toContain("Fourth page words");
+    expect(output).not.toContain("First page words");
+    expect(output).not.toContain("[page 3]");
+    await expect(call("native/read", { path: "long.pdf", pages: "5" })).rejects.toThrow(/4 pages/);
+    await expect(call("native/read", { path: "long.pdf", pages: "two" })).rejects.toThrow(/not a page or a range/);
+    writeFileSync(join(workspace, "notes.txt"), "plain");
+    await expect(call("native/read", { path: "notes.txt", pages: "1" })).rejects.toThrow(/offset and limit/);
+  });
+
+  it("read decodes a UTF-16 text file instead of refusing it as binary", async () => {
+    // What Notepad's "Unicode" and PowerShell's Out-File write.
+    writeFileSync(join(workspace, "unicode.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("Line one\r\nLine two café", "utf16le")]));
+    const output = await call("native/read", { path: "unicode.txt" });
+    expect(output).toContain("Line one");
+    expect(output).toContain("Line two café");
+    expect(output).not.toContain("\0");
+    writeFileSync(join(workspace, "blob.bin.txt"), Buffer.from([0x00, 0x01, 0x02, 0x00, 0xff, 0x00, 0x13, 0x37]));
+    await expect(call("native/read", { path: "blob.bin.txt" })).rejects.toThrow(/not text/);
+  });
+
   it("ocr sends the file and the pages to the provider and answers pages under markers", async () => {
     writeFileSync(join(workspace, "scan.pdf"), pdfOf(["Cover", "", ""]));
     standIn.answer = () => ({ pages: [{ index: 1, markdown: "Scanned two" }, { index: 2, markdown: "Scanned three" }] });
@@ -518,12 +545,30 @@ describe("a conversation's documents", () => {
     const announcement = store.announce("conv-1");
     expect(announcement?.documents.map((document) => document.fileName)).toEqual(["a.pdf", "b.txt"]);
     expect(announcement?.documents[0]?.announcedAt).toBe(2_000);
-    expect(announcement?.body).toContain(`The user attached "a.pdf" (1 page, 0.00 MB). It is saved at: ${first.path}`);
+    expect(announcement?.body).toMatch(/The user attached "a\.pdf" \(1 page, \d+ KB\)\. It is saved at: /);
+    expect(announcement?.body).toContain(first.path);
+    expect(announcement?.body).not.toContain("0.00 MB");
     expect(announcement?.body).toContain("Its text follows.\n\n[page 1]\nAlpha words, enough of them to be a page");
     expect(announcement?.body).toContain('The user attached "b.txt" (1 page');
-    expect(announcement?.body).toContain("Its text is not inlined here: read it with the read tool");
+    expect(announcement?.body).toContain("Its text is not inlined here: read it with the read tool by offset and limit, or grep it,");
     expect(store.announce("conv-1")).toBeUndefined();
     expect(store.list("conv-1").every((document) => document.announcedAt === 2_000)).toBe(true);
+  });
+
+  it("tells the model how a long document can really be read: pages for a PDF, grep only for text", async () => {
+    const short = await store.add("conv-1", { fileName: "manual.pdf", mimeType: "application/pdf", bytes: pdfOf(["Cover words, enough of them to be a page"]) });
+    // Past the inline limit, the note says how to reach the words.
+    const body = announcementOf({ ...short, pageCount: 300, inlineText: null });
+    expect(body).toContain('passing pages such as "1-5" to read only those pages (grep cannot search inside it)');
+    expect(body).not.toContain("or grep it");
+  });
+
+  it("inlines a UTF-16 text file as its words, not as NULs", async () => {
+    const bytes = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("Meeting notes: ship on Friday.", "utf16le")]);
+    const document = await store.add("conv-1", { fileName: "notes.txt", mimeType: "text/plain", bytes });
+    expect(document.inlineText).toBe("Meeting notes: ship on Friday.");
+    await expect(store.add("conv-1", { fileName: "fake.txt", mimeType: "text/plain", bytes: Buffer.from([0x00, 0x01, 0x00, 0xff, 0x00, 0x02]) }))
+      .rejects.toMatchObject({ kind: "invalid", message: expect.stringContaining("not text") });
   });
 
   it("tells the model which pages are scans, in the words the ocr tool takes", async () => {

@@ -14,6 +14,7 @@ import {
   servesKind,
 } from "../../contracts/providers.js";
 import {
+  type CapabilityState,
   type ModelCapability,
   type ReasoningLevel,
   ProviderConfigurationError,
@@ -32,6 +33,7 @@ import {
   type ModelOverride,
 } from "./model-edits.js";
 import { ProbeStateStore } from "./probe-state.js";
+import type { ServedModelFacts } from "./connection-probe.js";
 
 const modelReferenceSchema = v.object({
   connectionId: v.pipe(v.string(), v.minLength(1)),
@@ -324,16 +326,21 @@ export class ModelCatalog {
    * Probing learns the ids an endpoint serves, but learning alone leaves a
    * custom provider empty: every id still needs hand-entering before it can
    * be picked or set as default. Adoption closes that gap — ids the probe
-   * named that have no row yet gain one (origin manual, capabilities
-   * unknown), so adding any OpenAI-compatible endpoint is add, probe, pick.
-   * Ids that already have rows are untouched, so edits, renames, and
-   * overrides survive every probe. A row the user deleted returns on the
+   * named that have no row yet gain one (origin manual, with whatever the
+   * listing stated - context window, output limit, vision, tools, reasoning -
+   * and unknown for the rest), so adding any OpenAI-compatible endpoint is
+   * add, probe, pick. A vision model has to be known as one, or every picture
+   * sent to it becomes a placeholder. Ids that already have rows keep every
+   * known field; only fields still unknown take what the listing states, so
+   * edits, renames, and overrides survive every probe. Returns the rows added
+   * or filled in. A row the user deleted returns on the
    * next probe: the endpoint still serves it, and keeping an adopted row out
    * of the picker belongs to hiding, not to absence.
    */
   async adoptServedModels(
     connectionId: string,
     servedIds: readonly string[],
+    facts: ReadonlyMap<string, ServedModelFacts> = new Map(),
   ): Promise<readonly ProviderModel[]> {
     const connection = await this.#connections.get(connectionId);
     if (
@@ -348,11 +355,33 @@ export class ModelCatalog {
       (await this.listModels({ connectionId })).map((model) => model.modelId),
     );
     const adopted: ProviderModel[] = [];
+    const manuals = this.#edits.readManuals().get(connectionId);
     for (const modelId of servedIds) {
-      if (existing.has(modelId)) continue;
+      const stated = facts.get(modelId);
+      if (existing.has(modelId)) {
+        // A row adopted before its list said anything, or added by hand,
+        // learns what the list states - but only where it still says
+        // unknown, so nothing a person entered is ever overwritten.
+        const row = manuals?.get(modelId);
+        const filled = row === undefined || stated === undefined ? undefined : filledCapability(row.capability, stated);
+        if (row !== undefined && filled !== undefined) {
+          try {
+            const updated = validateProviderModel({ ...row, capability: filled });
+            this.#edits.writeManual(updated);
+            adopted.push(updated);
+          } catch {
+            // As below: one row that will not validate costs only itself.
+          }
+        }
+        continue;
+      }
       try {
         adopted.push(
-          await this.addManualModel(connectionId, { modelId, displayName: modelId }),
+          await this.addManualModel(connectionId, {
+            modelId,
+            displayName: modelId,
+            ...(stated === undefined ? {} : { capability: filledCapability(unknownCapability(), stated) ?? {} }),
+          }),
         );
         existing.add(modelId);
       } catch {
@@ -706,6 +735,28 @@ function unknownPricing(): ModelPricing {
     cacheRead: "unknown",
     cacheWrite: "unknown",
   };
+}
+
+/**
+ * A capability with what a listing stated written into the fields that are
+ * still unknown, or undefined when the listing adds nothing. Stated fields
+ * never replace known ones: those are a person's word, or a catalog's.
+ */
+function filledCapability(capability: ModelCapability, stated: ServedModelFacts): ModelCapability | undefined {
+  const state = (value: boolean): CapabilityState => (value ? "supported" : "unsupported");
+  const next: { -readonly [K in keyof ModelCapability]: ModelCapability[K] } = { ...capability };
+  let changed = false;
+  const fill = <K extends keyof ModelCapability>(key: K, value: ModelCapability[K] | undefined): void => {
+    if (value === undefined || capability[key] !== "unknown") return;
+    next[key] = value;
+    changed = true;
+  };
+  fill("contextWindow", stated.contextWindow);
+  fill("maxOutputTokens", stated.maxOutputTokens);
+  fill("vision", stated.vision === undefined ? undefined : state(stated.vision));
+  fill("toolCalling", stated.toolCalling === undefined ? undefined : state(stated.toolCalling));
+  fill("reasoning", stated.reasoning === undefined ? undefined : state(stated.reasoning));
+  return changed ? next : undefined;
 }
 
 function unknownCapability(): ModelCapability {

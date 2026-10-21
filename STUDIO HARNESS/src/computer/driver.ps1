@@ -139,7 +139,7 @@ function Resolve-Display($index) {
 # A PNG of one display, or a region of it, scaled so the longest side is at
 # most `max` pixels. The answer names the full frame the picture stands for,
 # because the model acts in that frame and never in the picture's pixels.
-function Take-Screenshot($display, $region, $max, $format, $quality, $window) {
+function Take-Screenshot($display, $region, $max, $format, $quality, $window, $budget) {
   # A window handle picks the display and the region both: the rectangle the
   # window covers, clipped to the display its centre is on. The answer still
   # names that display's frame, so a point in the picture is a point to click.
@@ -179,31 +179,76 @@ function Take-Screenshot($display, $region, $max, $format, $quality, $window) {
       $g2.DrawImage($bmp, 0, 0, $sw, $sh)
     } finally { $g2.Dispose() }
   }
-  # PNG for a picture the model will read closely; JPEG for the frame that
-  # rides along with an action, where "did the click land" is answered as
-  # well by a smaller file. The JPEG is saved at the library's default
-  # quality on purpose: setting one through EncoderParameters is a pattern
-  # Windows Defender's script scanner (AMSI) matches as spyware, and it
-  # blocked this whole script for it on 2026-09-15. `$quality` is accepted
-  # and ignored so the request shape need not change if that ever lifts.
-  $ms = New-Object System.IO.MemoryStream
-  $mime = "image/png"
-  try {
-    if ($format -eq "jpeg") {
-      $mime = "image/jpeg"
-      $out.Save($ms, [System.Drawing.Imaging.ImageFormat]::Jpeg)
-    } else {
-      $out.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    }
-    $data = [Convert]::ToBase64String($ms.ToArray())
-  } finally { $ms.Dispose() }
-  if ($out -ne $bmp) { $out.Dispose() }
-  $bmp.Dispose()
-  return [ordered]@{
+  try { $picture = Encode-Picture $out $format $budget }
+  finally {
+    if ($out -ne $bmp) { $out.Dispose() }
+    $bmp.Dispose()
+  }
+  $answer = [ordered]@{
     display = $d.index; frameWidth = $b.Width; frameHeight = $b.Height
     x = $x - $b.X; y = $y - $b.Y; width = $w; height = $h
-    imageWidth = [int][Math]::Round($w * $scale); imageHeight = [int][Math]::Round($h * $scale)
-    mimeType = $mime; data = $data
+    imageWidth = $picture.width; imageHeight = $picture.height
+    mimeType = $picture.mime; data = $picture.data
+  }
+  if ($null -ne $picture.note) { $answer.note = $picture.note }
+  return $answer
+}
+
+function Encoded-Bytes($bitmap, $format) {
+  $ms = New-Object System.IO.MemoryStream
+  try {
+    if ($format -eq "jpeg") { $bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Jpeg) }
+    else { $bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png) }
+    return ,$ms.ToArray()
+  } finally { $ms.Dispose() }
+}
+
+# One picture's bytes, within `budget`. PNG for a picture the model will read
+# closely; JPEG for the frame that rides along with an action, where "did the
+# click land" is answered as well by a smaller file.
+#
+# The budget is the reason a picture arrives at all. A PNG of a photo-like
+# screen at 1568 pixels is two to three megabytes, and an answer larger than
+# the MCP channel carries was dropped whole - the model waited out the
+# request deadline for a picture that had been taken in a tenth of a second
+# (2026-10-21). Over budget, a PNG becomes a JPEG of the same pixels, and a
+# JPEG still over it is made smaller; the note says which, so a model wanting
+# exact pixels knows to zoom into a region rather than ask again.
+#
+# The JPEG is saved at the library's default quality on purpose: setting one
+# through EncoderParameters is a pattern Windows Defender's script scanner
+# (AMSI) matches as spyware, and it blocked this whole script for it on
+# 2026-09-15. `$quality` is accepted and ignored so the request shape need not
+# change if that ever lifts.
+function Encode-Picture($bitmap, $format, $budget) {
+  $limit = if (Given $budget) { [int]$budget } else { 1000000 }
+  $kind = if ($format -eq "jpeg") { "jpeg" } else { "png" }
+  $bytes = Encoded-Bytes $bitmap $kind
+  $note = $null
+  if ($kind -eq "png" -and $bytes.Length -gt $limit) {
+    $note = "Sent as JPEG: as a PNG this picture was $([Math]::Round($bytes.Length / 1MB, 1)) MB, more than one picture may be. Zoom into a region for exact pixels."
+    $kind = "jpeg"
+    $bytes = Encoded-Bytes $bitmap $kind
+  }
+  $current = $bitmap
+  try {
+    while ($bytes.Length -gt $limit -and [Math]::Max($current.Width, $current.Height) -gt 320) {
+      $shrink = [Math]::Sqrt($limit / $bytes.Length) * 0.9
+      $sw = [Math]::Max(1, [int][Math]::Round($current.Width * $shrink)); $sh = [Math]::Max(1, [int][Math]::Round($current.Height * $shrink))
+      $smaller = New-Object System.Drawing.Bitmap $sw, $sh
+      $g = [System.Drawing.Graphics]::FromImage($smaller)
+      try {
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.DrawImage($current, 0, 0, $sw, $sh)
+      } finally { $g.Dispose() }
+      if ($current -ne $bitmap) { $current.Dispose() }
+      $current = $smaller
+      $bytes = Encoded-Bytes $current $kind
+      $note = "Sent smaller, as a $($current.Width)x$($current.Height) JPEG, to stay within what one picture may be. Zoom into a region for detail."
+    }
+    return @{ data = [Convert]::ToBase64String($bytes); mime = "image/$kind"; width = $current.Width; height = $current.Height; note = $note }
+  } finally {
+    if ($current -ne $bitmap) { $current.Dispose() }
   }
 }
 
@@ -1169,7 +1214,7 @@ try { while ($true) {
     }
     switch ($req.op) {
       "displays" { Answer $id @(Get-Displays) }
-      "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality $a.window) }
+      "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality $a.window $a.budget) }
       "status" { Answer $id (Get-Status) }
       "arrange" { Answer $id (Arrange-Window $a.window $a.action $a.display $a.x $a.y $a.width $a.height) }
       "wait_window" { Answer $id (Wait-ForWindow $a.text $a.seconds) }

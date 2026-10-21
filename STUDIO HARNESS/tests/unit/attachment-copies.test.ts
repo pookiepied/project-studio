@@ -64,7 +64,7 @@ describe("the copies a delivered message leaves", () => {
     ]);
     expect(copyDeliveredAttachments("cnv_mapping", pictures)).toEqual(copies);
     const note = attachmentCopyNote(copies);
-    const rows = note.split("\n").slice(4).map((line) => JSON.parse(line) as unknown);
+    const rows = note.split("\n").slice(5).map((line) => JSON.parse(line) as unknown);
     expect(rows).toEqual(copies.map((copy, index) => ({
       ...copy,
       fileName: ["same.png", "same-2.png", "same.png", "attachment-4.webp"][index],
@@ -105,7 +105,7 @@ describe("the copies a delivered message leaves", () => {
       path: join(folderOf("cnv_sanitized"), "photo.png"),
       read: { path: join(folderOf("cnv_sanitized"), "photo.png") },
     });
-    expect(note.split("\n")).toHaveLength(5);
+    expect(note.split("\n")).toHaveLength(6);
     expect(readFileSync(copies[0]?.path ?? "")).toEqual(Buffer.from([3]));
   });
 
@@ -177,5 +177,18 @@ describe("the copies a delivered message leaves", () => {
     copyDeliveredAttachments("cnv_empty", []);
 
     expect(existsSync(folderOf("cnv_empty"))).toBe(false);
+  });
+
+  it("records a picture's pixel size and warns when the provider will scale it down", () => {
+    const header = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 0);
+    header.write("IHDR", 12, "ascii");
+    header.writeUInt32BE(3840, 16);
+    header.writeUInt32BE(2160, 20);
+    const copies = copyDeliveredAttachments("cnv_sized", [delivered([...header], "screen.png")]);
+    expect(copies[0]).toMatchObject({ width: 3840, height: 2160 });
+    const row = JSON.parse(attachmentCopyNote(copies).split("\n").at(-1) ?? "null") as { size?: string };
+    expect(row.size).toMatch(/^3840x2160 px; the provider scales/);
+    expect(attachmentCopyNote(copies)).toContain("reading the file again shows the same scaled picture");
   });
 });

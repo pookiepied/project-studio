@@ -236,7 +236,7 @@ describe("NDJSON framing", () => {
 
   describe("maximum message size", () => {
     it("has a sane default", () => {
-      expect(DEFAULT_MAX_MESSAGE_BYTES).toBe(1_048_576);
+      expect(DEFAULT_MAX_MESSAGE_BYTES).toBe(8 * 1024 * 1024);
     });
 
     it("reports a complete line that exceeds the limit rather than dropping it silently", () => {

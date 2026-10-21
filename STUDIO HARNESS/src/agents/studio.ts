@@ -353,8 +353,9 @@ export function renderStudio(id: string, agentId: string) {
   const attachmentCopies = delivery.kind === "user" && delivery.attachments !== undefined
     ? runtime.persistDeliveredAttachments?.(id, delivery.attachments)
     : undefined;
-  // The documents the person attached with this message. They cannot ride
-  // the message - the engine carries pictures and nothing else - so the
+  // The documents the person attached with this message. They do not ride
+  // the message - the engine carries a PDF natively on only some protocols
+  // and Office files on none (`conversations/documents.ts`) - so the
   // composer uploaded them ahead of the words, and this is where the model
   // hears of them: a signal appended before its first turn, naming each
   // file, its pages, the pages with no text layer, and the text itself when

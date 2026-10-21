@@ -105,8 +105,24 @@ const TYPED_ARGUMENTS = /(?:_type|_key|_hold_key|_clipboard|_fill|_set_value)$/;
  * a drain — the running task is named every turn while it runs, and its
  * ending arrives through the ping, not here.
  */
-export function taskRunningLine(record: AgentTaskRecord): string {
-  return `Task "${record.title}" is running in the background.${record.agentName === "voice-work" ? ` Task id: ${record.id}.` : ""}`;
+export function taskRunningLine(record: AgentTaskRecord, latest?: TaskTrailEntry, now = Date.now()): string {
+  if (record.agentName !== "voice-work") return `Task "${record.title}" is running in the background.`;
+  // The voice agent's answer to "how is it going" without a tool call: the
+  // step it would have inspected for, named but never quoted.
+  const step = latest === undefined ? "" : ` Latest step, ${String(Math.max(0, Math.round((now - latest.at) / 1000)))}s ago: ${stepPhrase(latest)}.`;
+  return `Task "${record.title}" is running in the background. Task id: ${record.id}.${step}`;
+}
+
+/** A trail entry as a few words, with the model-facing tool name shortened. */
+function stepPhrase(entry: TaskTrailEntry): string {
+  const tool = entry.tool?.replace(/^mcp__.+?__\d+_/, "") ?? "a tool";
+  switch (entry.kind) {
+    case "started": return "started";
+    case "said": return "wrote a progress message";
+    case "tool_call": return `using ${tool}`;
+    case "tool_result": return `${tool} ${entry.isError === true ? "failed" : "finished"}`;
+    case "ended": return "finishing";
+  }
 }
 
 /**
@@ -215,6 +231,12 @@ export interface TaskActivity {
    * agent is still deciding what to do to the same desktop.
    */
   readonly computer?: true;
+  /**
+   * The worker an inline delegate runs inside, when it is one: a voice
+   * task's own delegate is the conversation's to see, but stopping it means
+   * cancelling the worker, which has the submission to cancel.
+   */
+  readonly owner?: string;
 }
 
 /** One step of a task's recent work, as a parent may read it. */
@@ -346,6 +368,11 @@ export class TaskProjector {
     return [...this.#activity.values()].filter((task) => task.parentConversationId === conversationId).slice(-64);
   }
 
+  /** A task's newest observed step, for its running line; process memory, like the trail. */
+  latestStep(taskId: string): TaskTrailEntry | undefined {
+    return this.#trails.get(taskId)?.entries.at(-1);
+  }
+
   /**
    * One task's recent steps, for the conversation that owns it and nobody
    * else. A read of what was observed, never a replay: nothing here runs,
@@ -454,7 +481,8 @@ export class TaskProjector {
           agentName: indexed?.agentName ?? (observation.type === "task_start" ? observation.agent : undefined) ?? previous?.agentName ?? "delegate",
           stage, updatedAt: now, createdAt: previous?.createdAt ?? now,
           ...(indexed?.agentName === "voice-work" ? { name: indexed.title } : {}),
-          ...(computer ? { computer: true as const } : {}) });
+          ...(computer ? { computer: true as const } : {}),
+          ...(indexed !== undefined && observation.taskId !== undefined && observation.taskId !== instanceId ? { owner: instanceId } : {}) });
         if (this.#activity.size > 512) this.#activity.delete(this.#activity.keys().next().value ?? "");
       }
       if (!ended && this.#activity.has(id)) this.#recordStep(id, observation);

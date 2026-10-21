@@ -26,6 +26,12 @@ export interface CustomProviderModel {
   readonly maxTokens: number | undefined;
   /** Declared reasoning levels; empty when the model cannot reason or nobody said so. */
   readonly reasoningLevels: readonly ReasoningLevel[];
+  /**
+   * Declared to read images. Unset is text-only: Pi turns every picture
+   * into a placeholder for such a model, so a vision model left undeclared
+   * here never sees a screenshot or an attachment.
+   */
+  readonly vision?: boolean | undefined;
 }
 
 export interface CustomProviderConfig {
@@ -55,6 +61,8 @@ interface ExtraRuntimeModel {
   readonly reasoningLevels: readonly ReasoningLevel[];
   readonly contextWindow: number | undefined;
   readonly maxTokens: number | undefined;
+  /** Declared to read images, as on `CustomProviderModel`. */
+  readonly vision?: boolean | undefined;
 }
 
 /** The models one provider gains from the user's hand-entered rows. */
@@ -93,6 +101,7 @@ const customProviderModelSchema = v.union([
     contextWindow: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
     maxTokens: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
     reasoningLevels: v.optional(v.array(reasoningLevelSchema)),
+    vision: v.optional(v.boolean()),
   }),
 ]);
 
@@ -264,6 +273,7 @@ interface CustomProviderModelInput {
   readonly contextWindow?: number | undefined;
   readonly maxTokens?: number | undefined;
   readonly reasoningLevels?: readonly ReasoningLevel[] | undefined;
+  readonly vision?: boolean | undefined;
 }
 
 interface CustomProviderInput {
@@ -332,6 +342,7 @@ function normalizeCustomProviderModel(
     contextWindow: entry.contextWindow,
     maxTokens: entry.maxTokens,
     reasoningLevels: entry.reasoningLevels ?? [],
+    ...(entry.vision === undefined ? {} : { vision: entry.vision }),
   };
 }
 

@@ -24,7 +24,9 @@ export type ExtendFailure =
   /** The caller withdrew before an answer came back. */
   | "cancelled"
   /** The connection ended with requests still waiting on it. */
-  | "disconnected";
+  | "disconnected"
+  /** The server answered with more than one message may carry. */
+  | "too_large";
 
 const MESSAGE_BY_FAILURE: Record<ExtendFailure, string> = {
   internal: "Something is wired incorrectly inside Project Studio.",
@@ -34,6 +36,7 @@ const MESSAGE_BY_FAILURE: Record<ExtendFailure, string> = {
   timed_out: "The server did not answer in time.",
   cancelled: "The request was stopped before the server answered.",
   disconnected: "The connection to the server ended before it answered.",
+  too_large: "The server's answer was larger than Studio accepts in one message, so it was not read.",
 };
 
 /**

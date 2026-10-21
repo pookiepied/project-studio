@@ -1,5 +1,49 @@
 # Studio observability implementation tracker
 
+## Picture window per model request (2026-10-21)
+
+A conversation resends every earlier picture on every turn, so a computer-use
+run past about thirty screenshots was refused by the provider (Anthropic's 32 MB
+request and 20-picture rules; lower counts on some OpenRouter routes).
+Screenshots arrive through MCP and never passed `ImageBudget`. Both alias stream
+paths in `local-adapter.ts` now send a projection that keeps the newest pictures
+(at most 20 and 20 MB of base64, no gaps) and replaces older ones with a text
+saying how to get them back. When it cuts, it records `provider.request.images`
+with stage `older_images_omitted`, provider, model and the two counts; no
+content. Attached and read pictures also report pixel size from their header,
+with a note when the provider will scale them down. Coverage:
+`image-window.test.ts`, `image-dimensions.test.ts`, `attachment-copies.test.ts`,
+`filesystem.test.ts`, `local-openai-compatible-provider.test.ts`.
+
+## Oversize MCP answers and bounded pictures (2026-10-21)
+
+An MCP stdio answer over the line limit used to be dropped with only a
+diagnostics line, so its request waited out the 30s deadline: two full-display
+PNG screenshots of a photo-like screen (2-3 MB) were lost this way in a voice
+run. The connection now reads the request id from the kept preview (only from
+the first two top-level members) and rejects that request at once with
+`ExtendError("too_large")`, recording an `mcp.connection` progress event with
+stage `response_oversize` and the `rpcId` only. The stdio limit is raised from
+1 MiB to the 8 MiB the HTTP channel already accepts, and the decoder now counts
+bytes incrementally instead of re-measuring the buffer on every chunk. At the
+source, computer and browser screenshots keep a 1 MB picture budget: an
+over-budget PNG is sent as a JPEG (the computer driver shrinks a JPEG still over
+it; the browser refuses a full page with a way forward), and the tool text says
+which. A voice task's running line in the environment block names its latest
+observed step (tool name only, never arguments) from the same process-memory
+trail as `inspect`. Task activity names the `owner` worker of a worker's inline
+delegate, so the desktop indicator's Stop cancels that worker. Self-hosted
+connections (9router): the probe's wire answer no longer carries `servedIds`;
+adoption records the limits, vision, tools and reasoning a listing states
+(only into fields still unknown); and declared vision now reaches the runtime
+model's inputs, where every self-hosted model used to be text-only and Pi
+replaced each picture with a placeholder. No new operation, route or content
+field. Coverage: `mcp-connection.test.ts`,
+`framing.test.ts`, `computer-driver-contract.test.ts`,
+`browser-screenshot-budget.test.ts`, `task-projector.test.ts`,
+`useComputerIndicator.test.tsx`, `useDelegatedComputerUse.test.ts`,
+`local-openai-compatible-provider.test.ts`, `provider-probe.test.ts`.
+
 ## Sub-agent inspection and delegated computer presence (2026-10-21)
 
 `task_activity` gains `inspect`, a read of one task's recent steps through the

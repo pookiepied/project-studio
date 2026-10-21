@@ -235,14 +235,17 @@ export class ProviderManagementService implements ProviderAdministration {
         // a probe that could not persist its list still reports what it saw.
       }
       try {
-        const adopted = await this.#catalog.adoptServedModels(id, detailed.servedIds);
+        const adopted = await this.#catalog.adoptServedModels(id, detailed.servedIds, detailed.servedFacts);
         if (adopted.length > 0) await this.#changed(undefined);
       } catch {
         // Adoption is learning too: a probe that could not add rows still
         // reports what it saw.
       }
     }
-    return detailed;
+    const { servedIds: _servedIds, servedFacts: _servedFacts, ...result } = detailed;
+    void _servedIds;
+    void _servedFacts;
+    return result;
   }
 
   listModels(

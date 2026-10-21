@@ -207,6 +207,7 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
           maxTokens:
             typeof m.capability.maxOutputTokens === "number" ? m.capability.maxOutputTokens : undefined,
           reasoningLevels: m.reasoningLevels ?? [],
+          vision: m.capability.vision === "supported",
         })),
         contextWindow,
         maxTokens,
@@ -232,6 +233,7 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
         id: model.modelId,
         name: model.displayName,
         reasoningLevels: model.reasoningLevels ?? [],
+        vision: model.capability.vision === "supported",
         contextWindow:
           typeof model.capability.contextWindow === "number"
             ? model.capability.contextWindow

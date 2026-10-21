@@ -142,7 +142,20 @@ interface Picture {
   readonly imageHeight: number;
   readonly mimeType: string;
   readonly data: string;
+  /** Set when the driver sent a JPEG or a smaller picture to stay within budget. */
+  readonly note?: string;
 }
+
+/**
+ * The most one picture's bytes may be, before base64.
+ *
+ * An MCP answer travels as one line, and a line over the channel's limit was
+ * dropped whole: the model then waited out the request deadline for a picture
+ * taken in a tenth of a second. A megabyte keeps every answer well inside the
+ * limit with its words, and it is also what each screenshot costs every later
+ * request of the conversation, which the picture rides in from then on.
+ */
+const PICTURE_BUDGET_BYTES = 1_000_000;
 
 function asPicture(value: unknown): Picture {
   if (!isRecord(value) || typeof value["data"] !== "string") {
@@ -161,14 +174,15 @@ function frameLine(picture: Picture): string {
     picture.imageWidth === picture.width
       ? ""
       : ` The image is ${String(picture.imageWidth)}x${String(picture.imageHeight)}; coordinates you give are in the display's pixels, not the image's.`;
-  return `Display ${String(picture.display)}: ${region}.${scaled}`;
+  const note = picture.note === undefined ? "" : ` ${picture.note}`;
+  return `Display ${String(picture.display)}: ${region}.${scaled}${note}`;
 }
 
 async function picture(
   session: ComputerSession,
   args: Record<string, unknown>,
 ): Promise<{ readonly line: string; readonly image: { type: "image"; data: string; mimeType: string } }> {
-  const shot = asPicture(await session.request("screenshot", args));
+  const shot = asPicture(await session.request("screenshot", { ...args, budget: PICTURE_BUDGET_BYTES }));
   session.rememberFrame({ display: shot.display, width: shot.frameWidth, height: shot.frameHeight });
   return {
     line: frameLine(shot),
@@ -299,7 +313,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       format: {
         type: "string",
         enum: ["jpeg", "png"],
-        description: "jpeg (default, smaller) or png (exact, for reading fine detail).",
+        description: "jpeg (default, smaller) or png (exact, for reading fine detail). A picture too large as a PNG arrives as a JPEG and says so.",
       },
     }),
     run: async (session, input) => {

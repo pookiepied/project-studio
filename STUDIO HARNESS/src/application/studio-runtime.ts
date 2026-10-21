@@ -1665,7 +1665,7 @@ export class StudioRuntime implements AgentHost {
     return this.#tasks
       .list({ parentConversationId: conversationId })
       .filter((record) => !isSettledTaskStatus(record.status))
-      .map((record) => taskRunningLine(record));
+      .map((record) => taskRunningLine(record, this.#taskProjector.latestStep(record.id)));
   }
 
   /**

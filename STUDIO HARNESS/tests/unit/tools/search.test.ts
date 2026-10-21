@@ -231,6 +231,13 @@ describe("reading ripgrep's output", () => {
   it("reports paths relative to the project", () => {
     expect(toRelative("C:/work", "C:/work/src/a.ts")).toBe("src/a.ts");
   });
+
+  it("keeps a result outside the project absolute instead of climbing out with ../", () => {
+    // An attachment under the Studio home, grepped from a deep workspace.
+    expect(toRelative("C:/work/deep/project", "C:/Users/me/.studio/attachments/notes.txt")).toBe("C:/Users/me/.studio/attachments/notes.txt");
+    expect(toRelative("C:/work", "C:/work")).toBe(".");
+    expect(toRelative("C:/work", "C:/work/..hidden/a.ts")).toBe("..hidden/a.ts");
+  });
 });
 
 describe("the tools themselves", () => {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ExtendError } from "../../src/extend/errors.js";
-import { McpConnection, type McpChannel } from "../../src/extend/mcp/connection.js";
+import { McpConnection, oversizeResponseId, type McpChannel } from "../../src/extend/mcp/connection.js";
+import { DEFAULT_MAX_MESSAGE_BYTES } from "../../src/extend/mcp/wire/framing.js";
 import { diagnosticRecorder } from "../../src/observability/recorder.js";
 import { createRootExecutionContext, runWithExecutionContext } from "../../src/execution/context.js";
 
@@ -256,6 +257,37 @@ describe("one conversation with one MCP server", () => {
       channel.emit({ jsonrpc: "2.0", id: channel.lastSent().id, result: { tools: [] } });
       await expect(later).resolves.toEqual({ tools: [] });
       expect(connection.inFlight).toBe(0);
+    });
+  });
+
+  describe("an answer larger than one message may be", () => {
+    it("fails its request at once instead of leaving it to wait out the deadline", async () => {
+      // A full-display PNG screenshot over the line limit was dropped and the
+      // model waited thirty seconds for "did not answer in time" (2026-10-21).
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel, { requestTimeoutMs: 60_000 });
+      const waiting = connection.request("tools/call");
+      const { id } = channel.lastSent();
+      const started = Date.now();
+      // Streamed in pieces, the way a pipe delivers it, without a newline yet.
+      const head = `{"jsonrpc":"2.0","id":${String(id)},"result":{"content":[{"type":"image","data":"`;
+      channel.raw(head);
+      for (let sent = 0; sent <= DEFAULT_MAX_MESSAGE_BYTES; sent += 65_536) channel.raw("A".repeat(65_536));
+      await expect(waiting).rejects.toMatchObject({ kind: "too_large" });
+      expect(Date.now() - started).toBeLessThan(5_000);
+      channel.raw('"}]}}\n');
+      // The connection goes on answering.
+      const later = connection.request("tools/list");
+      channel.emit({ jsonrpc: "2.0", id: channel.lastSent().id, result: { tools: [] } });
+      await expect(later).resolves.toEqual({ tools: [] });
+      connection.close();
+    });
+
+    it("reads the id only where a response puts it, never from inside the result", () => {
+      expect(oversizeResponseId('{"jsonrpc":"2.0","id":7,"result":{')).toBe(7);
+      expect(oversizeResponseId('{"id":12,"jsonrpc":"2.0","result":')).toBe(12);
+      expect(oversizeResponseId('{"jsonrpc":"2.0","result":{"id":3,"data":"')).toBeUndefined();
+      expect(oversizeResponseId('{"jsonrpc":"2.0","method":"notify","params":{"id":3')).toBeUndefined();
     });
   });
 

@@ -145,7 +145,8 @@ function customProviderModels(
     // The model's own declaration decides. An undeclared model stays
     // non-reasoning rather than advertising a capability nobody verified.
     reasoning: entry.reasoningLevels.length > 0,
-    input: ["text"],
+    // Likewise for pictures: declared vision is what lets an image through.
+    input: entry.vision === true ? ["text", "image"] : ["text"],
     cost: ZERO_COST,
     contextWindow:
       entry.contextWindow ?? config.contextWindow ?? ASSUMED_CUSTOM_CONTEXT_WINDOW,
@@ -349,7 +350,7 @@ function createModelsCollection(options: {
       // The user's own word about reasoning; the levels they chose are what
       // the request then asks for, rendered per protocol by pi-ai.
       reasoning: model.reasoningLevels.length > 0,
-      input: ["text"],
+      input: model.vision === true ? ["text", "image"] : ["text"],
       cost: ZERO_COST,
       contextWindow: model.contextWindow ?? ASSUMED_CUSTOM_CONTEXT_WINDOW,
       maxTokens: model.maxTokens ?? ASSUMED_CUSTOM_MAX_TOKENS,

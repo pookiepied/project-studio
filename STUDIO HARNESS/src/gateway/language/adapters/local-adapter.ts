@@ -28,6 +28,8 @@ import type { LocalRuntime } from "../local/runtime.js";
 import type { LocalModelConfig } from "../local/config.js";
 import { tracePrompt } from "../prompt-trace.js";
 import { observeProviderStream } from "../provider-observations.js";
+import { windowImages } from "../image-window.js";
+import { recordObservation } from "../../../observability/recorder.js";
 
 /** Pi wire-protocol slug standing in for "whatever the user's model speaks". */
 export const LOCAL_ALIAS_API = "project-studio-local";
@@ -225,7 +227,7 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     const target = this.#resolveTarget(alias);
     // The last point the request is ours. Off unless STUDIO_PROMPT_TRACE=1.
     tracePrompt(`${target.provider}/${target.id}`, context, options);
-    return observeProviderStream(target, options, (observed) => this.#runtime.models.streamSimple(target, context, observed));
+    return observeProviderStream(target, options, (observed) => this.#runtime.models.streamSimple(target, requestImages(target, context), observed));
   }
 
   /**
@@ -388,7 +390,7 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     // OpenAI's `reasoning_effort` there. `stream` takes options already in the
     // target's protocol and silently ignores anything else, which is how every
     // model reasoned invisibly: the request never asked for the trace.
-    return observeProviderStream(target, options, (observed) => this.#runtime.models.streamSimple(target, context, observed));
+    return observeProviderStream(target, options, (observed) => this.#runtime.models.streamSimple(target, requestImages(target, context), observed));
   };
 
   /**
@@ -422,4 +424,20 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     }
     return target;
   }
+}
+
+/**
+ * The request's pictures, cut to the newest ones every provider accepts (see
+ * `image-window.ts`). A cut is recorded as counts only - never the pictures.
+ */
+function requestImages(target: Model<Api>, context: Context): Context {
+  const windowed = windowImages(context);
+  if (windowed.omitted > 0) {
+    recordObservation({
+      name: "provider.request.images",
+      phase: "progress",
+      attributes: { stage: "older_images_omitted", provider: target.provider, model: target.id, kept: windowed.kept, omitted: windowed.omitted },
+    });
+  }
+  return windowed.context;
 }

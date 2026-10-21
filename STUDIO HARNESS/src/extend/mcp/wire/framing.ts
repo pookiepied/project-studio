@@ -7,7 +7,12 @@
  * separator. This module knows only that shape and nothing about policy.
  */
 
-export const DEFAULT_MAX_MESSAGE_BYTES = 1_048_576;
+/**
+ * The same eight megabytes the HTTP channel accepts in one response. One
+ * megabyte was below a single PNG screenshot of a photo-like screen, and
+ * pictures are what MCP servers most often answer with.
+ */
+export const DEFAULT_MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 
 export interface NdjsonDecoderOptions {
   readonly maxMessageBytes?: number;
@@ -81,6 +86,14 @@ export class NdjsonDecoder {
   readonly #maxBytes: number;
   readonly #decoder = new TextDecoder();
   #buffer = "";
+  /**
+   * The buffer's UTF-8 size, kept as chunks arrive. Measuring the whole
+   * buffer on every chunk made one large message cost the square of its
+   * size; a line is measured whole only once it is complete.
+   */
+  #bufferBytes = 0;
+  /** Where the buffer has already been searched for a newline. */
+  #scanned = 0;
   #dropping = false;
 
   constructor(options: NdjsonDecoderOptions = {}) {
@@ -96,6 +109,7 @@ export class NdjsonDecoder {
     }
 
     this.#buffer += text;
+    this.#bufferBytes += byteLength(text);
 
     const out: NdjsonMessage[] = [];
 
@@ -109,29 +123,33 @@ export class NdjsonDecoder {
           // Still no terminator — the whole buffer is part of the line being
           // dropped. Clear it to keep memory bounded and wait for the next
           // chunk to supply the newline.
-          if (this.#buffer.length > 0) {
-            this.#buffer = "";
-          }
+          this.#buffer = "";
+          this.#bufferBytes = 0;
           break;
         }
         this.#buffer = this.#buffer.slice(nl + 1);
+        this.#bufferBytes = byteLength(this.#buffer);
+        this.#scanned = 0;
         this.#dropping = false;
         continue;
       }
 
-      const nl = this.#buffer.indexOf("\n");
+      const nl = this.#buffer.indexOf("\n", this.#scanned);
 
       // No complete line yet — only a prefix that may still grow. If that
       // prefix already exceeds the limit it can never become a valid message
       // without first exhausting memory, so drop it and wait for its newline.
       if (nl === -1) {
-        if (byteLength(this.#buffer) > this.#maxBytes) {
+        this.#scanned = this.#buffer.length;
+        if (this.#bufferBytes > this.#maxBytes) {
           out.push({
             ok: false,
             reason: "oversize",
             raw: this.#buffer.slice(0, RAW_PREVIEW_CHARS),
           });
           this.#buffer = "";
+          this.#bufferBytes = 0;
+          this.#scanned = 0;
           this.#dropping = true;
         }
         break;
@@ -139,6 +157,9 @@ export class NdjsonDecoder {
 
       let line = this.#buffer.slice(0, nl);
       this.#buffer = this.#buffer.slice(nl + 1);
+      this.#scanned = 0;
+      const lineBytes = byteLength(line);
+      this.#bufferBytes -= lineBytes + 1;
 
       // `\r\n` is a single terminator; the `\r` is not part of the JSON.
       if (line.endsWith("\r")) {
@@ -149,7 +170,7 @@ export class NdjsonDecoder {
         continue;
       }
 
-      if (byteLength(line) > this.#maxBytes) {
+      if (lineBytes > this.#maxBytes) {
         out.push({
           ok: false,
           reason: "oversize",

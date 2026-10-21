@@ -3,6 +3,7 @@ import { extname, join } from "node:path";
 
 import { createStudioUuid } from "../contracts/uuid.js";
 import { DocumentError } from "../documents/errors.js";
+import { decodeTextBytes } from "../documents/text-encoding.js";
 import {
   documentFormatOf,
   extractDocument,
@@ -23,12 +24,15 @@ import { StorageError } from "../storage/errors.js";
  * ---- Why documents are not attachments -------------------------------------
  *
  * A picture rides the message: the engine carries image blocks to the
- * model and Flue's attachment store keeps them. It carries nothing else -
- * "images are the only supported attachment" is the engine's own word - so
- * a PDF cannot ride the message, and the harness has to carry it. It does
- * what Hermes Agent does for the same reason: the file is saved where the
- * conversation's file tools can read it, and the model is told, in a note
- * beside the words, that it is there.
+ * model and Flue's attachment store keeps them. Flue 2.3 can carry a PDF
+ * too, natively - but only on Anthropic Messages, Google and OpenAI
+ * Responses; on any other protocol, OpenRouter's and every self-hosted
+ * endpoint's included, the model gets a placeholder saying it was omitted -
+ * and Word, PowerPoint and Excel on none. Riding the message would make what
+ * the model can read depend on which provider answers. So the harness
+ * carries every document the same way, as Hermes Agent does for the same
+ * reason: the file is saved where the conversation's file tools can read
+ * it, and the model is told, in a note beside the words, that it is there.
  *
  * ---- The two halves ----------------------------------------------------------
  *
@@ -165,7 +169,13 @@ export class ConversationDocumentStore {
       }
       text = renderPages(extracted);
     } else if (isTextMime(mimeType)) {
-      text = Buffer.from(addition.bytes).toString("utf8");
+      // UTF-16 and BOM-led UTF-8 as well as plain UTF-8: decoded as UTF-8
+      // alone, a Notepad "Unicode" file was inlined as a run of NULs.
+      const decoded = decodeTextBytes(addition.bytes);
+      if (decoded === undefined) {
+        throw new StorageError("invalid", { message: `${fileName} is named as text but its bytes are not text.` });
+      }
+      text = decoded.text;
     } else {
       throw new StorageError("invalid", {
         message: `${fileName} is not a document the conversation can read: attach a PDF, Word, PowerPoint, Excel or plain text file.`,
@@ -331,16 +341,26 @@ export class ConversationDocumentStore {
 /** What the signal says about one document, in the words the model acts on. */
 export function announcementOf(document: ConversationDocument): string {
   const pages = `${String(document.pageCount)} ${document.unit}${document.pageCount === 1 ? "" : "s"}`;
-  const size = `${(document.byteLength / (1024 * 1024)).toFixed(document.byteLength < 1024 * 1024 ? 2 : 1)} MB`;
-  const head = `The user attached "${document.fileName}" (${pages}, ${size}). It is saved at: ${document.path}`;
+  const head = `The user attached "${document.fileName}" (${pages}, ${sizeOf(document.byteLength)}). It is saved at: ${document.path}`;
   const coverage = coverageLine(document);
   if (document.inlineText !== null) {
     return `${head}\n${coverage}Its text follows.\n\n${document.inlineText}`;
   }
+  // The two ways in differ by kind: grep sees only a text file's bytes, and
+  // a PDF or Office file is read through read's page selector.
+  const how = documentFormatOf(document.fileName) === undefined
+    ? "read it with the read tool by offset and limit, or grep it,"
+    : `read it with the read tool, passing pages such as "1-5" to read only those ${document.unit}s (grep cannot search inside it),`;
   return (
-    `${head}\n${coverage}Its text is not inlined here: read it with the read tool by page ` +
-    "range, or grep it, before answering about its contents. Do not ask the user to paste it."
+    `${head}\n${coverage}Its text is not inlined here: ${how} before answering about its contents. ` +
+    "Do not ask the user to paste it."
   );
+}
+
+/** A size a person would say: "12 KB", "3.4 MB" - never "0.00 MB" for a short note. */
+function sizeOf(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function coverageLine(document: ConversationDocument): string {

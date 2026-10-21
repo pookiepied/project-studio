@@ -1,4 +1,4 @@
-import { relative } from "node:path";
+import { isAbsolute, relative, sep } from "node:path";
 
 import { runProcess } from "../../process/exec.js";
 import { resolveBinary } from "../../vendor/resolver.js";
@@ -197,10 +197,21 @@ export function parseMatches(stdout: string): RipgrepMatch[] {
   return matches;
 }
 
-/** Turns absolute results back into project-relative paths. */
+/**
+ * Turns absolute results back into project-relative paths.
+ *
+ * A result outside the project - a conversation's attachments folder, a
+ * granted folder elsewhere - keeps its absolute path. Relative, it came out
+ * as "../../../Users/..." from deep in a workspace: a path nobody reads at a
+ * glance, and on another drive not a relative path at all.
+ */
 export function toRelative(root: string, path: string): string {
   const result = relative(root, path);
-  return result === "" ? "." : result.replaceAll("\\", "/");
+  if (result === "") return ".";
+  if (result === ".." || result.startsWith(`..${sep}`) || result.startsWith("../") || isAbsolute(result)) {
+    return path.replaceAll("\\", "/");
+  }
+  return result.replaceAll("\\", "/");
 }
 
 export interface RipgrepRun {

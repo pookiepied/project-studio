@@ -145,10 +145,15 @@ export function coverageNote(document: ExtractedDocument, path: string): string 
   );
 }
 
-/** The pages as one text, each under its own marker line. */
-export function renderPages(document: ExtractedDocument): string {
+/**
+ * The pages as one text, each under its own marker line. `only` keeps the
+ * named pages (one-based) and their real numbers, so page 40 read alone is
+ * still marked page 40.
+ */
+export function renderPages(document: ExtractedDocument, only?: readonly number[]): string {
+  const wanted = only === undefined ? undefined : new Set(only);
   return document.pages
-    .map((page, index) => `[${document.unit} ${String(index + 1)}]\n${page}`)
+    .flatMap((page, index) => (wanted === undefined || wanted.has(index + 1) ? [`[${document.unit} ${String(index + 1)}]\n${page}`] : []))
     .join("\n\n");
 }
 

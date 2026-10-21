@@ -30,7 +30,8 @@ import type { DelegatedComputerUse } from './useDelegatedComputerUse'
  * delegate or a voice task at the desktop is the same hand on the same
  * mouse. Their calls are not in this transcript, so `delegated` - the
  * harness's task activity - names them, and Stop also cancels the voice
- * tasks among them; an inline delegate ends with the turn `stopTurn` ends.
+ * tasks among them and the voice tasks their delegates run inside; any
+ * other inline delegate ends with the turn `stopTurn` ends.
  */
 export function useComputerIndicator(
   conversationId: string,
@@ -46,7 +47,10 @@ export function useComputerIndicator(
   // release input already sent to the separate computer MCP process.
   const stop = useCallback(() => {
     if (drivesComputer(items) || delegated.length > 0) void computer.stop(conversationId)
-    for (const task of delegated) if (task.agentName === 'voice-work') void tasks.cancel(task.id)
+    // A voice task stops by cancelling it, and so does a delegate inside
+    // one: the delegate has no submission of its own to cancel.
+    const workers = new Set(delegated.flatMap((task) => task.agentName === 'voice-work' ? [task.id] : task.owner === undefined ? [] : [task.owner]))
+    for (const id of workers) void tasks.cancel(id)
     stopTurn()
   }, [computer, tasks, conversationId, items, delegated, stopTurn])
   const stopRef = useRef(stop)

@@ -6,6 +6,7 @@ import { TaskStore } from "../../src/agents/definitions/task-store.js";
 import {
   TaskProjector,
   taskEndedLine,
+  taskRunningLine,
 } from "../../src/agents/task-projector.js";
 import { isSettledTaskStatus, IMPROVE_AGENT_ID, TITLE_AGENT_ID } from "../../src/contracts/agents.js";
 import { JobPings } from "../../src/process/job-pings.js";
@@ -162,8 +163,29 @@ describe("the task projector", () => {
     event({ type: "task_start", instanceId: "worker", taskId: "child", agent: "general", prompt: "x" });
     event({ type: "tool_start", instanceId: "worker", taskId: "child", toolCallId: "c", toolName: "mcp__15_studio-computer__21_studio_computer_click" });
     expect(projector.activity("conversation").find((task) => task.id === "child")).toMatchObject({ computer: true, stage: "using_tool" });
+    // Stopping it means cancelling the worker it runs inside.
+    expect(projector.activity("conversation").find((task) => task.id === "child")?.owner).toBe("worker");
+    expect(projector.activity("conversation").find((task) => task.id === "worker")?.owner).toBeUndefined();
     event({ type: "submission_settled", instanceId: "worker", submissionId: "host", outcome: "completed" });
     expect(projector.activity("conversation").find((task) => task.id === "worker")?.stage).toBe("completed");
+    projector.stop();
+  });
+
+  it("names a running voice task's latest step in its line, so the voice agent can answer without a tool call", () => {
+    let emit: ((observation: FlueObservation) => void) | undefined;
+    const projector = new TaskProjector({ tasks, subscribe: (handler) => { emit = handler; return () => undefined; } });
+    projector.start();
+    const row = tasks.record({ id: "voice_9", agentName: "voice-work", parentConversationId: "conversation", originSubmissionId: "host", title: "Drawing" });
+    expect(taskRunningLine(row, projector.latestStep("voice_9"))).toBe('Task "Drawing" is running in the background. Task id: voice_9.');
+    emit?.({ type: "agent_start", instanceId: "voice_9" } as unknown as FlueObservation);
+    emit?.({ type: "tool_start", instanceId: "voice_9", toolCallId: "a", toolName: "mcp__15_studio-computer__20_studio_computer_drag", args: { from: [1, 2] } } as unknown as FlueObservation);
+    const latest = projector.latestStep("voice_9");
+    const line = taskRunningLine(row, latest, (latest?.at ?? 0) + 12_000);
+    expect(line).toBe('Task "Drawing" is running in the background. Task id: voice_9. Latest step, 12s ago: using studio_computer_drag.');
+    // Named, never quoted: the arguments stay out of the line.
+    expect(line).not.toContain("from");
+    // Other tasks keep their line as it was.
+    expect(taskRunningLine({ ...row, agentName: "general", title: "Titler" }, latest)).toBe('Task "Titler" is running in the background.');
     projector.stop();
   });
 

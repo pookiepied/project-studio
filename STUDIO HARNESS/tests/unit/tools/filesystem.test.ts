@@ -249,6 +249,8 @@ describe("read sees pictures", () => {
     const image = blocks?.find(isImageBlock);
     expect(image?.mimeType).toBe("image/png");
     expect(image?.data).toBe(TINY_PNG);
+    const note = blocks?.find((block) => typeof block === "object" && block !== null && "text" in block) as { text: string } | undefined;
+    expect(note?.text).toMatch(/^Attached: logo\.png \(image\/png, 1x1 px\)\./);
   });
 
   it("returns the attachment when acceptance is merely unknown", async () => {

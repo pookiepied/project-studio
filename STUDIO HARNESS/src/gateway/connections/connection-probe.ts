@@ -84,6 +84,22 @@ export interface DetailedProbeResult extends ProbeResult {
    * caller's screen wants the count, not four hundred ids.
    */
   readonly servedIds?: readonly string[];
+  /**
+   * What the list said about each model, for the ids whose entry said
+   * anything: limits and senses a self-hosted router reports (9router,
+   * LiteLLM, OpenRouter-shaped lists). Consumed like `servedIds` and stripped
+   * from the wire the same way.
+   */
+  readonly servedFacts?: ReadonlyMap<string, ServedModelFacts>;
+}
+
+/** A listed model's own word about itself; absent fields were not stated. */
+export interface ServedModelFacts {
+  readonly contextWindow?: number;
+  readonly maxOutputTokens?: number;
+  readonly vision?: boolean;
+  readonly toolCalling?: boolean;
+  readonly reasoning?: boolean;
 }
 
 export async function probeProviderConnection(
@@ -92,8 +108,9 @@ export async function probeProviderConnection(
   options: ProbeOptions = {},
 ): Promise<ProbeResult> {
   const detailed = await probeProviderConnectionDetailed(connection, apiKey, options);
-  const { servedIds: _servedIds, ...result } = detailed;
+  const { servedIds: _servedIds, servedFacts: _servedFacts, ...result } = detailed;
   void _servedIds;
+  void _servedFacts;
   return result;
 }
 
@@ -227,6 +244,7 @@ export async function probeProviderConnectionDetailed(
 
   const modelCount = countModels(connection, response.body);
   const servedIds = listModelIds(connection, response.body);
+  const servedFacts = servedIds === undefined ? undefined : listModelFacts(connection, response.body);
   // A list the vendor serves to anyone proves reachability, not the key.
   // The credential check below is what turns a wrong key into a refusal.
   const credentialFailure = await checkCredential(connection, target, apiKey, timeoutMs);
@@ -238,6 +256,7 @@ export async function probeProviderConnectionDetailed(
     latencyMs,
     ...(modelCount === undefined ? {} : { modelCount }),
     ...(servedIds === undefined ? {} : { servedIds }),
+    ...(servedFacts === undefined || servedFacts.size === 0 ? {} : { servedFacts }),
   };
 }
 
@@ -457,6 +476,46 @@ function listModelIds(
     ids.push(id.startsWith("models/") ? id.slice("models/".length) : id);
   }
   return ids;
+}
+
+/**
+ * The facts each listed entry states about its model, keyed like
+ * `listModelIds`. Read from the fields such lists actually carry: OpenAI's
+ * own list states none, OpenRouter's `context_length`, `top_provider`,
+ * `architecture.input_modalities` and `supported_parameters`, and 9router's
+ * `capabilities` object beside them. A value of the wrong shape states
+ * nothing rather than a guess.
+ */
+function listModelFacts(connection: ProviderConnection, body: string): ReadonlyMap<string, ServedModelFacts> {
+  const facts = new Map<string, ServedModelFacts>();
+  for (const entry of modelListIn(body, connection) ?? []) {
+    if (!isRecord(entry)) continue;
+    const raw = typeof entry.id === "string" ? entry.id : typeof entry.name === "string" ? entry.name : undefined;
+    if (raw === undefined) continue;
+    const capabilities = isRecord(entry.capabilities) ? entry.capabilities : {};
+    const top = isRecord(entry.top_provider) ? entry.top_provider : {};
+    const architecture = isRecord(entry.architecture) ? entry.architecture : {};
+    const modalities = Array.isArray(architecture.input_modalities) ? architecture.input_modalities : undefined;
+    const parameters = Array.isArray(entry.supported_parameters) ? entry.supported_parameters : undefined;
+    const contextWindow = positiveInteger(entry.context_length) ?? positiveInteger(capabilities.contextWindow) ?? positiveInteger(top.context_length);
+    const maxOutputTokens = positiveInteger(entry.max_completion_tokens) ?? positiveInteger(capabilities.maxOutput) ?? positiveInteger(top.max_completion_tokens);
+    const vision = typeof capabilities.vision === "boolean" ? capabilities.vision : modalities === undefined ? undefined : modalities.includes("image");
+    const toolCalling = typeof capabilities.tools === "boolean" ? capabilities.tools : parameters === undefined ? undefined : parameters.includes("tools");
+    const reasoning = typeof capabilities.reasoning === "boolean" ? capabilities.reasoning : parameters === undefined ? undefined : parameters.includes("reasoning");
+    const stated: ServedModelFacts = {
+      ...(contextWindow === undefined ? {} : { contextWindow }),
+      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+      ...(vision === undefined ? {} : { vision }),
+      ...(toolCalling === undefined ? {} : { toolCalling }),
+      ...(reasoning === undefined ? {} : { reasoning }),
+    };
+    if (Object.keys(stated).length > 0) facts.set(raw.startsWith("models/") ? raw.slice("models/".length) : raw, stated);
+  }
+  return facts;
+}
+
+function positiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
 function modelListIn(body: string, connection: ProviderConnection): readonly unknown[] | undefined {

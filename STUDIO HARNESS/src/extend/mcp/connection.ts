@@ -82,6 +82,18 @@ export interface McpConnectionOptions {
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
+ * The request an oversize line answers, read from its kept first characters.
+ *
+ * Only an id among the first two top-level members counts: servers write
+ * `jsonrpc` and `id` ahead of the result, and an `"id"` found deeper would
+ * belong to something inside the result and fail the wrong request.
+ */
+export function oversizeResponseId(raw: string): number | undefined {
+  const match = /^\s*\{\s*(?:"jsonrpc"\s*:\s*"2\.0"\s*,\s*)?"id"\s*:\s*(\d+)\s*,/.exec(raw);
+  return match?.[1] === undefined ? undefined : Number(match[1]);
+}
+
+/**
  * Two hundred lines of diagnostics.
  *
  * Enough that a stack trace and the lines around it survive, and small enough
@@ -300,6 +312,14 @@ export class McpConnection {
         // is otherwise answering, and the record is what makes a later "why is
         // nothing coming back" answerable.
         this.#record(`unreadable message (${message.reason}): ${message.raw}`);
+        // An answer too large to keep still names its request in its first
+        // characters. Failing that request now is the difference between an
+        // accurate refusal and a caller waiting out the whole deadline for
+        // an answer that has already arrived and been dropped.
+        const id = message.reason === "oversize" ? oversizeResponseId(message.raw) : undefined;
+        if (id !== undefined && this.#pending.reject(id, new ExtendError("too_large"))) {
+          this.#connectionObservation("response_oversize", { rpcId: id });
+        }
         continue;
       }
 

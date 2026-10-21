@@ -6,7 +6,7 @@ if ($parseErrors.Count -ne 0) { throw $parseErrors[0].Message }
 
 # Load only the actual pure policy functions. The driver's top-level native
 # initialization and input loop must never run on the user's desktop in tests.
-foreach ($name in @("Window-Identity", "Same-Window", "Set-Target", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer")) {
+foreach ($name in @("Window-Identity", "Same-Window", "Set-Target", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Encoded-Bytes", "Encode-Picture")) {
   $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
   if ($null -eq $function) { throw "Missing production function $name" }
   . ([scriptblock]::Create($function.Extent.Text))
@@ -122,4 +122,16 @@ function Press-Button($button, $direction) { $script:releasedButtons += "$button
 function Send-Key($key, $down) { $script:releasedKeys += "$key/$down" }
 Release-HeldInput
 $checks.releasedButtons = $script:releasedButtons; $checks.releasedKeys = $script:releasedKeys
+# Pictures: a screen that would be a large PNG arrives within budget, and says how.
+Add-Type -AssemblyName System.Drawing
+$noise = New-Object System.Drawing.Bitmap 800, 600, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+$lock = $noise.LockBits((New-Object System.Drawing.Rectangle 0, 0, 800, 600), [System.Drawing.Imaging.ImageLockMode]::WriteOnly, $noise.PixelFormat)
+$random = New-Object byte[] ($lock.Stride * 600); (New-Object System.Random 7).NextBytes($random)
+[System.Runtime.InteropServices.Marshal]::Copy($random, 0, $lock.Scan0, $random.Length); $noise.UnlockBits($lock)
+$plain = New-Object System.Drawing.Bitmap 400, 300
+$fallback = Encode-Picture $noise "png" 400000
+$checks.fallback = @{ mime = $fallback.mime; width = $fallback.width; underBudget = ($fallback.data.Length * 3 / 4) -le 400000; note = $fallback.note }
+$small = Encode-Picture $plain "png" 400000
+$checks.keptPng = @{ mime = $small.mime; width = $small.width; note = $small.note }
+$noise.Dispose(); $plain.Dispose()
 [Console]::Out.WriteLine((ConvertTo-Json @{ checks = $checks } -Depth 12 -Compress))

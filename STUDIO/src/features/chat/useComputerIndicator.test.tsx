@@ -153,6 +153,19 @@ describe('useComputerIndicator', () => {
     expect(stopTurn).toHaveBeenCalledTimes(1)
   })
 
+  it("stops a voice task's own delegate at the computer by cancelling the voice task, once", async () => {
+    renderHook(() =>
+      useComputerIndicator('cnv_1', [], false, () => undefined, [
+        { id: 'inner', agentName: 'general', owner: 'voice_2' },
+        { id: 'voice_2', agentName: 'voice-work' },
+      ]),
+    )
+    await act(async () => { await Promise.resolve() })
+    act(() => stopHandler?.('cnv_1'))
+    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
+    expect(cancelTask.mock.calls).toEqual([['voice_2']])
+  })
+
   it("answers the pill's Stop for this conversation only", async () => {
     const stopTurn = vi.fn()
     renderHook(() =>

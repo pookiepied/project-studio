@@ -105,6 +105,9 @@ async function pageFor(
  */
 const TIMEOUT = 10_000;
 
+/** The most one screenshot's bytes may be, the same budget the computer's pictures keep. */
+const PICTURE_BUDGET_BYTES = 1_000_000;
+
 export const TOOLS: readonly ToolDefinition[] = [
   // ─── Getting somewhere ────────────────────────────────────────────────
 
@@ -291,7 +294,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     description:
       "Take a proper picture of the page, at full quality. " +
       "Acting tools already return a small frame, so reach for this when the look of the page " +
-      "is the point: checking a layout, a font, a colour, or one element close up.",
+      "is the point: checking a layout, a font, a colour, or one element close up. " +
+      "A picture too large as a PNG arrives as a JPEG and says so.",
     inputSchema: object({
       ...TAB,
       ...TARGET,
@@ -300,18 +304,35 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const tab = await pageFor(session, input);
       const wanted = target(input);
-      const shot =
-        wanted.ref === undefined && wanted.selector === undefined
-          ? await tab.page.screenshot({
-              type: "png",
-              fullPage: input["fullPage"] === true,
-              timeout: 15_000,
-            })
-          : await locate(tab.page, wanted).screenshot({ type: "png", timeout: TIMEOUT });
+      const take = (format: "png" | "jpeg"): Promise<Buffer> => {
+        const options = format === "png" ? { type: "png" as const } : { type: "jpeg" as const, quality: 80 };
+        return wanted.ref === undefined && wanted.selector === undefined
+          ? tab.page.screenshot({ ...options, fullPage: input["fullPage"] === true, timeout: 15_000 })
+          : locate(tab.page, wanted).screenshot({ ...options, timeout: TIMEOUT });
+      };
+      // Within budget, for the computer driver's reason (`PICTURE_BUDGET_BYTES`
+      // there): an answer over the channel's limit never arrives, and every
+      // picture rides in each later request of the conversation.
+      let shot = await take("png");
+      let mimeType = "image/png";
+      let note = "";
+      if (shot.length > PICTURE_BUDGET_BYTES) {
+        const megabytes = (shot.length / 1_048_576).toFixed(1);
+        shot = await take("jpeg");
+        mimeType = "image/jpeg";
+        note = ` Sent as JPEG: as a PNG it was ${megabytes} MB, more than one picture may be.`;
+      }
+      if (shot.length > PICTURE_BUDGET_BYTES) {
+        return failure(
+          `The picture is ${(shot.length / 1_048_576).toFixed(1)} MB even as a JPEG, more than one picture may be, so it was not sent. ` +
+            "Picture the viewport instead of the full page, or one element by ref or selector.\n\n" +
+            (await place(tab.page, tab.id)),
+        );
+      }
       return {
         content: [
-          text(`Screenshot taken.\n\n${await place(tab.page, tab.id)}`),
-          { type: "image", data: shot.toString("base64"), mimeType: "image/png" },
+          text(`Screenshot taken.${note}\n\n${await place(tab.page, tab.id)}`),
+          { type: "image", data: shot.toString("base64"), mimeType },
         ],
       };
     },

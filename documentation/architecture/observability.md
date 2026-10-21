@@ -240,7 +240,10 @@ or consumed. Google adapters reject custom fetch injection and remain unchanged;
 their normalized Flue observations and supported parsed callbacks remain available.
 `provider.payload` records the hook result before SDK selection, with a stage and
 hook-result label; `provider.http` is the actual serialized request source when
-available. Parsed provider items are not network bytes or provider compute time.
+available. `provider.request.images` (stage `older_images_omitted`) records only
+the kept and omitted picture counts when a request's older pictures are replaced
+by text to stay inside provider image limits; the transcript is unchanged.
+Parsed provider items are not network bytes or provider compute time.
 Argument fragments are explicitly omitted, including Responses/Pi typed deltas,
 Anthropic partial JSON and Completions arguments nested inside a delta. A fragment
 can be valid JSON containing only a secret value, so valid syntax alone cannot
