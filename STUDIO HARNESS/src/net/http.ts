@@ -3,6 +3,7 @@ import { request as httpsRequest } from "node:https";
 import { lookup as resolveName } from "node:dns/promises";
 
 import { StudioError } from "../contracts/errors.js";
+import { createObservationWriter, type ObservationInput } from "../observability/recorder.js";
 import {
   judgeHostPort,
   parseHostPort,
@@ -140,6 +141,12 @@ export interface HttpStream {
   readonly body: IncomingMessage;
 }
 
+/** One judged address a name resolved to, in the resolver's own order. */
+interface PinnedAddress {
+  readonly address: string;
+  readonly family: number;
+}
+
 /**
  * Resolves a host and judges **every** address it returned.
  *
@@ -147,13 +154,22 @@ export interface HttpStream {
  * address and a loopback address is a name being used to smuggle a destination,
  * and picking the first passing entry would let the same answer through by
  * chance of ordering.
+ *
+ * Every judged address is returned, in order, because the first is not always
+ * the one that answers: Windows resolves `localhost` to `::1` before
+ * `127.0.0.1`, and a local server bound to `0.0.0.0` (IPv4 only) refuses the
+ * IPv6 one. The caller connects to these and only these, so the pin holds —
+ * a fallback moves between addresses that were all judged, never to a fresh
+ * resolution.
  */
-async function pinAddress(hostPort: HostPort, author: UrlAuthor): Promise<string> {
+async function pinAddresses(
+  hostPort: HostPort,
+  author: UrlAuthor,
+): Promise<readonly PinnedAddress[]> {
   let resolved: readonly { address: string; family: number }[];
   try {
     // `verbatim` keeps the resolver's own order rather than sorting IPv4 first.
-    // The order does not decide anything here — every entry is judged — but a
-    // reordering would make the chosen address differ from the logged one.
+    // The order decides only which judged address is tried first.
     resolved = await resolveName(hostPort.host, { all: true, verbatim: true });
   } catch (error) {
     throw new HttpError("unreachable", { cause: error });
@@ -165,9 +181,80 @@ async function pinAddress(hostPort: HostPort, author: UrlAuthor): Promise<string
     judgeHostPort({ host: entry.address, port: hostPort.port }, author);
   }
 
-  const first = resolved[0];
-  if (first === undefined) throw new HttpError("unreachable");
-  return first.address;
+  const seen = new Set<string>();
+  const pinned: PinnedAddress[] = [];
+  for (const entry of resolved) {
+    if (seen.has(entry.address)) continue;
+    seen.add(entry.address);
+    pinned.push({ address: entry.address, family: entry.family });
+  }
+  return pinned;
+}
+
+/**
+ * Socket errors that mean "nothing listens at this address", raised before a
+ * connection exists — so not one byte of the request was sent, and trying the
+ * next judged address cannot repeat a side effect. A reset, a timeout, or
+ * anything after the socket opened is not here: those may follow a request
+ * the far end already received.
+ */
+const NOT_LISTENING_HERE = new Set([
+  "ECONNREFUSED",
+  "EADDRNOTAVAIL",
+  "EAFNOSUPPORT",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+]);
+
+function connectErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof HttpError) || error.kind !== "unreachable") return undefined;
+  const cause = (error as { cause?: unknown }).cause;
+  const code =
+    typeof cause === "object" && cause !== null ? (cause as { code?: unknown }).code : undefined;
+  return typeof code === "string" && NOT_LISTENING_HERE.has(code) ? code : undefined;
+}
+
+/**
+ * Opens one hop to the first judged address that accepts a connection.
+ *
+ * Falls through to the next address only on a refusal at connect time
+ * (`NOT_LISTENING_HERE`); any other failure, the caller's stop, or the
+ * deadline ends the hop as it always did. Each fallback is a stable,
+ * address-free observation: which family failed, which is tried next, and the
+ * socket code — never the address, the URL, or the error text.
+ */
+async function sendPinned(
+  url: URL,
+  pinned: readonly PinnedAddress[],
+  options: Parameters<typeof sendOnce>[2],
+  record: (input: ObservationInput) => void,
+): Promise<IncomingMessage> {
+  let lastError: unknown = new HttpError("unreachable");
+  for (let index = 0; index < pinned.length; index += 1) {
+    const candidate = pinned[index];
+    if (candidate === undefined) continue;
+    try {
+      return await sendOnce(url, candidate.address, options);
+    } catch (error) {
+      lastError = error;
+      const code = connectErrorCode(error);
+      const next = pinned[index + 1];
+      if (code === undefined || next === undefined || options.signal.aborted) throw error;
+      record({
+        name: "net.http.address_fallback",
+        phase: "progress",
+        attributes: {
+          stage: "connect_refused",
+          errorCode: code,
+          failedFamily: candidate.family,
+          nextFamily: next.family,
+          candidateIndex: index,
+          candidateCount: pinned.length,
+        },
+      });
+    }
+  }
+  throw lastError;
 }
 
 /** Reads a response body, stopping at the ceiling rather than after it. */
@@ -302,6 +389,9 @@ export async function requestStream(options: HttpRequestOptions): Promise<HttpSt
     ? AbortSignal.any([options.signal, deadline])
     : deadline;
 
+  // Bound at the start: a fallback is recorded only into the capture epoch the
+  // request began in.
+  const record = createObservationWriter();
   let target = options.url;
   let author: UrlAuthor = options.author;
   let headers: Record<string, string> = { ...options.headers };
@@ -311,14 +401,14 @@ export async function requestStream(options: HttpRequestOptions): Promise<HttpSt
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
     const hostPort = parseHostPort(target);
     // Judged before the name is resolved, so a refused literal never becomes a
-    // DNS query, and judged again per address inside `pinAddress`.
+    // DNS query, and judged again per address inside `pinAddresses`.
     judgeHostPort(hostPort, author);
     const url = new URL(target);
-    const pinned = await pinAddress(hostPort, author);
+    const pinned = await pinAddresses(hostPort, author);
 
     let response: IncomingMessage;
     try {
-      response = await sendOnce(url, pinned, { method, headers, body, signal });
+      response = await sendPinned(url, pinned, { method, headers, body, signal }, record);
     } catch (error) {
       if (deadline.aborted && error instanceof HttpError) throw new HttpError("timeout");
       if (options.signal?.aborted) throw options.signal.reason;

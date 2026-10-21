@@ -115,6 +115,14 @@ export interface ProviderManagementOptions {
   readonly catalog: ModelCatalog;
   /** Real provider icons; absent in tests that do not exercise the surface. */
   readonly icons?: ProviderIconCatalog;
+  /**
+   * Called after a write that can change which language models the runtime
+   * routes: a connection, a model row or a default. The composition root
+   * rebuilds the local source from settings here, so a model added in
+   * settings answers its first turn without a restart. Its failure never
+   * becomes the write's failure - the write is already durable.
+   */
+  readonly onLanguageSettingsChanged?: () => unknown;
 }
 
 /**
@@ -129,11 +137,23 @@ export class ProviderManagementService implements ProviderAdministration {
   readonly #connections: ConnectionStore;
   readonly #catalog: ModelCatalog;
   readonly #icons: ProviderIconCatalog | undefined;
+  readonly #onLanguageSettingsChanged: (() => unknown) | undefined;
 
   constructor(options: ProviderManagementOptions) {
     this.#connections = options.connections;
     this.#catalog = options.catalog;
     this.#icons = options.icons;
+    this.#onLanguageSettingsChanged = options.onLanguageSettingsChanged;
+  }
+
+  /** Runs the change hook once a write has landed; never alters its result. */
+  async #changed<T>(value: T): Promise<T> {
+    try {
+      await this.#onLanguageSettingsChanged?.();
+    } catch {
+      // The hook reports its own failures; the write it follows succeeded.
+    }
+    return value;
   }
 
   listConnections(): Promise<readonly ProviderConnection[]> {
@@ -160,7 +180,7 @@ export class ProviderManagementService implements ProviderAdministration {
     // The store writes the key to the OS credential store and only the
     // non-secret record to the database, so the connection this returns is the
     // one shape that can never carry the key back out.
-    return this.#connections.add(draft);
+    return this.#changed(await this.#connections.add(draft));
   }
 
   async updateConnection(
@@ -168,13 +188,14 @@ export class ProviderManagementService implements ProviderAdministration {
     patch: ProviderConnectionPatch,
     _auth: AuthContext,
   ): Promise<ProviderConnection> {
-    return this.#connections.update(id, patch);
+    return this.#changed(await this.#connections.update(id, patch));
   }
 
   async removeConnection(id: string, _auth: AuthContext): Promise<void> {
     // Keychain first, then the row; the model tables follow by cascade, which
     // the database enforces rather than this service remembering.
-    return this.#connections.remove(id);
+    await this.#connections.remove(id);
+    await this.#changed(undefined);
   }
 
   async probeConnection(id: string, _auth: AuthContext): Promise<ProbeResult> {
@@ -214,7 +235,8 @@ export class ProviderManagementService implements ProviderAdministration {
         // a probe that could not persist its list still reports what it saw.
       }
       try {
-        await this.#catalog.adoptServedModels(id, detailed.servedIds);
+        const adopted = await this.#catalog.adoptServedModels(id, detailed.servedIds);
+        if (adopted.length > 0) await this.#changed(undefined);
       } catch {
         // Adoption is learning too: a probe that could not add rows still
         // reports what it saw.
@@ -233,12 +255,12 @@ export class ProviderManagementService implements ProviderAdministration {
     return this.#catalog.servedModelReferences();
   }
 
-  addManualModel(
+  async addManualModel(
     connectionId: string,
     model: ManualModelInput,
     _auth: AuthContext,
   ): Promise<ProviderModel> {
-    return this.#catalog.addManualModel(connectionId, model);
+    return this.#changed(await this.#catalog.addManualModel(connectionId, model));
   }
 
   setModelOverride(
@@ -258,23 +280,27 @@ export class ProviderManagementService implements ProviderAdministration {
     return this.#catalog.setModelSelection(connectionId, selectedModelIds);
   }
 
-  removeModel(
+  async removeModel(
     connectionId: string,
     modelId: string,
     _auth: AuthContext,
   ): Promise<void> {
-    return this.#catalog.removeModel(connectionId, modelId);
+    await this.#catalog.removeModel(connectionId, modelId);
+    await this.#changed(undefined);
   }
 
   getDefaults(): Promise<DefaultSelection> {
     return this.#catalog.getDefaults();
   }
 
-  setDefault(
+  async setDefault(
     slot: CapabilitySlot,
     ref: DefaultReference | undefined,
     _auth: AuthContext,
   ): Promise<void> {
-    return this.#catalog.setDefault(slot, ref);
+    await this.#catalog.setDefault(slot, ref);
+    // Only the text default is the alias's target; other slots resolve per
+    // call through the capability resolver and need no runtime rebuild.
+    if (slot === "textGeneration") await this.#changed(undefined);
   }
 }

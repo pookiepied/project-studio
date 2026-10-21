@@ -34,6 +34,8 @@ import type { ProviderModel } from "../../contracts/providers.js";
 import { readDefaultSelectionRow } from "../connections/model-catalog.js";
 import { supportedCustomApis } from "./local/apis.js";
 import { connectionCredentialKey } from "../connections/connection-credentials.js";
+import { observationFailure, observeOperation } from "../../observability/operation.js";
+import { recordObservation } from "../../observability/recorder.js";
 
 interface LocalBootstrapOverrides {
   readonly config?: LocalModelConfig;
@@ -62,6 +64,13 @@ export function createModelProviderAdapter(
   }
 }
 
+/**
+ * How a settings-backed local adapter is rebuilt after provider settings
+ * change. Present only for an adapter whose configuration came from the
+ * database: a fixed `config` override has nothing newer to read.
+ */
+const localReloaders = new WeakMap<LocalModelProviderAdapter, () => void>();
+
 function createLocalAdapter(
   overrides: LocalBootstrapOverrides,
   database: StudioDatabase | undefined,
@@ -76,13 +85,38 @@ function createLocalAdapter(
     config = resolveLocalModelConfigFromSettings(database);
   }
   const credentials = overrides.credentials ?? new KeyringCredentialStore();
+  const runtimeFor = (resolved: LocalModelConfig) =>
+    createLocalRuntime({
+      config: resolved,
+      credentials: new PiCredentialStore(credentials, connectionKeyLookup(database, credentials)),
+    });
 
-  const runtime = createLocalRuntime({
-    config,
-    credentials: new PiCredentialStore(credentials, connectionKeyLookup(database, credentials)),
-  });
+  const adapter = new LocalModelProviderAdapter({ config, runtime: runtimeFor(config) });
+  if (overrides.config === undefined && database !== undefined) {
+    // The same credential store and lookup the boot runtime was given, so a
+    // reload changes which models exist and never where keys come from.
+    localReloaders.set(adapter, () => {
+      const next = resolveLocalModelConfigFromSettings(database);
+      adapter.reconfigure({ config: next, runtime: runtimeFor(next) });
+    });
+  }
+  return adapter;
+}
 
-  return new LocalModelProviderAdapter({ config, runtime });
+/**
+ * Rebuilds a settings-backed local adapter from the current provider tables.
+ *
+ * Returns false when the adapter is not settings-backed (a test source, or a
+ * fixed configuration), which is "nothing to reload", not a failure. A
+ * rebuild that throws leaves the previous runtime in place: the settings
+ * write already succeeded, and the turn path keeps working on what it had.
+ */
+export function reloadLocalModelAdapter(adapter: ModelProviderAdapter | undefined): boolean {
+  if (!(adapter instanceof LocalModelProviderAdapter)) return false;
+  const reload = localReloaders.get(adapter);
+  if (reload === undefined) return false;
+  reload();
+  return true;
 }
 
 /**
@@ -305,6 +339,26 @@ export class ProviderBootstrapCoordinator {
   get current(): BootstrapResult | undefined {
     return this.#result;
   }
+
+  /**
+   * Re-reads provider settings into the bootstrapped local source.
+   *
+   * Called after a provider connection, model or default changes, so what
+   * the catalog admits and what the runtime can route stay one set without
+   * a restart. Undefined before bootstrap and false for a source with
+   * nothing to reload.
+   */
+  reloadFromSettings(): boolean {
+    const result = this.#result;
+    if (result === undefined) return false;
+    const adapter = result.registry.getAdapter("local");
+    if (!reloadLocalModelAdapter(adapter)) return false;
+    this.#result = {
+      ...result,
+      descriptor: result.registry.resolveDescriptor(defaultModelReference(result.config.source)),
+    };
+    return true;
+  }
 }
 
 export function createProviderBootstrapCoordinator(): ProviderBootstrapCoordinator {
@@ -318,6 +372,29 @@ export function bootstrapModelProviders(
   options: BootstrapOptions = {},
 ): BootstrapResult {
   return productionCoordinator.bootstrap(config, options);
+}
+
+/**
+ * Makes provider-settings changes reach the running local source.
+ *
+ * Observed as its own operation under whatever request made the change: the
+ * outcome says whether the runtime now matches settings, and a failure is
+ * recorded and swallowed - the caller's write is already durable, and the
+ * previous runtime keeps serving until the next successful reload.
+ */
+export function reloadModelProvidersFromSettings(): Promise<boolean> {
+  return observeOperation("provider", "provider.language.reload", async () => {
+    try {
+      return productionCoordinator.reloadFromSettings();
+    } catch (error) {
+      recordObservation({
+        name: "provider.language.reload.failed",
+        phase: "progress",
+        attributes: { errorCode: observationFailure(error).errorCode },
+      });
+      return false;
+    }
+  });
 }
 
 /**

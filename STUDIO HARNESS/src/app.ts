@@ -28,7 +28,10 @@ import {
   StudioRuntime,
 } from "./application/studio-runtime.js";
 import { resolveProviderConfig } from "./gateway/language/provider-config.js";
-import { bootstrapModelProviders } from "./gateway/language/bootstrap.js";
+import {
+  bootstrapModelProviders,
+  reloadModelProvidersFromSettings,
+} from "./gateway/language/bootstrap.js";
 import { refreshBackgroundLadder } from "./gateway/language/background-model.js";
 import {
   initializeObservability,
@@ -278,6 +281,12 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       icons: createProviderIcons({
         cacheDir: studioPath("cache", "provider-icons"),
       }),
+      // A connection, model or text default changed: rebuild the local
+      // source from settings so the change routes without a restart, then
+      // re-rank the background ladder against what is now connected.
+      onLanguageSettingsChanged: async () => {
+        if (await reloadModelProvidersFromSettings()) await refreshBackgroundLadder();
+      },
     });
     bootLog("step 8: ConnectionStore, ProviderManagementService completed");
 

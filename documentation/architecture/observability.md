@@ -137,6 +137,14 @@ advertised voice IDs through the existing public catalog cache. The
 `media.voice.resolve` operation retains the execution parent and records only
 protocol/model identity and outcome; speech text, voice IDs and credentials are
 excluded. Catalog HTTP reads retain their existing transport observations.
+The direct HTTP client (`net/http.ts`) connects only to addresses the
+destination policy judged; when one refuses at connect time (nothing was
+sent), it tries the next judged address and records
+`net.http.address_fallback` with families, index and socket code only, never
+the address, host, URL or error text. A provider-settings write that can change
+routable language models runs `provider.language.reload` under the request
+that made it; a failed reload is recorded and leaves both the durable write
+and the previous runtime in place.
 Browser dictation decodes locally to mono PCM WAV before the existing media
 transport. This adds no upload boundary or capture setting; provider errors
 remain product results, with bounded UI details outside the control row.

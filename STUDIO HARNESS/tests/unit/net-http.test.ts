@@ -33,6 +33,7 @@ vi.mock("node:dns/promises", async (importOriginal) => {
 });
 
 const { HttpError, requestDirect, requestBinary } = await import("../../src/net/http.js");
+const { diagnosticRecorder } = await import("../../src/observability/recorder.js");
 
 interface Running {
   readonly server: Server;
@@ -214,6 +215,123 @@ describe("requestDirect", () => {
       await expect(
         requestDirect({ url: "http://missing.test/", author: "user" }),
       ).rejects.toBeInstanceOf(HttpError);
+    });
+
+    // Windows answers `localhost` with `::1` first, and a local server bound
+    // to IPv4 only (9router, many dev servers) refuses it. Taking only the
+    // first judged address made every such provider "could not be reached".
+    it("falls through to the next judged address when the first refuses the connection", async () => {
+      const bodies: string[] = [];
+      const target = await serve((request, response) => {
+        const chunks: Buffer[] = [];
+        request.on("data", (chunk: Buffer) => chunks.push(chunk));
+        request.on("end", () => {
+          bodies.push(Buffer.concat(chunks).toString("utf8"));
+          response.writeHead(200);
+          response.end("ipv4 only");
+        });
+      });
+      resolved.answer = [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ];
+
+      const answer = await requestDirect({
+        url: `http://localhost:${target.port}/v1/models`,
+        author: "user",
+        method: "POST",
+        body: "once",
+      });
+
+      expect(answer.body).toBe("ipv4 only");
+      // The refused address never received a byte, so the body arrived once.
+      expect(bodies).toEqual(["once"]);
+      expect(target.requests[0]?.headers.host).toBe(`localhost:${target.port}`);
+    });
+
+    it("records a fallback as address-free operational facts", async () => {
+      const target = await serve((_request, response) => response.end("ok"));
+      resolved.answer = [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ];
+      diagnosticRecorder.configure({ enabled: true });
+      try {
+        await requestDirect({ url: `http://localhost:${target.port}/secret-path?q=1`, author: "user" });
+        const fallback = diagnosticRecorder.read().events.filter((event) => event.name === "net.http.address_fallback");
+        expect(fallback).toHaveLength(1);
+        expect(fallback[0]).toMatchObject({
+          phase: "progress",
+          attributes: { stage: "connect_refused", failedFamily: 6, nextFamily: 4, candidateIndex: 0, candidateCount: 2 },
+        });
+        const serialized = JSON.stringify(fallback[0]);
+        // No address, host, path or error text reaches the observation.
+        for (const leaked of ["::1", "127.0.0.1", "localhost", "secret-path"]) {
+          expect(serialized).not.toContain(leaked);
+        }
+      } finally {
+        diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+        diagnosticRecorder.clear();
+      }
+    });
+
+    it("reports unreachable when every judged address refuses", async () => {
+      const closed = await serve(() => undefined);
+      const port = closed.port;
+      closed.server.close();
+      running.splice(running.indexOf(closed), 1);
+      resolved.answer = [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ];
+
+      await expect(
+        requestDirect({ url: `http://localhost:${port}/`, author: "user" }),
+      ).rejects.toMatchObject({ kind: "unreachable" });
+    });
+
+    it("does not resend to the next address after a connection that opened fails", async () => {
+      // A reset after the socket opened may follow a request the far end
+      // received, so the next address must not get a second copy.
+      const first = await serve((request) => request.socket.destroy());
+      const second = createServer((_request, response) => response.end("second"));
+      const secondConnections = { count: 0 };
+      second.on("connection", () => {
+        secondConnections.count += 1;
+      });
+      const bound = await new Promise<boolean>((resolve) => {
+        second.once("error", () => resolve(false));
+        second.listen(first.port, "::1", () => resolve(true));
+      });
+      if (!bound) return; // No IPv6 loopback here; the property is shown where it exists.
+      try {
+        resolved.answer = [
+          { address: "127.0.0.1", family: 4 },
+          { address: "::1", family: 6 },
+        ];
+
+        await expect(
+          requestDirect({ url: `http://localhost:${first.port}/`, author: "user", method: "POST", body: "x" }),
+        ).rejects.toMatchObject({ kind: "unreachable" });
+        expect(first.requests).toHaveLength(1);
+        expect(secondConnections.count).toBe(0);
+      } finally {
+        second.closeAllConnections();
+        await new Promise<void>((resolve) => second.close(() => resolve()));
+      }
+    });
+
+    it("never falls through to an address the policy refused", async () => {
+      const target = await serve((_request, response) => response.end("reached"));
+      resolved.answer = [
+        { address: "::1", family: 6 },
+        { address: "10.0.0.9", family: 4 },
+      ];
+
+      await expect(
+        requestDirect({ url: `http://mixed.test:${target.port}/`, author: "model" }),
+      ).rejects.toBeInstanceOf(DestinationError);
+      expect(target.connections.count).toBe(0);
     });
   });
 

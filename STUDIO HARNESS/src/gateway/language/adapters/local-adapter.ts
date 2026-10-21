@@ -106,12 +106,32 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
   readonly source = "local" as const;
   readonly operational = true;
 
-  readonly #config: LocalModelConfig;
-  readonly #runtime: LocalRuntime;
+  // Replaceable, not readonly: provider settings change while the harness
+  // runs, and `reconfigure` swaps both together so a turn never reads one
+  // generation's config with another's runtime.
+  #config: LocalModelConfig;
+  #runtime: LocalRuntime;
+  #registered = false;
 
   constructor(options: LocalModelProviderAdapterOptions) {
     this.#config = options.config;
     this.#runtime = options.runtime;
+  }
+
+  /**
+   * Replaces the configuration and runtime this source routes through.
+   *
+   * A connection or model added in settings after boot used to be admitted
+   * (the catalog names it) and then refused by the runtime built at boot,
+   * which had never heard of it - until the app was restarted. Swapping both
+   * here and re-registering the alias provider (Flue replaces a provider by
+   * id) makes the new model routable on the next turn. A stream already in
+   * flight keeps the target it resolved; nothing is resent.
+   */
+  reconfigure(options: LocalModelProviderAdapterOptions): void {
+    this.#config = options.config;
+    this.#runtime = options.runtime;
+    if (this.#registered) this.register();
   }
 
   /**
@@ -135,6 +155,7 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
       stream: (model, context, options) => this.#streamAlias(model, context, options),
       streamSimple: (model, context, options) => this.#streamAlias(model, context, options),
     };
+    this.#registered = true;
     setProvider(
       createProvider({
         id: DEFAULT_MODEL_PROVIDER,
