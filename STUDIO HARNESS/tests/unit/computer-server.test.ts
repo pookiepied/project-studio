@@ -12,7 +12,7 @@ import { definitions, TOOLS, toolByName } from "../../src/computer/tools.js";
 /**
  * The computer-use capability, tested at the seams that can break silently.
  *
- * **The surface**: twenty-three tools, folded the way ADR 0013 folds, each
+ * **The surface**: twenty-seven tools, folded the way ADR 0013 folds, each
  * one described because the schema is the manual.
  *
  * **The wire**, driven as a real process over real stdio, because what the
@@ -35,7 +35,7 @@ describe("the tool surface", () => {
   it("is the set that was designed, named as Studio's own", () => {
     for (const tool of TOOLS) expect(tool.name.startsWith("studio_computer_")).toBe(true);
     expect(new Set(TOOLS.map((tool) => tool.name)).size).toBe(TOOLS.length);
-    expect(TOOLS).toHaveLength(26);
+    expect(TOOLS).toHaveLength(27);
   });
 
   it("covers the jobs the capability exists for", () => {

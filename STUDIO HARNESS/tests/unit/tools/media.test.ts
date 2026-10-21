@@ -14,7 +14,6 @@ import { PermissionKernel } from "../../../src/permissions/kernel.js";
 import { LocalSandbox } from "../../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";
-import { ImageBudget } from "../../../src/tools/filesystem/image-budget.js";
 import { CallGate } from "../../../src/tools/gate.js";
 import { mediaFinishedNotice, mediaJobLines, registerMediaTools } from "../../../src/tools/media/index.js";
 
@@ -68,7 +67,7 @@ function standInService(overrides: Partial<MediaService> = {}): MediaService {
   return service as unknown as MediaService;
 }
 
-function build(media: MediaService, options: { acceptsImages?: boolean; budget?: ImageBudget } = {}): void {
+function build(media: MediaService, options: { acceptsImages?: boolean } = {}): void {
   gate = new CallGate({
     kernel: new PermissionKernel({
       grants: new PermissionGrantStore(db),
@@ -79,7 +78,6 @@ function build(media: MediaService, options: { acceptsImages?: boolean; budget?:
   registerMediaTools(gate, {
     media,
     acceptsImages: () => options.acceptsImages,
-    ...(options.budget === undefined ? {} : { imageBudget: options.budget }),
   });
 }
 
@@ -119,15 +117,20 @@ describe("studio_image", () => {
     expect(jobs.list("conv-1")[0]?.outputs).toHaveLength(1);
   });
 
-  it("keeps to the conversation's image budget", async () => {
-    const budget = new ImageBudget();
-    for (let n = 0; n < 20; n += 1) budget.record("conv-1", 10);
-    build(standInService(), { acceptsImages: true, budget });
+  it("answers in words when a generated picture is over the size one picture may be", async () => {
+    const big = new Uint8Array(6_000_000);
+    build(standInService({
+      generateImage: async (input: unknown, options: { conversationId: string }): Promise<MediaJobStatus> => jobs.start({
+        conversationId: options.conversationId,
+        slot: "imageGeneration",
+        description: (input as { prompt: string }).prompt,
+        modelId: "openai/gpt-image-2",
+        generation: { shape: "sync", result: Promise.resolve([{ bytes: big, mimeType: "image/png" }]) },
+      }),
+    }), { acceptsImages: true });
     const result = (await image({ prompt: "x" })) as { content: { type: string; text?: string }[] };
     expect(result.content.every((block) => block.type === "text")).toBe(true);
-    expect(result.content.map((block) => block.text).join("\n")).toContain("not a provider-reported error");
-    expect(result.content.map((block) => block.text).join("\n")).toContain("0 remaining");
-    expect(budget.spentOn("conv-1").images).toBe(20);
+    expect(result.content.map((block) => block.text).join(" ")).toContain("the limit for one picture");
   });
 
   it("reads input images from the workspace and makes the call an edit", async () => {

@@ -95,7 +95,7 @@ import { CallGate } from "../tools/gate.js";
 import { ToolError } from "../tools/errors.js";
 import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
-import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
+import { FileAccessLog } from "../tools/filesystem/index.js";
 import { BackgroundJobs, finishedNotice, type JobStatus } from "../process/background.js";
 import { JobPings } from "../process/job-pings.js";
 import { TaskStore } from "../agents/definitions/task-store.js";
@@ -779,7 +779,6 @@ export class StudioRuntime implements AgentHost {
    * accumulated, which every later turn resends - only means anything across
    * turns.
    */
-  readonly #imageBudget = new ImageBudget();
   /**
    * Background commands, one registry for the runtime.
    *
@@ -2168,7 +2167,6 @@ export class StudioRuntime implements AgentHost {
       credentials: this.#credentials,
       acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId, options.voiceOnly ? this.voiceModel() : undefined),
       accessLog: this.#accessLogFor(options.conversationId),
-      imageBudget: this.#imageBudget,
       jobs: this.#jobs,
       // The generations join the jobs tool's listing and its Stop: a
       // conversation's background work, one tool. Present exactly when the
@@ -2181,7 +2179,6 @@ export class StudioRuntime implements AgentHost {
             media: {
               media: this.#media,
               acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
-              imageBudget: this.#imageBudget,
             },
           }),
       discover: {

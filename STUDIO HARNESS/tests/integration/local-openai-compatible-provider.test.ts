@@ -288,16 +288,22 @@ describe("a keyless local OpenAI-compatible provider added while the harness run
     await addRouter(providers);
     await providers.probeConnection("9router", AUTH);
     const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-    const content = Array.from({ length: 34 }, () => ({ type: "image" as const, data: pixel, mimeType: "image/png" }));
+    // Sixty pictures in an earlier message, then the question: the earlier
+    // message's pictures are not the person's latest attachment, so they
+    // are trimmed to the newest fifty.
+    const content = Array.from({ length: 60 }, () => ({ type: "image" as const, data: pixel, mimeType: "image/png" }));
     const stream = adapter.stream(aliasFor(`9router/${VISION_ID}`), {
-      messages: [{ role: "user", content: [{ type: "text", text: "Where is the button?" }, ...content], timestamp: Date.now() }],
+      messages: [
+        { role: "user", content: [{ type: "text", text: "Here is the run so far." }, ...content], timestamp: Date.now() },
+        { role: "user", content: "Where is the button?", timestamp: Date.now() },
+      ],
     });
     for await (const event of stream) void event;
     await stream.result();
     const body = JSON.stringify(router.requests.filter((request) => request.path === "/v1/chat/completions").at(-1)?.body);
-    // 34 is 14 over the twenty-picture window; the cut moves in tens, so 20 go.
-    expect(body.split("data:image/png;base64,")).toHaveLength(15);
-    expect(body.split("left out of this request")).toHaveLength(21);
+    // 60 is 10 over the fifty-picture window; the cut moves in tens.
+    expect(body.split("data:image/png;base64,")).toHaveLength(51);
+    expect(body.split("left out of this request")).toHaveLength(11);
   });
 
   it("sends pictures to a hand-added model declared to read them", async () => {

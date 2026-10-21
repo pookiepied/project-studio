@@ -4,6 +4,7 @@ import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import {
+  imageBytesOf,
   pickImageFiles,
   readImageFile,
   imageMimeOf,
@@ -427,7 +428,7 @@ export function Composer({
           refused.push({ filename: file.name, reason: DUPLICATE_ATTACHMENT_NOTE })
           continue
         }
-        const room = pickImageFiles([file], current.length)
+        const room = pickImageFiles([file], current.length, current.reduce((sum, image) => sum + imageBytesOf(image), 0))
         if (room.accepted.length === 0) {
           refused.push(...room.rejections)
           continue

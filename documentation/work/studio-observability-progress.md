@@ -1,5 +1,27 @@
 # Studio observability implementation tracker
 
+## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
+
+Every picture, attachment and document limit now lives in
+`src/contracts/media-limits.ts` (client: `STUDIO/src/domain/attachments/limits.ts`,
+held equal by `media-limits.test.ts`); `documentation/architecture/media-limits.md`
+is the table and the decisions. The per-conversation `ImageBudget` was removed
+(it refused re-reading an old picture, which the request window relies on);
+`picture-size.ts` keeps the per-picture check. The request window now keeps 50
+pictures, always sends the latest user message's pictures, keeps to 20 when any
+picture is over 2000 px or of unknown size, and lowers the count for small
+context windows; `provider.request.images` is unchanged. The composer refuses
+past 15 MB of images per message. Computer use: `studio_computer_batch` runs up
+to 20 steps inside the same desktop-ownership gate and Stop fence as single
+tools (one MCP call, so one existing operation), halts at the first failure and
+lists the steps not run; UI references now survive Studio's own input and are
+refused when stale or off screen; the post-input wait ends once window state
+and pixels are steady on three samples (300-800 ms instead of a fixed 800).
+No new effectful boundary or content field. Coverage: `media-limits.test.ts`,
+`image-window.test.ts`, `computer-batch.test.ts`, `computer-driver-contract.test.ts`,
+`computer-server.test.ts`, `media.test.ts`, `filesystem.test.ts`, client
+`images.test.ts`.
+
 ## Picture window per model request (2026-10-21)
 
 A conversation resends every earlier picture on every turn, so a computer-use

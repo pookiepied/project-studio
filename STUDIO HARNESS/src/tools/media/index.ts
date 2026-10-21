@@ -10,7 +10,7 @@ import type { MediaJobStatus } from "../../gateway/media/jobs.js";
 import type { MediaService } from "../../gateway/media/service.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
-import { refusalMessage, type ImageBudget } from "../filesystem/image-budget.js";
+import { pictureSizeRefusal } from "../filesystem/picture-size.js";
 import { defineStudioTool, type ToolContext, type ToolDefinition } from "../types.js";
 
 /**
@@ -147,7 +147,6 @@ interface VideoToolInput {
 export interface MediaToolRegistration {
   readonly media: MediaService;
   readonly acceptsImages?: (conversationId: string) => boolean | undefined;
-  readonly imageBudget?: ImageBudget;
 }
 
 /** Five minutes: OpenRouter's own image example took ninety seconds. */
@@ -364,22 +363,18 @@ function createImageTool(
       ];
 
       // The picture goes back to the model only when it can see one and the
-      // conversation's image allowance has room; otherwise the words stand,
-      // and the person still sees the picture in the transcript.
+      // picture is within the size one may be; otherwise the words stand, and
+      // the person still sees the picture in the transcript.
       const acceptsImages = registration.acceptsImages?.(conversationId);
       if (acceptsImages !== false) {
         for (const output of finished.outputs) {
-          const refusal = registration.imageBudget?.check(conversationId, output.byteLength) ?? null;
+          const refusal = pictureSizeRefusal(output.path, output.byteLength);
           if (refusal !== null) {
-            content.push({ type: "text", text: refusalMessage(output.path, refusal) });
+            content.push({ type: "text", text: refusal });
             continue;
           }
           const bytes = await readFile(output.path);
-          registration.imageBudget?.record(conversationId, bytes.length);
           content.push({ type: "image", data: bytes.toString("base64"), mimeType: output.mimeType });
-        }
-        if (registration.imageBudget !== undefined) {
-          content.push({ type: "text", text: registration.imageBudget.statusMessage(conversationId) });
         }
       }
       return { content };

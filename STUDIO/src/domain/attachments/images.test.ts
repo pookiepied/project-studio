@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_IMAGE_BYTES, MAX_IMAGE_BYTES_PER_TURN, MAX_IMAGES_PER_TURN } from '@/domain/attachments/limits'
 
 import {
-  MAX_IMAGES_PER_TURN,
-  MAX_IMAGE_BYTES,
+  imageBytesOf,
   pickImageFiles,
   readImageFile,
   sniffImageMime,
@@ -68,6 +68,25 @@ describe('pickImageFiles judges before a byte is read', () => {
     expect(accepted.map((entry) => entry.name)).toEqual(['p0.png', 'p1.png'])
     expect(rejections).toHaveLength(5)
     expect(rejections[0].reason).toBe('A turn carries at most 5 images.')
+  })
+
+  it('caps the bytes of a whole message, so one turn fits the largest request a provider takes', () => {
+    // Five 10 MB photos are 66 MB once encoded; Anthropic refuses past 32 MB.
+    const haul = Array.from({ length: 3 }, (_, at) => file(`photo${at}.jpg`, 'image/jpeg', 6_000_000))
+    const { accepted, rejections } = pickImageFiles(haul)
+    expect(accepted.map((entry) => entry.name)).toEqual(['photo0.jpg', 'photo1.jpg'])
+    expect(rejections).toEqual([{
+      filename: 'photo2.jpg',
+      reason: `A message carries at most ${MAX_IMAGE_BYTES_PER_TURN / 1_000_000} MB of images in total. Send it with the next message.`,
+    }])
+    // What the composer already holds counts too.
+    expect(pickImageFiles([file('one.jpg', 'image/jpeg', 2_000_000)], 1, 14_000_000).accepted).toHaveLength(0)
+  })
+
+  it('knows a held picture\'s size from its base64', () => {
+    expect(imageBytesOf({ data: btoa('abcd') })).toBe(4)
+    expect(imageBytesOf({ data: btoa('abcde') })).toBe(5)
+    expect(imageBytesOf({ data: btoa('abcdef') })).toBe(6)
   })
 })
 

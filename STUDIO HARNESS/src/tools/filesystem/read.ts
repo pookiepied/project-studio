@@ -16,17 +16,12 @@ import {
   coverageNote,
   documentFormatOf,
   extractDocument,
-  MAX_DOCUMENT_BYTES,
   pageRanges,
   parsePageRanges,
   renderPages,
 } from "../../documents/extract.js";
-import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGES_PER_CONVERSATION,
-  refusalMessage,
-  type ImageBudget,
-} from "./image-budget.js";
+import { pictureSizeRefusal } from "./picture-size.js";
+import { DOCUMENT_MAX_BYTES, TOOL_PICTURE_MAX_BYTES } from "../../contracts/media-limits.js";
 
 /**
  * Reading a file, the way a model can actually use it.
@@ -53,7 +48,7 @@ const MAX_LINE_LENGTH = 2_000;
 /** 1 MiB. A larger file is a data file, and belongs to a search, not a read. */
 const MAX_TEXT_BYTES = 1024 * 1024;
 
-/** Every limit a picture is held to lives in `image-budget.ts`. */
+/** Every limit a picture is held to lives in `contracts/media-limits.ts`. */
 
 /** Image kinds that can ride an image content block, by extension. */
 const IMAGE_MIME_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
@@ -137,13 +132,6 @@ export interface ReadToolOptions {
    * user-declared endpoint out of the feature.
    */
   readonly acceptsImages?: (conversationId: string) => boolean | undefined;
-  /**
-   * What each conversation has already spent on pictures. Omitted, every
-   * image is judged on its own size alone - which is the right behaviour for
-   * a caller with no conversation to keep a total against, and the wrong one
-   * for the agent loop, where the totals are the limits that bite.
-   */
-  readonly imageBudget?: ImageBudget;
 }
 
 export const READ_DESCRIPTOR: CapabilityDescriptor = {
@@ -161,8 +149,8 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
     "file. A line longer than 2000 characters is truncated, and a text file " +
     "larger than 1 MB is refused - search it instead. " +
     `Images (PNG, JPEG, GIF, WebP) come back as attachments when the model ` +
-    `accepts image input, up to ${Math.round(MAX_IMAGE_BYTES / 1_000_000)} MB each and ` +
-    `${MAX_IMAGES_PER_CONVERSATION} per conversation. A PDF, Word, PowerPoint or Excel ` +
+    `accepts image input, up to ${String(Math.round(TOOL_PICTURE_MAX_BYTES / 1_000_000))} MB each. Older ` +
+    "pictures may later be left out of a request to stay inside provider limits; read the file again to see one. A PDF, Word, PowerPoint or Excel " +
     "file comes back as its text, page after page under [page N] markers, numbered and " +
     "paged like any text file; pass pages as \"3-5,9\" to read only those pages of a " +
     "long one. A note at the top names any pages with no text layer, which the ocr tool " +
@@ -532,7 +520,7 @@ export function createReadTool(
         // reads it. Ahead of the size check, because the text limit was
         // written for source files and a document's bytes are mostly not its
         // text.
-        if (stat.size > MAX_DOCUMENT_BYTES) {
+        if (stat.size > DOCUMENT_MAX_BYTES) {
           throw new ToolError("invalid_input", {
             message:
               `This document is ${Math.round(stat.size / (1024 * 1024))} MB, which is larger than ` +
@@ -633,18 +621,8 @@ export function createReadTool(
           });
         }
       } else {
-        const budget = options.imageBudget;
-        const refusal =
-          budget === undefined
-            ? stat.size > MAX_IMAGE_BYTES
-              ? ({ kind: "too-large", bytes: stat.size } as const)
-              : null
-            : budget.check(context.scope.conversationId, stat.size);
-        if (refusal !== null) {
-          throw new ToolError("invalid_input", {
-            message: refusalMessage(input.path, refusal),
-          });
-        }
+        const refusal = pictureSizeRefusal(input.path, stat.size);
+        if (refusal !== null) throw new ToolError("invalid_input", { message: refusal });
       }
 
       if (mimeType !== undefined) {
@@ -673,17 +651,9 @@ export function createReadTool(
           contentHash: hashContent(bytes),
         });
 
-        // Recorded only now, against an image that is actually going back to
-        // the model. Counting at the check instead would charge the budget
-        // for reads that were refused further down - an unreadable file, a
-        // model that cannot see - and a conversation could exhaust its
-        // allowance without ever having been shown a picture.
-        options.imageBudget?.record(context.scope.conversationId, bytes.length);
-
         return {
           content: [
-            { type: "text", text: `Attached: ${input.path} (${mimeType}${pixelSize(bytes)}).` +
-              (options.imageBudget === undefined ? "" : `\n${options.imageBudget.statusMessage(context.scope.conversationId)}`) },
+            { type: "text", text: `Attached: ${input.path} (${mimeType}${pixelSize(bytes)}).` },
             { type: "image", data: bytes.toString("base64"), mimeType },
           ],
         };

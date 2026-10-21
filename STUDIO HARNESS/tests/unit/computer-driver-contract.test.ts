@@ -45,7 +45,8 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     expect(checks["waitedWindow"]).toBe(20);
   });
   it("reports a delayed replacement without adopting an unrelated foreground window", () => {
-    expect(checks["samples"]).toBe(8);
+    // Changed on the second sample, then steady for two more: settled at 400 ms.
+    expect(checks["samples"]).toBe(4);
     expect(checks["delayed"]).toMatchObject({
       observationId: "22222222-2222-4222-8222-222222222222",
       targetGone: true, target: null, front: { handle: 30 },
@@ -53,10 +54,14 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
       newWindows: [{ handle: 20 }, { handle: 30 }], refsInvalidated: true,
     });
   });
-  it("invalidates controls at the actual action reply boundary", () => {
-    expect(checks["answerInvalidates"]).toBe(true);
-    expect(checks["refCount"]).toBe(0);
-    expect(receipt).toMatchObject({ id: "action", ok: true, result: { said: "Invoked.", observation: { available: true } } });
+  it("waits the full time for a screen that keeps changing, and no longer", () => {
+    expect(checks["busySamples"]).toBe(8);
+    expect(checks["busyWaited"]).toBe(800);
+  });
+  it("keeps the latest read's references across Studio's own input while the window is the same", () => {
+    expect(checks["answerKeeps"]).toBe("Restart");
+    expect(checks["refCount"]).toBe(1);
+    expect(receipt).toMatchObject({ id: "action", ok: true, result: { said: "Invoked.", observation: { available: true, refsInvalidated: false } } });
   });
   it("preserves the sent action result when post-action observation fails", () => {
     expect(missing).toMatchObject({ id: "missing", ok: true, result: { said: "Input sent.", observation: { available: false, refsInvalidated: true } } });

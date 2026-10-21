@@ -53,6 +53,10 @@ const VERBS: Readonly<Record<string, readonly [string, string]>> = {
   select_text: ['Selecting text', 'Selected text'],
   clipboard: ['Using the clipboard', 'Used the clipboard'],
   wait: ['Waiting', 'Waited'],
+  wait_for_window: ['Waiting for a window', 'Waited for a window'],
+  status: ['Checking the desktop', 'Checked the desktop'],
+  arrange: ['Arranging a window', 'Arranged a window'],
+  batch: ['Running several steps', 'Ran several steps'],
   stop: ['Stopping computer control', 'Stopped computer control'],
 }
 

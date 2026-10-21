@@ -1,10 +1,11 @@
 import { ComputerError } from "./errors.js";
 import type { ComputerSession } from "./session.js";
+import { AFTER_ACTION_SIDE_PX, SCREENSHOT_MAX_BYTES, SCREENSHOT_SIDE_PX } from "../contracts/media-limits.js";
 
 /**
  * The tools, as the model sees them.
  *
- * Twenty-three, named `studio_computer_*`, and each one earns its schema with
+ * Twenty-seven, named `studio_computer_*`, and each one earns its schema with
  * a job the capability exists for: see what is on screen, point and click,
  * type, find and drive windows, read a window's controls and act on them by
  * reference, and read or write the clipboard. The list a person handed over
@@ -16,9 +17,13 @@ import type { ComputerSession } from "./session.js";
  * Two conventions run through all of them. **Coordinates are the display's
  * physical pixels**, and every picture says which frame it stands for, so a
  * model reads the frame and never the picture's own size. **A control is
- * addressed by an observation-scoped ref from `read_ui`**, which is the reliable way, or
- * by a coordinate when there is nothing to reference - a canvas, a game, a
- * window that exposes no accessibility tree.
+ * addressed by a ref from `read_ui`**, which is the reliable way, or by a
+ * coordinate when there is nothing to reference - a canvas, a game, a window
+ * that exposes no accessibility tree. A ref stays good across Studio's own
+ * input while its control exists; the driver refuses a stale one. **Several
+ * steps go in one `batch`**, which runs them in order, stops at the first
+ * failure and answers with one picture: a model turn costs seconds, a step
+ * a few hundred milliseconds.
  */
 
 export interface ToolAnswer {
@@ -125,9 +130,36 @@ function actionAnswer(body: string, result: unknown): ToolAnswer {
       if (Array.isArray(rows)) for (const row of rows) if (isRecord(row)) lines.push(`${label}: ${windowLine(row)}.`);
     }
     if (observation["truncated"] === true) lines.push("Window changes were truncated; list windows for the current inventory.");
-    lines.push("Previous UI references are invalid. Observe the result and call read_ui again before using a control reference. Never repeat input just because verification is unavailable.");
+    lines.push(observation["refsInvalidated"] === false
+      ? "References from the latest read_ui still work while their controls exist; a stale one is refused, then read_ui again. Never repeat input just because verification is unavailable."
+      : "Previous UI references are invalid. Observe the result and call read_ui again before using a control reference. Never repeat input just because verification is unavailable.");
   }
   return { content: [text(lines.join("\n"))], structuredContent: { observation } };
+}
+
+/** Sessions inside a batch: their steps answer without a picture; the batch takes one at the end. */
+const batching = new WeakSet<ComputerSession>();
+
+/** What a batch may run. Seeing is the batch's own last picture; Stop and batch itself stay outside. */
+const BATCH_STEPS = new Set([
+  "move", "click", "drag", "scroll", "type", "key", "hold_key", "open", "focus",
+  "wait_for_window", "read_ui", "act", "set_value", "select_text", "wait",
+]);
+
+/** The most steps one batch runs. */
+const BATCH_MAX_STEPS = 20;
+
+/** A step's receipt without the lines every receipt repeats; the batch says those once. */
+function stepLines(answer: ToolAnswer): string {
+  return answer.content
+    .filter((block): block is { type: "text"; text: string } => block.type === "text" && typeof block["text"] === "string")
+    .map((block) => block.text.split("\n").filter((line) =>
+      !line.startsWith("Input was dispatched;") && !line.startsWith("References from the latest") && !line.startsWith("Previous UI references")).join("\n"))
+    .join("\n");
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 interface Picture {
@@ -146,16 +178,6 @@ interface Picture {
   readonly note?: string;
 }
 
-/**
- * The most one picture's bytes may be, before base64.
- *
- * An MCP answer travels as one line, and a line over the channel's limit was
- * dropped whole: the model then waited out the request deadline for a picture
- * taken in a tenth of a second. A megabyte keeps every answer well inside the
- * limit with its words, and it is also what each screenshot costs every later
- * request of the conversation, which the picture rides in from then on.
- */
-const PICTURE_BUDGET_BYTES = 1_000_000;
 
 function asPicture(value: unknown): Picture {
   if (!isRecord(value) || typeof value["data"] !== "string") {
@@ -182,7 +204,7 @@ async function picture(
   session: ComputerSession,
   args: Record<string, unknown>,
 ): Promise<{ readonly line: string; readonly image: { type: "image"; data: string; mimeType: string } }> {
-  const shot = asPicture(await session.request("screenshot", { ...args, budget: PICTURE_BUDGET_BYTES }));
+  const shot = asPicture(await session.request("screenshot", { ...args, budget: SCREENSHOT_MAX_BYTES }));
   session.rememberFrame({ display: shot.display, width: shot.frameWidth, height: shot.frameHeight });
   return {
     line: frameLine(shot),
@@ -199,6 +221,7 @@ async function picture(
  */
 async function acted(session: ComputerSession, said: string, display: number | undefined, result?: unknown): Promise<ToolAnswer> {
   const receipt = actionAnswer(said, result);
+  if (batching.has(session)) return receipt;
   try {
     const cursor = await session.request("cursor");
     const where = isRecord(cursor)
@@ -206,7 +229,7 @@ async function acted(session: ComputerSession, said: string, display: number | u
       : "";
     const shot = await picture(session, {
       ...(display === undefined ? {} : { display }),
-      max: 1280,
+      max: AFTER_ACTION_SIDE_PX,
       format: "jpeg",
     });
     return { ...receipt, content: [...receipt.content, text(`${where}\n${shot.line}`), shot.image] };
@@ -321,7 +344,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const shot = await picture(session, {
         ...displayArg(input),
         ...(window === undefined ? {} : { window }),
-        max: 1568,
+        max: SCREENSHOT_SIDE_PX,
         format: str(input, "format") ?? "jpeg",
       });
       return { content: [text(shot.line), shot.image] };
@@ -351,7 +374,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (!Array.isArray(region) || region.length !== 4 || !region.every((n) => typeof n === "number")) {
         throw new ComputerError("bad_input", { message: "Give region as [left, top, right, bottom]." });
       }
-      const shot = await picture(session, { ...displayArg(input), region, max: 1568, format: "png" });
+      const shot = await picture(session, { ...displayArg(input), region, max: SCREENSHOT_SIDE_PX, format: "png" });
       return { content: [text(shot.line), shot.image] };
     },
   },
@@ -387,7 +410,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "Click at a point on a display. One tool for every kind of click: choose the button, " +
       "how many times (2 for a double-click, 3 to select a line), and any keys to hold. " +
       "Prefer act with a complete ui_ reference from the latest read_ui when the control has one; click when it does not. " +
-      "Copy the display index and display-relative centre from read_ui. After input, inspect the observation and read controls again; do not reuse references.",
+      "Copy the display index and display-relative centre from read_ui. After input, inspect the observation; read controls again when the window changed.",
     inputSchema: object(
       {
         ...POINT,
@@ -756,7 +779,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "Read a window's controls as an outline, each stamped with a complete ui_<observation-id>_<index> reference, display index and display-relative centre point. " +
       "The reliable way to find what to act on: use act, set_value or select_text with a reference, " +
       "or click its centre. Reads the window named by handle, or else the one last opened, focused, " +
-      "read or clicked in; it never reads whatever happens to be in front. References expire after any input, a new read, or driver restart. " +
+      "read or clicked in; it never reads whatever happens to be in front. References stay valid across Studio's input while their controls are on screen, and expire on a new read, the person's own input, or driver restart; a stale one is refused. " +
       "Work one observed step at a time: choose the intended window, read it, act once, and inspect the returned observation and screenshot. " +
       "If a window closes or changes, use status/windows (or wait_for_window for a delayed transition), choose and focus the intended replacement explicitly, then read_ui again. " +
       "Never infer authority from foreground alone. A dispatched action is not a verified result; reobserve instead of replaying uncertain input. " +
@@ -793,7 +816,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "Works without moving the pointer, which is what makes it reliable.",
     inputSchema: object(
       {
-        ref: { type: "string", description: "The complete observation-scoped reference from the latest read_ui. Expired after any input or another read." },
+        ref: { type: "string", description: "The complete reference from the latest read_ui. A stale one is refused; read again then." },
         action: {
           type: "string",
           enum: ["invoke", "toggle", "expand", "collapse", "select", "focus", "scroll_into_view"],
@@ -880,6 +903,66 @@ export const TOOLS: readonly ToolDefinition[] = [
       const seconds = Math.min(Math.max(requiredNumber(input, "seconds"), 0), 30);
       await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
       return acted(session, `Waited ${String(seconds)} seconds.`, undefined);
+    },
+  },
+
+  {
+    name: "studio_computer_batch",
+    description:
+      "Run several steps in one call, in order: click, type, key, act, set_value, scroll, wait_for_window and the rest. " +
+      "Stops at the first step that fails and lists the ones not run; never repeat those automatically. " +
+      "Answers with each step's receipt and one picture at the end. Use it whenever you already know the next steps " +
+      "(fill a form, walk a menu, type then press return): it saves a model turn per step.",
+    inputSchema: object(
+      {
+        steps: {
+          type: "array",
+          description: `At most ${String(BATCH_MAX_STEPS)}. Each is { "tool": "click", ...that tool's arguments }, the tool named without its studio_computer_ prefix.`,
+          items: {
+            type: "object",
+            properties: { tool: { type: "string", enum: [...BATCH_STEPS] } },
+            required: ["tool"],
+          },
+        },
+        display: { type: "number", description: "Which display the final picture shows. Default: the window being worked in." },
+      },
+      ["steps"],
+    ),
+    run: async (session, input) => {
+      const steps = input["steps"];
+      if (!Array.isArray(steps) || steps.length === 0) throw new ComputerError("bad_input", { message: "Give the steps as a list." });
+      if (steps.length > BATCH_MAX_STEPS) throw new ComputerError("bad_input", { message: `A batch runs at most ${String(BATCH_MAX_STEPS)} steps.` });
+      // Every step is checked before any input goes out.
+      const plan = steps.map((step: unknown, index) => {
+        const name = isRecord(step) ? step["tool"] : undefined;
+        const tool = typeof name === "string" && BATCH_STEPS.has(name) ? toolByName(`studio_computer_${name}`) : undefined;
+        if (tool === undefined || !isRecord(step)) {
+          throw new ComputerError("bad_input", { message: `Step ${String(index + 1)} names no tool a batch runs. Use one of: ${[...BATCH_STEPS].join(", ")}.` });
+        }
+        const { tool: _named, ...args } = step;
+        return { name: name as string, tool, args };
+      });
+      const lines: string[] = [];
+      let failed = false;
+      batching.add(session);
+      try {
+        for (const [index, step] of plan.entries()) {
+          try {
+            lines.push(`${String(index + 1)}. ${step.name}: ${stepLines(await step.tool.run(session, step.args))}`);
+          } catch (error) {
+            failed = true;
+            lines.push(`${String(index + 1)}. ${step.name} failed: ${errorText(error)}`);
+            const rest = plan.slice(index + 1).map((later, offset) => `${String(index + 2 + offset)}. ${later.name}`);
+            if (rest.length > 0) lines.push(`Not run: ${rest.join(", ")}. Observe before deciding; do not replay them automatically.`);
+            break;
+          }
+        }
+      } finally {
+        batching.delete(session);
+      }
+      lines.push("Input was dispatched; the intended application result is not verified. Look at the picture before going on.");
+      const final = await acted(session, lines.join("\n"), num(input, "display"));
+      return failed ? { ...final, isError: true } : final;
     },
   },
 

@@ -7,7 +7,8 @@ import { deflateRawSync } from "node:zlib";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ConversationDocumentStore, INLINE_CHARS, announcementOf } from "../../src/conversations/documents.js";
+import { ConversationDocumentStore, announcementOf } from "../../src/conversations/documents.js";
+import { DOCUMENT_INLINE_CHARS } from "../../src/contracts/media-limits.js";
 import type { ExecutionScope } from "../../src/contracts/capabilities.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import {
@@ -518,7 +519,7 @@ describe("a conversation's documents", () => {
   });
 
   it("keeps a long document by path alone, and a plain text file as itself", async () => {
-    const long = await store.add("conv-1", { fileName: "book.txt", mimeType: "text/plain", bytes: Buffer.from("x".repeat(INLINE_CHARS + 1)) });
+    const long = await store.add("conv-1", { fileName: "book.txt", mimeType: "text/plain", bytes: Buffer.from("x".repeat(DOCUMENT_INLINE_CHARS + 1)) });
     expect(long.inlineText).toBeNull();
     expect(long.pageCount).toBe(1);
     const short = await store.add("conv-1", { fileName: "note.md", mimeType: "text/markdown", bytes: Buffer.from("# Note") });
@@ -540,7 +541,7 @@ describe("a conversation's documents", () => {
 
   it("announces what was attached since the last announcement, once", async () => {
     const first = await store.add("conv-1", { fileName: "a.pdf", mimeType: "application/pdf", bytes: pdfOf(["Alpha words, enough of them to be a page"]) });
-    await store.add("conv-1", { fileName: "b.txt", mimeType: "text/plain", bytes: Buffer.from("x".repeat(INLINE_CHARS + 1)) });
+    await store.add("conv-1", { fileName: "b.txt", mimeType: "text/plain", bytes: Buffer.from("x".repeat(DOCUMENT_INLINE_CHARS + 1)) });
     now = 2_000;
     const announcement = store.announce("conv-1");
     expect(announcement?.documents.map((document) => document.fileName)).toEqual(["a.pdf", "b.txt"]);

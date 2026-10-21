@@ -3,6 +3,7 @@ import { acted, answer, failure, place, read, text, type ToolAnswer } from "./re
 import type { BrowserSession, Tab } from "./session.js";
 import { locate, snapshot } from "./snapshot.js";
 import { BrowserError } from "./errors.js";
+import { SCREENSHOT_MAX_BYTES } from "../contracts/media-limits.js";
 
 /**
  * Studio's browser tools: what they accept, what they answer, all in one file.
@@ -105,8 +106,6 @@ async function pageFor(
  */
 const TIMEOUT = 10_000;
 
-/** The most one screenshot's bytes may be, the same budget the computer's pictures keep. */
-const PICTURE_BUDGET_BYTES = 1_000_000;
 
 export const TOOLS: readonly ToolDefinition[] = [
   // ─── Getting somewhere ────────────────────────────────────────────────
@@ -310,19 +309,19 @@ export const TOOLS: readonly ToolDefinition[] = [
           ? tab.page.screenshot({ ...options, fullPage: input["fullPage"] === true, timeout: 15_000 })
           : locate(tab.page, wanted).screenshot({ ...options, timeout: TIMEOUT });
       };
-      // Within budget, for the computer driver's reason (`PICTURE_BUDGET_BYTES`
+      // Within budget, for the computer driver's reason (`SCREENSHOT_MAX_BYTES`
       // there): an answer over the channel's limit never arrives, and every
       // picture rides in each later request of the conversation.
       let shot = await take("png");
       let mimeType = "image/png";
       let note = "";
-      if (shot.length > PICTURE_BUDGET_BYTES) {
+      if (shot.length > SCREENSHOT_MAX_BYTES) {
         const megabytes = (shot.length / 1_048_576).toFixed(1);
         shot = await take("jpeg");
         mimeType = "image/jpeg";
         note = ` Sent as JPEG: as a PNG it was ${megabytes} MB, more than one picture may be.`;
       }
-      if (shot.length > PICTURE_BUDGET_BYTES) {
+      if (shot.length > SCREENSHOT_MAX_BYTES) {
         return failure(
           `The picture is ${(shot.length / 1_048_576).toFixed(1)} MB even as a JPEG, more than one picture may be, so it was not sent. ` +
             "Picture the viewport instead of the full page, or one element by ref or selector.\n\n" +

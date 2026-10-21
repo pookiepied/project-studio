@@ -1,4 +1,5 @@
 import { findCatalogModel, type CatalogModel } from '@/domain/models/catalog'
+import { MAX_IMAGE_BYTES, MAX_IMAGE_BYTES_PER_TURN, MAX_IMAGES_PER_TURN } from '@/domain/attachments/limits'
 import { base64OfBytes } from '@/lib/base64'
 import type { SeamFailure, TurnImageWire } from '@/platform/harness'
 
@@ -32,18 +33,11 @@ import type { SeamFailure, TurnImageWire } from '@/platform/harness'
  * serve accepts fewer than five images per request. Per-provider headroom
  * (Anthropic takes a hundred, Google thousands) is a ceiling we do not need
  * to chase in the UI; the plan document carries the full matrix. The defaults
- * here are the honest intersection, tightened by our own transport: ten
- * megabytes of binary encodes just under Flue's fourteen-million-character
- * base64 ceiling with the JSON wrapper still to spend.
+ * here are the honest intersection, tightened by our own transport and by
+ * the largest request a provider takes. The numbers live in `limits.ts`.
  */
 const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 export type ImageMimeType = (typeof IMAGE_MIME_TYPES)[number]
-
-/** How many images one turn may carry. */
-export const MAX_IMAGES_PER_TURN = 5
-
-/** The largest single image, in bytes after decoding — not the base64 length. */
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 /** Why a picked file did not become an attachment. */
 export interface ImageRejection {
@@ -98,17 +92,20 @@ export function sniffImageMime(bytes: Uint8Array): ImageMimeType | null {
 
 /**
  * Splits the picker's haul into files worth reading and files to say no to.
- * `alreadyHeld` is what the composer carries, so the cap counts the turn,
- * not the click. Type and size are judged before anything is read; the room
- * runs out silently in the rejections list, which the composer shows.
+ * `alreadyHeld` and `heldBytes` are what the composer carries, so the caps
+ * count the turn, not the click. Type and size are judged before anything is
+ * read; the room runs out silently in the rejections list, which the
+ * composer shows.
  */
 export function pickImageFiles(
   files: readonly File[],
   alreadyHeld = 0,
+  heldBytes = 0,
 ): { accepted: readonly File[]; rejections: readonly ImageRejection[] } {
   const accepted: File[] = []
   const rejections: ImageRejection[] = []
   const room = Math.max(0, MAX_IMAGES_PER_TURN - alreadyHeld)
+  let bytes = heldBytes
   for (const file of files) {
     const mime = imageMimeOf(file)
     if (mime === null) {
@@ -116,7 +113,14 @@ export function pickImageFiles(
       continue
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      rejections.push({ filename: file.name, reason: 'Over 10 MB — too large to send.' })
+      rejections.push({ filename: file.name, reason: `Over ${megabytes(MAX_IMAGE_BYTES)} MB — too large to send.` })
+      continue
+    }
+    if (bytes + file.size > MAX_IMAGE_BYTES_PER_TURN) {
+      rejections.push({
+        filename: file.name,
+        reason: `A message carries at most ${megabytes(MAX_IMAGE_BYTES_PER_TURN)} MB of images in total. Send it with the next message.`,
+      })
       continue
     }
     if (accepted.length >= room) {
@@ -127,8 +131,20 @@ export function pickImageFiles(
       continue
     }
     accepted.push(file)
+    bytes += file.size
   }
   return { accepted, rejections }
+}
+
+/** The decoded size of a picture already read, from its base64 length. */
+export function imageBytesOf(image: Pick<TurnImageWire, 'data'>): number {
+  const padding = image.data.endsWith('==') ? 2 : image.data.endsWith('=') ? 1 : 0
+  return Math.floor((image.data.length * 3) / 4) - padding
+}
+
+/** Whole megabytes as people read them, rounded for the sentence. */
+function megabytes(bytes: number): number {
+  return Math.round(bytes / 1_000_000)
 }
 
 function sniffable(type: string): boolean {

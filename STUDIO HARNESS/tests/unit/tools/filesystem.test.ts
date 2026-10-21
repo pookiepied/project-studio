@@ -173,7 +173,7 @@ describe("read", () => {
     // file better answered by a search.
     writeFileSync(join(workspace, "huge.png"), Buffer.alloc(6 * 1024 * 1024));
 
-    await expect(read({ path: "huge.png" })).rejects.toThrow(/limit for one image/i);
+    await expect(read({ path: "huge.png" })).rejects.toThrow(/limit for one picture/i);
     await expect(read({ path: "huge.png" })).rejects.not.toThrow(/search it instead/i);
   });
 

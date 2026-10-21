@@ -28,7 +28,7 @@ import type { LocalRuntime } from "../local/runtime.js";
 import type { LocalModelConfig } from "../local/config.js";
 import { tracePrompt } from "../prompt-trace.js";
 import { observeProviderStream } from "../provider-observations.js";
-import { windowImages } from "../image-window.js";
+import { imageWindowFor, windowImages } from "../image-window.js";
 import { recordObservation } from "../../../observability/recorder.js";
 
 /** Pi wire-protocol slug standing in for "whatever the user's model speaks". */
@@ -431,7 +431,7 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
  * `image-window.ts`). A cut is recorded as counts only - never the pictures.
  */
 function requestImages(target: Model<Api>, context: Context): Context {
-  const windowed = windowImages(context);
+  const windowed = windowImages(context, imageWindowFor(target.contextWindow));
   if (windowed.omitted > 0) {
     recordObservation({
       name: "provider.request.images",

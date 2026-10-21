@@ -9,13 +9,13 @@ import { DocumentError } from "../../documents/errors.js";
 import {
   DOCUMENT_MIME_BY_FORMAT,
   documentFormatOf,
-  MAX_DOCUMENT_BYTES,
   parsePageRanges,
 } from "../../documents/extract.js";
 import type { MediaService } from "../../gateway/media/service.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
+import { DOCUMENT_MAX_BYTES } from "../../contracts/media-limits.js";
 
 /**
  * The document tool: a page with no text layer, read through a provider.
@@ -141,11 +141,11 @@ function createOcrTool(registration: DocumentToolRegistration): ToolDefinition<O
       } catch {
         throw new ToolError("invalid_input", { message: `${input.path} could not be read.` });
       }
-      if (bytes.byteLength > MAX_DOCUMENT_BYTES) {
+      if (bytes.byteLength > DOCUMENT_MAX_BYTES) {
         throw new ToolError("invalid_input", {
           message:
             `${input.path} is ${String(Math.round(bytes.byteLength / (1024 * 1024)))} MB, past the ` +
-            `${String(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB a provider takes. Split it first.`,
+            `${String(DOCUMENT_MAX_BYTES / (1024 * 1024))} MB a provider takes. Split it first.`,
         });
       }
       let pages: readonly number[] | undefined;

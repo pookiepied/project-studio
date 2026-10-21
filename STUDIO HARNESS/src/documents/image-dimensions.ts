@@ -1,3 +1,5 @@
+import { PROVIDER_DOWNSCALE_SIDE_PX } from "../contracts/media-limits.js";
+
 /**
  * A picture's width and height, read from its own header.
  *
@@ -18,18 +20,11 @@ export function imageDimensions(bytes: Uint8Array): ImageDimensions | undefined 
   return sized !== undefined && sized.width > 0 && sized.height > 0 ? sized : undefined;
 }
 
-/**
- * The longest side, in pixels, past which the providers Studio serves scale a
- * picture down (Anthropic about 1568, OpenAI's high detail 2048 then 768 on
- * the short side, Gemini tiles at 768). One conservative figure for the note.
- */
-export const PROVIDER_DOWNSCALE_SIDE = 1568;
-
 /** One line for the model: the size, and what that size means for detail. */
 export function dimensionsPhrase(dimensions: ImageDimensions | undefined): string {
   if (dimensions === undefined) return "";
   const size = `${String(dimensions.width)}x${String(dimensions.height)} px`;
-  return Math.max(dimensions.width, dimensions.height) > PROVIDER_DOWNSCALE_SIDE
+  return Math.max(dimensions.width, dimensions.height) > PROVIDER_DOWNSCALE_SIDE_PX
     ? `${size}; the provider scales pictures this large down, so fine detail may be lost and reading the file again shows no more`
     : size;
 }

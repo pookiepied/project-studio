@@ -1,7 +1,7 @@
 import { ComputerError } from "./errors.js";
 import type { ComputerSession } from "./session.js";
 
-const INPUT_TOOLS = new Set(["move", "click", "drag", "mouse_button", "scroll", "type", "key", "hold_key", "open", "focus", "arrange", "act", "set_value", "select_text", "read_ui", "clipboard"]);
+const INPUT_TOOLS = new Set(["batch", "move", "click", "drag", "mouse_button", "scroll", "type", "key", "hold_key", "open", "focus", "arrange", "act", "set_value", "select_text", "read_ui", "clipboard"]);
 
 /** The desktop is shared even when each conversation has its own driver. */
 export class DesktopControl {

@@ -48,6 +48,8 @@ describe('recognising one of our own computer calls', () => {
   it('says what happened in words, in both tenses', () => {
     expect(computerVerb('read_ui', true)).toBe('Reading the window')
     expect(computerVerb('read_ui', false)).toBe('Read the window')
+    expect(computerVerb('batch', true)).toBe('Running several steps')
+    expect(computerVerb('wait_for_window', false)).toBe('Waited for a window')
     expect(computerVerb('some_new_thing', false)).toBe('some new thing')
   })
 })

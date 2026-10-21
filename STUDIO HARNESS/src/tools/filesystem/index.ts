@@ -1,6 +1,5 @@
 import type { CallGate } from "../gate.js";
 import { FileAccessLog } from "./access-log.js";
-import type { ImageBudget } from "./image-budget.js";
 import { createDeleteTool } from "./delete.js";
 import { createEditTool } from "./edit.js";
 import { createMoveTool } from "./move.js";
@@ -8,10 +7,6 @@ import { createReadTool } from "./read.js";
 import { createWriteTool } from "./write.js";
 
 export { FileAccessLog } from "./access-log.js";
-export {
-  ImageBudget,
-  MAX_IMAGES_PER_CONVERSATION,
-} from "./image-budget.js";
 export { formatNumbered } from "./read.js";
 
 export interface FilesystemToolOptions {
@@ -21,8 +16,6 @@ export interface FilesystemToolOptions {
    * means.
    */
   readonly acceptsImages?: (conversationId: string) => boolean | undefined;
-  /** The running image total per conversation. See `image-budget.ts`. */
-  readonly imageBudget?: ImageBudget;
 }
 
 /**

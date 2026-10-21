@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_DOCUMENTS_PER_TURN, MAX_DOCUMENT_BYTES } from '@/domain/attachments/limits'
 
 import {
   DOCUMENT_ACCEPT,
-  MAX_DOCUMENTS_PER_TURN,
-  MAX_DOCUMENT_BYTES,
   documentMimeOf,
   pickDocumentFiles,
 } from './documents'

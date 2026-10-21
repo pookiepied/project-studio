@@ -18,6 +18,11 @@ function Window-Row($handle) { return $script:Rows[[string]$handle] }
 function Get-Displays { return @(@{ index = 0; x = 0; y = 0 }, @{ index = 1; x = 1920; y = 0 }, @{ index = 2; x = -1280; y = -400 }) }
 function Display-Of($x, $y) { if ($x -lt 0) { return 2 }; if ($x -ge 1920) { return 1 }; return 0 }
 function Start-Sleep { param($Milliseconds) }
+# The settle loop's clock and screen: sleeps are counted, not slept, and the
+# screen is whatever the scenario says it shows.
+$script:SettleMinMs = 300; $script:SettleMaxMs = 800; $script:SettleSampleMs = 100
+$script:Screen = "still"
+function Screen-Signature { return $script:Screen }
 function Given($value) { return $null -ne $value -and $value -ne "" }
 function Rejected($action) { try { & $action | Out-Null; return $false } catch { return $true } }
 $first = "11111111-1111-4111-8111-111111111111"
@@ -53,22 +58,32 @@ $checks.unique = (Select-UniqueWindow @($main)).handle
 $script:sample = 0
 function Get-Status {
   $script:sample++
-  if ($script:sample -lt 4) { return @{ target = $old; front = $old; targetInFront = $true } }
+  if ($script:sample -lt 2) { return @{ target = $old; front = $old; targetInFront = $true } }
   $script:Rows = @{ "20" = $main; "30" = $other }
   return @{ target = $null; front = $other; targetInFront = $false }
 }
 function Get-TopWindows($app) { return @($main, $other) }
 $checks.delayed = Observe-Action @{ target = $old } @($old) $second
 $checks.samples = $script:sample
+# A screen that never stops changing gets the whole wait, and no more.
+$script:sample = 0; $script:frames = 0
+function Screen-Signature { $script:frames++; return "frame$($script:frames)" }
+function Get-Status { $script:sample++; return @{ target = $main; front = $main; targetInFront = $true } }
+$checks.busyWaited = (Observe-Action @{ target = $main } @($main) $second).waitedMs
+$checks.busySamples = $script:sample
+function Screen-Signature { return $script:Screen }
 $checks.namedLaunch = (Wait-NewWindow @() "chrome").handle
 $checks.waitedWindow = (Wait-ForWindow "chrome" 0).handle
 
-# Answer is also the invalidation boundary after native accessibility actions.
+# Studio's own input keeps the latest read's references while their window
+# keeps its identity; each is still checked when it is used.
+$script:Rows["10"] = $old
+function Get-Status { return @{ target = $old; front = $old; targetInFront = $true } }
 $script:ActionBefore = @{ target = $old }
 $script:ActionWindows = @($old)
 $script:ObservationId = $second
 Answer "action" @{ said = "Invoked." }
-$checks.answerInvalidates = Rejected { Ui-Ref "ui_$($first)_1" }
+$checks.answerKeeps = (Ui-Ref "ui_$($first)_1").Current.Name
 $checks.refCount = $script:Refs.Count
 
 # Execute the production click dispatch with input and window discovery replaced

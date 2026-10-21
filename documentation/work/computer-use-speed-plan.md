@@ -1,5 +1,9 @@
 # Computer use: faster, fewer round trips, provider-safe (decision, 2026-10-21)
 
+Status: items 1-3 implemented 2026-10-21 (`studio_computer_batch`, references
+that survive Studio's input, adaptive settle in `Observe-Action`). Item 4 is
+superseded; item 5 is not started. Not yet timed live on a real task.
+
 Input: `computer-use-perception-research.md` (a model-written survey; useful
 direction, overstated in places) and the current Studio driver.
 

@@ -1,4 +1,5 @@
 import type { ImageRejection } from '@/domain/attachments/images'
+import { MAX_DOCUMENT_BYTES, MAX_DOCUMENTS_PER_TURN } from '@/domain/attachments/limits'
 
 /**
  * The rules a document has to pass to ride on a turn.
@@ -16,11 +17,6 @@ import type { ImageRejection } from '@/domain/attachments/images'
  * disagree about a `.md` and agree about a `.pdf`, and the harness judges the
  * bytes anyway.
  */
-
-/** How many documents one turn may carry. */
-export const MAX_DOCUMENTS_PER_TURN = 5
-/** The harness's own ceiling for one document. */
-export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
 
 const DOCUMENT_EXTENSIONS: ReadonlyMap<string, string> = new Map([
   ['pdf', 'application/pdf'],

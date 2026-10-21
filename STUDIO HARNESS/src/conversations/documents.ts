@@ -7,7 +7,6 @@ import { decodeTextBytes } from "../documents/text-encoding.js";
 import {
   documentFormatOf,
   extractDocument,
-  MAX_DOCUMENT_BYTES,
   needsOcr,
   pageRanges,
   renderPages,
@@ -16,6 +15,7 @@ import {
 import { conversationAttachmentsDirectory, ensureDirectory } from "../platform/paths.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { StorageError } from "../storage/errors.js";
+import { ATTACHMENT_NAME_MAX_CHARS, DOCUMENT_INLINE_CHARS, DOCUMENT_MAX_BYTES } from "../contracts/media-limits.js";
 
 /**
  * The documents a person attaches to a conversation, and how the model
@@ -49,7 +49,7 @@ import { StorageError } from "../storage/errors.js";
  *
  * A short document's whole text rides in the signal - the person attached
  * it to be read, and a round trip through the read tool for four pages is
- * ceremony. Past `INLINE_CHARS` the signal carries the path, the page
+ * ceremony. Past `DOCUMENT_INLINE_CHARS` the signal carries the path, the page
  * count and the coverage, and the model reads what it needs by range or
  * grep; a thousand-page manual costs nothing until a page is opened. The
  * threshold is characters, not bytes: a 30 MB PDF of photographs can be
@@ -65,11 +65,7 @@ import { StorageError } from "../storage/errors.js";
  * matter.
  */
 
-/** Roughly ten thousand tokens: the most a signal inlines. */
-export const INLINE_CHARS = 40_000;
-
 const DOCUMENT_ID = /^doc_[0-9a-f-]{36}$/;
-const MAX_NAME_LENGTH = 120;
 // eslint-disable-next-line no-control-regex -- removing control characters is the point.
 const UNSAFE_IN_A_NAME = /[\u0000-\u001f\u007f<>:"/\\|?*]+/g;
 
@@ -150,9 +146,9 @@ export class ConversationDocumentStore {
     if (addition.bytes.byteLength === 0) {
       throw new StorageError("invalid", { message: "The file is empty." });
     }
-    if (addition.bytes.byteLength > MAX_DOCUMENT_BYTES) {
+    if (addition.bytes.byteLength > DOCUMENT_MAX_BYTES) {
       throw new StorageError("invalid", {
-        message: `The file is larger than a conversation takes (${String(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB).`,
+        message: `The file is larger than a conversation takes (${String(DOCUMENT_MAX_BYTES / (1024 * 1024))} MB).`,
       });
     }
     const fileName = safeFileName(addition.fileName);
@@ -196,7 +192,7 @@ export class ConversationDocumentStore {
       pageCount: extracted?.pages.length ?? 1,
       unit: extracted?.unit ?? "page",
       emptyPages: extracted?.emptyPages ?? [],
-      inlineText: text.length <= INLINE_CHARS ? text : null,
+      inlineText: text.length <= DOCUMENT_INLINE_CHARS ? text : null,
       createdAt: now,
       announcedAt: null,
     };
@@ -408,9 +404,9 @@ export function safeFileName(name: string): string {
   const base = name.replace(/\\/g, "/").split("/").at(-1) ?? "";
   const cleaned = base.replace(UNSAFE_IN_A_NAME, " ").trim().replace(/\s+/g, " ");
   const fallback = cleaned === "" || cleaned === "." || cleaned === ".." ? "document" : cleaned;
-  if (fallback.length <= MAX_NAME_LENGTH) return fallback;
+  if (fallback.length <= ATTACHMENT_NAME_MAX_CHARS) return fallback;
   const extension = extname(fallback);
-  return fallback.slice(0, MAX_NAME_LENGTH - extension.length) + extension;
+  return fallback.slice(0, ATTACHMENT_NAME_MAX_CHARS - extension.length) + extension;
 }
 
 /**

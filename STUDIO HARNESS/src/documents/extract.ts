@@ -1,5 +1,6 @@
 import { DocumentError } from "./errors.js";
 import { ZipArchive } from "./zip.js";
+import { DOCUMENT_MAX_BYTES, SHEET_MAX_COLUMNS, SHEET_MAX_ROWS } from "../contracts/media-limits.js";
 
 /**
  * A document as text, one entry per page, and what the text layer failed
@@ -47,9 +48,6 @@ export interface ExtractedDocument {
   readonly emptyPages: readonly number[];
 }
 
-/** The largest document opened here; past this the pages are the person's to split. */
-export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
-
 /** Fewer extracted characters than this and the page is a picture, a divider, or blank. */
 const EMPTY_PAGE_CHARS = 20;
 /** Warn when this many pages are empty and they are this share of the whole... */
@@ -57,14 +55,6 @@ const COVERAGE_MIN_EMPTY = 2;
 const COVERAGE_MIN_RATIO = 0.2;
 /** ...or when this many are, whatever the share. */
 const COVERAGE_ABSOLUTE_EMPTY = 10;
-/** A sheet past this many rows is a data file; the model searches it or asks for a range. */
-const MAX_SHEET_ROWS = 5_000;
-/**
- * Cells are placed by their column, so one stray cell far to the right
- * would pad every row it sits in with thousands of tabs. Past this column
- * the cells are cut and the sheet says so.
- */
-const MAX_SHEET_COLUMNS = 1_024;
 
 const FORMAT_BY_EXTENSION: Readonly<Record<string, DocumentFormat>> = {
   pdf: "pdf",
@@ -89,11 +79,11 @@ export function documentFormatOf(fileName: string): DocumentFormat | undefined {
 }
 
 export async function extractDocument(bytes: Uint8Array, format: DocumentFormat): Promise<ExtractedDocument> {
-  if (bytes.byteLength > MAX_DOCUMENT_BYTES) {
+  if (bytes.byteLength > DOCUMENT_MAX_BYTES) {
     throw new DocumentError(
       "too-large",
       `The document is ${String(Math.round(bytes.byteLength / (1024 * 1024)))} MB, past the ` +
-        `${String(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB that is read here. Split it, or extract the pages you need with a command.`,
+        `${String(DOCUMENT_MAX_BYTES / (1024 * 1024))} MB that is read here. Split it, or extract the pages you need with a command.`,
     );
   }
   switch (format) {
@@ -486,7 +476,7 @@ function xlsxSheets(archive: ZipArchive): readonly string[] {
     let cutRows = false;
     let cutColumns = false;
     for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
-      if (rows.length >= MAX_SHEET_ROWS) {
+      if (rows.length >= SHEET_MAX_ROWS) {
         cutRows = true;
         break;
       }
@@ -495,7 +485,7 @@ function xlsxSheets(archive: ZipArchive): readonly string[] {
         const attributes = attributesOf(cell[1] ?? "");
         const inner = cell[2] ?? "";
         const column = columnOf(attributes.get("r")) ?? cells.length + 1;
-        if (column > MAX_SHEET_COLUMNS) {
+        if (column > SHEET_MAX_COLUMNS) {
           cutColumns = true;
           continue;
         }
@@ -516,8 +506,8 @@ function xlsxSheets(archive: ZipArchive): readonly string[] {
       rows.push(cells.join("\t"));
     }
     const trailer =
-      (cutColumns ? `\n[columns past ${String(MAX_SHEET_COLUMNS)} are not shown]` : "") +
-      (cutRows ? `\n[only the first ${String(MAX_SHEET_ROWS)} rows are shown]` : "");
+      (cutColumns ? `\n[columns past ${String(SHEET_MAX_COLUMNS)} are not shown]` : "") +
+      (cutRows ? `\n[only the first ${String(SHEET_MAX_ROWS)} rows are shown]` : "");
     return `${sheet.name}\n${rows.join("\n")}${trailer}`.trim();
   });
 }

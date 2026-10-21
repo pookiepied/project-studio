@@ -773,13 +773,56 @@ function Select-UniqueWindow($windows) {
   return $choices[0]
 }
 
+# What the screen shows of the window being worked in (else the one in
+# front), as a hash: enough to tell "still changing" from "settled". Pixels are
+# copied and hashed by .NET, never walked in script. Empty when there is no
+# window to look at or the copy fails; an empty signature never counts as
+# settled on its own.
+function Screen-Signature {
+  $h = if ($script:Target -ne 0) { $script:Target } else { [int64][Studio.Native]::GetForegroundWindow() }
+  $r = New-Object Studio.Native+RECT
+  if ($h -eq 0 -or -not [Studio.Native]::GetWindowRect([IntPtr]$h, [ref]$r)) { return "" }
+  $w = [Math]::Min($r.Right - $r.Left, 4096); $ht = [Math]::Min($r.Bottom - $r.Top, 4096)
+  if ($w -le 0 -or $ht -le 0) { return "" }
+  $bitmap = New-Object System.Drawing.Bitmap $w, $ht, ([System.Drawing.Imaging.PixelFormat]::Format32bppRgb)
+  try {
+    $g = [System.Drawing.Graphics]::FromImage($bitmap)
+    try { $g.CopyFromScreen($r.Left, $r.Top, 0, 0, (New-Object System.Drawing.Size $w, $ht)) } finally { $g.Dispose() }
+    $data = $bitmap.LockBits((New-Object System.Drawing.Rectangle 0, 0, $w, $ht), [System.Drawing.Imaging.ImageLockMode]::ReadOnly, $bitmap.PixelFormat)
+    try {
+      $bytes = New-Object byte[] ($data.Stride * $ht)
+      [System.Runtime.InteropServices.Marshal]::Copy($data.Scan0, $bytes, 0, $bytes.Length)
+    } finally { $bitmap.UnlockBits($data) }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return [Convert]::ToBase64String($sha.ComputeHash($bytes)) } finally { $sha.Dispose() }
+  } catch { return "" } finally { $bitmap.Dispose() }
+}
+
+# How long an action is given to show its effect: until the window state and
+# its pixels are the same on three samples in a row, at least SettleMinMs and
+# at most SettleMaxMs (the fixed wait this replaced). Most input settles in a
+# few hundred milliseconds; a page that keeps changing still gets the full wait.
+$script:SettleMinMs = 300
+$script:SettleMaxMs = 800
+$script:SettleSampleMs = 100
+
 # These are observations, not proof that an application's intended operation
 # completed. Recovery candidates never grant input authority to another window.
 function Observe-Action($before, $beforeWindows, $observationId) {
   $after = $null
-  for ($sample = 0; $sample -lt 8; $sample++) {
-    Start-Sleep -Milliseconds 100
+  $clock = [System.Diagnostics.Stopwatch]::StartNew()
+  $slept = 0
+  $previous = $null
+  $same = 0
+  while ($true) {
+    Start-Sleep -Milliseconds $script:SettleSampleMs
+    $slept += $script:SettleSampleMs
     $after = Get-Status
+    $signature = (ConvertTo-Json @($after.target, $after.front) -Compress -Depth 4) + "|" + (Screen-Signature)
+    if ($signature -eq $previous -and -not $signature.EndsWith("|")) { $same += 1 } else { $same = 0 }
+    $previous = $signature
+    $elapsed = [Math]::Max($clock.ElapsedMilliseconds, $slept)
+    if ($elapsed -ge $script:SettleMaxMs -or ($same -ge 2 -and $elapsed -ge $script:SettleMinMs)) { break }
   }
   $now = @(Get-TopWindows $null)
   $oldIdentities = @{}; $newIdentities = @{}
@@ -794,14 +837,17 @@ function Observe-Action($before, $beforeWindows, $observationId) {
     $candidates = @($now | Where-Object { $_.app -eq $previous.app -and -not $_.minimized })
   }
   return [ordered]@{
-    observationId = $observationId; available = $true; waitedMs = 800
+    observationId = $observationId; available = $true; waitedMs = [int][Math]::Max($clock.ElapsedMilliseconds, $slept)
     previousTarget = $previous; target = $after.target; front = $after.front
     targetGone = $gone; targetInFront = $after.targetInFront
     newWindows = @($opened | Select-Object -First 20)
     closedWindows = @($closed | Select-Object -First 20)
     candidates = @($candidates | Select-Object -First 20)
     truncated = ($opened.Count -gt 20 -or $closed.Count -gt 20 -or $candidates.Count -gt 20)
-    refsInvalidated = $true
+    # References outlive Studio's own input: each is checked when used, and
+    # refused if its window changed identity or its control is gone. Only the
+    # person's own input, a new read, or the window going clears them.
+    refsInvalidated = ($script:RefsEpoch -eq "" -or $gone)
   }
 }
 
@@ -1054,7 +1100,8 @@ function Ui-Ref($ref) {
   }
   $el = $script:Refs[$n]
   if ($null -eq $el) { throw "That element reference is not in the latest observation. Read the window again." }
-  try { [void]$el.Current.Name } catch { throw "That element reference is no longer on screen. Read the window again." }
+  try { [void]$el.Current.Name; $offscreen = $el.Current.IsOffscreen } catch { throw "That element reference is no longer on screen. Read the window again." }
+  if ($offscreen) { throw "That control is not on screen now (scrolled away, or its panel closed). Read the window again." }
   return $el
 }
 
@@ -1165,7 +1212,6 @@ function Take-InputUpdate {
 
 function Answer($id, $result) {
   if ($null -ne $script:ActionBefore) {
-    Reset-UiRefs
     $observation = try {
       Observe-Action $script:ActionBefore $script:ActionWindows $script:ObservationId
     } catch { [ordered]@{ available = $false; observationId = $script:ObservationId; refsInvalidated = $true } }
