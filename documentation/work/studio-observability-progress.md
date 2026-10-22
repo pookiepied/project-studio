@@ -135,21 +135,17 @@ The sequential root gate passed 2,567 harness tests (28 skipped) and 1,602 clien
 ## Voice on a loudspeaker, and the screen kept on (2026-10-22)
 
 Voice mode no longer takes its own reply for the person on a loudspeaker.
-Reply playback is routed through a page-local WebRTC loopback so the
-browser's echo canceller has it as a reference (falling back to direct
-playback when the loopback cannot form in 1.5 s); an `EchoGuard` learns the
-room's echo level from the reply's own meter and admits only levels clearly
-above it while Studio speaks; and a take that overlapped Studio speaking and
-mostly repeats its recent words, in order, reads as nothing said, so a held
-reply resumes. Interruption words and new words never match. A Screen Wake
-Lock is held while voice mode is open and re-requested when the page is
-shown again. None of this adds an entry point, route, command, job or ID;
-the loopback offers only host candidates between two connections in one
-page and carries no data off the device. No audio, transcript or echo
-verdict enters diagnostics; existing voice observation coverage is
-unchanged. Unit tests cover the echo text rule, the guard and the wake lock;
-the loopback was observed forming in 112 ms with audio flowing in Chromium.
-Cancellation quality on a physical phone is not yet verified.
+While Studio's voice is audible (speaking, not held, not deafened) and for
+400 ms after, microphone frames do not count toward a take, and the recording
+made in that window is discarded unsent; the Interrupt button cuts Studio off
+instead. Deafened, talking over Studio works as before. A first attempt (a
+WebRTC loopback as the echo canceller's reference, a learned echo-level gate
+and a transcript echo check) did not stop the echo on a phone and was
+removed. A Screen Wake Lock is held while voice mode is open and re-requested
+when the page is shown again. None of this adds an entry point, route,
+command, job or ID, and no audio or transcript enters diagnostics; existing
+voice observation coverage is unchanged. Unit tests cover the wake lock;
+the half-duplex window is not yet verified on a physical phone.
 
 ## Other-device HTTPS (2026-10-22)
 
