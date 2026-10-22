@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SegmentCutter } from '@/features/voice/segments'
 import { voicedFrame } from '@/features/voice/speechDetector'
+import { openEchoCancelledAudio, type EchoCancelledAudio } from '@/features/voice/echoCanceller'
 
 /**
  * The microphone, as a measured signal.
@@ -61,6 +62,14 @@ import { voicedFrame } from '@/features/voice/speechDetector'
  * before the stop then came back as a file of zero bytes, which the harness
  * refused as no audio at all, and the whole take failed on its last word.
  *
+ * ---- Talking over Studio ---------------------------------------------------
+ *
+ * With `cancelEcho`, used by voice mode, the microphone is measured and
+ * recorded after Studio's own voice has been taken out of it
+ * (`echoCanceller.ts`), and `playback()` is where that voice must be played
+ * for the canceller to know it. When the canceller cannot start, the
+ * microphone is opened with the browser's processing instead.
+ *
  * ---- Errors -----------------------------------------------------------------
  *
  * Permission refused, no device, or no API at all are *states of the feature*,
@@ -100,6 +109,8 @@ interface MicNodes {
   take: (() => Promise<VoiceNote | null>) | null
   stream: MediaStream
   context: AudioContext
+  /** The echo-cancelled graph, when `cancelEcho` asked for one and it started. */
+  echo: EchoCancelledAudio | null
   analyser: AnalyserNode
   frame: number
   recorder: MediaRecorder | null
@@ -141,6 +152,8 @@ export function useMicInput() {
 
   const start = useCallback(async (options?: {
     processing?: boolean
+    /** Take Studio's own voice out of the microphone (see the header). */
+    cancelEcho?: boolean
     record?: boolean
     /** Receives each segment as it is cut; asks for cutting by being given. */
     onSegment?: (note: VoiceNote) => void
@@ -162,18 +175,31 @@ export function useMicInput() {
       // quiet speech a meter most needs to show; auto gain rides the volume
       // like a second, slower meter fighting the first. The waveform's job is
       // to report the room, so the room is what it gets.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: options?.processing ?? false, noiseSuppression: options?.processing ?? false, autoGainControl: options?.processing ?? false },
+      // The echo canceller wants the raw microphone too: the browser's
+      // canceller in front of it would change the echo it is learning.
+      const open = (processing: boolean) => navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: processing, noiseSuppression: processing, autoGainControl: processing },
       })
+      let stream = await open(options?.cancelEcho === true ? false : options?.processing ?? false)
+      // Opened after the microphone: a page capturing audio may start sound.
+      const echo = options?.cancelEcho === true ? await openEchoCancelledAudio() : null
+      if (options?.cancelEcho === true && echo === null) {
+        for (const track of stream.getTracks()) track.stop()
+        stream = await open(true)
+      }
 
-      const context = new AudioContext()
+      const context = echo?.context ?? new AudioContext()
       // Created inside a click, so a suspended context is the exception — but
       // a resumed one is one `await` cheaper to guarantee than an assumption.
       if (context.state === 'suspended') await context.resume()
 
       const analyser = context.createAnalyser()
       analyser.fftSize = 2048
-      context.createMediaStreamSource(stream).connect(analyser)
+      // What is measured is what is recorded: the cleaned microphone when
+      // there is one.
+      const measured = echo === null ? stream : echo.attach(stream)
+      if (echo === null) context.createMediaStreamSource(stream).connect(analyser)
+      else echo.output.connect(analyser)
 
       const recording = options?.record === true && typeof MediaRecorder !== 'undefined'
       // Each recorder collects into its own array, bound at creation: a
@@ -182,7 +208,7 @@ export function useMicInput() {
       const startRecorder = (): { recorder: MediaRecorder; chunks: Blob[] } => {
         const own: Blob[] = []
         const type = pickMimeType()
-        const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined)
+        const recorder = new MediaRecorder(measured, type ? { mimeType: type } : undefined)
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) own.push(event.data)
         }
@@ -256,6 +282,7 @@ export function useMicInput() {
         take: null,
         stream,
         context,
+        echo,
         analyser,
         frame: requestAnimationFrame(step),
         recorder,
@@ -318,7 +345,8 @@ export function useMicInput() {
     cancelAnimationFrame(active.frame)
     const release = () => {
       for (const track of active.stream.getTracks()) track.stop()
-      void active.context.close()
+      if (active.echo === null) void active.context.close()
+      else active.echo.close()
     }
     setStatus('idle')
 
@@ -366,5 +394,7 @@ export function useMicInput() {
   const setMuted = useCallback((muted: boolean) => {
     for (const track of nodes.current?.stream.getAudioTracks() ?? []) track.enabled = !muted
   }, [])
-  return { status, start, stop, take, onFrame, setMuted }
+  /** Where Studio's voice goes to be cancelled, while a `cancelEcho` microphone is live. */
+  const playback = useCallback((): AudioNode | null => nodes.current?.echo?.playback ?? null, [])
+  return { status, start, stop, take, onFrame, setMuted, playback }
 }

@@ -134,18 +134,30 @@ capture policy are unchanged. Regression evidence and review limitations are in
 The sequential root gate passed 2,567 harness tests (28 skipped) and 1,602 client
 ## Voice on a loudspeaker, and the screen kept on (2026-10-22)
 
-Voice mode no longer takes its own reply for the person on a loudspeaker.
-While Studio's voice is audible (speaking, not held, not deafened) and for
-400 ms after, microphone frames do not count toward a take, and the recording
-made in that window is discarded unsent; the Interrupt button cuts Studio off
-instead. Deafened, talking over Studio works as before. A first attempt (a
-WebRTC loopback as the echo canceller's reference, a learned echo-level gate
-and a transcript echo check) did not stop the echo on a phone and was
-removed. A Screen Wake Lock is held while voice mode is open and re-requested
-when the page is shown again. None of this adds an entry point, route,
-command, job or ID, and no audio or transcript enters diagnostics; existing
-voice observation coverage is unchanged. Unit tests cover the wake lock;
-the half-duplex window is not yet verified on a physical phone.
+Voice mode now runs WebRTC's AEC3 echo canceller itself
+(`@ennuicastr/webrtcaec3.js`, BSD-3, WebAssembly embedded in the library)
+in an audio worklet, so talking over Studio works on a loudspeaker. The
+microphone (opened without browser processing) and Studio's playback share
+one `AudioContext`; the canceller's reference is exactly the samples sent to
+the speakers, and the detector, meter and recorder all hear the cleaned
+signal. Voice pause no longer suspends that context (the microphone shares
+it): the sink stops its clips and reschedules them from their offsets. If
+the worklet cannot start within 3 s, the microphone is reopened with the
+browser's processing, as before. The desktop CSP allows
+`'wasm-unsafe-eval'` for this. Earlier attempts in this change set (a WebRTC
+loopback reference, a learned echo-level gate, a transcript echo check, and
+half duplex) were removed. A Screen Wake Lock is held while voice mode is
+open and re-requested when the page is shown again.
+
+None of this adds an entry point, route, command, job or ID, and no audio or
+transcript enters diagnostics. Whether a session ran with the canceller or
+fell back is not observed: browser devices have no native capture, and the
+client observation names are unchanged. Tests run the real WebAssembly
+against a simulated room (echo reduced by more than 20 dB at 100 ms and
+250 ms delays, a talker over it kept audible) and cover the sink's pause and
+resume; the worklet was observed starting in 38 ms in Chromium with a
+synthetic echo reduced by about 30 dB. Behaviour on a physical phone is not
+yet verified.
 
 ## Other-device HTTPS (2026-10-22)
 

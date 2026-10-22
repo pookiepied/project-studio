@@ -12,12 +12,6 @@ import type { AudioSink } from './narration'
 import { isContinuer, saidNothing, SpeechGate } from './speechDetector'
 import { useScreenWakeLock } from './useScreenWakeLock'
 
-/**
- * How long after Studio's voice stops the microphone still ignores the room:
- * output latency (a Bluetooth speaker's especially) and the meter's release.
- */
-const ECHO_TAIL_MS = 400
-
 export type VoiceStage = 'connecting' | 'listening' | 'thinking' | 'speaking' | 'blocked'
 
 export function useVoiceSession(active: boolean, conversationId: string | null = null, fresh?: VoiceFreshChat) {
@@ -36,7 +30,7 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
   const sink = useRef<AudioSink | null>(null)
   const mutedRef = useRef(false)
   const mic = useMicInput()
-  const { start, stop, take, onFrame, setMuted } = mic
+  const { start, stop, take, onFrame, setMuted, playback } = mic
   const stageRef = useRef(stage)
   stageRef.current = stage
   const session = useRef<VoiceConversation | null>(null)
@@ -54,10 +48,6 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
   const [holding, setHolding] = useState(false)
   const gate = useRef(new SpeechGate())
   const takeVoicedMs = useRef(0)
-  // Until when the microphone may still be hearing Studio's own voice, and
-  // whether the recording since then holds it (see the frame handler).
-  const echoUntil = useRef(0)
-  const echoInTake = useRef(false)
   useScreenWakeLock(active)
   // Read when a session starts, not a reason to restart one: the chat a
   // first utterance created keeps the same id and the same session.
@@ -187,8 +177,6 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
     const current = ++epoch.current
     moveTo('connecting')
     setNote('')
-    echoUntil.current = 0
-    echoInTake.current = false
     const started = performance.now()
     const clock = window.setInterval(() => {
       const now = performance.now()
@@ -208,7 +196,9 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
         output: () => new StreamingSpeech({
           speak: speakText,
           openSink: (onEnded) => {
-            const opened = openWebAudioSink(onEnded)
+            // Played where the microphone's echo canceller hears it, so
+            // talking over Studio works on a loudspeaker (`echoCanceller.ts`).
+            const opened = openWebAudioSink(onEnded, playback() ?? undefined)
             opened.setMuted?.(deafenedRef.current)
             sink.current = opened
             return opened
@@ -230,7 +220,7 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
       })
       session.current = owner
       owner.start()
-      const live = await start({ record: true, processing: true })
+      const live = await start({ record: true, processing: true, cancelEcho: true })
       if (current !== epoch.current || session.current !== owner) { void stop(); owner.close(); return }
       if (!live) { setDenied(true); fail('The microphone is unavailable or blocked. Check microphone permissions, then try again.'); return }
       setMuted(mutedRef.current)
@@ -251,44 +241,13 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
       pendingTranscripts.current = []
       setHolding(false)
     }
-  }, [active, conversationId, retryCount, start, stop, moveTo, fail, setMuted])
+  }, [active, conversationId, retryCount, start, stop, moveTo, fail, setMuted, playback])
 
   useEffect(() => {
     if (!active) return
     return onFrame((raw, dtMs, voiced) => {
       if (stageRef.current === 'blocked' || stageRef.current === 'connecting') return
       const level = mutedRef.current ? 0 : raw
-      // Half duplex while Studio's voice is in the room. On a loudspeaker the
-      // microphone hears the reply about as loudly as the person, and no
-      // browser's echo canceller reliably removes it: it passed the detector,
-      // paused Studio, and was transcribed as the person's turn. So while the
-      // reply sounds, and for the moment the room takes to go quiet after,
-      // the microphone does not count; Interrupt cuts Studio off instead.
-      // Deafened, Studio is silent, and talking over it works as before.
-      const now = performance.now()
-      if (stageRef.current === 'speaking' && !(session.current?.holding ?? false) && !deafenedRef.current) {
-        echoUntil.current = now + ECHO_TAIL_MS
-      }
-      if (now < echoUntil.current) {
-        speechMs.current = 0
-        silenceMs.current = 0
-        takeVoicedMs.current = 0
-        gate.current.reset()
-        echoInTake.current = true
-        // A long reply's echo is dropped as it goes, not kept to the end.
-        if (now - sinceCut.current >= 10_000 && !taking.current) {
-          sinceCut.current = now
-          void take()
-        }
-        return
-      }
-      // The recording made while Studio spoke is its echo: dropped unheard,
-      // so the person's next words start a clean take.
-      if (echoInTake.current && !taking.current) {
-        echoInTake.current = false
-        sinceCut.current = now
-        void take()
-      }
       const loud = level >= 0.085
       // A voice held for a quarter second, not just a loud frame: claps,
       // knocks and typing never get this far (see `speechDetector.ts`).
