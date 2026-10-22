@@ -54,6 +54,8 @@ export interface AudioSink {
   close(): void
   /** Silences or restores playback without stopping it; optional for sinks that cannot. */
   setMuted?(muted: boolean): void
+  /** How loud the playback is right now, on the microphone meter's scale; optional. */
+  level?(): number
 }
 
 export interface NarrationOptions {

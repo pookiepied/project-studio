@@ -1,5 +1,7 @@
 import { bytesOfBase64 } from '@/lib/base64'
+import { openEchoReference, type EchoReference } from './echoReference'
 import type { AudioSink, Clip } from './narration'
+import { meterLevel } from './useMicInput'
 
 /**
  * The passages of one narration, joined without a gap.
@@ -20,8 +22,14 @@ import type { AudioSink, Clip } from './narration'
  * queued during a pause still lands right after the one before. Close is
  * the context closed, which stops every source at once and frees the
  * device.
+ *
+ * With `echoReference`, used while the microphone is open in voice mode, the
+ * output is played as call audio so the browser's echo canceller hears it
+ * (`echoReference.ts`). The first clip waits for that route - it forms while
+ * the first passage renders, so the wait is rarely felt - and plays directly
+ * if the route cannot form.
  */
-export function openWebAudioSink(onEnded: () => void): AudioSink {
+export function openWebAudioSink(onEnded: () => void, options?: { echoReference?: boolean }): AudioSink {
   const context = new AudioContext()
   // A context made outside a user gesture starts suspended; this one is made
   // in the click, and asking anyway costs nothing where it already runs.
@@ -29,7 +37,20 @@ export function openWebAudioSink(onEnded: () => void): AudioSink {
   // Every clip plays through one gain, so deafening silences what is already
   // scheduled as well as what comes next, and the clock keeps running.
   const output = context.createGain()
-  output.connect(context.destination)
+  // Read for the echo guard: how loud Studio sounds in the room. After the
+  // deafen gain, because a deafened reply never reaches the room to return.
+  const meter = context.createAnalyser()
+  meter.fftSize = 1024
+  output.connect(meter)
+  const samples = new Float32Array(meter.fftSize)
+  let reference: EchoReference | null = null
+  const routed: Promise<void> = options?.echoReference === true
+    ? openEchoReference(context).then((opened) => {
+        if (closed) { opened?.close(); return }
+        reference = opened
+        output.connect(opened?.input ?? context.destination)
+      })
+    : Promise.resolve(output.connect(context.destination)).then(() => undefined)
   const sounding = new Set<AudioBufferSourceNode>()
   let nextAt = 0
   let finished = false
@@ -43,6 +64,7 @@ export function openWebAudioSink(onEnded: () => void): AudioSink {
     // decodeAudioData detaches the buffer it is given; the decoder owns
     // these bytes and nothing else reads them after.
     const buffer = await context.decodeAudioData(bytesOfBase64(clip.audio).buffer)
+    await routed
     if (closed) return
     const source = context.createBufferSource()
     source.buffer = buffer
@@ -73,8 +95,16 @@ export function openWebAudioSink(onEnded: () => void): AudioSink {
     setMuted(muted: boolean) {
       output.gain.value = muted ? 0 : 1
     },
+    level() {
+      if (closed || sounding.size === 0) return 0
+      meter.getFloatTimeDomainData(samples)
+      let sum = 0
+      for (const sample of samples) sum += sample * sample
+      return meterLevel(Math.sqrt(sum / samples.length))
+    },
     close() {
       closed = true
+      reference?.close()
       void context.close()
     },
   }

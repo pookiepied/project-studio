@@ -10,6 +10,8 @@ import { voiceModelSetting } from './settings'
 import { captionTokens } from './captions'
 import type { AudioSink } from './narration'
 import { isContinuer, saidNothing, SpeechGate } from './speechDetector'
+import { EchoGuard, isOwnEcho } from './echo'
+import { useScreenWakeLock } from './useScreenWakeLock'
 
 export type VoiceStage = 'connecting' | 'listening' | 'thinking' | 'speaking' | 'blocked'
 
@@ -47,6 +49,13 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
   const [holding, setHolding] = useState(false)
   const gate = useRef(new SpeechGate())
   const takeVoicedMs = useRef(0)
+  // Studio hearing itself on a loudspeaker (`echo.ts`): the room's echo
+  // level, Studio's own recent loudness, and whether the take being
+  // recorded overlapped Studio speaking - only such a take can be an echo.
+  const echoGuard = useRef(new EchoGuard())
+  const replyEnvelope = useRef(0)
+  const heardStudio = useRef(false)
+  useScreenWakeLock(active)
   // Read when a session starts, not a reason to restart one: the chat a
   // first utterance created keeps the same id and the same session.
   const freshRef = useRef(fresh)
@@ -93,6 +102,11 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
     const current = epoch.current
     takeVoicedMs.current = 0
     gate.current.reset()
+    // What Studio was saying while this take was recorded, kept with the
+    // take: the caption moves on, and a later reply must not be compared.
+    const echoable = heardStudio.current
+    const spokenDuringTake = captions.current
+    heardStudio.current = stageRef.current === 'speaking'
     const sequence = ++takeSequence.current
     const owner = session.current
     // Words said while Studio talks or thinks hold it, never cancel it, until
@@ -121,15 +135,18 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
         return
       }
       const latest = sequence === takeSequence.current && speechMs.current < 120
+      // Studio's own reply, come back through the microphone, is no one's
+      // turn: it reads as nothing said, so a held reply carries on.
+      const heard = echoable && isOwnEcho(answer.text, spokenDuringTake) ? '' : answer.text
       // The soft interrupt's verdict. Nothing intelligible (a sound that got
       // past the detector) or only "yeah, go on" lets Studio carry on from
       // the word it paused on; anything else is a turn, and only then is the
       // reply Studio was giving cancelled.
-      if (owner.holding && pendingTranscripts.current.length === 0 && (saidNothing(answer.text) || isContinuer(answer.text))) {
+      if (owner.holding && pendingTranscripts.current.length === 0 && (saidNothing(heard) || isContinuer(heard))) {
         if (latest) release()
         return
       }
-      if (!saidNothing(answer.text)) pendingTranscripts.current.push(answer.text)
+      if (!saidNothing(heard)) pendingTranscripts.current.push(heard)
       // Preserve an earlier utterance while the user is already correcting it.
       // Submit both verbatim once the newer take is transcribed.
       if (!latest) return
@@ -175,6 +192,11 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
     const current = ++epoch.current
     moveTo('connecting')
     setNote('')
+    // A new session may be a different room, or the same phone now on a
+    // headset: the echo path is learned again.
+    echoGuard.current.reset()
+    replyEnvelope.current = 0
+    heardStudio.current = false
     const started = performance.now()
     const clock = window.setInterval(() => {
       const now = performance.now()
@@ -194,7 +216,7 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
         output: () => new StreamingSpeech({
           speak: speakText,
           openSink: (onEnded) => {
-            const opened = openWebAudioSink(onEnded)
+            const opened = openWebAudioSink(onEnded, { echoReference: true })
             opened.setMuted?.(deafenedRef.current)
             sink.current = opened
             return opened
@@ -244,10 +266,20 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
     return onFrame((raw, dtMs, voiced) => {
       if (stageRef.current === 'blocked' || stageRef.current === 'connecting') return
       const level = mutedRef.current ? 0 : raw
-      const loud = level >= 0.085
+      // Studio's own loudness, held briefly: the room returns a word a
+      // little after it was played, and the meter releases slowly.
+      const reply = sink.current?.level?.() ?? 0
+      replyEnvelope.current = Math.max(reply, replyEnvelope.current * Math.exp(-dtMs / 250))
+      const studioSounding = stageRef.current === 'speaking' && !(session.current?.holding ?? false)
+      if (stageRef.current === 'speaking') heardStudio.current = true
+      // While Studio speaks, only a level clearly above its own echo is the
+      // person; the rest is the room returning the reply (`echo.ts`).
+      const person = !studioSounding || echoGuard.current.isPerson(level, replyEnvelope.current)
+      const loud = level >= 0.085 && person
       // A voice held for a quarter second, not just a loud frame: claps,
       // knocks and typing never get this far (see `speechDetector.ts`).
       const talking = gate.current.observe(loud, voiced, dtMs)
+      if (studioSounding && !talking) echoGuard.current.observe(level, replyEnvelope.current)
       if (loud && voiced) takeVoicedMs.current += dtMs
       if (loud) {
         speechMs.current += dtMs
@@ -264,6 +296,7 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
           silenceMs.current = 0
           takeVoicedMs.current = 0
           sinceCut.current = performance.now()
+          heardStudio.current = stageRef.current === 'speaking'
           if (!taking.current) void take()
         }
       }

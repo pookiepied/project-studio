@@ -81,6 +81,16 @@ const RELEASE = 0.11
 /** How long a stopped recorder is given to flush before the take goes on without it. */
 const FLUSH_GUARD_MS = 2_000
 
+/**
+ * One RMS reading as the meter shows it: gated, normalised and lifted, but
+ * not smoothed. Exported so a level measured elsewhere - Studio's own voice,
+ * for the echo guard - is on the same scale as the microphone's.
+ */
+export function meterLevel(rms: number): number {
+  const gated = Math.max(0, rms - NOISE_FLOOR) / (LEVEL_CEILING - NOISE_FLOOR)
+  return Math.pow(Math.min(1, gated), GAMMA)
+}
+
 export type MicStatus = 'idle' | 'requesting' | 'live' | 'denied' | 'unavailable'
 
 /**
@@ -237,8 +247,7 @@ export function useMicInput() {
         }
         const rms = Math.sqrt(sum / timeDomain.length)
 
-        const gated = Math.max(0, rms - NOISE_FLOOR) / (LEVEL_CEILING - NOISE_FLOOR)
-        const target = Math.pow(Math.min(1, gated), GAMMA)
+        const target = meterLevel(rms)
 
         // Frame-rate independent: the fractions are authored against one
         // 60fps frame, then scaled by how much frame this actually was.
