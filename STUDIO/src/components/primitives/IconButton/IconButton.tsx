@@ -114,7 +114,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     disabled ? 'rest' : pointer === 'press' ? 'press' : active ? 'on' : pointer
 
   return (
-    <Tooltip label={label} side={tooltipSide}>
+    <Tooltip label={label} side={tooltipSide} explainOnTap={disabled}>
       <button
         ref={ref}
         type="button"

@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { VoiceModeProvider } from '@/features/voice'
+import { VOICE_UNAVAILABLE_REASON, VoiceModeProvider } from '@/features/voice'
 import { Composer } from './Composer'
 import type { TurnImageWire } from '@/platform/harness'
 
@@ -519,7 +519,7 @@ describe('voice on an insecure origin', () => {
     // label - the dictate control and voice mode carry the same sentence
     // because they refuse for the same reason.
     const disabled = screen.getAllByRole('button', {
-      name: 'Voice input needs a secure connection to Studio.',
+      name: VOICE_UNAVAILABLE_REASON,
     })
     expect(disabled).toHaveLength(2)
     for (const control of disabled) expect(control.hasAttribute('disabled')).toBe(true)
@@ -532,6 +532,33 @@ describe('voice on an insecure origin', () => {
     // part of the degradation.
     expect(screen.getByRole('textbox')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Add context' })).toBeTruthy()
+  })
+
+  it('shows the reason when a disabled voice control is tapped, since a phone has no hover', async () => {
+    vi.useFakeTimers()
+    try {
+      Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true })
+      renderComposer(vi.fn(async () => ({ ok: true })))
+
+      const [dictate] = screen.getAllByRole('button', { name: VOICE_UNAVAILABLE_REASON })
+      // The tooltip's trigger wraps the control: a disabled button takes no
+      // pointer events of its own.
+      const trigger = dictate?.parentElement
+      if (!trigger) throw new Error('the dictate control has no tooltip trigger')
+      fireEvent.pointerDown(trigger, { pointerType: 'touch' })
+      fireEvent.pointerLeave(trigger, { pointerType: 'touch' })
+      expect(screen.getByRole('tooltip').textContent).toBe(VOICE_UNAVAILABLE_REASON)
+
+      // It goes on its own; nothing else on a phone would close it.
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      vi.useRealTimers()
+      // Its exit animation runs on real frames.
+      await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps the voice controls enabled on a secure origin', () => {

@@ -146,6 +146,7 @@ function AddressSection({ addresses, code }: { addresses: RemoteAddresses | null
     )
   }
 
+  const url = addressUrl(addresses)
   const home = addresses.home.map((address) => url(address, addresses.port))
   const address = scannedUrl(addresses)
   // Fragments stay in the browser and are removed before submitting the code.
@@ -191,6 +192,12 @@ function AddressSection({ addresses, code }: { addresses: RemoteAddresses | null
               is running here, its address appears in this list.
             </p>
           )}
+          {addresses.secureHosts.length > 0 ? (
+            <p className="text-caption text-muted-foreground/80">
+              HTTPS addresses use this PC's certificate, so voice input works on a device that
+              trusts it. Any device can still open the same address with http://, without voice.
+            </p>
+          ) : null}
         </div>
       </div>
     </Section>
@@ -204,15 +211,26 @@ function AddressSection({ addresses, code }: { addresses: RemoteAddresses | null
  * since a code for an address that cannot be reached is worse than no code.
  */
 function scannedUrl(addresses: RemoteAddresses): string | null {
+  const url = addressUrl(addresses)
   const home = addresses.home[0]
   if (home !== undefined) return url(home, addresses.port)
   if (addresses.away !== null) return url(addresses.away.address, addresses.port)
   return null
 }
 
-/** A bare name when the port is the one a browser assumes; the port otherwise. */
-function url(host: string, port: number): string {
-  return port === 80 ? `http://${host}` : `http://${host}:${port}`
+/**
+ * The link for one host. HTTPS on the listener's own port when the
+ * certificate names the host - port 80 is never TLS, so the name's port does
+ * not apply - and plain HTTP otherwise, bare when the port is the one a
+ * browser assumes.
+ */
+function addressUrl(addresses: RemoteAddresses): (host: string, port: number) => string {
+  return (host, port) => {
+    if (addresses.secureHosts.includes(host)) {
+      return addresses.port === 443 ? `https://${host}` : `https://${host}:${addresses.port}`
+    }
+    return port === 80 ? `http://${host}` : `http://${host}:${port}`
+  }
 }
 
 function AddressGroup({

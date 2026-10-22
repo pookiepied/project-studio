@@ -22,6 +22,7 @@ const desktop = vi.hoisted(() => ({
     home: ['192.168.1.47'],
     homeName: 'studio.local',
     away: null as { address: string; name: string | null } | null,
+    secureHosts: [] as string[],
   },
   code: 'ABC234',
   devices: [] as { id: string; name: string; pairedAtMs: number; lastSeenMs: number }[],
@@ -89,6 +90,7 @@ beforeEach(() => {
     home: ['192.168.1.47'],
     homeName: 'studio.local',
     away: null,
+    secureHosts: [],
   }
   desktop.code = 'ABC234'
   desktop.devices = []
@@ -162,6 +164,34 @@ describe('DevicesPane', () => {
     expect(await screen.findByText('http://studio.local')).not.toBeNull()
     // The raw address keeps its port: it is the listener, not the name.
     expect(screen.getByText('http://192.168.1.47:4747')).not.toBeNull()
+  })
+
+  it('links the hosts the certificate names over HTTPS, and only those', async () => {
+    onDesktop()
+    desktop.addresses.namePort = 80
+    desktop.addresses.home = ['192.168.1.47', '10.0.0.5']
+    desktop.addresses.secureHosts = ['192.168.1.47']
+    render(<DevicesPane />)
+    await turnOn()
+
+    expect(await screen.findByText('https://192.168.1.47:4747')).not.toBeNull()
+    // Not named by the certificate: plain, as before, and the name keeps
+    // its bare port-80 address.
+    expect(screen.getByText('http://10.0.0.5:4747')).not.toBeNull()
+    expect(screen.getByText('http://studio.local')).not.toBeNull()
+    expect(screen.getByText(/voice input works on a device that trusts it/)).not.toBeNull()
+    // The scanned address is the secure one, so a phone that trusts the
+    // certificate pairs straight into a page where voice works.
+    expect(screen.getByRole('img').getAttribute('data-value')).toBe('https://192.168.1.47:4747/#pair=ABC234')
+  })
+
+  it('says nothing about HTTPS without a certificate', async () => {
+    onDesktop()
+    render(<DevicesPane />)
+    await turnOn()
+
+    expect(await screen.findByText('http://192.168.1.47:4747')).not.toBeNull()
+    expect(screen.queryByText(/HTTPS addresses/)).toBeNull()
   })
 
   it('renews the code and the QR together only when asked', async () => {

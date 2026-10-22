@@ -248,6 +248,32 @@ If this proves annoying in practice, the follow-up is Studio running
 `tailscale serve` itself when it detects Tailscale, which turns the documented
 step into a checkbox. That is deliberately out of scope for the first version.
 
+**Amended 2026-10-22 — HTTPS when the person supplies a certificate.** The
+rejection above was of a certificate Studio would mint and no device trusts.
+A person who runs their own local CA (mkcert or similar) and has installed
+its root on their phone has removed that objection themselves. So the
+listener now also speaks TLS when a certificate is there
+(`STUDIO/src-tauri/src/remote/tls.rs`): `PROJECT_STUDIO_REMOTE_TLS_CERT` and
+`PROJECT_STUDIO_REMOTE_TLS_KEY`, or else `<studio home>/tls/cert.pem` and
+`key.pem`, read at each switch-on. Studio still never mints a certificate or
+installs trust.
+
+- **One port, both schemes.** Each connection's first byte decides: `0x16`
+  is a TLS handshake, anything else is plain HTTP. A device that does not
+  trust the certificate keeps its `http://` address, and nothing about it
+  changes. The pairing gate and routes are the same for both.
+- **No new failure.** A configured pair that cannot be used is a log line
+  and a plain-HTTP listener, never a failed start.
+- **Addresses are printed by what the certificate names.** The settings
+  screen links a host as `https://host:port` only when the certificate is
+  valid for that exact name or IP (`secureHosts`). Others stay `http://`,
+  because an `https://` link to them would open on a mismatch warning. The QR
+  code carries the secure address when the certificate covers it.
+- **Voice decides itself.** The client still reads `window.isSecureContext`.
+  Opened over `https://` with a trusted certificate, voice works on the phone.
+  Over `http://` the controls stay disabled with the reason, which now opens on
+  a tap as well as on hover, because a phone has no hover.
+
 ### 3.8 Nothing is exposed until you say so
 
 - The listener does not exist until the setting is switched on. It is not

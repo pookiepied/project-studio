@@ -55,6 +55,7 @@ mod mdns;
 mod pairing;
 mod proxy;
 pub(crate) mod secret_store;
+mod tls;
 
 use std::convert::Infallible;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -66,6 +67,7 @@ use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use tauri::{AppHandle, Runtime};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 
@@ -138,6 +140,9 @@ struct Running {
     /// The port the name answers on: `NAME_PORT` when that bind took, else
     /// the same as `address`'s.
     name_port: u16,
+    /// The certificate this start loaded, when there was one: the listener
+    /// then answers HTTPS as well as HTTP on the same ports (`tls.rs`).
+    tls: Option<tls::TlsIdentity>,
     /// Dropping or setting this ends every accept loop. A `watch` rather than
     /// a `oneshot` because the loops select on it repeatedly.
     stop: watch::Sender<bool>,
@@ -160,6 +165,14 @@ impl RemoteAccess {
             .and_then(|running| running.as_ref().map(|running| running.name_port))
     }
 
+    /// The certificate being served, if the listener is on and has one.
+    fn tls(&self) -> Option<tls::TlsIdentity> {
+        self.running
+            .lock()
+            .ok()
+            .and_then(|running| running.as_ref().and_then(|running| running.tls.clone()))
+    }
+
     /// The addresses the settings screen prints, for the port being served.
     ///
     /// `None` while the listener is off: there is nothing to reach, so
@@ -174,7 +187,7 @@ impl RemoteAccess {
             .lock()
             .map(|publisher| publisher.is_published())
             .unwrap_or(false);
-        Some(addresses::read(port, name_port, published).await)
+        Some(addresses::read(port, name_port, published, self.tls().as_ref()).await)
     }
 
     /// Starts the listener, or reports the one already running.
@@ -248,6 +261,18 @@ impl RemoteAccess {
         };
         let name_port = if named.is_some() { NAME_PORT } else { port };
 
+        // HTTPS alongside HTTP when a certificate is there. Read now, after
+        // the bind, so a refused port is still the sentence it was; and never
+        // a failed start, because plain HTTP is the feature as it always was.
+        let tls = match tls::load() {
+            Ok(tls) => tls,
+            Err(problem) => {
+                log::warn!("Remote access: serving plain HTTP only; the TLS certificate is configured but {problem}.");
+                None
+            }
+        };
+        let secure = tls.is_some();
+
         let (stop, stopped) = watch::channel(false);
 
         {
@@ -263,6 +288,7 @@ impl RemoteAccess {
             *running = Some(Running {
                 address,
                 name_port,
+                tls: tls.clone(),
                 stop,
             });
         }
@@ -280,6 +306,7 @@ impl RemoteAccess {
             devices,
             pairing,
             assets: Arc::new(assets),
+            tls: tls.map(|identity| identity.acceptor().clone()),
         };
         tauri::async_runtime::spawn(accept_loop(listener, stopped.clone(), shared.clone()));
         if let Some(named) = named {
@@ -291,7 +318,8 @@ impl RemoteAccess {
         // that refuses would be a name that lies.
         self.publish_name(name_port);
 
-        log::info!("Remote access: serving {address} (devices gate on)");
+        let scheme = if secure { "HTTPS and HTTP" } else { "HTTP" };
+        log::info!("Remote access: serving {address} over {scheme} (devices gate on)");
         Ok(address)
     }
 
@@ -347,6 +375,9 @@ struct Shared {
     devices: Arc<Devices>,
     pairing: Arc<PairingState>,
     assets: Arc<AssetSource>,
+    /// Present when a certificate was loaded: a connection that opens with a
+    /// TLS handshake is answered through it, any other as plain HTTP.
+    tls: Option<tokio_rustls::TlsAcceptor>,
 }
 
 /// Accepts on one bound port until `stopped` says otherwise.
@@ -381,31 +412,55 @@ async fn accept_loop(listener: TcpListener, mut stopped: watch::Receiver<bool>, 
         let shared = shared.clone();
         let peer = peer.ip();
         tauri::async_runtime::spawn(async move {
-            let io = TokioIo::new(stream);
-            // The clones happen per request, and the async block owns
-            // them: a future that borrowed from this closure would
-            // not satisfy hyper's `Service` (the same shape the
-            // listener first shipped with).
-            let service = service_fn(move |request| {
-                let shared = shared.clone();
-                async move {
-                    handle(
-                        &*shared.assets,
-                        &shared.supervisor,
-                        &shared.devices,
-                        &shared.pairing,
-                        peer,
-                        request,
-                    )
-                    .await
-                }
-            });
-            if let Err(error) = http1::Builder::new().serve_connection(io, service).await {
-                log::debug!("Remote access: connection ended: {error}");
+            // The scheme is decided by the connection's first byte, so one
+            // port answers both (`tls.rs`). Without a certificate nothing is
+            // read ahead and every connection is plain, as it always was.
+            let Some(acceptor) = shared.tls.clone() else {
+                return serve_connection(stream, shared, peer).await;
+            };
+            match tls::opens_with_handshake(&stream).await {
+                Ok(true) => match acceptor.accept(stream).await {
+                    Ok(stream) => serve_connection(stream, shared, peer).await,
+                    // Most often a device that does not trust the issuer
+                    // closing the handshake; it may still use http://.
+                    Err(error) => log::debug!("Remote access: TLS handshake ended: {error}"),
+                },
+                Ok(false) => serve_connection(stream, shared, peer).await,
+                Err(error) => log::debug!("Remote access: connection ended: {error}"),
             }
         });
     }
     log::info!("Remote access: stopped serving {address}");
+}
+
+/// Serves one connection, plain or already through TLS, with the same gate
+/// and routes either way: the scheme changes what a browser allows the page,
+/// never what the listener allows the browser.
+async fn serve_connection<S>(stream: S, shared: Shared, peer: IpAddr)
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let io = TokioIo::new(stream);
+    // The clones happen per request, and the async block owns them: a future
+    // that borrowed from this closure would not satisfy hyper's `Service`
+    // (the same shape the listener first shipped with).
+    let service = service_fn(move |request| {
+        let shared = shared.clone();
+        async move {
+            handle(
+                &*shared.assets,
+                &shared.supervisor,
+                &shared.devices,
+                &shared.pairing,
+                peer,
+                request,
+            )
+            .await
+        }
+    });
+    if let Err(error) = http1::Builder::new().serve_connection(io, service).await {
+        log::debug!("Remote access: connection ended: {error}");
+    }
 }
 
 /// The port to bind: the fixed default, or the override when it is set to
@@ -896,6 +951,81 @@ mod tests {
         assert_eq!(configured_port(), DEFAULT_PORT);
 
         std::env::remove_var(PORT_VARIABLE);
+    }
+
+    /// One real port, both schemes: the same gate and routes answer a TLS
+    /// client and a plain one, which is what lets a device that does not
+    /// trust the certificate keep its `http://` bookmark.
+    #[tokio::test]
+    async fn one_port_answers_https_and_http_alike() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio_rustls::rustls;
+        use tokio_rustls::rustls::pki_types::pem::PemObject;
+
+        let identity = tls::tests::test_identity();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (stop, stopped) = watch::channel(false);
+        let shared = Shared {
+            supervisor: fresh_supervisor(),
+            devices: Arc::new(devices()),
+            pairing: Arc::new(PairingState::default()),
+            assets: Arc::new(asset),
+            tls: Some(identity.acceptor().clone()),
+        };
+        tokio::spawn(accept_loop(listener, stopped, shared));
+
+        let request = b"GET /index.html HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+        let read_all = |mut stream: Box<dyn tokio::io::AsyncRead + Unpin + Send>| async move {
+            let mut text = String::new();
+            tokio::time::timeout(std::time::Duration::from_secs(5), stream.read_to_string(&mut text))
+                .await
+                .expect("the answer never finished")
+                .unwrap();
+            text
+        };
+
+        // Plain HTTP, exactly as before a certificate existed.
+        let mut plain = tokio::net::TcpStream::connect(address).await.unwrap();
+        plain.write_all(request).await.unwrap();
+        let answer = read_all(Box::new(plain)).await;
+        assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+        assert!(answer.ends_with("asset:/index.html"), "{answer}");
+
+        // TLS, from a client that trusts only the fixture's own CA.
+        let mut roots = rustls::RootCertStore::empty();
+        roots
+            .add(rustls::pki_types::CertificateDer::from_pem_slice(tls::tests::CA.as_bytes()).unwrap())
+            .unwrap();
+        let config = rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+        let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
+        let tcp = tokio::net::TcpStream::connect(address).await.unwrap();
+        let mut secure = connector
+            .connect("localhost".try_into().unwrap(), tcp)
+            .await
+            .expect("the handshake completes");
+        secure.write_all(request).await.unwrap();
+        let answer = read_all(Box::new(secure)).await;
+        assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+        assert!(answer.ends_with("asset:/index.html"), "{answer}");
+
+        // And the gate is the same gate under TLS.
+        let tcp = tokio::net::TcpStream::connect(address).await.unwrap();
+        let mut secure = connector.connect("localhost".try_into().unwrap(), tcp).await.unwrap();
+        secure
+            .write_all(b"GET /api/conversations HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let answer = read_all(Box::new(secure)).await;
+        assert!(answer.starts_with("HTTP/1.1 401"), "{answer}");
+
+        let _ = stop.send(true);
     }
 
     #[test]

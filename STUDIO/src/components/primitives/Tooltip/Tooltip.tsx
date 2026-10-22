@@ -36,6 +36,8 @@ import { cn } from '@/lib/cn'
  * and pulled back inside it when it would overhang.
  */
 const DELAY_MS = 400
+/** How long a tapped explanation stays up: long enough to read one line. */
+const TAP_MS = 2500
 const OFFSET = 8
 const MARGIN = 8
 
@@ -44,10 +46,18 @@ type Side = 'right' | 'top' | 'bottom'
 export function Tooltip({
   label,
   side = 'top',
+  explainOnTap = false,
   children,
 }: {
   label: string
   side?: Side
+  /**
+   * Open on a touch or pen tap instead of closing. For a disabled control,
+   * whose label is the reason it is disabled: a phone has no hover, so
+   * without this the reason is never shown there - and a phone is exactly
+   * where voice input is greyed out.
+   */
+  explainOnTap?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -109,11 +119,22 @@ export function Tooltip({
     <span
       ref={anchor}
       className="relative inline-flex"
-      onPointerEnter={schedule}
-      onPointerLeave={dismiss}
+      onPointerEnter={(event) => {
+        if (event.pointerType === 'mouse' || !explainOnTap) schedule()
+      }}
+      onPointerLeave={(event) => {
+        // A finger "leaves" the moment it lifts; the tap's own timer closes it.
+        if (event.pointerType === 'mouse' || !explainOnTap) dismiss()
+      }}
       // A tooltip that survives the click it labelled sits over the thing the
-      // click just revealed.
-      onPointerDown={dismiss}
+      // click just revealed. A tap on a disabled control revealed nothing,
+      // so there the label is the answer to the tap.
+      onPointerDown={(event) => {
+        if (event.pointerType === 'mouse' || !explainOnTap) return dismiss()
+        clear()
+        setOpen(true)
+        timer.current = window.setTimeout(() => setOpen(false), TAP_MS)
+      }}
       onFocus={(event) => {
         if (!event.currentTarget.matches(':focus-visible')) return
         schedule()

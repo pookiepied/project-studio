@@ -24,6 +24,9 @@ target/
 .dev.vars.*
 *.pem
 *.key
+# Throwaway test certificates for the listener's TLS tests; the issuing
+# test CA's key was discarded, so nothing real can be signed with these.
+!STUDIO/src-tauri/src/remote/testdata/*.pem
 
 # ── Logs ─────────────────────────────────────────────────────
 *.log

@@ -87,14 +87,21 @@ tokio = { version = "1", features = ["rt", "macros", "sync", "time", "net", "io-
 # reason `reqwest` is here with its defaults off. An HTTP router would have
 # been one more thing to keep current in exchange for a `match` on a string.
 #
-# `server` and `http1` only: the listener speaks plain HTTP to devices on the
-# home network or through Tailscale, and a scheme it cannot speak is one more
-# place it cannot be steered into. HTTP/2 buys nothing here and TLS is
-# Tailscale's job (ADR 0050 3.7).
+# `server` and `http1` only: HTTP/2 buys nothing for devices on the home
+# network or through Tailscale, and a protocol the listener cannot speak is one
+# more place it cannot be steered into.
 hyper = { version = "1", default-features = false, features = ["server", "http1"] }
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
 http-body-util = "0.1"
 bytes = "1"
+
+# HTTPS on the same listener, only when the person has put a certificate there
+# (`remote/tls.rs`): a phone is a secure context - and so may use the
+# microphone - only over TLS. The `ring` provider rather than rustls' default
+# aws-lc-rs, which needs CMake and NASM to build on Windows; `tls12` because
+# older phones still offer nothing newer. The server side of TLS only: the
+# harness hop stays plain HTTP to loopback, and `reqwest` still links no TLS.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
 
 # Paired-device credentials for the same listener (`remote/devices.rs`): the
 # secret that each paired browser presents as its cookie never touches disk in

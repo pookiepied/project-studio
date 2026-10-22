@@ -132,6 +132,19 @@ replay failed pairing submissions. Existing remote HTTP observation gaps and
 capture policy are unchanged. Regression evidence and review limitations are in
 `report/other-device-pairing.md`.
 The sequential root gate passed 2,567 harness tests (28 skipped) and 1,602 client
+## Other-device HTTPS (2026-10-22)
+
+The existing remote listener answers TLS on the same ports when a certificate
+pair is configured (plan §3.7 amendment). It adds no entry point, route,
+command, transport, job or ID. Connection scheme selection, handshake
+failures and an unusable certificate are debug/warn log lines only; no path,
+certificate, key or peer value enters diagnostics. The existing remote HTTP
+observation gaps and capture policy are unchanged, and this entry claims no
+new coverage. Native tests cover the certificate-to-host match, a mismatched
+key, unreadable files without the path in the sentence, the configuration
+order, and one real port serving a TLS client and a plain client through the
+same gate. No physical-iPhone verification is claimed.
+
 tests. Serial native library checks passed 154 tests, excluding the existing
 real-keyring self-test; Clippy with warnings denied, the production frontend
 build and the embedded desktop debug build passed. No physical remote-device

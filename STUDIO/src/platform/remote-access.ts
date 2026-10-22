@@ -47,6 +47,13 @@ export interface RemoteAddresses {
   readonly home: readonly string[]
   readonly homeName: string | null
   readonly away: AwayAddress | null
+  /**
+   * The hosts above that the listener's certificate is valid for, each
+   * reachable as `https://host:port`. Empty when the desktop has no
+   * certificate. Every host answers `http://` as well; only an HTTPS page is
+   * a secure context, and so only there can a phone use voice input.
+   */
+  readonly secureHosts: readonly string[]
 }
 
 /** Starts the listener; the address it serves, or the sentence saying why not. */

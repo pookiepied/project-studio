@@ -19,6 +19,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use super::mdns;
+use super::tls::TlsIdentity;
 
 /// What a device can type or scan, for one reading of the machine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -50,6 +51,11 @@ pub(crate) struct Addresses {
     /// The address that works away from home, when Tailscale is on this
     /// machine.
     pub(crate) away: Option<Away>,
+    /// The hosts above that the listener's certificate is valid for, each of
+    /// which is reachable as `https://host:port` (`tls.rs`). Empty when the
+    /// listener has no certificate. A host left out still answers `http://`;
+    /// an `https://` link to it would open on a name-mismatch warning.
+    pub(crate) secure_hosts: Vec<String>,
 }
 
 /// The Tailscale side of the reading.
@@ -70,7 +76,12 @@ pub(crate) struct Away {
 /// the publisher's lock. The Tailscale name is asked of the `tailscale`
 /// tool with a short deadline: a machine without it answers "no such
 /// program" at once, and one where the tool hangs must not hang the screen.
-pub(crate) async fn read(port: u16, name_port: u16, home_name_published: bool) -> Addresses {
+pub(crate) async fn read(
+    port: u16,
+    name_port: u16,
+    home_name_published: bool,
+    tls: Option<&TlsIdentity>,
+) -> Addresses {
     let (home, tailscale) = interfaces();
     let away = match tailscale {
         Some(address) => Some(Away {
@@ -79,13 +90,33 @@ pub(crate) async fn read(port: u16, name_port: u16, home_name_published: bool) -
         }),
         None => None,
     };
-    Addresses {
+    let mut addresses = Addresses {
         port,
         name_port,
         home: home.iter().map(ToString::to_string).collect(),
         home_name: home_name_published.then(|| mdns::HOME_NAME.to_owned()),
         away,
+        secure_hosts: Vec::new(),
+    };
+    if let Some(tls) = tls {
+        addresses.secure_hosts = secure_hosts(&addresses, |host| tls.covers(host));
     }
+    addresses
+}
+
+/// Every printed host, in printed order, that `covers` accepts.
+fn secure_hosts(addresses: &Addresses, covers: impl Fn(&str) -> bool) -> Vec<String> {
+    let away = addresses.away.iter().flat_map(|away| {
+        away.name.iter().chain(std::iter::once(&away.address))
+    });
+    addresses
+        .home_name
+        .iter()
+        .chain(&addresses.home)
+        .chain(away)
+        .filter(|host| covers(host))
+        .cloned()
+        .collect()
 }
 
 /// The home addresses, and the Tailscale one if there is one.
@@ -208,6 +239,29 @@ mod tests {
     fn a_machine_without_tailscale_has_no_away_address() {
         let (_, away) = split(vec![address([192, 168, 1, 47])]);
         assert_eq!(away, None);
+    }
+
+    #[test]
+    fn only_the_hosts_the_certificate_names_are_offered_as_https() {
+        let identity = crate::remote::tls::tests::test_identity();
+        let addresses = Addresses {
+            port: 4747,
+            name_port: 80,
+            home: vec!["192.168.1.47".to_owned(), "192.168.1.48".to_owned()],
+            home_name: Some("studio.local".to_owned()),
+            away: Some(Away {
+                address: "100.101.102.103".to_owned(),
+                name: Some("desk.tail1234.ts.net".to_owned()),
+            }),
+            secure_hosts: Vec::new(),
+        };
+        // The fixture names studio.local and 192.168.1.47 and nothing else
+        // printed here, so the second home address and both Tailscale ones
+        // stay plain.
+        assert_eq!(
+            secure_hosts(&addresses, |host| identity.covers(host)),
+            vec!["studio.local".to_owned(), "192.168.1.47".to_owned()]
+        );
     }
 
     #[test]
