@@ -156,8 +156,24 @@ client observation names are unchanged. Tests run the real WebAssembly
 against a simulated room (echo reduced by more than 20 dB at 100 ms and
 250 ms delays, a talker over it kept audible) and cover the sink's pause and
 resume; the worklet was observed starting in 38 ms in Chromium with a
-synthetic echo reduced by about 30 dB. Behaviour on a physical phone is not
-yet verified.
+synthetic echo reduced by about 30 dB.
+
+Follow-up (2026-10-24), after a phone still answered itself: AEC3 only finds
+an echo returning within about half a second, and removed almost nothing at
+600 ms and beyond, which a phone browser's output and capture path can reach.
+The filter now measures the delay (log-loudness envelopes of what was played
+and heard, compared at 10 ms steps up to 1.5 s, believed when found twice) and
+holds the reference back by all but ~150 ms of it. A new hold-back takes
+effect with a fresh AEC3 only once Studio has been silent longer than the
+delay plus 300 ms, because AEC3 re-aligned or started while echo was arriving
+kept leaking for seconds. The measured value is kept in the browser's
+`localStorage` (`studio.voice.echoHeldBackSeconds`, a number only) and starts
+the next conversation aligned, so on a slow-echo device only the first reply
+of the first conversation can leak. When the canceller cannot start, voice
+mode now says so on the listening line. Tests cover a 700 ms echo (the second
+reply reduced by more than 20 dB, a person between the replies kept) and a
+remembered delay cancelling the first reply. The delay this phone actually
+has, and the result on it, are not yet verified.
 
 ## Other-device HTTPS (2026-10-22)
 

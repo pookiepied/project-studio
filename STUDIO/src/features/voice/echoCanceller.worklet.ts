@@ -5,9 +5,11 @@
  *
  * Built as its own bundle and loaded with `audioWorklet.addModule`. It says
  * `ready` once the canceller is built, or `failed`; until then it passes the
- * microphone through, so nothing is lost while it starts.
+ * microphone through, so nothing is lost while it starts. It starts with the
+ * hold-back in `processorOptions.heldBackSeconds` and reports
+ * `{ heldBackSeconds }` whenever it measures a new one.
  */
-import { createAec3, EchoCancellingFilter } from './aec3'
+import { loadAec3, EchoCancellingFilter } from './aec3'
 
 // The worklet scope's own globals, which the DOM library does not declare.
 declare const sampleRate: number
@@ -16,20 +18,22 @@ declare class AudioWorkletProcessor {
 }
 declare function registerProcessor(
   name: string,
-  processor: new () => AudioWorkletProcessor,
+  processor: new (options: { processorOptions?: { heldBackSeconds?: number } }) => AudioWorkletProcessor,
 ): void
 
 class EchoCancellerProcessor extends AudioWorkletProcessor {
   #filter: EchoCancellingFilter | null = null
   #closed = false
   #silence = new Float32Array(128)
+  #reported = 0
 
-  constructor() {
+  constructor(options: { processorOptions?: { heldBackSeconds?: number } }) {
     super()
-    createAec3().then(
-      (aec) => {
-        if (this.#closed) { aec.free(); return }
-        this.#filter = new EchoCancellingFilter(aec, sampleRate)
+    loadAec3().then(
+      (make) => {
+        if (this.#closed) return
+        this.#filter = new EchoCancellingFilter(make, sampleRate, (options.processorOptions?.heldBackSeconds ?? 0) * sampleRate)
+        this.#reported = this.#filter.heldBack
         this.port.postMessage('ready')
       },
       () => this.port.postMessage('failed'),
@@ -49,7 +53,13 @@ class EchoCancellerProcessor extends AudioWorkletProcessor {
     const heard = inputs[0]?.[0] ?? this.#silence
     const played = inputs[1]?.[0] ?? this.#silence
     if (this.#filter === null) out.set(heard)
-    else this.#filter.process(heard, played, out)
+    else {
+      this.#filter.process(heard, played, out)
+      if (this.#filter.heldBack !== this.#reported) {
+        this.#reported = this.#filter.heldBack
+        this.port.postMessage({ heldBackSeconds: this.#reported / sampleRate })
+      }
+    }
     return !this.#closed
   }
 }

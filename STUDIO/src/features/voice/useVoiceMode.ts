@@ -228,6 +228,10 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
       silenceMs.current = 0
       sinceCut.current = performance.now()
       taking.current = false
+      // Without the canceller the browser's own is all there is, and on a
+      // phone's loudspeaker it does not know Studio's voice: say so, rather
+      // than let Studio answer itself unexplained.
+      if (playback() === null) setNote('Echo cancelling could not start in this browser, so on a loudspeaker Studio may hear itself. Headphones avoid it.')
       moveTo('listening')
     })().catch(() => { if (current === epoch.current) fail('Voice mode could not connect. Try again.') })
     return () => {
