@@ -67,8 +67,9 @@ import { openEchoCancelledAudio, type EchoCancelledAudio } from '@/features/voic
  * With `cancelEcho`, used by voice mode, the microphone is measured and
  * recorded after Studio's own voice has been taken out of it
  * (`echoCanceller.ts`), and `playback()` is where that voice must be played
- * for the canceller to know it. When the canceller cannot start, the
- * microphone is opened with the browser's processing instead.
+ * for the canceller to know it. When the canceller cannot start, or starts
+ * and lets no sound through, the microphone is opened with the browser's
+ * processing instead.
  *
  * ---- Errors -----------------------------------------------------------------
  *
@@ -182,7 +183,15 @@ export function useMicInput() {
       })
       let stream = await open(options?.cancelEcho === true ? false : options?.processing ?? false)
       // Opened after the microphone: a page capturing audio may start sound.
-      const echo = options?.cancelEcho === true ? await openEchoCancelledAudio() : null
+      let echo = options?.cancelEcho === true ? await openEchoCancelledAudio() : null
+      let cleaned = echo?.attach(stream) ?? null
+      // A canceller that started but passes no sound on is worse than none:
+      // nothing the person says would be heard.
+      if (echo !== null && !(await echo.flowing())) {
+        echo.close()
+        echo = null
+        cleaned = null
+      }
       if (options?.cancelEcho === true && echo === null) {
         for (const track of stream.getTracks()) track.stop()
         stream = await open(true)
@@ -197,7 +206,7 @@ export function useMicInput() {
       analyser.fftSize = 2048
       // What is measured is what is recorded: the cleaned microphone when
       // there is one.
-      const measured = echo === null ? stream : echo.attach(stream)
+      const measured = cleaned ?? stream
       if (echo === null) context.createMediaStreamSource(stream).connect(analyser)
       else echo.output.connect(analyser)
 

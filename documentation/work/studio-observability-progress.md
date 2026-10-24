@@ -175,6 +175,16 @@ reply reduced by more than 20 dB, a person between the replies kept) and a
 remembered delay cancelling the first reply. The delay this phone actually
 has, and the result on it, are not yet verified.
 
+Second follow-up (2026-10-24), after the phone's microphone reached Studio
+not at all: the context now runs at the device's own rate (AEC3 resamples)
+instead of a forced 48 kHz, and before voice mode listens it asks the worklet
+for quarter-second peaks in and out; no non-zero microphone through the
+canceller within 3 s closes the graph and reopens the microphone with the
+browser's processing, with the existing "could not start" line shown. In
+Chromium a live source passed and a silent one fell back after 3 s; a
+44.1 kHz filter test was added. Which of these the phone hit is not known,
+because no client observation carries it.
+
 ## Other-device HTTPS (2026-10-22)
 
 The existing remote listener answers TLS on the same ports when a certificate

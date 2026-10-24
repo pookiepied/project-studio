@@ -7,7 +7,10 @@
  * `ready` once the canceller is built, or `failed`; until then it passes the
  * microphone through, so nothing is lost while it starts. It starts with the
  * hold-back in `processorOptions.heldBackSeconds` and reports
- * `{ heldBackSeconds }` whenever it measures a new one.
+ * `{ heldBackSeconds }` whenever it measures a new one. Sent `check`, it
+ * reports `{ heardPeak, outPeak }` every quarter second for a few seconds, so
+ * the page can tell a microphone that reaches it, and leaves it, from one
+ * that does not.
  */
 import { loadAec3, EchoCancellingFilter } from './aec3'
 
@@ -21,11 +24,18 @@ declare function registerProcessor(
   processor: new (options: { processorOptions?: { heldBackSeconds?: number } }) => AudioWorkletProcessor,
 ): void
 
+/** Quarter seconds of health reports after a `check`: longer than the page waits. */
+const HEALTH_REPORTS = 16
+
 class EchoCancellerProcessor extends AudioWorkletProcessor {
   #filter: EchoCancellingFilter | null = null
   #closed = false
   #silence = new Float32Array(128)
   #reported = 0
+  #heardPeak = 0
+  #outPeak = 0
+  #counted = 0
+  #reports = HEALTH_REPORTS
 
   constructor(options: { processorOptions?: { heldBackSeconds?: number } }) {
     super()
@@ -39,6 +49,13 @@ class EchoCancellerProcessor extends AudioWorkletProcessor {
       () => this.port.postMessage('failed'),
     )
     this.port.onmessage = (event) => {
+      if (event.data === 'check') {
+        this.#reports = 0
+        this.#heardPeak = 0
+        this.#outPeak = 0
+        this.#counted = 0
+        return
+      }
       if (event.data !== 'close') return
       this.#closed = true
       this.#filter?.free()
@@ -60,7 +77,20 @@ class EchoCancellerProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ heldBackSeconds: this.#reported / sampleRate })
       }
     }
+    if (this.#reports < HEALTH_REPORTS) this.#health(heard, out)
     return !this.#closed
+  }
+
+  #health(heard: Float32Array, out: Float32Array): void {
+    for (const sample of heard) this.#heardPeak = Math.max(this.#heardPeak, Math.abs(sample))
+    for (const sample of out) this.#outPeak = Math.max(this.#outPeak, Math.abs(sample))
+    this.#counted += out.length
+    if (this.#counted < sampleRate / 4) return
+    this.port.postMessage({ heardPeak: this.#heardPeak, outPeak: this.#outPeak })
+    this.#reports++
+    this.#heardPeak = 0
+    this.#outPeak = 0
+    this.#counted = 0
   }
 }
 

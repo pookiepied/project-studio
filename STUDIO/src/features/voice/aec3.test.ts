@@ -115,6 +115,20 @@ describe('EchoCancellingFilter', () => {
     expect(10 * Math.log10(energy(cleaned, RATE) / energy(echo, RATE))).toBeLessThan(-20)
   })
 
+  // The context runs at the device's rate, which is not always AEC3's own.
+  it('cancels at 44.1 kHz too', async () => {
+    const rate = 44_100
+    const studio = voice(6, 1)
+    const echo = room(studio, 0.1 * rate)
+    const filter = new EchoCancellingFilter(await loadAec3(), rate)
+    const cleaned = new Float32Array(echo.length)
+    for (let at = 0; at + QUANTUM <= echo.length; at += QUANTUM) {
+      filter.process(echo.subarray(at, at + QUANTUM), studio.subarray(at, at + QUANTUM), cleaned.subarray(at, at + QUANTUM))
+    }
+    filter.free()
+    expect(10 * Math.log10(energy(cleaned, 2 * rate) / energy(echo, 2 * rate))).toBeLessThan(-20)
+  })
+
   it('passes the microphone through when nothing is playing', async () => {
     const person = voice(3, 7)
     const cleaned = await run(person, new Float32Array(person.length))
