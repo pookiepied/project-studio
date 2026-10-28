@@ -11,6 +11,7 @@ import { captionTokens } from './captions'
 import type { AudioSink } from './narration'
 import { isContinuer, saidNothing, SpeechGate } from './speechDetector'
 import { useScreenWakeLock } from './useScreenWakeLock'
+import { recordClientObservation } from '@/platform/diagnostics/events'
 
 export type VoiceStage = 'connecting' | 'listening' | 'thinking' | 'speaking' | 'blocked'
 
@@ -48,6 +49,9 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
   const [holding, setHolding] = useState(false)
   const gate = useRef(new SpeechGate())
   const takeVoicedMs = useRef(0)
+  // When the latest submitted utterance ended, for the end-of-speech to
+  // first-audio measurement. Stage timings only; never words or audio.
+  const endpointAt = useRef<number | null>(null)
   useScreenWakeLock(active)
   // Read when a session starts, not a reason to restart one: the chat a
   // first utterance created keeps the same id and the same session.
@@ -103,11 +107,13 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
     if (overStudio) hold()
     else moveTo('thinking')
     const recording = take()
+    const endedAt = performance.now()
     transcriptQueue.current = transcriptQueue.current.then(async () => {
       const audio = await recording
       taking.current = false
       if (current !== epoch.current || owner === null || owner !== session.current || audio === null) return
       const answer = await transcribeRecording(audio, { segment: true })
+      recordClientObservation({ name: 'client.voice', phase: 'progress', attributes: { stage: 'transcribed', durationMs: Math.round(performance.now() - endedAt), failed: answer.kind === 'note' } })
       if (current !== epoch.current || owner !== session.current) return
       // One take the transcriber could not read - a provider rate limit, a
       // dropped request - costs that take, not the call: the stage says what
@@ -148,6 +154,7 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
       captions.current = ''
       setSpoken([])
       setTurn((value) => value + 1)
+      endpointAt.current = endedAt
       await owner.send(text)
     }).catch(() => { if (current === epoch.current) fail('Voice input failed. Try again.') })
   }, [take, moveTo, fail, hold, release, interrupt])
@@ -203,7 +210,15 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
             sink.current = opened
             return opened
           },
-          onPlaying: () => { if (current === epoch.current) moveTo('speaking') },
+          onPlaying: () => {
+            if (current !== epoch.current) return
+            // The first sound after an utterance, once: later replies (a task
+            // finishing) are not answers to it and would skew the measure.
+            const ended = endpointAt.current
+            endpointAt.current = null
+            if (ended !== null) recordClientObservation({ name: 'client.voice', phase: 'progress', attributes: { stage: 'first_audio', durationMs: Math.round(performance.now() - ended) } })
+            moveTo('speaking')
+          },
           // The caption grows a phrase at a time as each one starts to sound,
           // so it shows what is being said rather than what has streamed in.
           onPhrase: (phrase) => {

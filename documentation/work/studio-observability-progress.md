@@ -1,5 +1,17 @@
 # Studio observability implementation tracker
 
+## Interactive voice and computer use (in progress, 2026-10-28)
+
+The plan, its verified starting state and its completion criteria are in
+`voice-computer-interaction-plan.md`. Stage 1 adds two client observation
+names, `client.voice` and `client.computer`, to the fixed allowlist on both
+sides. `client.voice` carries `stage: transcribed` (end of speech to
+transcript, with `failed`) and `stage: first_audio` (end of the submitted
+utterance to the first sound of the reply, once per utterance) as durations
+only; no words, audio or levels. Baselines on this container: harness 2,618
+passed, 10 failed for environment reasons (listed in the plan), 62 skipped;
+client 1,666 passed.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in

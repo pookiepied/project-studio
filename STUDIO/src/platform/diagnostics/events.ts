@@ -3,6 +3,7 @@ import { newUuid } from '@/lib/id'
 export const CLIENT_OBSERVATION_NAMES = [
   'client.request', 'client.submission', 'client.stream', 'client.delivery',
   'client.projection', 'client.display', 'client.window',
+  'client.voice', 'client.computer',
 ] as const
 export type ClientObservationName = (typeof CLIENT_OBSERVATION_NAMES)[number]
 export const CLIENT_ATTRIBUTE_KEYS = [

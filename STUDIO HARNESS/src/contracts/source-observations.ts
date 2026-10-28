@@ -14,6 +14,7 @@ export interface ObservationSource {
 export const CLIENT_OBSERVATION_NAMES = [
   "client.request", "client.submission", "client.stream", "client.delivery",
   "client.projection", "client.display", "client.window",
+  "client.voice", "client.computer",
 ] as const;
 export const CLIENT_ATTRIBUTE_KEYS = [
   "method", "status", "durationMs", "timedOut", "stage", "failure", "characters",
