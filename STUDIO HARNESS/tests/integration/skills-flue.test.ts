@@ -143,6 +143,16 @@ describe("skills through the Flue agent", () => {
     };
     expect(listing.skills.map((skill) => skill.id)).toContain("hello");
     expect(listing.skills.find((skill) => skill.id === "hello")?.enabledByDefault).toBe(false);
+    expect(listing.skills.find((skill) => skill.id === "visual-responses")?.enabledByDefault).toBe(true);
+
+    // The hello probe owns the activation surface; a bundled default must
+    // not supply that surface while the probed skill is switched off.
+    const bundled = await fetch(`${harness.baseUrl}/api/skills/extensions/skill/visual-responses`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ enabled: false }),
+    });
+    expect(bundled.status).toBe(200);
 
     const client = new FlueHarnessClient({ baseUrl: harness.baseUrl, token: harness.token });
 
