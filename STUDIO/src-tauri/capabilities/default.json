@@ -8,7 +8,8 @@
     "conversation-*",
     "browser-*",
     "diagnostic-*",
-    "computer-indicator"
+    "computer-indicator",
+    "screen-overlay"
   ],
   "permissions": [
     "core:default",

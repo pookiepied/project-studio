@@ -6,6 +6,7 @@ mod clipboard;
 mod external;
 mod permissions;
 mod remote;
+mod screen_overlay;
 mod services;
 mod tray;
 mod window;
@@ -130,6 +131,12 @@ async fn app_ready(window: tauri::WebviewWindow) -> Result<(), String> {
   // keyboard away from the very window the model was just told is the target.
   if window.label() == COMPUTER_INDICATOR_LABEL {
     let _ = window.show();
+    return Ok(());
+  }
+  // The screen overlay is shown only by its own commands, when there is
+  // something to draw; ready alone would put an empty, full-display window
+  // over the desktop.
+  if window.label() == screen_overlay::SCREEN_OVERLAY_LABEL {
     return Ok(());
   }
   let _ = window.show();
@@ -752,6 +759,7 @@ pub fn run() {
     .manage(std::sync::Arc::new(remote::PairingState::default()))
     .manage(remote::RemoteAccess::default())
     .manage(ComputerIndicator::default())
+    .manage(screen_overlay::ScreenOverlay::default())
     // The permission grant, attached to every webview this app creates.
     .plugin(permissions_plugin())
     // Remembers size and position across launches. A desktop app that reopens
@@ -860,6 +868,13 @@ pub fn run() {
       computer_indicator_show,
       computer_indicator_hide,
       computer_indicator_stop,
+      screen_overlay::screen_overlay_marks,
+      screen_overlay::screen_overlay_draw,
+      screen_overlay::screen_overlay_state,
+      screen_overlay::screen_overlay_drawn,
+      screen_overlay::screen_overlay_finish,
+      screen_overlay::screen_overlay_idle,
+      screen_overlay::screen_overlay_reset,
       quit_app,
       clipboard::read_clipboard_text,
       get_harness_endpoint,

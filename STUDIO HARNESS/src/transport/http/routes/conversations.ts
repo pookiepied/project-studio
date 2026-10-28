@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import * as v from "valibot";
 
 import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
+import type { DrawnShapeInput } from "../../../contracts/voice-computer.js";
 import {
   conversationCreateSchema,
   conversationPatchSchema,
@@ -114,8 +115,20 @@ export interface ConversationRoutesOptions {
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
     /** The voice call's Share screen switch; off by default and never turned on by Studio. */
     sharing?(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }>;
+    /** A picture of the display the person points at, taken as they finish speaking. */
+    glance?(conversationId: string): Promise<unknown>;
+    /** Shapes the person drew on the shared screen, in desktop pixels. */
+    drew?(conversationId: string, shapes: readonly DrawnShapeInput[]): Promise<unknown>;
   };
 }
+
+const drawnSchema = v.object({
+  shapes: v.pipe(v.array(v.object({
+    shape: v.picklist(["loop", "line", "dot", "scribble"]),
+    x: v.pipe(v.number(), v.finite()), y: v.pipe(v.number(), v.finite()),
+    width: v.pipe(v.number(), v.finite(), v.minValue(0)), height: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  })), v.minLength(1), v.maxLength(12)),
+});
 
 /**
  * Parses a request body without trusting it. `conversationCreateSchema` and
@@ -410,6 +423,27 @@ export function createConversationRoutes(
     }
     if (options.computer?.sharing === undefined) return context.json({ error: { message: "Screen sharing is unavailable." } }, 503);
     return context.json(await options.computer.sharing(id, parsed.output.on));
+  });
+
+  routes.post("/:id/computer/glance", async (context) => {
+    context.header("Cache-Control", "no-store");
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
+    if (options.computer?.glance === undefined) return context.json({ error: { message: "Screen pictures are unavailable." } }, 503);
+    return context.json(await options.computer.glance(id));
+  });
+
+  routes.post("/:id/computer/drew", async (context) => {
+    context.header("Cache-Control", "no-store");
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
+    const parsed = v.safeParse(drawnSchema, await body(context));
+    if (!parsed.success) {
+      const error = invalidBody("A drawing is { \"shapes\": [...] } with one to twelve shapes, each a loop, line, dot or scribble with x, y, width and height.");
+      return context.json(failure(error), statusOf(error));
+    }
+    if (options.computer?.drew === undefined) return context.json({ error: { message: "Drawing on the screen is unavailable." } }, 503);
+    return context.json(await options.computer.drew(id, parsed.output.shapes));
   });
 
   routes.post("/", async (context) => {

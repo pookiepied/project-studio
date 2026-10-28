@@ -41,6 +41,7 @@ import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
 import { McpMark } from '@/components/icons/McpMark'
 import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave } from '@/components/icons/drawn'
+import { DoneMark, EraserMark, HighlighterMark, PenMark, ShareScreenMark, ShowMeMark, UndoMark } from '@/components/icons/screen'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
 const SNAP = { type: 'spring', stiffness: 520, damping: 30, mass: 0.5 } as const
@@ -399,5 +400,15 @@ export const Icons = {
   stop: StopSquare,
   play: PlayTriangle,
   pause: PauseBars,
+  // The screen family (`screen.tsx`): one hand for the drawing toolbar, so
+  // its undo and done are drawn there too rather than borrowed from the
+  // library's `undo` and `check`, which they sit beside nowhere else.
+  shareScreen: ShareScreenMark,
+  showMe: ShowMeMark,
+  inkPen: PenMark,
+  inkHighlighter: HighlighterMark,
+  inkErase: EraserMark,
+  inkUndo: UndoMark,
+  inkDone: DoneMark,
 }
 

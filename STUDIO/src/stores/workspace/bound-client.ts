@@ -113,6 +113,18 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
         call('The harness is not running, so nothing is driving the computer.', (client) =>
           client.stopConversationComputer(conversationId),
         ),
+      control: (conversationId, action) =>
+        call('The harness is not running, so the desktop cannot be paused or handed back.', (client) =>
+          client.controlConversationComputer(conversationId, action)),
+      share: (conversationId, on) =>
+        call('The harness is not running, so the screen cannot be shared.', (client) =>
+          client.shareConversationScreen(conversationId, on)),
+      glance: (conversationId) =>
+        call('The harness is not running, so no picture was taken.', (client) =>
+          client.glanceConversationScreen(conversationId)),
+      drew: (conversationId, shapes) =>
+        call('The harness is not running, so the drawing did not reach Studio.', (client) =>
+          client.drewOnConversationScreen(conversationId, shapes)),
     },
     mediaJobs: {
       list: (conversationId) =>

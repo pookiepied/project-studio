@@ -36,8 +36,9 @@ describe("the tool surface", () => {
     for (const tool of TOOLS) expect(tool.name.startsWith("studio_computer_")).toBe(true);
     expect(new Set(TOOLS.map((tool) => tool.name)).size).toBe(TOOLS.length);
     // 27 until desktop control (ADR 0059) added `control`: the lease is a
-    // capability a model must be able to read and hand back.
-    expect(TOOLS).toHaveLength(28);
+    // capability a model must be able to read and hand back; 29 with `mark`,
+    // pointing on the person's screen without touching it.
+    expect(TOOLS).toHaveLength(29);
   });
 
   it("covers the jobs the capability exists for", () => {

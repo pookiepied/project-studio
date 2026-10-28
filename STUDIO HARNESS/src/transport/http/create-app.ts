@@ -28,6 +28,7 @@ import type { ConversationTitlingPort } from "../../conversations/titling.js";
 import type { BackgroundJobs } from "../../process/background.js";
 import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
+import type { DrawnShapeInput } from "../../contracts/voice-computer.js";
 import type { TaskStore } from "../../agents/definitions/task-store.js";
 import type { TaskControlPort } from "./routes/tasks.js";
 import { createTaskRoutes } from "./routes/tasks.js";
@@ -180,6 +181,8 @@ export interface CreateHttpAppOptions {
     stop(conversationId: string): Promise<boolean>;
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
     sharing?(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }>;
+    glance?(conversationId: string): Promise<unknown>;
+    drew?(conversationId: string, shapes: readonly DrawnShapeInput[]): Promise<unknown>;
   };
   /**
    * The application database. The conversation routes own the purge of

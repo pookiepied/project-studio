@@ -149,6 +149,14 @@ export interface BoundClient {
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
   readonly computer: {
     stop: (conversationId: string) => Promise<HarnessResult<boolean>>
+    /** The person's hold on the desktop lease: pause, show-me, hand back (ADR 0059). */
+    control: (conversationId: string, action: 'pause' | 'resume' | 'demonstrate') => Promise<HarnessResult<void>>
+    /** The voice call's Share screen switch. */
+    share: (conversationId: string, on: boolean) => Promise<HarnessResult<boolean>>
+    /** A picture of the display the person points at, as their speech ends. */
+    glance: (conversationId: string) => Promise<HarnessResult<void>>
+    /** Shapes the person drew on screen. */
+    drew: (conversationId: string, shapes: readonly import('@/domain/screen/ink').DrawnShape[]) => Promise<HarnessResult<void>>
   }
   /** The generation jobs - images and videos - bound the same way. */
   readonly mediaJobs: {

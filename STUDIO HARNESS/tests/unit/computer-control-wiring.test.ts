@@ -136,7 +136,7 @@ describe("what the voice agent is offered", () => {
     expect(voiceToolOffered("native", "read", false)).toBe(true);
     for (const name of ["bash", "write", "edit", "jobs", "discover", "task"]) expect(voiceToolOffered("native", name, true)).toBe(false);
     expect(voiceToolOffered(COMPUTER_NAMESPACE, "studio_computer_screenshot", false)).toBe(false);
-    const offered = ["displays", "screenshot", "zoom", "cursor", "status", "windows", "apps", "control", "read_ui", "act", "set_value", "click", "type", "key", "scroll", "focus", "open", "batch"];
+    const offered = ["displays", "screenshot", "zoom", "cursor", "status", "windows", "apps", "control", "read_ui", "act", "set_value", "click", "type", "key", "scroll", "focus", "open", "batch", "mark"];
     for (const name of offered) expect(voiceToolOffered(COMPUTER_NAMESPACE, `studio_computer_${name}`, true)).toBe(true);
     for (const name of ["stop", "drag", "mouse_button", "hold_key", "clipboard", "wait", "wait_for_window", "arrange", "select_text", "move"]) {
       expect(voiceToolOffered(COMPUTER_NAMESPACE, `studio_computer_${name}`, true)).toBe(false);
@@ -177,6 +177,32 @@ describe("the interaction block a voice turn starts with", () => {
     expect(interactionContextText(false, undefined)).toContain("the computer server is not running");
     expect(interactionContextText(true, { desktop: { mode: "active", fresh: true, owner: null } })).toContain("none taken in this conversation");
   });
+
+  it("says where the pointer is now and what the person did, newest first, marking what the picture cannot show", () => {
+    const text = interactionContextText(true, {
+      ...state,
+      latest: { ...state.latest, by: { role: "glance" }, ageMs: 3000 },
+      pointer: { x: 1840, y: 520, display: 1, ageMs: 300 },
+      recent: [
+        { kind: "rest", at: 1, x: 300, y: 200, display: 0, ms: 900, title: "Notes", agoMs: 8000 },
+        { kind: "display", at: 2, display: 1, agoMs: 2000 },
+        { kind: "drew", at: 3, shape: "loop", display: 1, x: 1800, y: 500, width: 80, height: 40, agoMs: 1000 },
+        { kind: "future", at: 4, agoMs: 500 },
+      ],
+    });
+    expect(text).toContain("taken by Studio, as the person finished speaking");
+    expect(text).toContain("- Pointer now: (1840,520) on display 1, sampled 0.3s ago.");
+    const events = text.split("\n").filter((line) => / ago: /.test(line));
+    expect(events).toEqual([
+      "  1.0s ago: the person drew a loop around the 80x40 area from (1800,500) on display 1 [after the latest picture]",
+      "  2.0s ago: the pointer crossed to display 1 [after the latest picture]",
+      "  8.0s ago: the pointer rested 0.9s at (300,200) on display 0, over \"Notes\"",
+    ]);
+  });
+
+  it("says when live updates are unavailable rather than going quiet", () => {
+    expect(interactionContextText(true, { desktop: { mode: "active", fresh: true, owner: null }, live: "unavailable" })).toContain("Live pointer updates are unavailable");
+  });
 });
 
 describe("the Share screen switch", () => {
@@ -202,5 +228,30 @@ describe("the Share screen switch", () => {
     expect((await put("cnv_7/computer/sharing", { on: "yes" })).status).toBe(400);
     expect((await put("cnv_missing/computer/sharing", { on: true })).status).toBe(404);
     expect(asked).toEqual(["cnv_7:true", "cnv_7:false"]);
+  });
+
+  it("hands a glance and a drawing to the runtime, and refuses a drawing that is not one", async () => {
+    const session = createAdmissionSession({ scopes: ALL_ADMISSION_SCOPES });
+    const app = new Hono<AdmissionEnv>();
+    app.use("*", createAdmissionMiddleware(session.verifier));
+    const asked: string[] = [];
+    app.route("/api/conversations", createConversationRoutes({
+      conversations: { list: () => [], get: (id: string) => id === "cnv_7" ? { id } : undefined } as unknown as ConversationStore,
+      database: db,
+      computer: {
+        stop: async () => false,
+        glance: async (id) => { asked.push(`glance:${id}`); return { glanced: true }; },
+        drew: async (id, shapes) => { asked.push(`drew:${id}:${String(shapes.length)}`); return { recorded: shapes.length }; },
+      },
+    }));
+    const post = (path: string, body?: unknown) => app.request(`http://harness.test/api/conversations/${path}`, {
+      method: "POST", headers: { authorization: `Bearer ${session.credential}`, "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    expect(await (await post("cnv_7/computer/glance")).json()).toEqual({ glanced: true });
+    expect(await (await post("cnv_7/computer/drew", { shapes: [{ shape: "loop", x: 1, y: 2, width: 3, height: 4 }] })).json()).toEqual({ recorded: 1 });
+    expect((await post("cnv_7/computer/drew", { shapes: [] })).status).toBe(400);
+    expect((await post("cnv_7/computer/drew", { shapes: [{ shape: "star", x: 1, y: 2, width: 3, height: 4 }] })).status).toBe(400);
+    expect((await post("cnv_missing/computer/glance")).status).toBe(404);
+    expect(asked).toEqual(["glance:cnv_7", "drew:cnv_7:1"]);
   });
 });

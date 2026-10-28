@@ -7,11 +7,13 @@ import {
   browserConversationId,
   diagnosticKind,
   indicatorKind,
+  overlayKind,
   signalAppReady,
   suppressWebviewChrome,
 } from '@/platform/tauri'
 import { AppShell } from '@/shell/AppShell'
 import { ComputerIndicatorWindow } from '@/shell/ComputerIndicatorWindow'
+import { ScreenOverlayWindow } from '@/features/screen/ScreenOverlayWindow'
 import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { CaptureMonitor } from '@/shell/CaptureMonitor'
 import { DetachedShell } from '@/shell/DetachedShell'
@@ -43,6 +45,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
   const browserConversation = browserConversationId()
   const diagnostic = diagnosticKind()
   const indicator = indicatorKind()
+  const overlay = overlayKind()
 
   useEffect(() => {
     // Startup contract: the native window stays hidden until the first paint,
@@ -63,6 +66,18 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
   // The computer indicator stops here for the same reason, and further: it
   // needs no pairing and no harness, only the theme, because its one action
   // is a call to the native side. See `ComputerIndicatorWindow`.
+  // The screen overlay stops here for the indicator's reasons: it draws
+  // what Rust tells it to and answers through Rust. See `ScreenOverlayWindow`.
+  if (overlay === 'screen') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AppearanceProvider initial={initialAppearance}>
+          <ScreenOverlayWindow />
+        </AppearanceProvider>
+      </MotionConfig>
+    )
+  }
+
   if (indicator === 'computer') {
     return (
       <MotionConfig reducedMotion="user">

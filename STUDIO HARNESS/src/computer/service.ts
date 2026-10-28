@@ -5,9 +5,31 @@ import { VOICE_BATCH_STEPS, VOICE_COMPUTER_TOOLS } from "../contracts/voice-comp
 import { ComputerError } from "./errors.js";
 import { ComputerSession } from "./session.js";
 import { toolByName, type ToolAnswer } from "./tools.js";
+import { sampleFrom, ScreenWatch, type DrawnShape } from "./screen-watch.js";
+import { displaysFrom } from "./marks.js";
 
 /** How long a pause waits for held input to be let go before saying it is still pending. */
 const RELEASE_WAIT_MS = 5_000;
+
+/** How often the pointer and front window are sampled while the screen is shared. */
+const PULSE_MS = 500;
+
+/** Failed samples in a row after which the watch stops and says so, rather than retrying forever. */
+const PULSE_FAILURES = 3;
+
+/** The most shapes one drawing report may carry. */
+const MAX_DRAWN = 12;
+
+interface Watching {
+  readonly watch: ScreenWatch;
+  readonly timer: NodeJS.Timeout | undefined;
+  inflight: boolean;
+  failures: number;
+}
+
+function isShape(value: unknown): value is DrawnShape["shape"] {
+  return value === "loop" || value === "line" || value === "dot" || value === "scribble";
+}
 
 /** Conversations whose latest picture is kept; older ones drop theirs. */
 const MAX_PICTURED_CONVERSATIONS = 8;
@@ -65,11 +87,17 @@ export class ComputerService {
   readonly #sharing = new Set<string>();
   readonly #sharingEpochs = new Map<string, number>();
   readonly #pictured = new Set<string>();
+  readonly #watches = new Map<string, Watching>();
+  /** Conversations whose watch gave up, so the turn's context can say live updates are unavailable. */
+  readonly #unwatchable = new Set<string>();
   readonly desktop = new DesktopControl();
   readonly #create: (key: string) => ComputerSession;
+  readonly #pulseMs: number;
 
-  constructor(create: (key: string) => ComputerSession = (key) => new ComputerSession(key)) {
+  /** `pulseMs` 0 keeps the watch's events (drawings) without sampling, for tests about something else. */
+  constructor(create: (key: string) => ComputerSession = (key) => new ComputerSession(key), pulseMs = PULSE_MS) {
     this.#create = create;
+    this.#pulseMs = pulseMs;
   }
 
   session(conversation: string): ComputerSession {
@@ -92,6 +120,12 @@ export class ComputerService {
     if (sharing !== undefined) this.setSharing(actor.conversation, sharing);
     const voiceRefusal = this.#voiceRefusal(actor, name, args);
     if (voiceRefusal !== undefined) return voiceRefusal;
+    // Marks are drawn by the window showing this conversation, from its own
+    // transcript; a task's calls are not in it, so its marks would be
+    // reported shown and never appear.
+    if (actor.role === "worker" && name === "studio_computer_mark") {
+      return { isError: true, content: [{ type: "text", text: "Marks are shown for the agent the person is talking with, not for tasks. Say where things are in your answer instead." }] };
+    }
     // Stop bypasses the queue so cancellation invalidates queued input, and
     // fences the lease first so nothing queued slips in before the driver ends.
     if (name === "studio_computer_stop") {
@@ -186,6 +220,103 @@ export class ComputerService {
     if (on) this.#sharing.add(conversation);
     else this.#sharing.delete(conversation);
     this.#sharingEpochs.set(conversation, this.#sharingEpoch(conversation) + 1);
+    if (on) this.#watch(conversation);
+    else this.#unwatch(conversation);
+  }
+
+  /**
+   * Samples the pointer, the front window and the person's input counts
+   * twice a second while the screen is shared, and only then: sharing is
+   * the person's switch, and off means nothing is sampled. A sample never
+   * waits behind a running call - it is skipped - so watching never slows
+   * the work it watches.
+   */
+  #watch(conversation: string): void {
+    if (this.#watches.has(conversation)) return;
+    this.#unwatchable.delete(conversation);
+    const session = this.session(conversation);
+    const watching: Watching = {
+      watch: new ScreenWatch(),
+      inflight: false,
+      failures: 0,
+      timer: this.#pulseMs <= 0 ? undefined : setInterval(() => {
+        if (watching.inflight || session.busy) return;
+        watching.inflight = true;
+        session.request("pulse").then((value) => {
+          const sample = sampleFrom(value, Date.now());
+          if (sample === undefined) throw new ComputerError("internal", { message: "The driver answered a pulse without a pointer." });
+          watching.failures = 0;
+          if (this.#watches.get(conversation) !== watching) return;
+          if (watching.watch.sample(sample)) this.desktop.noteHumanInput();
+        }).catch(() => {
+          watching.failures += 1;
+          if (watching.failures < PULSE_FAILURES) return;
+          this.#unwatch(conversation);
+          this.#unwatchable.add(conversation);
+        }).finally(() => { watching.inflight = false; });
+      }, this.#pulseMs),
+    };
+    watching.timer?.unref();
+    this.#watches.set(conversation, watching);
+  }
+
+  #unwatch(conversation: string): void {
+    const watching = this.#watches.get(conversation);
+    if (watching === undefined) return;
+    clearInterval(watching.timer);
+    this.#watches.delete(conversation);
+  }
+
+  /**
+   * A picture of the display the person is pointing at, taken as they finish
+   * speaking so it is ready when the turn starts. Skipped when the shared
+   * picture already shows that display and nothing has happened since. It is
+   * taken under its own actor, so it is the conversation's shared picture
+   * but never counts as the voice agent's own look before input.
+   */
+  async #glance(conversation: string): Promise<Record<string, unknown>> {
+    if (!this.#sharing.has(conversation)) return { glanced: false, reason: "sharing_off" };
+    const now = Date.now();
+    const watch = this.#watches.get(conversation)?.watch;
+    const pointer = watch?.pointer;
+    const latest = this.#sessions.get(conversation)?.latestObservation;
+    const happened = latest !== undefined && (watch?.recent(now) ?? []).some((event) => event.kind !== "rest" && event.at > latest.capturedAt);
+    const current = latest !== undefined && staleReasons(latest, this.desktop.changes, now).length === 0 && !happened
+      && (pointer === undefined || pointer.display === latest.display);
+    if (current) return { glanced: false, reason: "current", id: latest.id };
+    const meta = { "studio/conversation": conversation, "studio/actor": `glance:${conversation}`, "studio/role": "voice", "studio/sharing": "on" };
+    const answer = await this.call("studio_computer_screenshot", pointer === undefined ? {} : { display: pointer.display }, meta);
+    const taken = this.#sessions.get(conversation)?.latestObservation;
+    return answer.isError === true || taken === undefined || taken === latest
+      ? { glanced: false, reason: "failed" }
+      : { glanced: true, id: taken.id };
+  }
+
+  /**
+   * What the person drew, from Studio's own drawing window: shapes in the
+   * desktop's physical pixels, placed here on the display they fall on. The
+   * ink itself stays on screen, so the next picture shows it too.
+   */
+  async #drew(conversation: string, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const watch = this.#watches.get(conversation)?.watch;
+    if (watch === undefined) return { recorded: 0, reason: "not_watching" };
+    const shapes = Array.isArray(input["shapes"]) ? input["shapes"].slice(0, MAX_DRAWN) : [];
+    const displays = displaysFrom(await this.session(conversation).request("displays"));
+    const now = Date.now();
+    let recorded = 0;
+    for (const shape of shapes) {
+      if (!isRecord(shape) || !isShape(shape["shape"])) continue;
+      const [x, y, width, height] = [shape["x"], shape["y"], shape["width"], shape["height"]].map((value) => typeof value === "number" && Number.isFinite(value) ? Math.round(value) : NaN);
+      if (x === undefined || y === undefined || width === undefined || height === undefined || [x, y, width, height].some(Number.isNaN)) continue;
+      const centreX = x + width / 2; const centreY = y + height / 2;
+      const on = displays.find((d) => centreX >= d.x && centreX < d.x + d.width && centreY >= d.y && centreY < d.y + d.height);
+      if (on === undefined) continue;
+      watch.drew(now, { shape: shape["shape"], display: on.index, x: x - on.x, y: y - on.y, width: Math.max(0, width), height: Math.max(0, height) });
+      recorded += 1;
+    }
+    // Drawing is the person changing what the screen shows.
+    if (recorded > 0) this.desktop.noteHumanInput();
+    return { recorded };
   }
 
   /**
@@ -198,11 +329,18 @@ export class ComputerService {
     const asking = conversationActor(conversation);
     const latest = this.#sessions.get(conversation)?.latestObservation;
     const now = Date.now();
+    const watch = this.#watches.get(conversation)?.watch;
+    const pointer = watch?.pointer;
     return {
       sharing: this.#sharing.has(conversation),
+      live: watch !== undefined ? "on" : this.#unwatchable.has(conversation) ? "unavailable" : "off",
+      ...(pointer === undefined ? {} : { pointer: { x: pointer.x, y: pointer.y, display: pointer.display, ageMs: now - pointer.at } }),
+      ...(watch === undefined ? {} : { recent: watch.recent(now) }),
       desktop: this.desktop.state(asking),
       ...(latest === undefined ? {} : { latest: {
-        id: latest.id, ageMs: now - latest.capturedAt, by: latest.by.role === "worker" ? { role: "worker", taskId: latest.by.id, ...(latest.by.name === undefined ? {} : { name: latest.by.name }) } : { role: latest.by.role },
+        id: latest.id, ageMs: now - latest.capturedAt,
+        by: latest.by.role === "worker" ? { role: "worker", taskId: latest.by.id, ...(latest.by.name === undefined ? {} : { name: latest.by.name }) }
+          : latest.by.id.startsWith("glance:") ? { role: "glance" } : { role: latest.by.role },
         display: latest.display, frame: latest.frame, region: latest.region, image: latest.image, pointer: latest.pointer,
         front: latest.front === null ? null : { handle: latest.front.handle, app: latest.front.app, title: latest.front.title },
         stale: staleReasons(latest, this.desktop.changes, now),
@@ -239,6 +377,10 @@ export class ComputerService {
         return { sharing: this.#sharing.has(conversation) };
       case "context":
         return this.context(conversation);
+      case "glance":
+        return this.#glance(conversation);
+      case "drew":
+        return this.#drew(conversation, input);
       case "release_actor": {
         const id = input["actor"];
         if (typeof id !== "string" || id === "") throw new ComputerError("bad_input", { message: "Name the actor to release." });
@@ -265,6 +407,7 @@ export class ComputerService {
   }
 
   async finish(): Promise<void> {
+    for (const conversation of [...this.#watches.keys()]) this.#unwatch(conversation);
     await Promise.all([...this.#sessions.values()].map((session) => session.close()));
   }
 }

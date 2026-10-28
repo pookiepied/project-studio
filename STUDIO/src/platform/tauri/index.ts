@@ -20,5 +20,13 @@ export {
   resetWindowSize,
   signalAppReady,
 } from './window'
+export {
+  overlayKind,
+  showScreenMarks,
+  startScreenDrawing,
+  resetScreenOverlay,
+  onScreenDrawn,
+  onScreenDrawingFinished,
+} from './screenOverlay'
 export { suppressWebviewChrome } from './nativeMenus'
 export { readDesktopClipboardText } from './clipboard'

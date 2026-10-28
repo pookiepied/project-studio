@@ -4,15 +4,24 @@
  * list and the computer server's refusal. A rule only one of them knew would
  * be the rule the other forgot.
  *
- * Looking, the lease, and short, bounded actions. Dragging, holding keys or
+ * Looking, pointing things out, the lease, and short, bounded actions. Dragging, holding keys or
  * buttons, the clipboard, waiting, arranging windows and selecting text by
  * offsets are sustained or fiddly work for a task. Stop is the person's
  * control, not the agent's.
  */
 export const VOICE_COMPUTER_TOOLS: ReadonlySet<string> = new Set([
   "displays", "screenshot", "zoom", "cursor", "status", "windows", "apps", "control",
-  "read_ui", "act", "set_value", "click", "type", "key", "scroll", "focus", "open", "batch",
+  "read_ui", "act", "set_value", "click", "type", "key", "scroll", "focus", "open", "batch", "mark",
 ]);
+
+/** One shape the person drew with Studio's drawing window, in the desktop's physical pixels. */
+export interface DrawnShapeInput {
+  readonly shape: "loop" | "line" | "dot" | "scribble";
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 
 /** The longest batch the conversation's own agent runs in a voice call. */
 export const VOICE_BATCH_STEPS = 6;

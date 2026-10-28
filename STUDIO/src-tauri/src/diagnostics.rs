@@ -126,6 +126,14 @@ pub(crate) fn command_received(command: &str) {
         "computer_indicator_show" => "computer_indicator_show",
         "computer_indicator_hide" => "computer_indicator_hide",
         "computer_indicator_stop" => "computer_indicator_stop",
+        "screen_overlay_marks" => "screen_overlay_marks",
+        "screen_overlay_draw" => "screen_overlay_draw",
+        "screen_overlay_drawn" => "screen_overlay_drawn",
+        "screen_overlay_finish" => "screen_overlay_finish",
+        "screen_overlay_reset" => "screen_overlay_reset",
+        // The page's own housekeeping: what to show after loading, and going
+        // quiet when a fade ends. Neither is a person's or the agent's act.
+        "screen_overlay_state" | "screen_overlay_idle" => return,
         "quit_app" => "quit_app",
         "read_clipboard_text" => "read_clipboard_text",
         // Diagnostic polling resolves the owner through these read-only probes.

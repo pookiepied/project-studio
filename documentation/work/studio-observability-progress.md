@@ -71,6 +71,31 @@ says the desktop may be shared. No new boundary, so no new observation.
 Coverage: `agent-slots.test.ts`. The opt-in routing eval needs a provider key
 and is not part of this stage.
 
+Stage 5, the shared screen between pictures, pointing and drawing. Live
+awareness is events, not video: while sharing is on the computer server
+samples the pointer, the front window and the person's input counts twice a
+second (driver `pulse`, which never consumes the input a tool result must
+report) and folds them into a short expiring list (`computer/screen-watch.ts`:
+pointer rests, display crossings, window changes, input bursts, drawings; at
+most 24 events, 60 s). The turn's `interaction_context` gains the pointer now
+and the six newest events, marked when they came after the latest picture.
+As speech ends the client asks for a glance (`POST .../computer/glance`,
+operation `computer.glance`, stage `glanced`/`current`/`sharing_off`/`failed`/
+`not_running`): a picture of the pointer's display under its own actor, so it
+is shared but never counts as the voice agent's look before input. The new
+`studio_computer_mark` tool (29 tools) shows points, rings, boxes and arrows
+on screen through a native overlay window (`screen_overlay.rs`, native
+commands `screen_overlay_*` recorded as received); tasks are refused it. Show
+me holds the lease (`demonstrate`) and opens the overlay for drawing; each
+stroke goes to `POST .../computer/drew` (operation `computer.drew`, counts
+only) as a shape and box in desktop pixels, never points. Sharing starts the
+computer server; everything else here still never does.
+Coverage: `screen-watch.test.ts`, `computer-marks.test.ts`, `computer-lease.test.ts`
+(watch, glance, drawing, marks), `computer-control-wiring.test.ts` (context,
+routes); client `ink`, `marks`, `markCalls`, `useScreenShare`,
+`ScreenOverlayWindow`, `VoiceModeOverlay`. Not verifiable here: the overlay on
+a real display, the driver's pulse on Windows.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in

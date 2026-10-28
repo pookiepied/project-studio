@@ -24,9 +24,11 @@ vi.mock("node:child_process", async (load) => {
     const answer = (request) => {
       shots++;
       const result = request.op === 'screenshot'
-        ? { display: 0, frameWidth: 100, frameHeight: 100, x: 0, y: 0, width: 100, height: 100, imageWidth: 100, imageHeight: 100, mimeType: 'image/jpeg', data: 'SHOT' + shots,
+        ? { display: typeof request.args.display === 'number' ? request.args.display : 0, frameWidth: 100, frameHeight: 100, x: 0, y: 0, width: 100, height: 100, imageWidth: 100, imageHeight: 100, mimeType: 'image/jpeg', data: 'SHOT' + shots,
             pointer: { x: 7, y: 8, display: 0 }, front: { title: 'Form', app: 'app', handle: 42 } }
         : request.op === 'cursor' ? { x: 1, y: 2, display: 0 }
+        : request.op === 'pulse' ? { pointer: { x: 150, y: 40, display: 1 }, front: { title: 'Form', app: 'app', handle: 42 }, input: { buttons: 0, keys: 0, wheels: 0, moves: 0 }, monitored: true }
+        : request.op === 'displays' ? [{ index: 0, x: 0, y: 0, width: 100, height: 100 }, { index: 1, x: 100, y: 0, width: 200, height: 100 }]
         : request.op === 'status' ? { target: null, front: null, cursor: { x: 1, y: 2, display: 0 }, displays: [] }
         : { said: 'Sent.', typed: 5, done: true, released: true, observation: { available: true, refsInvalidated: true } };
       // The window list stands in for any answer that carries the person's own clicks.
@@ -59,7 +61,9 @@ vi.mock("node:child_process", async (load) => {
 const services: ComputerService[] = [];
 /** Sharing is on for the chat here: these tests are about the lease, and sharing has its own below. */
 function service(sharing = true): ComputerService {
-  const created = new ComputerService();
+  // No pulse: these count the operations that reach the driver, and the
+  // screen watch's own sampling has its tests below.
+  const created = new ComputerService(undefined, 0);
   if (sharing) created.setSharing(CHAT, true);
   services.push(created);
   return created;
@@ -373,5 +377,73 @@ describe("screen sharing in a voice call", () => {
     expect(said(await computer.call("studio_computer_drag", { from: [0, 0], to: [1, 1] }, voice))).toContain("not offered");
     expect(said(await computer.call("studio_computer_stop", {}, voice))).toContain("not offered");
     expect(spawned.ops).not.toContain("key");
+  });
+});
+
+describe("the shared screen between pictures", () => {
+  function watched(pulseMs = 20): ComputerService {
+    const created = new ComputerService(undefined, pulseMs);
+    services.push(created);
+    return created;
+  }
+
+  it("samples the pointer only while sharing is on, and says where it is", async () => {
+    const computer = watched();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(spawned.ops).not.toContain("pulse");
+    expect(computer.context(CHAT)["live"]).toBe("off");
+    computer.setSharing(CHAT, true);
+    await vi.waitFor(() => expect(computer.context(CHAT)["pointer"]).toMatchObject({ x: 150, y: 40, display: 1 }));
+    expect(computer.context(CHAT)["live"]).toBe("on");
+    computer.setSharing(CHAT, false);
+    const sampled = spawned.ops.filter((op) => op === "pulse").length;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(spawned.ops.filter((op) => op === "pulse").length).toBe(sampled);
+    expect(computer.context(CHAT)["pointer"]).toBeUndefined();
+  });
+
+  it("takes a picture of the display the pointer is on as speech ends, and skips it while that picture is current", async () => {
+    const computer = watched();
+    computer.setSharing(CHAT, true);
+    await vi.waitFor(() => expect(computer.context(CHAT)["pointer"]).toBeDefined());
+    const first = await computer.control({ input: { action: "glance" }, _meta: { "studio/conversation": CHAT } });
+    expect(first).toMatchObject({ glanced: true });
+    expect(computer.context(CHAT)["latest"]).toMatchObject({ by: { role: "glance" } });
+    const again = await computer.control({ input: { action: "glance" }, _meta: { "studio/conversation": CHAT } });
+    expect(again).toMatchObject({ glanced: false });
+    expect(spawned.ops.filter((op) => op === "screenshot").length).toBe(1);
+  });
+
+  it("does not let a glance count as the voice agent's own look before input", async () => {
+    const computer = watched(0);
+    computer.setSharing(CHAT, true);
+    await computer.control({ input: { action: "glance" }, _meta: { "studio/conversation": CHAT } });
+    const clicked = await computer.call("studio_computer_click", { x: 5, y: 5 }, voice);
+    expect(refusal(clicked)).toBe("observe_first");
+  });
+
+  it("refuses a glance while sharing is off, sending nothing", async () => {
+    const computer = watched(0);
+    expect(await computer.control({ input: { action: "glance" }, _meta: { "studio/conversation": CHAT } })).toEqual({ glanced: false, reason: "sharing_off" });
+    expect(spawned.ops).toEqual([]);
+  });
+
+  it("places what the person drew on the display it falls on, in that display's pixels", async () => {
+    const computer = watched(0);
+    computer.setSharing(CHAT, true);
+    const recorded = await computer.control({ input: { action: "drew", shapes: [{ shape: "loop", x: 140, y: 20, width: 30, height: 20 }, { shape: "dot", x: 9999, y: 9999, width: 0, height: 0 }] }, _meta: { "studio/conversation": CHAT } });
+    expect(recorded).toEqual({ recorded: 1 });
+    expect(computer.context(CHAT)["recent"]).toEqual([expect.objectContaining({ kind: "drew", shape: "loop", display: 1, x: 40, y: 20, width: 30, height: 20 })]);
+  });
+
+  it("shows the voice agent's marks on the display it names, and refuses a task's", async () => {
+    const computer = watched(0);
+    computer.setSharing(CHAT, true);
+    const shown = await computer.call("studio_computer_mark", { display: 1, marks: [{ kind: "ring", x: 10, y: 10, width: 40, height: 20, label: "Save" }] }, voice);
+    expect(shown.isError).toBeUndefined();
+    expect(shown.structuredContent).toMatchObject({ marks: { display: { index: 1, x: 100, y: 0, width: 200, height: 100 }, marks: [{ kind: "ring", label: "Save" }] } });
+    const worker = await computer.call("studio_computer_mark", { display: 1, marks: [{ kind: "point", x: 1, y: 1 }] }, hazel);
+    expect(worker.isError).toBe(true);
+    expect(said(worker)).toContain("not for tasks");
   });
 });

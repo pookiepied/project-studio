@@ -58,6 +58,8 @@ const VERBS: Readonly<Record<string, readonly [string, string]>> = {
   arrange: ['Arranging a window', 'Arranged a window'],
   batch: ['Running several steps', 'Ran several steps'],
   stop: ['Stopping computer control', 'Stopped computer control'],
+  control: ['Checking who has the desktop', 'Checked who has the desktop'],
+  mark: ['Pointing on your screen', 'Pointed on your screen'],
 }
 
 export function computerVerb(action: string, running: boolean): string {

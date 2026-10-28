@@ -3,16 +3,18 @@ import type { ComputerSession } from "./session.js";
 import { refusalMessage, type Actor, type DesktopControl, type DesktopState } from "./control.js";
 import { describeObservation, frontFrom, pointerFrom, staleReasons } from "./observations.js";
 import { createStudioUuid } from "../contracts/uuid.js";
+import { displaysFrom, markSet } from "./marks.js";
 import { AFTER_ACTION_SIDE_PX, SCREENSHOT_MAX_BYTES, SCREENSHOT_SIDE_PX } from "../contracts/media-limits.js";
 
 /**
  * The tools, as the model sees them.
  *
- * Twenty-eight, named `studio_computer_*`, and each one earns its schema with
+ * Twenty-nine, named `studio_computer_*`, and each one earns its schema with
  * a job the capability exists for: see what is on screen, point and click,
  * type, find and drive windows, read a window's controls and act on them by
- * reference, read or write the clipboard, and take or give back the one
- * desktop (`control`, ADR 0059). The list a person handed over
+ * reference, read or write the clipboard, take or give back the one
+ * desktop (`control`, ADR 0059), and point things out to the person
+ * without touching anything (`mark`). The list a person handed over
  * as "the common pattern" had thirty; the difference is folding (ADR 0013,
  * one tool per capability): five kinds of click are one `click` with a
  * button and a count, two mouse-button tools are one, two clipboard tools
@@ -989,6 +991,50 @@ export const TOOLS: readonly ToolDefinition[] = [
       lines.push("Input was dispatched; the intended application result is not verified. Look at the picture before going on.");
       const final = await acted(session, lines.join("\n"), num(input, "display"));
       return failed ? { ...final, isError: true } : final;
+    },
+  },
+
+  {
+    name: "studio_computer_mark",
+    description:
+      "Point at things on the person's screen while you talk: a point (\"this one\"), a ring around something, a box around an area, " +
+      "or an arrow from x,y to toX,toY, each with an optional short label. Up to 6 at once on one display, in the display's pixels like a click; " +
+      "they fade after seconds (default 6, at most 30). clear: true takes yours down early. A mark sends no input and needs no desktop. " +
+      "Studio draws them above every window, so they show in screenshots taken while they are up. Point from a fresh picture, never a stale one.",
+    inputSchema: object({
+      ...DISPLAY,
+      marks: {
+        type: "array",
+        maxItems: 6,
+        items: {
+          type: "object",
+          properties: {
+            kind: { type: "string", enum: ["point", "ring", "box", "arrow"] },
+            x: NUMBER, y: NUMBER,
+            width: { type: "number", description: "ring and box: the area's width from x." },
+            height: { type: "number", description: "ring and box: the area's height from y." },
+            toX: { type: "number", description: "arrow: where it points." },
+            toY: { type: "number", description: "arrow: where it points." },
+            label: { type: "string", description: "A few words beside the mark." },
+          },
+          required: ["kind", "x", "y"],
+          additionalProperties: false,
+        },
+      },
+      seconds: { type: "number", description: "How long they show. Default 6, at most 30." },
+      clear: { type: "boolean", description: "Take down the marks you showed instead." },
+    }),
+    run: async (session, input) => {
+      if (input["clear"] === true) {
+        return { content: [text("Your marks were taken down.")], structuredContent: { marks: { clear: true } } };
+      }
+      const set = markSet(input, displaysFrom(await session.request("displays")), Date.now());
+      const seconds = Math.round((set.expiresAt - Date.now()) / 1_000);
+      return {
+        content: [text(`Showing ${String(set.marks.length)} mark${set.marks.length === 1 ? "" : "s"} on display ${String(set.display.index)} for ${String(seconds)} seconds. ` +
+          "The person sees them now, and pictures taken while they are up include them. Marks point; they do not click.")],
+        structuredContent: { marks: set },
+      };
     },
   },
 

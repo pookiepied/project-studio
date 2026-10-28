@@ -27,6 +27,7 @@ import { SKILLS_PATH } from './skills'
 import type { HarnessResult, Requester } from './request'
 import { parseQueuedMessage, parseQueuedMessages, type QueuedMessage } from './queued-messages'
 import { parseLiveBrowserState, type BrowserCommand, type LiveBrowserState } from '@/domain/browser/live'
+import type { DrawnShape } from '@/domain/screen/ink'
 
 /**
  * `/api/conversations`: the index rows, their destruction, and the three
@@ -142,6 +143,21 @@ export interface ConversationIndexClient {
    * Answers whether a driver was actually running, for the same reason.
    */
   stopConversationComputer(id: string): Promise<HarnessResult<boolean>>
+  /**
+   * The person's own hold on the desktop lease (ADR 0059): pause the agent,
+   * show it something, or hand it back. No model is asked.
+   */
+  controlConversationComputer(id: string, action: 'pause' | 'resume' | 'demonstrate'): Promise<HarnessResult<void>>
+  /** The voice call's Share screen switch. Answers what the harness now holds. */
+  shareConversationScreen(id: string, on: boolean): Promise<HarnessResult<boolean>>
+  /**
+   * Asks for a picture of the display the person points at, as their speech
+   * ends, so it is ready when the turn starts. Skipped by the harness when
+   * the latest one is current.
+   */
+  glanceConversationScreen(id: string): Promise<HarnessResult<void>>
+  /** Shapes the person drew on screen, in the desktop's physical pixels. */
+  drewOnConversationScreen(id: string, shapes: readonly DrawnShape[]): Promise<HarnessResult<void>>
   /**
    * The undo history of the project this conversation writes to, newest
    * first. Recorded on every write-bearing turn; the read is the one that
@@ -313,6 +329,26 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
             ? (value as Record<string, unknown>)['stopped'] === true
             : false,
       )
+    },
+
+    controlConversationComputer(id, action) {
+      return empty('POST', conversationPath(id, '/computer/control'), { action })
+    },
+
+    shareConversationScreen(id, on) {
+      return json('PUT', conversationPath(id, '/computer/sharing'), { on }, (value) =>
+        typeof value === 'object' && value !== null
+          ? (value as Record<string, unknown>)['sharing'] === true
+          : false,
+      )
+    },
+
+    glanceConversationScreen(id) {
+      return empty('POST', conversationPath(id, '/computer/glance'))
+    },
+
+    drewOnConversationScreen(id, shapes) {
+      return empty('POST', conversationPath(id, '/computer/drew'), { shapes })
     },
 
     stopConversationJob(id, jobId) {

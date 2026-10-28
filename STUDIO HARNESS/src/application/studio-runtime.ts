@@ -120,7 +120,7 @@ import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
 import { init, observe } from "@flue/runtime";
 import { steerTask } from "../agents/task-control.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
-import { voiceToolOffered } from "../contracts/voice-computer.js";
+import { voiceToolOffered, type DrawnShapeInput } from "../contracts/voice-computer.js";
 import { interactionContextText } from "../context/interaction-context.js";
 import { voiceImagePath } from "../conversations/voice-policy.js";
 import { ProviderConfigurationError } from "../contracts/models.js";
@@ -1852,9 +1852,42 @@ export class StudioRuntime implements AgentHost {
     return observeOperation("mcp", "computer.sharing", async () => {
       if (on) this.#screenSharing.add(conversationId);
       else this.#screenSharing.delete(conversationId);
-      await this.#computerRpc(conversationId, { action: "sharing", on });
+      // On starts the computer server, unlike every other control here: the
+      // person just asked to be watched, and live pointer updates only run
+      // where a server is up to sample them.
+      await this.#computerRpc(conversationId, { action: "sharing", on }, on);
       return { sharing: this.#screenSharing.has(conversationId) };
     }, { stage: on ? "on" : "off" }, conversationId);
+  }
+
+  /**
+   * A picture of the display the person is pointing at, asked for as their
+   * speech ends so it is ready by the time the turn starts. The server skips
+   * it when the shared picture is still current.
+   */
+  async glanceScreen(conversationId: string): Promise<unknown> {
+    return observeOperation("mcp", "computer.glance", async () => {
+      const record = createObservationWriter();
+      if (!this.#screenSharing.has(conversationId)) {
+        record({ name: "computer.glance.result", phase: "progress", attributes: { stage: "sharing_off" } });
+        return { glanced: false, reason: "sharing_off" };
+      }
+      const answer = await this.#computerRpc(conversationId, { action: "glance" });
+      const reason = isRecord(answer) ? answer["glanced"] === true ? "glanced" : typeof answer["reason"] === "string" ? answer["reason"] : "answered" : "not_running";
+      record({ name: "computer.glance.result", phase: "progress", attributes: { stage: reason } });
+      return answer ?? { glanced: false, reason: "not_running" };
+    }, {}, conversationId);
+  }
+
+  /** Shapes the person drew on the shared screen, handed to the server's watch. Counts only are observed. */
+  async drewOnScreen(conversationId: string, shapes: readonly DrawnShapeInput[]): Promise<unknown> {
+    return observeOperation("mcp", "computer.drew", async () => {
+      const record = createObservationWriter();
+      const answer = this.#screenSharing.has(conversationId) ? await this.#computerRpc(conversationId, { action: "drew", shapes }) : undefined;
+      const recorded = isRecord(answer) && typeof answer["recorded"] === "number" ? answer["recorded"] : 0;
+      record({ name: "computer.drew.result", phase: "progress", attributes: { shapes: shapes.length, recorded } });
+      return { recorded };
+    }, {}, conversationId);
   }
 
   /**
@@ -1877,9 +1910,10 @@ export class StudioRuntime implements AgentHost {
     }, { agentInstanceId: actor }, conversationId).catch(() => undefined);
   }
 
-  async #computerRpc(conversationId: string, input: Record<string, unknown>): Promise<unknown> {
+  async #computerRpc(conversationId: string, input: Record<string, unknown>, start = false): Promise<unknown> {
     const record = this.#registry.get(COMPUTER_SERVER_ID);
-    if (record?.provenance !== "system" || this.#supervisor.status(record.id)?.state !== "ready") return undefined;
+    if (record?.provenance !== "system") return undefined;
+    if (!start && this.#supervisor.status(record.id)?.state !== "ready") return undefined;
     const connection = await this.#supervisor.ensure(record);
     return connection.request("studio/computer", { input, _meta: { "studio/conversation": conversationId } });
   }

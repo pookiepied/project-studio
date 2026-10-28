@@ -24,6 +24,13 @@ const session = {
 }
 let questions: unknown[] = []
 let workers: unknown[] = []
+// Off and unavailable, as in a browser tab, unless a test says otherwise.
+const screenShare = {
+  available: false, sharing: false, showing: false, pending: false, note: '',
+  toggle: vi.fn(), showMe: vi.fn(), onSpeechEnd: vi.fn(),
+}
+
+vi.mock('@/features/screen/useScreenShare', () => ({ useScreenShare: () => screenShare }))
 
 vi.mock('@/features/voice/useVoiceMode', () => ({ useVoiceSession: () => session }))
 vi.mock('@/features/chat/permissions/usePendingApprovals', () => ({
@@ -45,7 +52,27 @@ function stage(props: Partial<Parameters<typeof VoiceModeOverlay>[0]> = {}) {
 }
 
 describe('VoiceModeOverlay', () => {
-  afterEach(() => { cleanup(); vi.clearAllMocks(); questions = []; workers = [] })
+  afterEach(() => {
+    cleanup(); vi.clearAllMocks(); questions = []; workers = []
+    Object.assign(screenShare, { available: false, sharing: false, showing: false, note: '' })
+  })
+
+  it('wraps the call switches in the screen pair on the desktop, and says when the screen is shared', () => {
+    Object.assign(session, { stage: 'listening', muted: false, deafened: false })
+    Object.assign(screenShare, { available: true, sharing: false })
+    const { rerender } = stage()
+    const bar = screen.getByRole('toolbar', { name: 'Call controls' })
+    const labels = [...bar.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))
+    expect(labels).toEqual(['Share your screen', 'Mute microphone', 'Interrupt', 'Deafen', 'Share your screen to draw on it'])
+    expect(screen.getByRole('button', { name: 'Share your screen to draw on it' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Share your screen' }))
+    expect(screenShare.toggle).toHaveBeenCalled()
+    Object.assign(screenShare, { sharing: true })
+    rerender(<VoiceModeOverlay open conversationId="cnv_1" onClose={() => {}} />)
+    expect(screen.getByRole('status').textContent).toContain('Sharing your screen')
+    fireEvent.click(screen.getByRole('button', { name: 'Show me: draw on your screen' }))
+    expect(screenShare.showMe).toHaveBeenCalled()
+  })
 
   it('names the voice Studio and plays the join cue', () => {
     Object.assign(session, { stage: 'listening', muted: false, deafened: false })

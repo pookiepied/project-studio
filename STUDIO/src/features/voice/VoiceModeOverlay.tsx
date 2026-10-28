@@ -19,6 +19,43 @@ import { Caption } from './Caption'
 import { playCue } from './callSounds'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
 import { usePendingApprovals } from '@/features/chat/permissions/usePendingApprovals'
+import { useScreenShare } from '@/features/screen/useScreenShare'
+
+type Screen = ReturnType<typeof useScreenShare>
+
+/**
+ * Share screen: the person's switch, off at the start of every call. Solid
+ * while on, like mute and deafen, so the bar says at a glance what Studio
+ * can see.
+ */
+function ShareButton({ screen, size }: { screen: Screen; size: 'md' | 'lg' }) {
+  return (
+    <IconButton
+      label={screen.sharing ? 'Stop sharing your screen' : 'Share your screen'}
+      size={size}
+      tone={screen.sharing ? 'solid' : 'quiet'}
+      disabled={screen.pending}
+      onClick={() => void screen.toggle()}
+    >
+      <Icons.shareScreen size="md" />
+    </IconButton>
+  )
+}
+
+/** Show me: hold Studio back and draw on the screen. Only while sharing. */
+function ShowMeButton({ screen, size }: { screen: Screen; size: 'md' | 'lg' }) {
+  return (
+    <IconButton
+      label={screen.sharing ? 'Show me: draw on your screen' : 'Share your screen to draw on it'}
+      size={size}
+      tone={screen.showing ? 'solid' : 'quiet'}
+      disabled={!screen.sharing || screen.showing}
+      onClick={() => void screen.showMe()}
+    >
+      <Icons.showMe size="md" />
+    </IconButton>
+  )
+}
 
 /**
  * The voice stage: a call with Studio.
@@ -130,7 +167,8 @@ export function VoiceModeOverlay({
   /** How much of the window's right edge the side rail holds, so the corner player clears it. */
   insetRight?: number
 }) {
-  const session = useVoiceSession(open, conversationId, fresh)
+  const screen = useScreenShare(conversationId, open)
+  const session = useVoiceSession(open, conversationId, fresh, screen.onSpeechEnd)
   const call = useCallParticipants(conversationId, open)
   // A worker parks on a permission question the chat page would show; the
   // full stage covers that page, so the stage asks it itself. The id is the
@@ -208,6 +246,7 @@ export function VoiceModeOverlay({
             <IconButton label="Interrupt" size="md" disabled={!canInterrupt(session)} onClick={session.interrupt}>
               <Icons.stop size="md" />
             </IconButton>
+            {screen.available ? <ShareButton screen={screen} size="md" /> : null}
             <span className="flex-1" />
             <IconButton label="Expand voice mode" size="md" onClick={onRestore}>
               <Icons.openLarger size="md" />
@@ -240,6 +279,27 @@ export function VoiceModeOverlay({
             className="flex shrink-0 items-center justify-end gap-1"
             style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
           >
+            {/* What Studio can see, said where the eye starts. */}
+            <AnimatePresence initial={false}>
+              {screen.sharing || screen.note !== '' ? (
+                <motion.span
+                  key={screen.note === '' ? 'sharing' : 'note'}
+                  role="status"
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: DURATION.base, ease: EASE_OUT }}
+                  className="mr-auto flex items-center gap-2 rounded-full bg-tint px-3 py-1 text-micro text-foreground"
+                >
+                  {screen.note === '' ? (
+                    <>
+                      <span aria-hidden className="size-1.5 rounded-full bg-[var(--voice-listening)] motion-safe:animate-pulse" />
+                      {screen.showing ? 'Drawing on your screen' : 'Sharing your screen'}
+                    </>
+                  ) : screen.note}
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
             {onMinimize === undefined ? null : (
               <IconButton label="Minimize voice mode" size="md" onClick={onMinimize}>
                 <Icons.minimize size="md" />
@@ -353,6 +413,9 @@ export function VoiceModeOverlay({
                     instrument rather than three circles floating under the
                     orb. Interrupt is the solid one in the middle. */}
                 <div role="toolbar" aria-label="Call controls" className="flex items-center gap-3 rounded-full border border-border bg-surface-raised p-1.5 shadow-sm">
+                  {/* The screen pair wraps the three call switches, one each
+                      side, so interrupt stays the centre of the bar. */}
+                  {screen.available ? <ShareButton screen={screen} size="lg" /> : null}
                   <MuteButton session={session} size="lg" />
                   <IconButton
                     label="Interrupt"
@@ -364,6 +427,7 @@ export function VoiceModeOverlay({
                     <Icons.stop size="lg" />
                   </IconButton>
                   <DeafenButton session={session} size="lg" />
+                  {screen.available ? <ShowMeButton screen={screen} size="lg" /> : null}
                 </div>
                 <span className="text-micro text-muted-foreground/70">Esc to leave</span>
               </>

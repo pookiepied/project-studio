@@ -481,6 +481,8 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         stop: (conversationId) => runtime.stopComputer(conversationId),
         control: (conversationId, action) => runtime.controlComputer(conversationId, action),
         sharing: (conversationId, on) => runtime.setScreenSharing(conversationId, on),
+        glance: (conversationId) => runtime.glanceScreen(conversationId),
+        drew: (conversationId, shapes) => runtime.drewOnScreen(conversationId, shapes),
       },
       admission: admission.verifier,
       // The same list the model picker is filled from: a submission's model

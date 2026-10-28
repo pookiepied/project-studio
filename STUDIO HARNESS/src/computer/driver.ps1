@@ -1286,6 +1286,22 @@ function Answer($id, $result) {
   [Console]::Out.Flush()
 }
 
+# The screen pulse's answer (ADR 0059). Written without Take-InputUpdate so
+# sampling twice a second never swallows the person's input that the next
+# tool result must still report; the counts it carries are the running
+# totals since that result, which the server diffs between pulses.
+function Answer-Pulse($id) {
+  if ($null -ne $script:Activity) { $script:Activity.Start(); Collect-UserInput }
+  $fg = [int64][Studio.Native]::GetForegroundWindow()
+  $front = if ($fg -eq 0) { $null } else { Window-Row (Root-Of $fg) }
+  $pending = $script:InputPending
+  $counts = if ($null -eq $pending) { [ordered]@{ buttons = 0; keys = 0; wheels = 0; moves = 0 } }
+    else { [ordered]@{ buttons = $pending.buttons; keys = $pending.keys; wheels = $pending.wheels; moves = $pending.moves } }
+  $result = [ordered]@{ pointer = (Get-Cursor); front = $front; input = $counts; monitored = ($null -ne $script:Activity) }
+  [Console]::Out.WriteLine((ConvertTo-Json ([ordered]@{ id = $id; ok = $true; result = $result }) -Compress -Depth 6))
+  [Console]::Out.Flush()
+}
+
 function Refuse($id, $message) {
   Reset-UiRefs
   if ($null -ne $script:ActionBefore) {
@@ -1329,6 +1345,7 @@ try { while ($true) {
       "arrange" { Answer $id (Arrange-Window $a.window $a.action $a.display $a.x $a.y $a.width $a.height) }
       "wait_window" { Answer $id (Wait-ForWindow $a.text $a.seconds) }
       "cursor" { Answer $id (Get-Cursor) }
+      "pulse" { Answer-Pulse $id }
       "move" { Move-Pointer $a.display $a.x $a.y; Answer $id (Get-Cursor) }
       "click" {
         $outside = (Given $a.x) -and (Outside-Target $a.display $a.x $a.y)

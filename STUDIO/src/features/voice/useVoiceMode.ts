@@ -15,7 +15,14 @@ import { recordClientObservation } from '@/platform/diagnostics/events'
 
 export type VoiceStage = 'connecting' | 'listening' | 'thinking' | 'speaking' | 'blocked'
 
-export function useVoiceSession(active: boolean, conversationId: string | null = null, fresh?: VoiceFreshChat) {
+export function useVoiceSession(
+  active: boolean,
+  conversationId: string | null = null,
+  fresh?: VoiceFreshChat,
+  onSpeechEnd?: () => void,
+) {
+  const onSpeechEndRef = useRef(onSpeechEnd)
+  onSpeechEndRef.current = onSpeechEnd
   const [stage, setStage] = useState<VoiceStage>('connecting')
   const [note, setNote] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -108,6 +115,9 @@ export function useVoiceSession(active: boolean, conversationId: string | null =
     else moveTo('thinking')
     const recording = take()
     const endedAt = performance.now()
+    // Told now, not when the words come back, so whatever it starts - a
+    // picture of the shared screen - runs while the take is transcribed.
+    onSpeechEndRef.current?.()
     transcriptQueue.current = transcriptQueue.current.then(async () => {
       const audio = await recording
       taking.current = false

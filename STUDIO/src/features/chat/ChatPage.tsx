@@ -25,6 +25,7 @@ import { PlanPill, usePlan } from '@/features/plans'
 import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
 import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
+import { useScreenCollaboration } from '@/features/screen/useScreenCollaboration'
 import { useDelegatedComputerUse } from '@/features/chat/useDelegatedComputerUse'
 import { GALLERY_CONVERSATION_ID } from '@/domain/conversation/gallery'
 import { contextReport } from '@/domain/turn/context'
@@ -410,6 +411,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // computer. Its Stop ends the run here.
   const delegatedComputerUse = useDelegatedComputerUse(conversation.id)
   const stopWithComputerCleanup = useComputerIndicator(conversation.id, live.items, running, stopTurn, delegatedComputerUse)
+
+  // The agent's marks on the screen, and the person's ink coming back.
+  useScreenCollaboration(conversation.id, live.items)
 
   return (
     <div data-attachment-drop-zone className="relative flex h-full flex-col">
