@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -77,6 +78,14 @@ describe("a conversation's own pictures", () => {
 
     expect((await picture("docs/shot.webp")).status).toBe(200);
     expect((await picture("scratch/plot.png")).status).toBe(200);
+  });
+
+  it("reads file URLs containing reserved filename characters", async () => {
+    const workspace = conversationWorkspaceDirectory("cnv-1");
+    await mkdir(workspace, { recursive: true });
+    const path = join(workspace, "chart #1.png");
+    await writeFile(path, PNG);
+    expect((await routed().picture(pathToFileURL(path).href)).status).toBe(200);
   });
 
   it("refuses a linked directory that leaves the conversation's roots", async () => {

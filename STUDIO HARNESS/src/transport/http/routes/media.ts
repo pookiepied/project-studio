@@ -1,5 +1,6 @@
 import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { Hono } from "hono";
 import * as v from "valibot";
@@ -115,7 +116,7 @@ async function conversationPicture(
   // A `file:` address is the same path spelled as a URL: `file:///C:/x` on
   // Windows, `file:///home/x` elsewhere.
   const named = /^file:\/\//i.test(requested)
-    ? decodeURI(requested.replace(/^file:\/\//i, "")).replace(/^\/([A-Za-z]:)/, "$1")
+    ? fileURLToPath(requested)
     : requested;
   const candidates = isAbsolute(named) ? [named] : [resolve(stand, named), resolve(home, named)];
   const realRoots = (await Promise.all(roots.map((root) => realpath(root).catch(() => null))))
