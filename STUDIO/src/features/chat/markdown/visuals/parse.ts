@@ -104,7 +104,8 @@ function numeric(value: unknown): number | null {
   if (typeof value !== 'string') return null
   const cleaned = value.replace(/[,\s%$\u20ac\u00a3\u00a5]/g, '').replace(/^\u2212/, '-')
   if (cleaned === '' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(cleaned)) return null
-  return Number(cleaned)
+  const number = Number(cleaned)
+  return Number.isFinite(number) ? number : null
 }
 
 function list(value: unknown, what: string): unknown[] {

@@ -27,6 +27,13 @@ describe('reading a visual', () => {
     expect(many).toMatchObject({ kind: 'invalid', message: 'At most 8 series' })
   })
 
+  it('rejects overflowing numeric strings before they reach plot geometry', () => {
+    expect(parseVisual('chart', JSON.stringify({ data: [{ label: 'A', value: '1e999' }] }), false))
+      .toEqual({ kind: 'invalid', message: 'No numeric values' })
+    expect(parseVisual('progress', JSON.stringify({ items: [{ label: 'A', value: '1e999' }] }), false))
+      .toEqual({ kind: 'invalid', message: "Item 1's value is not a number" })
+  })
+
   it('waits quietly for a fence that is still arriving, and names a finished one that is broken', () => {
     expect(parseVisual('stats', '{"items": [{"label"', true)).toEqual({ kind: 'pending' })
     expect(parseVisual('stats', '{"items": [{"label"', false)).toMatchObject({ kind: 'invalid' })
