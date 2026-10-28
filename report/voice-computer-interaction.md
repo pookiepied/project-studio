@@ -1,6 +1,6 @@
 # Interactive voice and computer use: what was built, and what is still unproven
 
-*Seven stages, committed to `main` from `4549ef3` to the Stage 7 commit. The
+*Seven stages, committed to `main` from `4549ef3` to the Stage 7 follow-up. The
 plan is `documentation/work/voice-computer-interaction-plan.md`, the decision
 is [ADR 0059](../documentation/decisions/0059-the-desktop-has-one-hand.md), and
 the running record is the "Interactive voice and computer use" section of
@@ -47,7 +47,7 @@ display and no provider key, so the last section matters as much as the first.*
 | 4 | `d79dbdf` | The voice prompt, the capability overview and the Studio prompt teach the lease, freshness and bounded action |
 | 5 | `23c2d62` | The screen watch, the glance at end of speech, `studio_computer_mark`, the native overlay, Show me drawing, the call's Share screen and Show me buttons |
 | 6 | `8942bcd` | Voice-task model, `continue`, redirect checkpoint, `heard_before_interrupt`, the spoken-command matcher, Stop talking, Pause/Stop computer, four stop outcomes |
-| 7 | this commit | Full checks, ADR 0059, observability contract, retry map, README map, this report |
+| 7 | `6c19510`, and the follow-up recording the check results | Full checks, ADR 0059, observability contract, retry map, README map, this report |
 
 ## Departures from the plan, and why
 
@@ -99,8 +99,22 @@ The plan asked for one row per scenario, covering:
 ## Verification that ran
 
 - **Full checks, run in sequence:**
-  - `CI=true pnpm -C "STUDIO HARNESS" check`: result recorded in the follow-up commit once the run finishes.
-  - `CI=true pnpm -C STUDIO check`: result recorded in the follow-up commit once the run finishes.
+  - `CI=true pnpm -C STUDIO check`: typecheck, lint and build clean; 1,691 of 1,691
+    tests passed (1,666 before this work).
+  - `CI=true pnpm -C "STUDIO HARNESS" check`: typecheck and build clean; 2,691 passed
+    and 22 failed (2,618 passed and 10 failed before this work). None of the 22 is in
+    code this work changed:
+    - The same 10 as before: `customization-connections` (5, no npm registry),
+      `conversation-export` (2), `browser-server` (no browser installed), `net-http`
+      (the container's proxy answers a private address itself) and `sandbox-bwrap` (1).
+    - 11 that newly ran. Installing the WebKit packages for `cargo` also installed
+      `bubblewrap`, which un-skipped the containment suites. The container cannot
+      contain a child, so they fail: `sandbox-bwrap` (9 more), `sandbox-scope` (1)
+      and `project-folders` (1). No commit here touches `src/sandbox/` or the shell.
+    - 1 was this work's own: the lease test that samples the pointer counted the fake
+      driver's log while a pulse written before sharing stopped was still landing. The
+      follow-up commit lets it land first. The test passed five runs in a row, and it
+      still fails when `#unwatch` keeps the timer (11 pulses where 6 were expected).
 - **Rust:** `cargo check` and `cargo test` under `STUDIO/src-tauri` were possible after
   installing the GTK and WebKit development packages in the container. 158 of 159
   passed. The one failure is the real OS credential store round trip, which this

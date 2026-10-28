@@ -396,6 +396,9 @@ describe("the shared screen between pictures", () => {
     await vi.waitFor(() => expect(computer.context(CHAT)["pointer"]).toMatchObject({ x: 150, y: 40, display: 1 }));
     expect(computer.context(CHAT)["live"]).toBe("on");
     computer.setSharing(CHAT, false);
+    // The fake driver logs an op when it reads it, so a pulse already written
+    // when sharing stopped can still be counted after; let it land first.
+    await new Promise((resolve) => setTimeout(resolve, 60));
     const sampled = spawned.ops.filter((op) => op === "pulse").length;
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(spawned.ops.filter((op) => op === "pulse").length).toBe(sampled);
