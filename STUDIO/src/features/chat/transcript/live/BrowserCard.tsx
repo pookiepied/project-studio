@@ -35,7 +35,7 @@ export function BrowserCard({
       {url === null && title === null ? null : (
         <div className="flex min-w-0 flex-col gap-0.5">
           {title === null || title === '' ? null : (
-            <span className="truncate text-sm font-medium">{title}</span>
+            <span className="truncate text-ui font-medium">{title}</span>
           )}
           {url === null ? null : (
             // Not a link. Opening it would hand the page to the person's real

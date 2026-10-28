@@ -461,7 +461,7 @@ function AskWorkingOut({ call }: { call: ToolCallView }) {
     <div className="flex flex-col gap-2 text-ui">
       {asked.map((question, index) => (
         <div key={index} className="flex flex-col gap-0.5">
-          <span className="text-caption leading-relaxed text-muted-foreground">
+          <span className="text-caption text-muted-foreground">
             {question.question}
           </span>
           <AnswerView report={reports?.[index]} />

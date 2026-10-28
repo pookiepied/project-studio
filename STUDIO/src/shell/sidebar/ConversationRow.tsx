@@ -119,7 +119,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         trigger={
           // One box, always the same size, so the menu anchors to the same
           // corner and the row never shifts as the occupants swap.
-          <span className="relative flex size-5 shrink-0 items-center justify-center">
+          <span className="relative flex size-[var(--control-xs)] shrink-0 items-center justify-center">
             {working ? (
               // After the title, not before it. Leading, it would push every
               // title in the column right the moment any one of them started
@@ -136,7 +136,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
                   // `relative` keeps this button above the selection chip: the
                   // chip is positioned, and a positioned element paints over
                   // anything static beside it.
-                  'relative flex size-5 items-center justify-center rounded-full transition-all duration-fast',
+                  'relative flex size-[var(--control-xs)] items-center justify-center rounded-full transition-all duration-fast',
                   'text-muted-foreground hover:bg-tint hover:text-foreground',
                   'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
                 )}

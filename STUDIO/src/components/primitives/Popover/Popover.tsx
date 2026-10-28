@@ -71,6 +71,7 @@ export function Popover({
   offset = OFFSET,
   children,
   className,
+  inline = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -86,9 +87,11 @@ export function Popover({
   offset?: number
   children: ReactNode
   className?: string
+  inline?: boolean
 }) {
-  const anchor = useRef<HTMLDivElement>(null)
+  const anchor = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement>(null)
+  const focusedInline = useRef(false)
   const [position, setPosition] = useState<{ top: number; left: number; side: Side } | null>(null)
 
   /**
@@ -192,9 +195,21 @@ export function Popover({
       onOpenChange(false)
     }
     const onKeyDown = (event: KeyboardEvent) => {
+      if (inline && event.key !== 'Escape' && panel.current?.contains(document.activeElement)) {
+        const items = [...panel.current.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')]
+        const index = items.findIndex((item) => item === document.activeElement)
+        const next = event.key === 'ArrowDown' ? (index + 1) % items.length
+          : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length
+          : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : null
+        if (next !== null) {
+          event.preventDefault()
+          items[next]?.focus()
+        }
+      }
       if (event.key !== 'Escape') return
       event.stopPropagation()
       onOpenChange(false)
+      if (inline) anchor.current?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus()
     }
 
     document.addEventListener('pointerdown', onPointerDown)
@@ -203,10 +218,24 @@ export function Popover({
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [open, onOpenChange])
+  }, [open, onOpenChange, inline])
 
+  useEffect(() => {
+    if (!open) { focusedInline.current = false; return }
+    // A panel cannot accept focus until its measured position makes it visible.
+    if (!inline || position === null || focusedInline.current) return
+    focusedInline.current = true
+    panel.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  }, [open, inline, position])
+
+  // An inline anchor stays plain inline. As `inline-flex` it made every prose
+  // link a flex box: a long link could no longer wrap across lines, and a
+  // citation pill inside it was blockified and pushed its line apart. The
+  // panel is portaled and placed from the anchor's rect, so it needs nothing
+  // from the anchor's display.
+  const Anchor = inline ? 'span' : 'div'
   return (
-    <div ref={anchor} className="relative inline-flex">
+    <Anchor ref={(element) => { anchor.current = element }} className={inline ? 'relative' : 'relative inline-flex'}>
       {trigger}
       {createPortal(
         <AnimatePresence>
@@ -256,6 +285,6 @@ export function Popover({
         </AnimatePresence>,
         document.body,
       )}
-    </div>
+    </Anchor>
   )
 }

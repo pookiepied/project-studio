@@ -166,9 +166,11 @@
      the first render. Invisible, but it is the same species of drift this
      whole block exists to end, and a fraction costs nothing.
 
-     A compact round control -- menu affordances, row overflow buttons. */
+     The smallest actions sit inside rows and cards. */
+  --control-xs: calc(var(--ui-size) * 5 / 3);
+  /** Compact round controls: menu affordances and row overflow buttons. */
   --control-sm: calc(var(--ui-size) * 2);
-  /** The default: icon buttons in the chrome, and the composer's row. */
+  /** Default text actions, fields, icon buttons and composer controls. */
   --control-md: calc(var(--ui-size) * 7 / 3);
   /** The largest round control in the chrome. */
   --control-lg: calc(var(--ui-size) * 8 / 3);
@@ -215,6 +217,7 @@
    back to the calc. The guard is what makes the fallback actually happen. */
 @supports (width: round(1px, 1px)) {
   :root {
+    --control-xs: round(calc(var(--ui-size) * 5 / 3), 1px);
     --control-md: round(calc(var(--ui-size) * 7 / 3), 1px);
     --control-lg: round(calc(var(--ui-size) * 8 / 3), 1px);
     --control-xl: round(calc(var(--ui-size) * 11 / 3), 1px);

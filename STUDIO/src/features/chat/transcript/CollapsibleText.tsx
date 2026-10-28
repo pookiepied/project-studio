@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icons } from '@/components/icons'
+import { Markdown } from '@/features/chat/markdown'
 
 /** Height cap while collapsed, in px. Roughly nine lines. */
 const COLLAPSED_MAX = 190
@@ -22,7 +23,7 @@ const SLOP = 28
  * anyway to know whether a toggle is needed at all.
  */
 export function CollapsibleText({ text }: { text: string }) {
-  const body = useRef<HTMLParagraphElement>(null)
+  const body = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
   const [fullHeight, setFullHeight] = useState(0)
@@ -98,12 +99,12 @@ export function CollapsibleText({ text }: { text: string }) {
             : null),
         }}
       >
-        <p
+        <div
           ref={body}
-          className="studio-selectable text-body whitespace-pre-wrap [overflow-wrap:anywhere]"
+          className="studio-prose studio-user-prose"
         >
-          {text}
-        </p>
+          <Markdown text={text} user />
+        </div>
 
       </div>
 

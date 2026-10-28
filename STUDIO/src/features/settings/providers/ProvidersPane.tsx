@@ -450,7 +450,7 @@ function ConnectionRow({
                 type="button"
                 aria-label={`${record.displayName} options`}
                 onClick={() => setMenuOpen((open) => !open)}
-                className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint"
+                className="flex size-[var(--control-md)] items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint"
               >
                 <Icons.more />
               </button>

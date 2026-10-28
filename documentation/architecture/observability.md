@@ -381,6 +381,32 @@ between pulses, and whether a mark was seen. `computer-lease.test.ts`,
 and the client `screen`/`voice` suites cover refusal, fencing, privacy and the
 person-visible outcomes.
 
+The conversation workspace derives primary tasks from canonical submission and
+tool-call identities; history replay is presentation, never a new execution.
+Worker inspection is a read-only subscriber to the existing agent-instance
+stream. Its URL retains the worker instance ID; client observation scope uses
+the indexed parent conversation ID. Closing inspection cancels only that read.
+Cancellation acceptance remains intent until the task index or job response
+confirms settlement. No new capture policy, content field, or transport route
+is introduced. Inline delegates without an addressable stream and worker
+attachment previews remain unsupported; no parent-conversation attachment URL
+is fabricated for a worker. `worker-inspection.test.ts` verifies the scope and
+read-only transport, while workspace lifecycle/polling fixtures fence stale
+responses and foreign task rows.
+
+Reply images use admitted `GET /api/media/workspace/:conversationId` and
+`GET /api/web/image` reads under the existing HTTP request observation.
+Local reads resolve the conversation workspace, scratch, artifacts, attachments
+and assigned project roots before serving a picture. Web reads reuse the
+destination-checked binary HTTP transport and its request observations; they
+do not add execution authority or retry ownership. Paths, remote URLs, image
+bytes and visual data remain product content, never observation attributes.
+Primary workspace inspection retains its conversation scope for images; worker
+inspection does not borrow the parent's file scope. Painting, provider use of
+visual formats and local file changes during a read remain unverified by these
+boundaries. Coverage: `reply-images.test.ts`, `ReplyImage.test.tsx`,
+`WorkspaceOverview.test.tsx` and `visuals.test.tsx`.
+
 Image read disclosures reuse native `read` results and their existing tool-call
 and conversation identities. Only returned PNG/JPEG/GIF/WebP image blocks earn
 a viewed-image row; text reads and refused/pending reads retain their existing

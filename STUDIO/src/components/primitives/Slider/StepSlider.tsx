@@ -69,7 +69,7 @@ export function StepSlider<T extends string>({
 
   return (
     <div className="px-2 pt-1 pb-2">
-      <div className="flex min-h-5 items-baseline justify-between gap-2 pb-2">
+      <div className="flex min-h-[var(--control-xs)] items-baseline justify-between gap-2 pb-2">
         <label htmlFor={id} className="text-ui text-foreground">
           {current?.name ?? 'Default'}
         </label>
@@ -89,10 +89,10 @@ export function StepSlider<T extends string>({
         </AnimatePresence>
       </div>
 
-      <div className="relative flex h-5 items-center">
+      <div className="relative flex h-[var(--control-md)] items-center">
         {/* The track. The filled part is the distance travelled, which is what
             makes the position readable at a glance without counting stops. */}
-        <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted">
+        <div className="absolute inset-x-0 h-[0.5em] rounded-full bg-muted">
           <motion.div
             className="h-full rounded-full bg-primary"
             animate={{ width: `${progress * 100}%` }}
@@ -107,7 +107,7 @@ export function StepSlider<T extends string>({
             <span
               key={step.id}
               className={cn(
-                'size-1 rounded-full transition-colors duration-fast',
+                'size-[calc(var(--ui-size)/3)] rounded-full transition-colors duration-fast',
                 at <= index ? 'bg-primary-foreground/45' : 'bg-foreground/20',
               )}
             />
@@ -116,10 +116,10 @@ export function StepSlider<T extends string>({
 
         <motion.div
           aria-hidden
-          className="pointer-events-none absolute size-3.5 rounded-full border border-hairline bg-surface-raised shadow-chip"
+          className="pointer-events-none absolute size-[var(--icon-sm)] rounded-full border border-hairline bg-surface-raised shadow-chip"
           // `calc` with the thumb's own width backed out, so it stays inside
           // the track at both ends instead of hanging half off.
-          animate={{ left: `calc(${progress * 100}% - ${progress * 14}px)` }}
+          animate={{ left: `calc(${progress * 100}% - ${progress} * var(--icon-sm))` }}
           transition={SPRING_SNAPPY}
         />
 
@@ -136,7 +136,7 @@ export function StepSlider<T extends string>({
           }}
           aria-label="Reasoning effort"
           aria-valuetext={current?.name}
-          className="absolute inset-x-0 h-5 w-full cursor-pointer opacity-0"
+          className="absolute inset-x-0 h-full w-full cursor-pointer opacity-0"
         />
       </div>
 

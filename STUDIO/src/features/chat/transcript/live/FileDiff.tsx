@@ -1,5 +1,9 @@
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { cn } from '@/lib/cn'
+import { Deferred, lazyNamed } from '@/components/state'
+import { resolveLanguage } from '@/features/chat/markdown/languages'
+
+const DiffSyntax = lazyNamed(() => import('@/features/changes/DiffSyntax'), 'DiffSyntax')
 
 import type { DiffRow, LineDiff } from './diffLines'
 
@@ -26,9 +30,10 @@ import type { DiffRow, LineDiff } from './diffLines'
  * Numbers that pointed at the wrong lines would be a navigational lie told
  * in a monospace font -- the one thing a diff must never be.
  */
-export function FileDiff({ path, diff }: { path: string; diff: LineDiff }) {
+export function FileDiff({ path, diff, syntax = false }: { path: string; diff: LineDiff; syntax?: boolean }) {
   const numbered = diff.rows.some((row) => row.oldLine !== null || row.newLine !== null)
   const { name, dir } = splitFilePath(path)
+  const language = syntax ? resolveLanguage(path.split('.').pop() ?? '') : null
   return (
     // `text-foreground` is load-bearing, not decoration: nothing in this app
     // sets a default text colour, so an uncoloured surface inherits the
@@ -69,7 +74,7 @@ export function FileDiff({ path, diff }: { path: string; diff: LineDiff }) {
             )}
           >
             {diff.rows.map((row, index) => (
-              <DiffRowView key={index} row={row} numbered={numbered} />
+              <DiffRowView key={index} row={row} numbered={numbered} language={language} />
             ))}
           </div>
         </div>
@@ -78,7 +83,7 @@ export function FileDiff({ path, diff }: { path: string; diff: LineDiff }) {
   )
 }
 
-function DiffRowView({ row, numbered }: { row: DiffRow; numbered: boolean }) {
+function DiffRowView({ row, numbered, language }: { row: DiffRow; numbered: boolean; language: string | null }) {
   const changed = row.type !== 'ctx'
   return (
     <div
@@ -111,7 +116,7 @@ function DiffRowView({ row, numbered }: { row: DiffRow; numbered: boolean }) {
       <code className={cn('studio-selectable whitespace-pre pl-2', !changed && 'text-muted-foreground')}>
         {/* A wholly empty line collapses without a character to carry the
             row's height, so it draws a space instead. */}
-        {row.text === '' ? ' ' : row.text}
+        {language ? <Deferred label="Syntax highlighting" fallback={row.text || ' '}><DiffSyntax text={row.text} language={language} /></Deferred> : row.text || ' '}
       </code>
     </div>
   )

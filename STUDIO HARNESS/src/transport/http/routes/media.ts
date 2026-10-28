@@ -1,5 +1,5 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, readdir, realpath, stat } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { Hono } from "hono";
 import * as v from "valibot";
@@ -14,7 +14,13 @@ import { StudioError } from "../../../contracts/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { MediaAdministration } from "../../../gateway/media/service.js";
 import { ImproveError, type TextImproverPort } from "../../../application/text-improver.js";
-import { conversationArtifactsDirectory } from "../../../platform/paths.js";
+import {
+  conversationArtifactsDirectory,
+  conversationAttachmentsDirectory,
+  conversationDirectory,
+  conversationScratchDirectory,
+  conversationWorkspaceDirectory,
+} from "../../../platform/paths.js";
 import type { VoiceSettings } from "../../../gateway/language/voice-settings.js";
 import { observeOperation } from "../../../observability/operation.js";
 
@@ -59,6 +65,70 @@ const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   wav: "audio/wav",
   ogg: "audio/ogg",
 };
+
+/** The pictures a reply may show from a conversation's own folders. */
+const PICTURE_BY_EXTENSION: Readonly<Record<string, string>> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+  svg: "image/svg+xml",
+};
+
+const PICTURE_MAX_BYTES = 25 * 1024 * 1024;
+
+/** `child` is `root` or lies beneath it. Both are already real paths. */
+function within(root: string, child: string): boolean {
+  const offset = relative(root, child);
+  return offset === "" || (!offset.startsWith("..") && !isAbsolute(offset));
+}
+
+/**
+ * The file a reply's picture names, if it is one this conversation may show.
+ *
+ * A model that saved a chart writes `![chart](workspace/chart.png)`, or the
+ * path relative to where it stands, or an absolute one. All three are tried
+ * against the places the conversation itself works in - where its turns
+ * stand, its project's folders, and the directories the app keeps for it -
+ * and a file is served only when its real path, links resolved, is inside
+ * one of them. A path that climbs out, or a link that points out, names a
+ * file this conversation was never given and is answered like a missing one.
+ */
+async function conversationPicture(
+  conversationId: string,
+  requested: string,
+  projectFolders: readonly string[],
+): Promise<{ path: string; mimeType: string } | null> {
+  const mimeType = PICTURE_BY_EXTENSION[requested.slice(requested.lastIndexOf(".") + 1).toLowerCase()];
+  if (mimeType === undefined) return null;
+  const home = conversationDirectory(conversationId);
+  const stand = projectFolders[0] ?? conversationWorkspaceDirectory(conversationId);
+  const roots = [
+    ...projectFolders,
+    conversationWorkspaceDirectory(conversationId),
+    conversationScratchDirectory(conversationId),
+    conversationArtifactsDirectory(conversationId),
+    conversationAttachmentsDirectory(conversationId),
+  ];
+  // A `file:` address is the same path spelled as a URL: `file:///C:/x` on
+  // Windows, `file:///home/x` elsewhere.
+  const named = /^file:\/\//i.test(requested)
+    ? decodeURI(requested.replace(/^file:\/\//i, "")).replace(/^\/([A-Za-z]:)/, "$1")
+    : requested;
+  const candidates = isAbsolute(named) ? [named] : [resolve(stand, named), resolve(home, named)];
+  const realRoots = (await Promise.all(roots.map((root) => realpath(root).catch(() => null))))
+    .filter((root): root is string => root !== null);
+  for (const candidate of candidates) {
+    const real = await realpath(candidate).catch(() => null);
+    if (real === null || !realRoots.some((root) => within(root, real))) continue;
+    const info = await stat(real).catch(() => null);
+    if (info === null || !info.isFile() || info.size > PICTURE_MAX_BYTES) continue;
+    return { path: real, mimeType };
+  }
+  return null;
+}
 
 /** The type a finished artifact answers as, from the extension its name carries. */
 function mimeTypeOf(fileName: string): string {
@@ -117,6 +187,8 @@ export function createMediaRoutes(
     readonly isModelServed?: (modelId: string) => Promise<boolean>;
     /** Why a model cannot run voice tasks - it cannot call tools or see - or undefined when nothing says it cannot. */
     readonly voiceTaskRefusal?: (modelId: string) => string | undefined;
+    /** The folders of the project a conversation is filed under, first where it stands. */
+    readonly projectFolders?: (conversationId: string) => readonly string[];
   } = {},
 ): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
@@ -285,6 +357,33 @@ export function createMediaRoutes(
       });
     } catch {
       return context.json({ error: "There is no such artifact.", code: "media.not-found" }, 404);
+    }
+  });
+
+  /**
+   * A picture a reply embeds from the conversation's own files - a chart the
+   * model saved, a screenshot it took. Not immutable like an artifact: the
+   * model may write the same name again, so the window is told not to keep it.
+   */
+  routes.get("/workspace/:conversationId", async (context) => {
+    const conversationId = context.req.param("conversationId");
+    const requested = context.req.query("path");
+    const missing = () => context.json({ error: "There is no such picture.", code: "media.not-found" }, 404);
+    if (!CONVERSATION_ID.test(conversationId) || requested === undefined || requested.length === 0) return missing();
+    const picture = await conversationPicture(conversationId, requested, options.projectFolders?.(conversationId) ?? []).catch(() => null);
+    if (picture === null) return missing();
+    try {
+      const bytes = await readFile(picture.path);
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          "content-type": picture.mimeType,
+          "content-length": String(bytes.byteLength),
+          "cache-control": "private, no-cache",
+        },
+      });
+    } catch {
+      return missing();
     }
   });
 

@@ -54,7 +54,7 @@ export function Segmented<T extends string | number>({
               // that bargain: without it a long label wraps to a second line
               // and takes the whole control's height with it, which is how a
               // two-word option once turned this into a two-line block.
-              'relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5',
+              'studio-control-flat relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-2',
               'whitespace-nowrap text-ui transition-colors duration-fast',
               selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}

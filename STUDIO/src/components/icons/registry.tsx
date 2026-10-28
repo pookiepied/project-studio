@@ -26,7 +26,7 @@
  * glyph inside it rather than the glyph having its own small hitbox.
  */
 import {
-  Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
+  Archive, ArrowDown, ArrowLeft, ArrowUp, ArrowUpRight, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, CornerDownRight, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
   GalleryVerticalEnd, GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
@@ -125,6 +125,9 @@ const REGISTRY = {
   askAbout: { mark: MessageSquareQuote },
   more: { mark: MoreHorizontal },
   openExternal: { mark: ExternalLink },
+  // A link's own way out: the bare arrow, lighter than the boxed mark,
+  // for the one-button pill a plain link opens.
+  openLink: { mark: ArrowUpRight },
   jumpToLatest: { mark: ArrowDown, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
   // Leaving the one surface whose navigation lives in the sidebar column.
   back: { mark: ArrowLeft },

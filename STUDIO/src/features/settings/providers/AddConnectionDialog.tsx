@@ -338,7 +338,7 @@ export function AddConnectionDialog({
                   onClick={() => setMenuOpen((value) => !value)}
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
-                  className="flex h-8 w-full items-center justify-between rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-fast hover:bg-tint"
+                  className="studio-control flex w-full items-center justify-between rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-fast hover:bg-tint"
                 >
                   {LANGUAGE_PROTOCOL_CHOICES.find((item) => item.id === protocol)?.name}
                   <Icons.dropdown />

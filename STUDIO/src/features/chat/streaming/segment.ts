@@ -337,6 +337,20 @@ function coalesce(blocks: readonly Block[]): Block[] {
   return merged
 }
 
+function needsDocumentContext(text: string): boolean {
+  let fence: string | null = null
+  for (const line of text.split('\n')) {
+    if (fence !== null) {
+      if (line.trim().startsWith(fence)) fence = null
+      continue
+    }
+    if (/^(?: {2,}|\t)\S|^ {0,3}\[[^\]\n]+\]:/.test(line)) return true
+    const opening = FENCE.exec(line)
+    if (opening) fence = opening[1]
+  }
+  return false
+}
+
 /**
  * Split `text` into finished blocks and the one still being written.
  *
@@ -346,6 +360,15 @@ function coalesce(blocks: readonly Block[]): Block[] {
  */
 export function segment(text: string, settled: boolean): Segments {
   if (text.length === 0) return { stable: [], tail: '' }
+
+  // Indented continuations and reference definitions bind across blank lines.
+  // Keep their document context rather than freezing a fragment that can no
+  // longer resolve a link or belong to its original list item.
+  if (needsDocumentContext(text)) {
+    return settled
+      ? { stable: [text], tail: '' }
+      : { stable: [], tail: closeOpenFence(text) }
+  }
 
   const blocks = coalesce(blocksOf(text))
   if (blocks.length === 0) return { stable: [], tail: '' }

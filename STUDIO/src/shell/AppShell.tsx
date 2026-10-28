@@ -53,12 +53,10 @@ export function AppShell() {
   const {
     open: railOpen,
     collapsed: railCollapsed,
-    entries: railEntries,
     width: railWidth,
     collapse: collapseRail,
     expand: expandRail,
   } = useRail()
-  const railEntryCount = railEntries.length
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
   /**
@@ -71,12 +69,15 @@ export function AppShell() {
    */
   const { sidebarShown, railShown, sidebarSettled, railSettled } = usePanelHandover({
     sidebarOpen,
-    railOpen,
+    railOpen: route.kind === 'chat' && railOpen,
     closeSidebar: toggleSidebar,
     collapseRail,
   })
   const compact = useCompactLayout(railShown ? railWidth : 0)
   const { setCompactLayout } = useNavigation()
+  useEffect(() => {
+    if (route.kind !== 'chat') railSettled()
+  }, [route.kind, railSettled])
 
   // The store's leave-Settings rule is a layout answer (a drawer is dismissed
   // where a resident column would be restored), so the shell - the one place
@@ -292,7 +293,7 @@ export function AppShell() {
       {/* Outside the page's rounded container, so the rail is a sibling of the
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
-      <SideRail open={railShown} onClosed={railSettled} />
+      {route.kind === 'chat' ? <SideRail key={route.conversationId} open={railShown} onClosed={railSettled} /> : null}
 
       {/* The rail, folded, saying so.
           Only this side gets a prompt. The sidebar is summoned by a control
@@ -302,13 +303,13 @@ export function AppShell() {
           from having been closed. A tab on the edge it went behind is the
           smallest thing that says "still here, this way". */}
       <AnimatePresence>
-        {railCollapsed ? (
+        {route.kind === 'chat' && railCollapsed ? (
           <motion.button
             type="button"
             // Bringing the rail back is the same request as opening anything
             // into it: the handover closes the sidebar first if it is up.
             onClick={expandRail}
-            aria-label={`Show the side rail (${railEntryCount} open)`}
+            aria-label="Open conversation workspace"
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 8 }}
@@ -321,7 +322,7 @@ export function AppShell() {
             )}
           >
             <Icons.openLarger />
-            <span className="text-micro tabular-nums">{railEntryCount}</span>
+            <span className="text-micro">Workspace</span>
           </motion.button>
         ) : null}
       </AnimatePresence>

@@ -1,5 +1,6 @@
 import { JobsPanel } from '@/features/jobs/JobsPanel'
 import { TasksSection } from '@/features/jobs/TasksSection'
+import type { AgentTask } from '@/platform/harness'
 
 /**
  * The conversation's background work: both kinds, one panel.
@@ -18,10 +19,10 @@ import { TasksSection } from '@/features/jobs/TasksSection'
  * the commands' own "nothing is running", which is the honest sentence for
  * the whole panel.
  */
-export function BackgroundWorkPanel({ conversationId }: { conversationId: string }) {
+export function BackgroundWorkPanel({ conversationId, onInspectAgent }: { conversationId: string; onInspectAgent?: (task: AgentTask) => void }) {
   return (
     <div className="flex flex-col gap-5 pt-1">
-      <TasksSection />
+      <TasksSection conversationId={conversationId} onInspect={onInspectAgent} />
       <JobsPanel conversationId={conversationId} />
     </div>
   )

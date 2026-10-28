@@ -28,7 +28,7 @@ const BASE = [
   // container and gets clipped at the edges rather than shrinking. Every
   // field lives in a column or a row of some layout; none of them wants the
   // default minimum.
-  'w-full min-w-0 rounded-md border bg-surface px-2.5 py-1.5 text-ui text-foreground',
+  'studio-control w-full min-w-0 rounded-md border bg-surface px-2.5 text-ui text-foreground',
   'placeholder:text-muted-foreground/70',
   'transition-[border-color] duration-fast outline-none',
   'focus:border-foreground/45',

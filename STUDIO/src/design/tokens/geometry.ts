@@ -62,9 +62,11 @@ export const RADIUS = {
  * moved the text while the sidebar, the chrome and the composer stood still.
  */
 export const CONTROL = {
+  /** Small actions inside cards, paired with caption text. */
+  xs: Math.round((DEFAULT_UI_SIZE * 5) / 3),
   /** Compact: row overflow buttons, menu affordances. */
   sm: (DEFAULT_UI_SIZE * 2) / 1,
-  /** The default: icon buttons in the chrome, and the composer's row. */
+  /** Default text actions, fields, icon buttons and composer controls. */
   md: Math.round((DEFAULT_UI_SIZE * 7) / 3),
   /** The largest round control in the chrome. */
   lg: Math.round((DEFAULT_UI_SIZE * 8) / 3),

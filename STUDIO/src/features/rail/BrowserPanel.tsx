@@ -58,7 +58,7 @@ export function BrowserPanel({
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">
+          <span className="truncate text-ui font-medium">
             {entry.title === null || entry.title === '' ? family.nowhere : entry.title}
           </span>
           {entry.url === null ? null : (

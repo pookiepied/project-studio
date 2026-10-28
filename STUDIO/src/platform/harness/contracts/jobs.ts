@@ -17,7 +17,7 @@ export interface BackgroundJob {
   readonly id: string
   /** The command line as the person would read it. */
   readonly command: string
-  readonly state: 'running' | 'exited' | 'stopped' | 'failed'
+  readonly state: 'running' | 'stopping' | 'exited' | 'stopped' | 'failed'
   /** Null while it runs. */
   readonly exitCode: number | null
   readonly startedAt: number
@@ -28,7 +28,7 @@ export interface BackgroundJob {
   readonly error?: string
 }
 
-export const JOB_STATES = ['running', 'exited', 'stopped', 'failed'] as const
+export const JOB_STATES: readonly BackgroundJob['state'][] = ['running', 'stopping', 'exited', 'stopped', 'failed']
 
 /**
  * One finished generation's output as the harness names its file.

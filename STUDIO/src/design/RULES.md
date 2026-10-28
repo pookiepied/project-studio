@@ -195,6 +195,21 @@ voice and becomes a second UI font.
 `text-micro`, `text-title`. Nothing writes `text-sm`. Every role derives from
 `--ui-size`, so the whole text system scales from one number.
 
+Conversation documents use `--text-body`, level with interface text, through
+`.studio-prose`. User messages, assistant answers and the composer share that
+base size. Code inherits the global user-selected offset; prose never replaces
+it locally. Markdown structure supplies the hierarchy, while caption and micro
+roles remain reserved for supporting labels. Text-paired icons inherit their
+role's size; standalone icons use the existing icon steps.
+
+Default text buttons, fields, menu actions and segmented options use the shared
+`--control-md` height. Compact text actions use `--control-xs` or `--control-sm`,
+and larger actions use `--control-lg`. Their minimum height and vertical padding
+follow the role's actual line box, so multi-line content can grow. A font-size
+preference must move labels, glyphs and control geometry together. Inline file
+references keep sentence size and family at medium weight; ordinary inline code
+keeps the code-size preference with enough weight to remain readable.
+
 **The root font-size is 16px, and text size never touches it.** The root is the
 rem grid the layout is drawn on — control heights, paddings, dialog widths.
 Setting it to the UI text size once put every rem utility at 0.81× of the

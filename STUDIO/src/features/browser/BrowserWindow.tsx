@@ -86,7 +86,7 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
       ) : (
         <div className="flex min-h-0 flex-1 items-center justify-center p-10 text-center">
           <motion.div {...ENTER} className="flex max-w-sm flex-col gap-2">
-            <p className="font-serif text-2xl text-foreground">{state && !state.running ? 'This session has ended' : state?.tabs.length === 0 ? 'A little room to explore' : 'Opening your browser'}</p>
+            <p className="studio-heading text-foreground">{state && !state.running ? 'This session has ended' : state?.tabs.length === 0 ? 'A little room to explore' : 'Opening your browser'}</p>
             <p className="text-caption text-muted-foreground">{state?.frameUnavailable ? 'This live frame exceeded the delivery limit. Resize the window or wait for the next frame.' : state && !state.running ? 'Ask Studio to open a page, then reconnect here.' : state?.tabs.length === 0 ? 'Take control and open a new tab.' : 'The live page will appear here.'}</p>
           </motion.div>
         </div>

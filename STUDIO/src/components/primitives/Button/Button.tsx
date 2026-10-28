@@ -85,10 +85,10 @@ const VARIANT: Record<Variant, string> = {
  * denser than a page pill.
  */
 const SIZE: Record<Size, string> = {
-  xs: 'h-6 gap-1 rounded-full px-2.5 text-caption',
-  sm: 'h-7 gap-1.5 rounded-full px-3.5 text-caption',
-  md: 'h-8 gap-2 rounded-full px-4 text-ui',
-  lg: 'h-10 gap-2 rounded-full px-5 text-ui',
+  xs: '[--control-size:var(--control-xs)] gap-1 rounded-full px-2.5 text-caption',
+  sm: '[--control-size:var(--control-sm)] gap-1.5 rounded-full px-3.5 text-caption',
+  md: '[--control-size:var(--control-md)] gap-2 rounded-full px-4 text-ui',
+  lg: '[--control-size:var(--control-lg)] gap-2 rounded-full px-5 text-ui',
 }
 
 export function Button({
@@ -101,6 +101,8 @@ export function Button({
   icon,
   fullWidth = false,
   className,
+  role,
+  label,
   children,
 }: {
   onClick?: () => void
@@ -114,6 +116,10 @@ export function Button({
   icon?: ReactNode
   fullWidth?: boolean
   className?: string
+  /** `menuitem` when the button is an action inside a popover menu. */
+  role?: 'menuitem'
+  /** Accessible name, when the visible text alone does not say enough. */
+  label?: string
   children: ReactNode
 }) {
   const inert = disabled || busy
@@ -121,12 +127,14 @@ export function Button({
   return (
     <button
       type={type}
+      role={role}
+      aria-label={label}
       onClick={onClick}
       disabled={inert}
       aria-busy={busy || undefined}
       className={cn(
         'relative inline-flex shrink-0 items-center justify-center',
-        'font-medium leading-none whitespace-nowrap select-none',
+        'studio-control font-medium whitespace-nowrap select-none',
         // Color and shadow together: the press deepens the chip and settles
         // the resting shadow in the same 120ms, which is what makes it read
         // as one gesture — the control sinking — rather than two effects.
@@ -172,7 +180,7 @@ function Spinner() {
   return (
     <motion.span
       aria-hidden
-      className="size-3.5 rounded-full border-[1.5px] border-current border-t-transparent opacity-70"
+      className="size-[1.1em] rounded-full border-[1.5px] border-current border-t-transparent opacity-70"
       animate={{ rotate: 360 }}
       transition={LOOP.spin}
     />

@@ -37,6 +37,7 @@ import {
 import { McpCapabilityCatalog, systemActorMeta } from "../extend/mcp/capabilities.js";
 import type { McpTool } from "../extend/mcp/capabilities.js";
 import { BROWSER_SERVER_ID, COMPUTER_SERVER_ID, registerBuiltInServers } from "../extend/mcp/builtin.js";
+import { switchOnBuiltInSkills } from "../extend/skills/builtin.js";
 import { createMcpLauncher } from "../extend/mcp/launcher.js";
 import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
@@ -981,6 +982,7 @@ export class StudioRuntime implements AgentHost {
     // skill is a folder of text, and there is nothing to start or stop when
     // one is switched on - the render reads what is on and mounts it.
     this.#skills = new SkillRegistry();
+    switchOnBuiltInSkills(this.#selection);
     this.#inventory.register("skill", () => this.#skills.asExtensions());
     this.#extensions.register(
       "mcp",

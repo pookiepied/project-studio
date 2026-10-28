@@ -55,7 +55,7 @@ export function SettingsTree({
                 aria-current={selected ? 'page' : undefined}
                 onClick={() => onSelect(section.id)}
                 className={cn(
-                  'relative flex h-8 items-center gap-2 rounded-md px-2 text-left',
+                  'studio-control-flat relative flex items-center gap-2 rounded-md px-2 text-left',
                   'text-ui transition-colors duration-fast',
                   selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}

@@ -14,7 +14,7 @@ export function QueuedMessages({ messages, disabled, onAction }: {
       {messages.map((message) => (
         <QueueRow key={message.submissionId} message={message} disabled={disabled} onAction={onAction} />
       ))}
-      {messages.length === 3 ? <p className="px-1 pt-1 text-xs text-muted-foreground">Queue full (3/3)</p> : null}
+      {messages.length === 3 ? <p className="px-1 pt-1 text-caption text-muted-foreground">Queue full (3/3)</p> : null}
     </div>
   )
 }
@@ -29,7 +29,7 @@ function QueueRow({ message, disabled, onAction }: {
     <div className="flex min-h-7 items-center gap-2 text-ui">
       <Icons.queue size="sm" className="shrink-0 text-muted-foreground" />
       <p title={message.text} className="min-w-0 flex-1 truncate">{message.text || 'Attached images'}</p>
-      <button type="button" disabled={disabled} className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-tint disabled:opacity-40" title="Use in the active response at its next safe step" onClick={() => onAction(message, 'steer')}>
+      <button type="button" disabled={disabled} className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-tint disabled:opacity-40" title="Use in the active response at its next safe step" onClick={() => onAction(message, 'steer')}>
         <Icons.steer size="sm" /> Steer now
       </button>
       <IconButton label="Delete queued message" size="sm" disabled={disabled} onClick={() => onAction(message, 'remove')}><Icons.delete size="sm" /></IconButton>

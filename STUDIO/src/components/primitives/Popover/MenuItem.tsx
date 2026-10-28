@@ -53,7 +53,7 @@ export function MenuItem({
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        'flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left text-ui',
+        'studio-control-flat flex w-full items-start gap-2 rounded-sm px-2 text-left text-ui',
         'transition-colors duration-fast',
         selected ? 'text-foreground' : 'text-muted-foreground',
         'enabled:hover:bg-tint enabled:hover:text-foreground',

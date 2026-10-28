@@ -81,9 +81,9 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
         ),
     },
     tasks: {
-      list: () =>
+      list: (conversationId) =>
         call('The harness is not running, so there are no tasks to list.', (client) =>
-          client.tasks(),
+          client.tasks(conversationId === undefined ? undefined : { parentConversationId: conversationId }),
         ),
       cancel: (taskId) =>
         call('The harness is not running, so nothing was stopped.', (client) =>

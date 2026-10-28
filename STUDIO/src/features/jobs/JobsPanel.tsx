@@ -17,12 +17,12 @@ import type { BackgroundJob } from '@/platform/harness'
  * actions and the rare case one.
  */
 export function JobsPanel({ conversationId }: { conversationId: string }) {
-  const { jobs, stoppingId, stop } = useBackgroundJobs(conversationId)
+  const { jobs, stoppingId, stop, error } = useBackgroundJobs(conversationId)
 
   if (jobs.length === 0) {
     return (
       <p className="pt-1 text-caption text-muted-foreground">
-        Nothing is running in the background for this conversation.
+        {error ?? 'Nothing is running in the background for this conversation.'}
       </p>
     )
   }
@@ -31,6 +31,7 @@ export function JobsPanel({ conversationId }: { conversationId: string }) {
 
   return (
     <div className="flex flex-col gap-3 pt-1">
+      {error ? <p role="status" className="text-caption text-danger">{error}</p> : null}
       <p className="text-caption tabular-nums text-muted-foreground">
         {running === 0
           ? `${jobs.length} finished`
@@ -53,6 +54,7 @@ export function JobsPanel({ conversationId }: { conversationId: string }) {
 /** How a job ended, or that it has not. One phrase, in the person's words. */
 function stateLabel(job: BackgroundJob): string {
   if (job.state === 'running') return 'Running'
+  if (job.state === 'stopping') return 'Stopping'
   if (job.state === 'stopped') return 'Stopped'
   if (job.state === 'failed') return job.error ?? 'Never started'
   return job.exitCode === 0 ? 'Finished' : `Exited ${job.exitCode ?? '?'}`
@@ -86,7 +88,7 @@ function JobRow({
           )}
         />
         <span className="min-w-0 flex-1 truncate font-mono text-caption text-foreground">
-          {job.command}
+          Background command
         </span>
         <span
           className={cn(
@@ -112,6 +114,8 @@ function JobRow({
         ) : null}
       </div>
 
+      <details><summary className="ml-3.5 cursor-pointer text-micro text-muted-foreground">Inspect command and output</summary>
+      <code className="block break-all text-micro">{job.command}</code>
       {job.dropped > 0 ? (
         // Said rather than implied. A tail that quietly begins mid-stream reads
         // as the whole of the output.
@@ -125,6 +129,7 @@ function JobRow({
           {job.output}
         </pre>
       )}
+      </details>
     </li>
   )
 }

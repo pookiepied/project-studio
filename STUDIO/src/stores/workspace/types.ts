@@ -129,7 +129,7 @@ export interface BoundClient {
   }
   /** The harness's dispatched agent tasks, bound like the commands. */
   readonly tasks: {
-    list: () => Promise<HarnessResult<readonly AgentTask[]>>
+    list: (conversationId?: string) => Promise<HarnessResult<readonly AgentTask[]>>
     cancel: (taskId: string) => Promise<HarnessResult<boolean>>
   }
   /**

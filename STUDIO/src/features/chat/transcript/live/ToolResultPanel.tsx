@@ -18,7 +18,7 @@ export function ToolResultPanel({ title, call, live, children, statusLabel }: {
     <section aria-label={title} className="my-1 min-w-0 rounded-lg bg-muted/60 px-3 py-2.5 text-foreground">
       <div className="mb-3 text-caption font-medium text-muted-foreground">{title}</div>
       <div role="region" aria-label={`${title} details`} tabIndex={0}
-        className="studio-selectable studio-scroll-bounded flex max-h-80 min-w-0 flex-col gap-3 overflow-auto overscroll-contain text-caption leading-relaxed [overflow-wrap:anywhere]">
+        className="studio-selectable studio-scroll-bounded flex max-h-80 min-w-0 flex-col gap-3 overflow-auto overscroll-contain text-caption [overflow-wrap:anywhere]">
         {children}
         {call.errorText !== null ? <p className="whitespace-pre-wrap text-danger">{call.errorText}</p> : null}
       </div>

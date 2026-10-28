@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import type { AdmissionEnv } from "../middleware/admission.js";
 import type { FaviconSource } from "../../../web/favicons.js";
+import type { WebImageSource } from "../../../web/images.js";
 
 /**
  * What the window asks the harness about the web on a reader's behalf.
@@ -16,7 +17,7 @@ import type { FaviconSource } from "../../../web/favicons.js";
  * the life of a conversation, and a reader scrolling back through one must
  * not cost a request per row.
  */
-export function createWebRoutes(favicons: FaviconSource): Hono<AdmissionEnv> {
+export function createWebRoutes(favicons: FaviconSource, images?: WebImageSource): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
 
   routes.get("/favicons/:host", async (context) => {
@@ -30,6 +31,25 @@ export function createWebRoutes(favicons: FaviconSource): Hono<AdmissionEnv> {
         "content-type": icon.mimeType,
         "content-length": String(icon.bytes.byteLength),
         "cache-control": "private, max-age=86400",
+      },
+    });
+  });
+
+  // A picture a reply embeds, fetched here so the window never asks the
+  // host (see `web/images.ts`). The answer for one address can change, so it
+  // is cached for the session rather than for good.
+  routes.get("/image", async (context) => {
+    const url = context.req.query("url");
+    const image = url === undefined || images === undefined ? null : await images.fetch(url);
+    if (image === null) {
+      return context.json({ error: "That image could not be loaded.", code: "web.no-image" }, 404);
+    }
+    return new Response(new Uint8Array(image.bytes), {
+      status: 200,
+      headers: {
+        "content-type": image.mimeType,
+        "content-length": String(image.bytes.byteLength),
+        "cache-control": "private, max-age=3600",
       },
     });
   });

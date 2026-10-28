@@ -217,7 +217,7 @@ function ModelRowMenu({
           type="button"
           aria-label={`${model.displayName} options`}
           onClick={() => setOpen((value) => !value)}
-          className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint"
+          className="flex size-[var(--control-sm)] shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint"
         >
           <Icons.more />
         </button>

@@ -1,11 +1,16 @@
 import { createContext, memo, useContext, type ReactNode } from 'react'
-import ReactMarkdown, { type Components } from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { ArtifactBlock } from '@/features/artifacts'
 import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/blocks'
 import { useMath } from '@/features/chat/markdown/useMath'
+import { MarkdownLink } from './MarkdownLink'
+import { prepareMath } from './prepareMath'
+import { rehypeReply, type Sources } from './rehypeReply'
+import { VISUAL_FENCES, VisualBlock } from './visuals'
+import { LOCAL_IMAGE, remarkReplyImages, ReplyImage } from './ReplyImage'
 
 /**
  * Model output, rendered.
@@ -57,7 +62,7 @@ const SVG_TAGS = [
   // element names, while some upstream tooling keeps the SVG camel case.
   'lineargradient', 'linearGradient', 'radialgradient', 'radialGradient',
   'stop', 'clippath', 'clipPath', 'mask', 'text', 'tspan',
-] as const
+]
 
 const SVG_ATTRIBUTES = [
   'd', 'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width',
@@ -68,7 +73,7 @@ const SVG_ATTRIBUTES = [
   'gradientUnits', 'gradientTransform', 'patternUnits', 'clip-rule',
   'text-anchor', 'dominant-baseline', 'font-size', 'font-family',
   'font-weight', 'role', 'aria-hidden', 'aria-label',
-] as const
+]
 
 const SCHEMA = {
   ...defaultSchema,
@@ -95,7 +100,17 @@ const SCHEMA = {
     ...Object.fromEntries(
       SVG_TAGS.map((tag) => [tag, [...SVG_ATTRIBUTES, ['className', 'math-inline', 'math-display']]]),
     ),
+  },  // A local picture arrives as `studio-file:` (see `remarkReplyImages`); the
+  // image component, not the webview, decides what that may load.
+  protocols: {
+    ...defaultSchema.protocols,
+    src: [...(defaultSchema.protocols?.src ?? []), LOCAL_IMAGE.slice(0, -1)],
   },
+}
+
+/** react-markdown's own URL filter, with the one scheme this file adds. */
+function urlTransform(url: string): string {
+  return url.startsWith(LOCAL_IMAGE) ? url : defaultUrlTransform(url)
 }
 
 /**
@@ -141,11 +156,17 @@ function textOf(node: FenceNode): string {
 }
 
 const StreamingContext = createContext(false)
+const UserContext = createContext(false)
 
 function Fence({ node }: { node: FenceNode | undefined }) {
   const streaming = useContext(StreamingContext)
+  const user = useContext(UserContext)
   const { fence, text } = fenceOf(node)
-  if (fence === 'artifact') return <ArtifactBlock source={text} />
+  if (fence === 'artifact') return user ? <TextBlock text={text} fence="text" /> : <ArtifactBlock source={text} />
+  // A visual is drawn for a reply and shown as written in a person's own message.
+  if (fence !== undefined && VISUAL_FENCES.has(fence)) {
+    return user ? <TextBlock text={text} fence="text" /> : <VisualBlock fence={fence} source={text} streaming={streaming} />
+  }
   if (fence === undefined || fence in TEXT_FENCES) return <TextBlock text={text} fence={fence ?? 'text'} />
   return <CodeBlock code={text} fence={fence} streaming={streaming} />
 }
@@ -165,8 +186,8 @@ const COMPONENTS: Components = {
    *   are things the reader takes away or works in rather than reads past.
    * - everything else is prose and stays inline.
    *
-   * Images and videos never pass through here; they are artifacts and render
-   * independent of the text, at their own measure.
+   * Generated images and videos are artifacts and render independent of the
+   * text; a picture the reply itself embeds is drawn inline (`img`).
    *
    * ---- Why fences are routed at `pre`, not at `code` -----------------------
    *
@@ -185,8 +206,11 @@ const COMPONENTS: Components = {
 
   /** Inline code, and nothing else -- every fence was routed at `pre`. */
   code({ className, children, ...rest }) {
+    const fileReference = typeof children === 'string'
+      && (!/\s/.test(children) || /^(?:[A-Za-z]:[\\/]|\/|\.{1,2}[\\/])/.test(children))
+      && /(?:^|[\\/])[^\\/\n]+\.(?:png|jpe?g|webp|gif|svg|avif|pdf|docx?|pptx?|xlsx?|csv|tsv|txt|md|py|[cm]?[jt]sx?|json|html?|css|rs|go|java|toml|ya?ml|sh|sql|mp4|webm|mp3|wav|ogg)(?::\d+(?::\d+)?)?$/i.test(children)
     return (
-      <code className={className} {...rest}>
+      <code className={fileReference ? 'studio-file-reference' : className} {...rest}>
         {children}
       </code>
     )
@@ -216,32 +240,37 @@ const COMPONENTS: Components = {
     )
   },
 
-  /** Links open outside the app; nothing in a transcript navigates the shell. */
-  a({ href, children }) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer noopener">
-        {children}
-      </a>
-    )
+  /** Inspect the destination before deliberately opening the OS browser. */
+  /** Pictures are fetched through the harness, never by the webview (see `ReplyImage`). */
+  img({ src, alt }) {
+    return <ReplyImage src={typeof src === 'string' ? src : undefined} alt={alt} />
+  },
+
+  a({ href, title, children }) {
+    return <MarkdownLink href={href} title={title} children={children} />
   },
 }
 
-export const Markdown = memo(function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }): ReactNode {
+export const Markdown = memo(function Markdown({ text, streaming = false, user = false, sources }: { text: string; streaming?: boolean; user?: boolean; sources?: Sources }): ReactNode {
   // The maths plugins join the pipeline only for a reply that carries a
   // formula, and only once they have arrived (`useMath`). The sanitiser
   // keeps its place between raw and katex either way.
   const math = useMath(text)
+  const source = math === null ? text : prepareMath(text)
+  const reply: [typeof rehypeReply, { sources?: Sources }] = [rehypeReply, { sources }]
   return (
-    <StreamingContext.Provider value={streaming}><ReactMarkdown
-      remarkPlugins={math === null ? [remarkGfm] : [remarkGfm, math.remark]}
+    <UserContext.Provider value={user}><StreamingContext.Provider value={streaming}><ReactMarkdown
+      skipHtml={user}
+      remarkPlugins={math === null ? [remarkGfm, remarkReplyImages] : [remarkGfm, remarkReplyImages, math.remark]}
+      urlTransform={urlTransform}
       rehypePlugins={
-        math === null
-          ? [rehypeRaw, [rehypeSanitize, SCHEMA]]
-          : [rehypeRaw, [rehypeSanitize, SCHEMA], math.rehype]
+        user ? (math === null ? [reply] : [reply, math.rehype]) : math === null
+          ? [rehypeRaw, [rehypeSanitize, SCHEMA], reply]
+          : [rehypeRaw, [rehypeSanitize, SCHEMA], reply, math.rehype]
       }
       components={COMPONENTS}
     >
-      {text}
-    </ReactMarkdown></StreamingContext.Provider>
+      {source}
+    </ReactMarkdown></StreamingContext.Provider></UserContext.Provider>
   )
 })

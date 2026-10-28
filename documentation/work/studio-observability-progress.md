@@ -120,6 +120,21 @@ Coverage: `computer-lease.test.ts` (checkpoint), `media-routes.test.ts`,
 `controlMatcher`, `useScreenShare`, `BrowserPanel`, `VoiceModelSetting`,
 `VoiceModeOverlay`, harness `conversation` wire.
 
+## Conversation workspace (2026-10-21)
+
+The side workspace now projects durable transcript submissions into scoped tasks
+and keeps selection/resources per conversation. Manual collapse is a persisted
+window preference. Agent list requests and displayed rows are parent-filtered;
+polling cleanup rejects late responses. The existing worker stream supports
+read-only inspection, with parent product scope distinct from worker instance
+addressing. Stop acceptance no longer fabricates a terminal state; background
+jobs retain the backend's `stopping` state. No capture policy or body fields
+were added. Regression coverage: `workspace-lifecycle.test.tsx`,
+`workspaceTasks.test.ts`, `workspace-polling.test.tsx`, `TasksSection.test.tsx`,
+`WorkspaceOverview.test.tsx`, and `worker-inspection.test.ts`.
+Inline delegates without a public stream and persisted worker attachment
+previews remain unsupported. Native GUI execution is not covered by these tests.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in
@@ -237,21 +252,6 @@ Verification results and implementation limits are recorded in
 microphone latency, native speech-to-speech, complete Studio readiness, or live
 steering of framework-inline delegates.
 
-## Other-device pairing follow-up (2026-10-20)
-
-Pairing renewal uses the existing `remote_pairing_code` command with an optional
-renewal flag; no new native command or HTTP route is added. The existing command
-arrival registry remains applicable and does not claim command completion.
-QR submission uses the existing pairing endpoint, retains native authentication
-and verifies cookie acceptance before mounting the workspace. The code travels
-in a URL fragment removed before requests; no credential, code, raw user-agent
-or URL content is added to diagnostics. Device IDs remain unchanged; restored
-revocation channels retain the original device identity. Storage failures remain
-product failures rather than successful pairing/removal. UI refreshes do not
-replay failed pairing submissions. Existing remote HTTP observation gaps and
-capture policy are unchanged. Regression evidence and review limitations are in
-`report/other-device-pairing.md`.
-The sequential root gate passed 2,567 harness tests (28 skipped) and 1,602 client
 ## Voice on a loudspeaker, and the screen kept on (2026-10-22)
 
 Voice mode now runs WebRTC's AEC3 echo canceller itself
@@ -318,6 +318,21 @@ key, unreadable files without the path in the sentence, the configuration
 order, and one real port serving a TLS client and a plain client through the
 same gate. No physical-iPhone verification is claimed.
 
+## Other-device pairing follow-up (2026-10-20)
+
+Pairing renewal uses the existing `remote_pairing_code` command with an optional
+renewal flag; no new native command or HTTP route is added. The existing command
+arrival registry remains applicable and does not claim command completion.
+QR submission uses the existing pairing endpoint, retains native authentication
+and verifies cookie acceptance before mounting the workspace. The code travels
+in a URL fragment removed before requests; no credential, code, raw user-agent
+or URL content is added to diagnostics. Device IDs remain unchanged; restored
+revocation channels retain the original device identity. Storage failures remain
+product failures rather than successful pairing/removal. UI refreshes do not
+replay failed pairing submissions. Existing remote HTTP observation gaps and
+capture policy are unchanged. Regression evidence and review limitations are in
+`report/other-device-pairing.md`.
+The sequential root gate passed 2,567 harness tests (28 skipped) and 1,602 client
 tests. Serial native library checks passed 154 tests, excluding the existing
 real-keyring self-test; Clippy with warnings denied, the production frontend
 build and the embedded desktop debug build passed. No physical remote-device

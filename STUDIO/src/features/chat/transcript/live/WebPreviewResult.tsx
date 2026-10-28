@@ -36,7 +36,7 @@ export function WebPreviewResult({ preview, conversationId, resultId }: {
     <div className="flex min-w-0 items-center gap-3 p-3">
       <button type="button" onClick={openPreview} aria-label={`Open web preview: ${preview.title}`} title={preview.url}
         className="group/preview flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-lg text-muted-foreground"><Icons.browserUse /></span>
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground"><Icons.browserUse size="lg" /></span>
         <span className="min-w-0 flex-1">
           <span className="block font-medium group-hover/preview:underline">Web preview</span>
           <span className="block truncate text-muted-foreground">Website · {preview.title}</span>

@@ -63,9 +63,9 @@ export function usePlan(
 
   const hasPlan = snapshot !== null && (snapshot.damaged || snapshot.items.length > 0)
 
-  const read = useCallback(async () => {
+  const read = useCallback(async (current: () => boolean) => {
     const result = await plans.get(conversationId)
-    if (!result.ok || !liveRef.current) return
+    if (!result.ok || !liveRef.current || !current()) return
     setSnapshot(result.value)
   }, [plans, conversationId])
 
@@ -78,14 +78,16 @@ export function usePlan(
 
   useEffect(() => {
     if (!enabled) return
+    let disposed = false
     let timer: ReturnType<typeof setTimeout> | null = null
     const tickPoll = () => {
-      void read().then(() => {
-        if (liveRef.current) timer = setTimeout(tickPoll, active ? ACTIVE_POLL_MS : IDLE_POLL_MS)
+      void read(() => !disposed).then(() => {
+        if (liveRef.current && !disposed) timer = setTimeout(tickPoll, active ? ACTIVE_POLL_MS : IDLE_POLL_MS)
       })
     }
     tickPoll()
     return () => {
+      disposed = true
       if (timer !== null) clearTimeout(timer)
     }
   }, [enabled, active, read])

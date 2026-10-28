@@ -119,7 +119,7 @@ export const NATIVE_TOOL_NAMES: ReadonlySet<string> = new Set([
  * Same maintenance contract as `NATIVE_TOOL_NAMES`: adding a bundled skill
  * is a decision, and this list is where it is repeated.
  */
-const BUNDLED_SKILL_IDS: ReadonlySet<string> = new Set(["create-skill", "customize-studio"]);
+const BUNDLED_SKILL_IDS: ReadonlySet<string> = new Set(["create-skill", "customize-studio", "visual-responses"]);
 
 /**
  * The cross-field rules a schema cannot express: what each kind of agent may

@@ -1,5 +1,5 @@
-import { memo } from 'react'
-import { Markdown } from '@/features/chat/markdown'
+import { memo, useRef } from 'react'
+import { Markdown, scanSources, type Sources } from '@/features/chat/markdown'
 import { segment } from '@/features/chat/streaming/segment'
 
 /**
@@ -23,11 +23,19 @@ import { segment } from '@/features/chat/streaming/segment'
 export function StreamedMarkdown({ text, streaming }: { text: string; streaming: boolean }) {
   const { stable, tail } = segment(text, !streaming)
   const blocks = tail ? [...stable, tail] : stable
+  // Citations and their source list usually sit in different blocks, so the
+  // list is read off the whole reply and shared. Keyed on its content, so the
+  // finished blocks keep their memo until the list itself changes.
+  const scanned = scanSources(text)
+  const key = JSON.stringify([...scanned])
+  const previous = useRef<{ key: string; sources: Sources } | null>(null)
+  if (previous.current === null || previous.current.key !== key) previous.current = { key, sources: scanned }
+  const sources = previous.current.sources
 
   return (
     <>
       {blocks.map((block, index) => (
-        <Block key={index} text={block} streaming={streaming && index === blocks.length - 1 && tail !== ''} />
+        <Block key={index} text={block} sources={sources} streaming={streaming && index === blocks.length - 1 && tail !== ''} />
       ))}
     </>
   )
@@ -42,6 +50,6 @@ export function StreamedMarkdown({ text, streaming }: { text: string; streaming:
  * grows with the length of the reply, and a long answer stutters worse the
  * further it gets.
  */
-const Block = memo(function Block({ text, streaming }: { text: string; streaming: boolean }) {
-  return <Markdown text={text} streaming={streaming} />
+const Block = memo(function Block({ text, streaming, sources }: { text: string; streaming: boolean; sources: Sources }) {
+  return <Markdown text={text} streaming={streaming} sources={sources} />
 })

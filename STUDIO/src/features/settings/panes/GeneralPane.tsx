@@ -87,7 +87,7 @@ export function GeneralPane() {
               onClick={() => setOpen((value) => !value)}
               aria-haspopup="menu"
               aria-expanded={open}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-fast hover:bg-tint"
+              className="studio-control inline-flex items-center gap-1.5 rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-fast hover:bg-tint"
             >
               <Glyph />
               {mode.name}

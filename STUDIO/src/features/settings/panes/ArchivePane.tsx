@@ -32,8 +32,10 @@ import { cn } from '@/lib/cn'
  *
  * Trees an earlier partial delete left behind: the index row is gone, so the
  * purge cannot target them, and no journal stream owns them either. They are
- * listed for a person's sweep and never swept by the app - nothing here
- * deletes on its own.
+ * not a separate chore: every delete here ends by sweeping them, so a person
+ * has one button to empty the archive and nothing left over to find. When
+ * only leftovers remain, the same Clear archive button is what removes them.
+ * Nothing here deletes on its own, without a click.
  *
  * ---- Why the empty sentence is gated on ready ------------------------------
  *
@@ -56,7 +58,6 @@ export function ArchivePane() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [purging, setPurging] = useState(false)
   const [purgeFailures, setPurgeFailures] = useState<Readonly<Record<string, string>>>({})
-  const [sweeping, setSweeping] = useState(false)
   const [sweepFailure, setSweepFailure] = useState<HarnessFailure | null>(null)
   const [sweepFailures, setSweepFailures] = useState<Readonly<Record<string, string>>>({})
 
@@ -77,32 +78,27 @@ export function ArchivePane() {
     })
   }
 
+  /**
+   * Deletes the conversations, then sweeps whatever folders a delete - this
+   * one or an earlier one - left behind. One act, so a person never meets a
+   * second button for the remainder of the first.
+   */
   const purge = async (ids: readonly string[]) => {
     if (purging) return
     setPurging(true)
     setPurgeFailures({})
-    try {
-      const failures = await removeMany(ids)
-      setPurgeFailures(failures)
-      setSelected(new Set())
-      // A tree the purge could not fully remove is the sweep's shape now.
-      await refreshOrphanTrees()
-    } finally {
-      setPurging(false)
-    }
-  }
-
-  const sweep = async () => {
-    if (sweeping) return
-    setSweeping(true)
     setSweepFailure(null)
     setSweepFailures({})
     try {
+      if (ids.length > 0) {
+        setPurgeFailures(await removeMany(ids))
+        setSelected(new Set())
+      }
       const outcome = await sweepOrphanTrees()
       if (!outcome.ok) setSweepFailure(outcome.error)
       else setSweepFailures(outcome.value)
     } finally {
-      setSweeping(false)
+      setPurging(false)
     }
   }
 
@@ -127,8 +123,19 @@ export function ArchivePane() {
           detail={storePhase.error?.message ?? 'The harness stopped answering.'}
           action={retry}
         />
-      ) : archived.length === 0 ? (
+      ) : archived.length === 0 && orphanTrees.length === 0 ? (
         <p className="py-4 text-ui text-muted-foreground">Nothing archived.</p>
+      ) : archived.length === 0 ? (
+        <div className="flex items-center justify-between gap-2 py-2.5">
+          <span className="text-caption text-muted-foreground">
+            {orphanTrees.length === 1
+              ? 'Nothing archived, but one folder from a deleted chat is still on disk.'
+              : `Nothing archived, but ${orphanTrees.length} folders from deleted chats are still on disk.`}
+          </span>
+          <Button variant="danger" size="sm" busy={purging} icon={<Icons.clear />} onClick={() => void purge([])}>
+            Clear archive
+          </Button>
+        </div>
       ) : (
         <>
           <div className="flex items-center justify-between gap-2 py-2.5">
@@ -160,8 +167,8 @@ export function ArchivePane() {
           </div>
 
           <p className="text-micro text-muted-foreground">
-            Deleting removes the conversation, its files and its transcript. It cannot be
-            undone.
+            Deleting removes the conversation, its files and its transcript, and any folders
+            an earlier delete left behind. It cannot be undone.
           </p>
 
           {Object.entries(purgeFailures).map(([id, message]) => (
@@ -205,35 +212,16 @@ export function ArchivePane() {
         </>
       )}
 
-      {storePhase.status === 'ready' && orphanTrees.length > 0 ? (
-        <div className="flex flex-col gap-2 border-t py-2.5">
-          <p className="text-caption text-muted-foreground">
-            {/* The pronoun belongs to the branch that set the number. Written
-                as a shared tail it said "One leftover folder ... Removing
-                them", which is the sentence a person reads when they have
-                exactly one. */}
-            {orphanTrees.length === 1
-              ? 'One leftover folder from a conversation that is already gone. Removing it deletes the files.'
-              : `${orphanTrees.length} leftover folders from conversations that are already gone. Removing them deletes the files.`}{' '}
-            This cannot be undone.
-          </p>
-          <div>
-            <Button variant="danger" size="sm" busy={sweeping} onClick={() => void sweep()}>
-              Remove leftover folders
-            </Button>
-          </div>
-          {sweepFailure ? (
-            <p role="alert" className="text-caption text-danger">
-              {sweepFailure.message}
-            </p>
-          ) : null}
-          {Object.entries(sweepFailures).map(([name, message]) => (
-            <p key={name} role="alert" className="text-caption text-danger">
-              {message}
-            </p>
-          ))}
-        </div>
+      {sweepFailure ? (
+        <p role="alert" className="pt-1 text-caption text-danger">
+          {sweepFailure.message}
+        </p>
       ) : null}
+      {Object.entries(sweepFailures).map(([name, message]) => (
+        <p key={name} role="alert" className="pt-1 text-caption text-danger">
+          {message}
+        </p>
+      ))}
     </Pane>
   )
 }

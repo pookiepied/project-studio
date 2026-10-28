@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { FADE, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
 import { BackgroundWorkPanel } from '@/features/jobs'
 import { BrowserPanel } from '@/features/rail/BrowserPanel'
-import { familyById } from '@/features/chat/transcript/live/reportFamily'
 import { PlanPanel } from '@/features/plans'
 import { ChangesPanel } from '@/features/changes/ChangesPanel'
-import { RailTabs } from '@/features/rail/RailTabs'
-import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, type RailEntry } from '@/stores/rail'
+import { WorkspaceOverview, WorkspaceTaskDetail, entryTitle } from './WorkspaceOverview'
+import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, useWorkspaceTaskHistory } from '@/stores/rail'
 import { cn } from '@/lib/cn'
+import type { AgentTask } from '@/platform/harness'
+import { AgentInspector } from './AgentInspector'
 
 /**
  * The narrowest the conversation may become.
@@ -24,12 +25,6 @@ import { cn } from '@/lib/cn'
 const MIN_PAGE_WIDTH = 520
 
 /** What the header calls the active entry, per kind. */
-function entryTitle(entry: RailEntry): string {
-  if (entry.kind === 'artifact') return entry.artifact.title
-  if (entry.kind === 'jobs') return 'Background work'
-  if (entry.kind === 'changes') return 'File changes'
-  return entry.kind === 'browser' ? entry.recorded ? 'Web preview' : familyById(entry.family).label : 'Plan'
-}
 
 
 /**
@@ -69,11 +64,16 @@ export function SideRail({
   /** The rail has finished leaving. What releases a sidebar waiting on it. */
   onClosed?: () => void
 }) {
-  const { entries, activeId, width, setWidth, closeAll } = useRail()
+  const { entries, activeId, width, setWidth, closeAll, overview, conversationId } = useRail()
+  const tasks = useWorkspaceTaskHistory()
+  const [agent, setAgent] = useState<AgentTask | null>(null)
+  const inspectedAgent = activeId === null ? agent : null
+  const reducedMotion = useReducedMotion()
   const frame = useRef<HTMLElement>(null)
   const [room, setRoom] = useState(Number.POSITIVE_INFINITY)
 
-  const active = entries.find((entry) => entry.id === activeId) ?? entries[entries.length - 1]
+  const active = entries.find((entry) => entry.id === activeId)
+  const task = tasks.find((item) => item.id === activeId)
 
   /**
    * The rail may not starve the page.
@@ -100,13 +100,20 @@ export function SideRail({
   }, [open])
 
   const ceiling = Math.max(RAIL_MIN_WIDTH, room - MIN_PAGE_WIDTH)
-  const effective = Math.min(width, ceiling)
+  const overlay = room < MIN_PAGE_WIDTH + RAIL_MIN_WIDTH
+  const effective = Math.min(width, ceiling, room)
 
   return (
     <AnimatePresence initial={false} onExitComplete={onClosed}>
       {open ? (
         <motion.aside
-          aria-label="Side rail"
+          aria-label="Conversation workspace"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return
+            event.stopPropagation()
+            if (inspectedAgent || task || active) { setAgent(null); overview() }
+            else closeAll()
+          }}
           // Width animates, and nothing else. Sliding the rail in from off
           // screen would push the conversation sideways for the length of the
           // animation, and the conversation is what the reader is looking at.
@@ -122,7 +129,7 @@ export function SideRail({
           initial={{ width: 0, opacity: 0 }}
           animate={{ width: effective, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
-          transition={{ width: SPRING_PANEL, opacity: FADE.transition }}
+          transition={reducedMotion ? { duration: 0 } : { width: SPRING_PANEL, opacity: FADE.transition }}
           // Square, flush, and sunken — the mirror of the sidebar, for the
           // reason spelled out in `AppShell`: the radius belongs to the centre,
           // not to the column beside it.
@@ -138,7 +145,7 @@ export function SideRail({
           // No hairline, same as the docked sidebar: the page's corner cuts a
           // notch through this edge, and a border would draw a straight rule
           // across the arc. The sunken surface is the seam.
-          className="relative flex shrink-0 flex-col overflow-hidden bg-surface-sunken"
+          className={cn('flex shrink-0 flex-col overflow-hidden bg-surface-sunken text-foreground', overlay ? 'absolute inset-y-0 right-0 z-30 shadow-panel' : 'relative')}
         >
           <ResizeHandle width={effective} ceiling={ceiling} onWidth={setWidth} />
 
@@ -151,16 +158,16 @@ export function SideRail({
               way the sidebar's inner column has always been sized. */}
           <div className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: effective }}>
             <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
-              <span className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
-                {active === undefined ? 'Side rail' : entryTitle(active)}
-              </span>
+              {active || task || inspectedAgent ? <IconButton label="Back to workspace" size="sm" onClick={() => { setAgent(null); overview() }}><Icons.back size="sm" /></IconButton> : null}
+              <h2 className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
+                {inspectedAgent?.title ?? task?.title ?? (active === undefined ? 'Workspace' : entryTitle(active))}
+              </h2>
 
-              <IconButton label="Close the rail" size="sm" onClick={closeAll}>
+              <IconButton label="Collapse workspace" size="sm" onClick={closeAll}>
                 <Icons.close size="sm" />
               </IconButton>
             </header>
 
-            <RailTabs />
 
             {/* Keyed by the entry, so switching plays the view transition rather
                 than swapping content inside a frame that never acknowledges it
@@ -180,12 +187,12 @@ export function SideRail({
                 rather than the whole rail. */}
             <div className="studio-scroll-inset relative min-h-0 flex-1 overflow-y-auto px-3 pb-4">
               <AnimatePresence initial={false} mode="popLayout">
-                {active !== undefined ? (
-                  <motion.div {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
+                {inspectedAgent && conversationId ? <AgentInspector key={inspectedAgent.id} task={inspectedAgent} conversationId={conversationId} /> : task ? <WorkspaceTaskDetail key={task.id} task={task} /> : active !== undefined ? (
+                  <motion.div key={active.id} {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
                     {active.kind === 'artifact' ? (
                       renderArtifact(active.artifact)
                     ) : active.kind === 'jobs' ? (
-                      <BackgroundWorkPanel conversationId={active.conversationId} />
+                      <BackgroundWorkPanel key={active.conversationId} conversationId={active.conversationId} onInspectAgent={(item) => { overview(); setAgent(item) }} />
                     ) : active.kind === 'browser' ? (
                       <BrowserPanel entry={active} />
                     ) : active.kind === 'changes' ? (
@@ -194,7 +201,7 @@ export function SideRail({
                       <PlanPanel conversationId={active.conversationId} />
                     )}
                   </motion.div>
-                ) : null}
+                ) : <WorkspaceOverview key="overview" onInspectAgent={setAgent} />}
               </AnimatePresence>
             </div>
           </div>
@@ -270,11 +277,13 @@ function ResizeHandle({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={() => { start.current = null }}
+      onLostPointerCapture={() => { start.current = null }}
       onKeyDown={(event) => {
         // Keyboard resize, because a drag handle that only answers to a mouse
         // is a control some people simply cannot use.
-        if (event.key === 'ArrowLeft') onWidth(Math.min(ceiling, width + 24))
-        if (event.key === 'ArrowRight') onWidth(width - 24)
+        if (event.key === 'ArrowLeft') { event.preventDefault(); onWidth(Math.min(ceiling, width + 24)) }
+        if (event.key === 'ArrowRight') { event.preventDefault(); onWidth(width - 24) }
       }}
       className="group/resize absolute inset-y-0 left-0 z-10 w-3 cursor-col-resize touch-none"
     >

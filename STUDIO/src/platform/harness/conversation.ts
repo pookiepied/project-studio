@@ -381,6 +381,8 @@ export interface ConversationClientOptions {
   readonly conversationId: string
   /** The Flue agent instance name. Production runs exactly one, `studio`. */
   readonly agentName?: string
+  /** Product owner when reading an independently addressed worker's stream. */
+  readonly observationConversationId?: string
   readonly invoke?: ServiceInvoke
   readonly createChannel?: ChannelFactory
   /**
@@ -624,7 +626,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
 
     attach(handlers, attachOptions) {
       const streamId = newId('stream')
-      const streamIdentity = { conversationId, streamId }
+      const streamIdentity = { conversationId: options.observationConversationId ?? conversationId, streamId }
       recordClientObservation({ name: 'client.stream', phase: 'start', identity: streamIdentity })
       const previous = active
 

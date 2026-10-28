@@ -219,6 +219,15 @@
     letter-spacing: -0.003em;
   }
 
+  /* A default field, button and menu row share one height. The padding follows
+     the role's real line box, so larger text and multi-line labels can grow. */
+  .studio-control,
+  .studio-control-flat {
+    min-height: var(--control-size, var(--control-md));
+    padding-block: max(0px, calc((var(--control-size, var(--control-md)) - 1lh - var(--control-border, 2px)) / 2));
+  }
+  .studio-control-flat { --control-border: 0px; }
+
   /* Monospaced text outside the transcript: a JSON view, a stderr dump, any
      block where alignment carries meaning. `--code-size` already existed and
      was reachable only from prose `code`, so every panel wanting it had to

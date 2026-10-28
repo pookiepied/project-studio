@@ -23,6 +23,11 @@ describe('the finished part and the live part', () => {
 })
 
 describe('inline markup, closed while it is still being written', () => {
+  it('keeps indented code memoizable without mistaking it for list continuation', () => {
+    const { stable } = segment('Intro.\n\n```python\nif ready:\n    print("done")\n```\n\nNext paragraph.', false)
+    expect(stable).toEqual(['Intro.', '```python\nif ready:\n    print("done")\n```'])
+  })
+
   // The reason this exists: the tail is parsed on every frame, so a half-typed
   // delimiter renders as literal punctuation and then rewrites itself when the
   // closer lands. Emphasis is wider than plain text, so the line re-wraps and

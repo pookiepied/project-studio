@@ -117,6 +117,20 @@
      translucent pull of the foreground over the ground the table sits on. */
   --table-head: color-mix(in oklab, var(--foreground) 4%, transparent);
 
+  /* Series colours for the charts a reply draws (`visuals/`). Eight hues in a
+     fixed order -- the order is what keeps neighbours apart for colour-blind
+     readers, so a chart takes them in turn and never cycles. Validated on the
+     sunken ground the charts sit on; three light steps fall under 3:1, which
+     is why every chart carries a legend and a table view. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+
   /* -- Pointer and selection states ---------------------------------------
      Translucent on purpose. `--muted` is an opaque swatch, and using it for
      hover meant a row did not darken -- it was *replaced* by a grey chip that
@@ -190,6 +204,16 @@
      ground and clearly off the page. See the light token for why this cannot
      be one formula. */
   --table-head: var(--surface-raised);
+
+  /* The same eight hues, stepped for the dark ground (all clear 3:1). */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
 
   /* Slightly stronger than light: a white tint over a dark surface lifts less
      per percent than a black tint darkens a light one. */

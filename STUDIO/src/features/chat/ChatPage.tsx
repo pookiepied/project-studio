@@ -24,6 +24,8 @@ import { JobsPill, useBackgroundJobs } from '@/features/jobs'
 import { PlanPill, usePlan } from '@/features/plans'
 import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
+import { useWorkspaceTasks } from '@/features/rail/useWorkspaceTasks'
+import { useAgentTasks } from '@/features/jobs/useAgentTasks'
 import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
 import { useScreenCollaboration } from '@/features/screen/useScreenCollaboration'
 import { useDelegatedComputerUse } from '@/features/chat/useDelegatedComputerUse'
@@ -120,6 +122,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // the run's: a download started three turns ago is still writing output long
   // after the turn that began it ended.
   const jobs = useBackgroundJobs(conversation.id, { enabled: !gallery })
+  const agents = useAgentTasks({ conversationId: conversation.id, enabled: !gallery })
 
   /**
    * True from the moment the words leave the composer until the harness
@@ -382,6 +385,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     activeId: railActiveId,
     openPlan,
     openJobs,
+    showResources,
     close: closeRailEntry,
   } = useRail()
   const planEntryVisible = railOpen && railActiveId === planEntryId(conversation.id)
@@ -405,6 +409,10 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // The rail's browser preview follows the conversation without ever taking it
   // over: the entry is kept current, and opening it stays the person's move.
   useBrowserPreview(conversation.id, conversation.title ?? 'Conversation', live.items)
+  useWorkspaceTasks(conversation.id, live.items, running, live.phase.status === 'submitted' || live.phase.status === 'streaming' ? live.phase.submissionId : null, queue.messages)
+  useEffect(() => {
+    showResources(conversation.id, conversation.title ?? 'Conversation', plan.hasPlan, jobs.jobs.length > 0 || agents.tasks.length > 0)
+  }, [conversation.id, conversation.title, plan.hasPlan, jobs.jobs.length, agents.tasks.length, showResources])
 
   // The sign on the desktop that Studio is at the keyboard, up for exactly as
   // long as this turn, or one of its delegates or voice tasks, is driving the
@@ -653,7 +661,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
               <AnsweredElsewhere sentence={questions.answeredElsewhere} />
             ) : null}
 
-            {queue.error ? <p role="alert" className="mb-2 text-sm text-muted-foreground">{queue.error}</p> : null}
+            {queue.error ? <p role="alert" className="mb-2 text-caption text-muted-foreground">{queue.error}</p> : null}
             <QueuedMessages messages={queue.messages} disabled={queue.changing} onAction={(message, action) => { void queue.change(message, action) }} />
             <Composer
               conversationId={conversation.id}

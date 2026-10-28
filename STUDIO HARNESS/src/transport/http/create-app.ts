@@ -54,6 +54,7 @@ import { createSandboxRoutes } from "./routes/sandbox.js";
 import { createWebRoutes } from "./routes/web.js";
 import { streamHeartbeat } from "./sse-heartbeat.js";
 import type { FaviconSource } from "../../web/favicons.js";
+import type { WebImageSource } from "../../web/images.js";
 
 export interface CreateHttpAppOptions {
   /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
@@ -104,6 +105,8 @@ export interface CreateHttpAppOptions {
    * and the window draws every site as its letter.
    */
   readonly favicons?: FaviconSource;
+  /** Pictures a reply embeds from the web, fetched on the window's behalf. */
+  readonly webImages?: WebImageSource;
   readonly approvals: PermissionApprovalBroker;
   /**
    * The stored grants, as the narrow view a route may hold. Required the way
@@ -282,12 +285,17 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
       ...(options.voiceSettings === undefined ? {} : { voiceSettings: options.voiceSettings }),
       isModelServed: options.isModelServed,
       ...(options.voiceTaskRefusal === undefined ? {} : { voiceTaskRefusal: options.voiceTaskRefusal }),
+      projectFolders: (conversationId) => {
+        const projectId = options.conversations.get(conversationId)?.projectId;
+        if (projectId === undefined || projectId === null) return [];
+        return (options.projects.get(projectId)?.folders ?? []).map((folder) => folder.path);
+      },
     }),
   );
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
   app.route("/api/permissions/grants", createGrantsRoutes(options.grants));
   if (options.favicons !== undefined) {
-    app.route("/api/web", createWebRoutes(options.favicons));
+    app.route("/api/web", createWebRoutes(options.favicons, options.webImages));
   }
   if (options.questions !== undefined) {
     app.route("/api/questions", createQuestionRoutes(options.questions));

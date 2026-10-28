@@ -61,6 +61,35 @@ afterEach(() => {
 })
 
 describe('a message carrying attachments', () => {
+  it('renders the structure of pasted Markdown inside the user bubble', () => {
+    const { container } = render(<LiveUserMessage item={{ ...message([]),
+      text: '# Research brief\n\nKeep **important** details and *emphasis*.\n\n1. First\n2. Second\n\n`workspace/chart.png`',
+    }} />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Research brief' })).toBeTruthy()
+    expect(container.querySelector('strong')?.textContent).toBe('important')
+    expect(container.querySelector('em')?.textContent).toBe('emphasis')
+    expect(container.querySelectorAll('ol > li')).toHaveLength(2)
+    expect(container.querySelector('code')?.textContent).toBe('workspace/chart.png')
+    expect(container.querySelector('.studio-user-prose')).not.toBeNull()
+  })
+
+  it('does not interpret pasted HTML as application markup', () => {
+    const { container } = render(<LiveUserMessage item={{ ...message([]),
+      text: 'Hello <img src="https://example.com/track.png" onerror="alert(1)"> <script>alert(1)</script>',
+    }} />)
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('script')).toBeNull()
+  })
+
+  it('gives file references a readable treatment while preserving literal text', () => {
+    const { container } = render(<LiveUserMessage item={{ ...message([]),
+      text: 'Use `workspace/chart.png`, `C:\\My Project\\chart.png`, and `npm i`.',
+    }} />)
+    const files = [...container.querySelectorAll('code.studio-file-reference')]
+    expect(files.map((file) => file.textContent)).toEqual(['workspace/chart.png', 'C:\\My Project\\chart.png'])
+    expect([...container.querySelectorAll('code')].find((code) => code.textContent === 'npm i')?.className).not.toContain('studio-file-reference')
+  })
+
   it('draws two files that share a name and a type as two rows', () => {
     render(<LiveUserMessage item={message([SCREENSHOT, SCREENSHOT])} />)
 

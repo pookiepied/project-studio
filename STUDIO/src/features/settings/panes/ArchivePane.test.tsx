@@ -131,23 +131,39 @@ describe('ArchivePane', () => {
     expect(screen.getByRole('alert').textContent).toContain('has a turn in flight')
   })
 
-  it('offers the leftover folders with what removing them means', () => {
+  it('has no separate button for leftover folders', () => {
     ready()
-    workspace.conversations = []
+    workspace.conversations = [archivedConversation('cnv_a', 'Old chat')]
     workspace.orphanTrees = ['cnv_1j04nco6']
     render(<ArchivePane />)
-    expect(screen.getByText(/One leftover folder/)).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Remove leftover folders' })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove leftover folders' })).toBeNull()
+    expect(screen.getByText(/any folders an earlier delete left behind/)).not.toBeNull()
   })
 
-  it('sweeps the leftover folders when asked', async () => {
+  it('clears the archive and then sweeps what any delete left behind, in one click', async () => {
+    ready()
+    workspace.conversations = [archivedConversation('cnv_a', 'Old chat')]
+    workspace.orphanTrees = ['cnv_1j04nco6']
+    const order: string[] = []
+    workspace.removeMany = vi.fn(async (ids: readonly string[]) => { order.push(`purge ${ids.join(',')}`); return {} })
+    workspace.sweepOrphanTrees = vi.fn(async (): Promise<{ ok: true; value: Record<string, never> }> => { order.push('sweep'); return { ok: true, value: {} } })
+    render(<ArchivePane />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear archive' }))
+    await waitFor(() => expect(order).toEqual(['purge cnv_a', 'sweep']))
+  })
+
+  it('offers Clear archive when only leftover folders remain, and only sweeps', async () => {
     ready()
     workspace.conversations = []
     workspace.orphanTrees = ['cnv_1j04nco6']
-    workspace.sweepOrphanTrees = vi.fn(async () => ({ ok: true as const, value: {} }))
+    workspace.removeMany = vi.fn(async () => ({}))
+    workspace.sweepOrphanTrees = vi.fn(async (): Promise<{ ok: true; value: Record<string, never> }> => ({ ok: true, value: {} }))
     render(<ArchivePane />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove leftover folders' }))
+    expect(screen.getByText(/one folder from a deleted chat is still on disk/)).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear archive' }))
     await waitFor(() => expect(workspace.sweepOrphanTrees).toHaveBeenCalledTimes(1))
+    expect(workspace.removeMany).not.toHaveBeenCalled()
   })
 })

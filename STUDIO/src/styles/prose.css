@@ -107,7 +107,15 @@
     margin-top: 0.9em;
   }
 
-  .studio-prose :is(h1, h2, h3, h4) {
+  .studio-user-prose :is(p, li) {
+    white-space: pre-wrap;
+  }
+
+  .studio-prose :is(li, blockquote) > * + * {
+    margin-top: 0.65em;
+  }
+
+  .studio-prose :is(h1, h2, h3, h4, h5, h6) {
     @apply font-semibold tracking-tight;
     line-height: 1.35;
     /* Headings are short and often wrap to two lines. `balance` evens those
@@ -134,19 +142,25 @@
      who enlarges the text gets less hierarchy, not more. A ratio holds at every
      setting, and matches the em-based rhythm the rest of this block already
      uses. */
-  .studio-prose h1 { font-size: 1.45em; }
-  .studio-prose h2 { font-size: 1.25em; }
-  .studio-prose h3 { font-size: 1.1em; }
+  /* The steps are wider than they first were. At 1.1x an `h3` at the 12px
+     default was 13.2px semibold beside 12px bold paragraph leads -- replies
+     open sections with `**Label.**` constantly -- so a section title and an
+     emphasised sentence read as the same object. Each rung now clears the
+     next by enough to be seen without comparing. */
+  .studio-prose h1 { font-size: 1.6em; letter-spacing: -0.02em; }
+  .studio-prose h2 { font-size: 1.36em; letter-spacing: -0.015em; }
+  .studio-prose h3 { font-size: 1.18em; }
   /* Level with the body on purpose: the last rung is a label for the paragraph
      under it, and colour is the whole of its difference. A fourth size here
      would be a step nobody could name. */
   .studio-prose h4 { font-size: 1em; color: var(--muted-foreground); }
+  .studio-prose :is(h5, h6) { font-size: 1em; }
 
   /* Headings bind to the text beneath them, not the block above. */
-  .studio-prose > * + :is(h1, h2, h3, h4) {
+  .studio-prose > * + :is(h1, h2, h3, h4, h5, h6) {
     margin-top: 1.7em;
   }
-  .studio-prose :is(h1, h2, h3, h4) + * {
+  .studio-prose :is(h1, h2, h3, h4, h5, h6) + * {
     margin-top: 0.45em;
   }
 
@@ -160,14 +174,114 @@
   .studio-prose li::marker { color: var(--muted-foreground); }
   .studio-prose li > :is(ul, ol) { margin-top: 0.3em; }
 
+  /* A link has to be findable without hovering. The underline was drawn in
+     the hairline colour -- 7.5% of the foreground, the weight of a divider --
+     and on the dark palette it disappeared, so links read as body text. The
+     palette is monochrome by rule, so the cue is weight and a real underline
+     rather than a hue: medium weight, and a rule at 35% that firms up under
+     the pointer. */
+  /* Reply links carry no `href` (see `MarkdownLink`), so the pointer is
+     stated rather than inherited from the anchor. */
   .studio-prose a {
     color: var(--foreground);
+    cursor: pointer;
+    font-weight: 500;
     text-decoration: underline;
-    text-decoration-color: var(--border);
-    text-underline-offset: 2px;
+    text-decoration-color: color-mix(in oklab, var(--foreground) 35%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--duration-fast) var(--ease-out-quint);
   }
   .studio-prose a:hover {
     text-decoration-color: var(--foreground);
+  }
+
+  /* A citation names where a claim came from, so it shows the site rather
+     than a number the reader has to look up. A small pill on the muted
+     ground, a step below the sentence and centred on it, the way an inline
+     reference sits in a typeset document. */
+  /* An inline-block on the text baseline whose own line box is shorter than
+     the paragraph's, so a line with a chip in it is exactly as tall as one
+     without -- a taller chip pushed its line apart and the paragraph's rhythm
+     went uneven wherever a claim was cited. */
+  .studio-prose a.studio-citation {
+    display: inline-block;
+    border-radius: 999px;
+    padding-inline: 0.6em;
+    margin-inline-start: 0.3em;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 0.86em;
+    font-weight: 500;
+    line-height: 1.55;
+    /* No overflow clipping: an inline-block that clips takes its bottom edge
+       as its baseline and rides up out of the sentence. Hosts are short. */
+    white-space: nowrap;
+    text-decoration: none;
+    vertical-align: baseline;
+    transition: background-color var(--duration-fast) var(--ease-out-quint), color var(--duration-fast) var(--ease-out-quint);
+  }
+  .studio-prose a.studio-citation + a.studio-citation { margin-inline-start: 0.2em; }
+  .studio-prose a.studio-citation:hover,
+  .studio-prose a.studio-citation[aria-expanded='true'] {
+    background: var(--selected);
+    color: var(--foreground);
+  }
+
+  /* The numbered list the citations point at. It is reference matter, read
+     only when checking a claim, so it steps back: caption size, muted, and
+     each entry's address shown as its site. */
+  .studio-prose ol.studio-sources {
+    color: var(--muted-foreground);
+    font-size: var(--text-caption);
+  }
+  .studio-prose ol.studio-sources li + li { margin-top: 0.4em; }
+  .studio-prose ol.studio-sources a { color: var(--foreground); }
+
+  /* -- Checklists -----------------------------------------------------------
+
+     Drawn marks, not form controls. The browser's checkbox was a grey square
+     beside a list bullet; a task item has no bullet -- the mark is the
+     bullet -- and the three states differ by fill rather than by a glyph in
+     a box. Done is a filled disc with the check knocked out of it, open is
+     an outline, blocked is an outline with a bar. Completed items recede to
+     muted text, as finished work should.
+     --------------------------------------------------------------------- */
+  .studio-prose :is(ul, ol).contains-task-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .studio-prose li.task-list-item {
+    position: relative;
+    padding-left: 1.6em;
+  }
+  .studio-prose li.task-list-item.studio-task-complete { color: var(--muted-foreground); }
+  .studio-prose .studio-task-mark {
+    position: absolute;
+    left: 0;
+    /* Centred on the first line box, whatever the line height. */
+    top: calc((1lh - 1.05em) / 2);
+    width: 1.05em;
+    height: 1.05em;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--foreground) 32%, transparent);
+  }
+  .studio-prose .studio-task-done {
+    background: var(--foreground);
+    box-shadow: none;
+  }
+  .studio-prose :is(.studio-task-done, .studio-task-blocked)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .studio-prose .studio-task-done::after {
+    background: var(--background);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.6 8.3l2.2 2.2 4.6-4.8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+  }
+  .studio-prose .studio-task-blocked::after {
+    background: color-mix(in oklab, var(--foreground) 55%, transparent);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 8h6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% no-repeat;
   }
 
   .studio-prose strong { @apply font-semibold; }
@@ -190,7 +304,15 @@
     background: var(--muted);
     font-family: var(--font-mono);
     font-size: var(--code-size);
+    font-weight: 500;
     overflow-wrap: anywhere;
+  }
+
+  /* A filename names an object in the conversation, not a snippet to execute. */
+  .studio-prose :not(pre) > code.studio-file-reference {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
   }
 
   /* The prose-wide `overflow-wrap: anywhere` must not reach fenced code: it
@@ -300,6 +422,40 @@
 
   .studio-prose img {
     @apply max-w-full rounded-lg;
+  }
+
+  /* A picture the reply embeds. Set on its own line at its own size, capped
+     so a tall screenshot does not become the whole reply, and rounded on the
+     block step so it sits with the code and table cards. While it loads, a
+     sunken frame holds the place with its caption; one that cannot be shown
+     is a quiet chip naming it, never a broken-image glyph. */
+  .studio-prose .studio-reply-image {
+    display: block;
+    max-height: 28rem;
+    margin-block: 0.75em;
+    border-radius: var(--radius-block-inner);
+  }
+  .studio-prose .studio-reply-image-pending {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 24rem);
+    aspect-ratio: 4 / 3;
+    margin-block: 0.75em;
+    border-radius: var(--radius-block-inner);
+    background: var(--surface-sunken);
+    color: var(--muted-foreground);
+    font-size: var(--text-caption);
+  }
+  .studio-prose .studio-reply-image-missing {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.1em 0.6em;
+    border-radius: 999px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: var(--text-caption);
   }
 
   /* -- Syntax ---------------------------------------------------------------

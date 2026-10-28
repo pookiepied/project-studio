@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { AppearanceProvider, type Appearance } from '@/design/theme'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
@@ -21,7 +21,7 @@ import { BrowserWindow } from '@/features/browser/BrowserWindow'
 import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { useFileDropGuard } from '@/shell/useFileDropGuard'
-import { NavigationProvider } from '@/stores/navigation'
+import { NavigationProvider, useNavigation } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
 import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
 
@@ -116,13 +116,13 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
             never asks. See `PairingGate`. */}
         <PairingGate>
           <WorkspaceProvider>
-          <RailProvider>
             <NavigationProvider>
-              <CaptureMonitor />
-              {browserConversation ? <BrowserWindow conversationId={browserConversation} /> : detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
+              <ConversationWorkspace detached={detached}>
+                <CaptureMonitor />
+                {browserConversation ? <BrowserWindow conversationId={browserConversation} /> : detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
+              </ConversationWorkspace>
             </NavigationProvider>
-          </RailProvider>
-        </WorkspaceProvider>
+          </WorkspaceProvider>
         </PairingGate>
       </AppearanceProvider>
     </MotionConfig>
@@ -130,6 +130,11 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
 }
 
 /** The main window: the studio, arriving out of the splash. */
+function ConversationWorkspace({ detached, children }: { detached: string | null; children: ReactNode }) {
+  const { route } = useNavigation()
+  return <RailProvider conversationId={detached ?? (route.kind === 'chat' ? route.conversationId : null)}>{children}</RailProvider>
+}
+
 function StudioApp() {
   // Clock started at first render, not inside the effect: StrictMode remounts
   // effects in development, and a clock that restarts with them would stretch

@@ -8,6 +8,8 @@ import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useWorkspace } from '@/stores/workspace'
+import { useRail } from '@/stores/rail'
+import { SideRail } from '@/features/rail'
 
 /**
  * One conversation, in a window of its own.
@@ -33,6 +35,7 @@ import { useWorkspace } from '@/stores/workspace'
  */
 export function DetachedShell({ conversationId }: { conversationId: string }) {
   const { conversations } = useWorkspace()
+  const rail = useRail()
   const conversation = conversations.find((item) => item.id === conversationId)
 
   if (!conversation) return <Missing />
@@ -70,12 +73,14 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            {rail.collapsed ? <button type="button" aria-label="Open conversation workspace" onClick={rail.expand} className="rounded-lg px-2 py-1 text-caption text-muted-foreground hover:bg-tint">Workspace</button> : null}
             <TurnMenu />
           </div>
         </header>
 
         <ChatPage conversation={conversation} />
       </div>
+      <SideRail key={conversationId} open={rail.open} />
       </VoiceModeProvider>
     </div>
   )

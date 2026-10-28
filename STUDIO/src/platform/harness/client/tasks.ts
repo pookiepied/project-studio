@@ -15,7 +15,7 @@ export interface TaskClient {
    * Every task the harness has dispatched, newest first. Optionally narrowed
    * by the agent that ran it.
    */
-  tasks(filters?: { agentName?: string }): Promise<HarnessResult<readonly AgentTask[]>>
+  tasks(filters?: { agentName?: string; parentConversationId?: string }): Promise<HarnessResult<readonly AgentTask[]>>
   /**
    * Stops one task. Answers whether there was something to stop: the
    * difference between "I stopped it" and "it had already settled", which
@@ -28,7 +28,10 @@ export function taskClient(request: Requester): TaskClient {
   const json = request.json
   return {
     tasks(filters) {
-      const query = filters?.agentName === undefined ? '' : `?agentName=${encodeURIComponent(filters.agentName)}`
+      const params = new URLSearchParams()
+      if (filters?.agentName !== undefined) params.set('agentName', filters.agentName)
+      if (filters?.parentConversationId !== undefined) params.set('parentConversationId', filters.parentConversationId)
+      const query = params.size === 0 ? '' : `?${params.toString()}`
       return json('GET', `/api/tasks${query}`, undefined, parseAgentTasks)
     },
     cancelTask(taskId) {

@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { recordClientObservation, type ClientObservationIdentity } from '@/platform/diagnostics/events'
 import { Icons } from '@/components/icons'
 import { Arrive, Arriving } from '@/components/motion/Arrive'
+import { ReplyConversation } from '@/features/chat/markdown'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
 import { ReadAloud } from '@/features/voice/ReadAloud'
 import {
@@ -197,7 +198,7 @@ function TextSegment({
 
   return (
     <Arrive className="studio-prose min-w-0">
-      <StreamedMarkdown text={shown} streaming={growing || revealing} />
+      <ReplyConversation.Provider value={identity.conversationId ?? null}><StreamedMarkdown text={shown} streaming={growing || revealing} /></ReplyConversation.Provider>
       {growing || revealing ? (
         <span
           aria-hidden

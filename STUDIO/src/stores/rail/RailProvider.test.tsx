@@ -42,8 +42,8 @@ describe('the rail holding a plan', () => {
     }))
     expect(result.current.entries.find((entry) => entry.id === result.current.activeId)?.kind).toBe('browser')
     expect(result.current.entries.filter((entry) => entry.kind === 'plan')).toHaveLength(12)
-    expect(result.current.entries.some((entry) => entry.kind === 'changes')).toBe(false)
-    expect(result.current.entries).toHaveLength(13)
+    expect(result.current.entries.some((entry) => entry.kind === 'changes')).toBe(true)
+    expect(result.current.entries).toHaveLength(14)
   })
 
   it('opens the conversation plan once and focuses it on a second open', () => {
@@ -69,7 +69,7 @@ describe('the rail holding a plan', () => {
     expect(result.current.activeId).toBe(planEntryId('cnv_2'))
   })
 
-  it('is exempt from the twelve-entry cap: thirteen artifacts do not evict it', () => {
+  it('retains plans and artifacts beyond the former twelve-tab limit', () => {
     const { result } = renderHook(() => useRail(), { wrapper })
 
     act(() => {
@@ -81,25 +81,23 @@ describe('the rail holding a plan', () => {
       })
     }
 
-    // The cap governs the whole strip, so artifacts give the plan one of the
-    // twelve places - but the plan itself is never the entry dropped.
-    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(11)
+    // Pagination bounds the overview, while the complete history stays available.
+    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(13)
     expect(
       result.current.entries.find((entry) => entry.id === planEntryId('cnv_1')),
     ).toBeDefined()
 
-    // A fourteenth artifact takes the freed place; the oldest artifact goes,
-    // the plan stays.
+    // Opening another result must not discard either the plan or an older artifact.
     act(() => {
       result.current.openArtifact(artifact('art_13'), 'cnv_1', 'Conversation')
     })
     expect(
       result.current.entries.find((entry) => entry.id === planEntryId('cnv_1')),
     ).toBeDefined()
-    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(11)
+    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(14)
   })
 
-  it('holds the cap when the plan arrives last, not only when it arrives first', () => {
+  it('retains all artifacts when the plan arrives last', () => {
     // The other filling order. Twelve artifacts first, then the plan: if the
     // cap is applied only where artifacts are opened, the strip quietly sits
     // at thirteen and the rule the exemption is written against stops being
@@ -117,13 +115,13 @@ describe('the rail holding a plan', () => {
       result.current.openPlan('cnv_1', 'Conversation')
     })
 
-    expect(result.current.entries).toHaveLength(12)
-    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(11)
+    expect(result.current.entries).toHaveLength(13)
+    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(12)
     expect(
       result.current.entries.find((entry) => entry.id === planEntryId('cnv_1')),
     ).toBeDefined()
-    // The oldest artifact is the one that made room.
-    expect(result.current.entries.find((entry) => entry.id === 'art_0')).toBeUndefined()
+    // A plan no longer needs to evict an artifact to make room in a tab strip.
+    expect(result.current.entries.find((entry) => entry.id === 'art_0')).toBeDefined()
   })
 
   it('closes like any entry: closing the plan empties the rail when it is all there was', () => {

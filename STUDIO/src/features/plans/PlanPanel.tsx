@@ -84,7 +84,7 @@ function PlanRow({
         disabled={busy}
         onClick={onTick}
         className={cn(
-          'group/row flex w-full items-start gap-2.5 rounded-lg px-1.5 py-1.5 text-left',
+          'group/row flex w-full items-start gap-2.5 rounded-lg px-1.5 py-1.5 text-left text-ui',
           'transition-colors duration-fast hover:bg-tint',
           busy && 'cursor-default',
         )}
@@ -94,7 +94,7 @@ function PlanRow({
             so the row never restyles the words to imply a verdict of its own. */}
         <span
           className={cn(
-            'min-w-0 flex-1 text-caption leading-relaxed',
+            'min-w-0 flex-1 text-ui',
             ticked ? 'text-muted-foreground line-through' : 'text-foreground',
           )}
         >
@@ -115,32 +115,32 @@ function StatusMark({ status }: { readonly status: ArtifactStatus }) {
   switch (status) {
     case 'done':
       return (
-        <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-selected text-foreground">
-          <Icons.check size="sm" />
+        <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center text-foreground">
+          <Icons.check />
         </span>
       )
     case 'failed':
       return (
-        <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-          <Icons.failed size="sm" />
+        <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center text-muted-foreground">
+          <Icons.failed />
         </span>
       )
     case 'running':
       return (
-        <span className="flex size-4 shrink-0 items-center justify-center">
-          <span className="size-2.5 rounded-full border border-foreground/50" />
+        <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+          <span className="size-[0.8em] rounded-full border border-foreground/50" />
         </span>
       )
     case 'cancelled':
       return (
-        <span className="flex size-4 shrink-0 items-center justify-center">
-          <span className="h-px w-2.5 bg-muted-foreground/60" />
+        <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+          <span className="h-px w-[0.8em] bg-muted-foreground/60" />
         </span>
       )
     default:
       return (
-        <span className="flex size-4 shrink-0 items-center justify-center">
-          <span className="size-2.5 rounded-full border border-hairline" />
+        <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+          <span className="size-[0.8em] rounded-full border border-hairline" />
         </span>
       )
   }

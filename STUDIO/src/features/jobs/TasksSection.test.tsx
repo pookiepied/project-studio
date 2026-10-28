@@ -25,7 +25,7 @@ function task(overrides: Partial<AgentTask> = {}): AgentTask {
   return {
     id: 'cnv_x',
     agentName: 'title',
-    parentConversationId: null,
+    parentConversationId: 'conversation',
     title: 'Titler',
     status: 'running',
     createdAt: 1,
@@ -48,23 +48,41 @@ const cancelTask = vi.fn(async (_taskId: string) => {
   return { ok: true as const, value: true }
 })
 
-vi.mock('@/stores/workspace', () => ({
-  useWorkspace: () => ({
-    tasks: {
-      list: () => list(),
-      cancel: (taskId: string) => cancelTask(taskId),
-    },
-  }),
-}))
+const tasksSurface = { list: () => list(), cancel: (taskId: string) => cancelTask(taskId) }
+vi.mock('@/stores/workspace', () => ({ useWorkspace: () => ({ tasks: tasksSurface }) }))
 
 beforeEach(() => {
+  vi.clearAllMocks()
   server = [task()]
   list.mockImplementation(async () => ({ ok: true as const, value: server }))
 })
 
 describe('the agent tasks section', () => {
+  it('reports cancellation failure and makes the control available again', async () => {
+    cancelTask.mockRejectedValueOnce(new Error('disconnected'))
+    render(<TasksSection conversationId="conversation" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+    await screen.findByText('The stop request failed. Try again.')
+    expect(screen.getByRole('button', { name: 'Stop' }).hasAttribute('disabled')).toBe(false)
+    expect(screen.getByText('Running')).toBeTruthy()
+  })
+  it('excludes unowned tasks and tasks owned by other conversations', async () => {
+    server = [task(), task({ id: 'foreign', title: 'Other conversation', parentConversationId: 'other' }), task({ id: 'unowned', title: 'Unowned task', parentConversationId: null })]
+    render(<TasksSection conversationId="conversation" />)
+    await screen.findByText('Titler')
+    expect(screen.queryByText('Other conversation')).toBeNull()
+    expect(screen.queryByText('Unowned task')).toBeNull()
+  })
+  it('does not confuse an accepted cancellation request with termination', async () => {
+    cancelTask.mockResolvedValueOnce({ ok: true, value: true })
+    render(<TasksSection conversationId="conversation" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+    await waitFor(() => expect(cancelTask).toHaveBeenCalled())
+    expect(screen.queryByText('Stopped')).toBeNull()
+    expect(screen.getByText('Running')).toBeTruthy()
+  })
   it('shows the task, its state, and stops a running one', async () => {
-    render(<TasksSection />)
+    render(<TasksSection conversationId="conversation" />)
 
     await screen.findByText('Titler')
     expect(screen.getByText('Running')).toBeTruthy()
@@ -76,22 +94,23 @@ describe('the agent tasks section', () => {
 
   it('names a failure rather than a bare Finished', async () => {
     server = [task({ status: 'failed', settledAt: 5, resultSummary: 'The model had a bad day.' })]
-    render(<TasksSection />)
+    render(<TasksSection conversationId="conversation" />)
 
-    await screen.findByText('The model had a bad day.')
+    await screen.findByText('Failed')
+    expect(screen.getByTitle('The model had a bad day.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
   })
 
   it('reads a status it cannot parse as Unknown rather than inventing one', async () => {
     server = [task({ status: 'unknown', settledAt: 5 })]
-    render(<TasksSection />)
+    render(<TasksSection conversationId="conversation" />)
 
     await screen.findByText('Unknown')
   })
 
   it('is silent when the harness has dispatched nothing', async () => {
     server = []
-    const { container } = render(<TasksSection />)
+    const { container } = render(<TasksSection conversationId="conversation" />)
 
     await waitFor(() => expect(list).toHaveBeenCalled())
     expect(container.textContent).toBe('')

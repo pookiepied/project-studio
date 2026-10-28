@@ -307,7 +307,7 @@ export function Sidebar({
                     type="button"
                     aria-label="New project"
                     onClick={onNewProject}
-                    className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
+                    className="flex size-[var(--control-xs)] shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
                   >
                     <Icons.projectNew />
                   </button>

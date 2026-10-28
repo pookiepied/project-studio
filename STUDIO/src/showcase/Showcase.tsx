@@ -30,6 +30,8 @@ import {
 import { StateNote } from '@/components/state'
 import { ArtifactsSection } from './ArtifactsSection'
 import { Section } from './Section'
+import { WorkspaceSection } from './WorkspaceSection'
+import { ConversationSection } from './ConversationSection'
 
 /**
  * The parts, on one page.
@@ -95,6 +97,7 @@ function ShowcasePage() {
           </div>
         </header>
 
+        <ConversationSection />
         <ButtonsSection />
         <IconButtonsSection />
         <FieldsSection />
@@ -105,6 +108,7 @@ function ShowcasePage() {
         <TypeSection />
         <ElevationSection />
         <MotionSection />
+        <WorkspaceSection />
         <ArtifactsSection />
 
         <footer className="pb-4">
@@ -461,7 +465,8 @@ function TypeSection() {
           <p className="text-micro text-foreground">Micro — the label under a control</p>
           <p className="text-caption text-foreground">Caption — secondary lines, states, notes</p>
           <p className="text-ui text-foreground">Interface — buttons, rows, fields</p>
-          <p className="text-body text-foreground">Body — what the transcript reads at</p>
+          <p className="text-body text-foreground">{'Body \u2014 supporting interface text'}</p>
+          <p className="studio-prose">{'Conversation \u2014 the shared reading size for messages'}</p>
           <p className="text-title text-foreground">Title — a section's heading</p>
           <p className="studio-heading text-foreground">Heading — a sheet's title voice</p>
           <p className="studio-display text-foreground">Display — the serif, arriving once</p>

@@ -227,7 +227,7 @@ function Body({
             aria-label="Project"
             value={projectId ?? ''}
             onChange={(event) => onSelectProject(event.target.value === '' ? null : event.target.value)}
-            className="h-7 rounded-md border bg-surface px-2 text-ui text-foreground"
+            className="studio-control rounded-md border bg-surface px-2 text-ui text-foreground"
           >
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
@@ -393,7 +393,7 @@ function Body({
               setCustomError(null)
             }}
             placeholder={CUSTOM_PATH_PLACEHOLDER}
-            className="h-7 min-w-0 flex-1 rounded-md border bg-surface px-2 text-ui text-foreground"
+            className="studio-control min-w-0 flex-1 rounded-md border bg-surface px-2 text-ui text-foreground"
           />
           <Segmented
             layoutId="settings-scope-mode"
