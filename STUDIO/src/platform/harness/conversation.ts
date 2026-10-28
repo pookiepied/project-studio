@@ -206,8 +206,31 @@ interface SubmittedTurn {
  * here while the send paths above always carry one: what the picker shows is
  * what is sent.
  */
+/**
+ * The voice signal's attributes: what the person heard of a reply they cut
+ * off, and what Studio already did for a spoken command. Flue escapes them
+ * and renders them on the `voice_input` tag, beside the words.
+ */
+function signalAttributes(wire: TurnSettingsWire): { attributes?: Record<string, string> } {
+  const attributes: Record<string, string> = {}
+  if (wire.heardBeforeInterrupt !== undefined) {
+    attributes['heard_before_interrupt'] = wire.heardBeforeInterrupt === '' ? '(nothing; cut off before it sounded)' : wire.heardBeforeInterrupt
+  }
+  if (wire.control !== undefined) attributes['control'] = wire.control
+  return Object.keys(attributes).length === 0 ? {} : { attributes }
+}
+
 export interface TurnSettingsWire {
   readonly voice?: boolean
+  /**
+   * What the person heard of the reply they cut off, as far as the speaker
+   * knows (D8); "" when they cut it off before any of it sounded. Rides on
+   * the voice signal as an attribute, so the agent reads it beside the words
+   * that answer it. Voice only.
+   */
+  readonly heardBeforeInterrupt?: string
+  /** What Studio already did for these words as a spoken command (D4). Voice only, as an attribute. */
+  readonly control?: string
   readonly deliveryMode?: 'queue' | 'steer'
   readonly modelId: string | null
   readonly reasoningLevel: string | null
@@ -536,6 +559,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
       const carried = images ?? []
       const sent = await request('POST', agentsPath(), JSON.stringify({
         ...(wire.voice ? { kind: 'signal', type: 'voice_input', tagName: 'voice_input' } : { kind: 'user' }),
+        ...(wire.voice ? signalAttributes(wire) : {}),
         body: message,
         ...(wire.deliveryMode === undefined ? {} : { deliveryMode: wire.deliveryMode }),
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),

@@ -377,6 +377,11 @@ export class ComputerService {
         return { sharing: this.#sharing.has(conversation) };
       case "context":
         return this.context(conversation);
+      case "checkpoint": {
+        const id = input["actor"];
+        if (typeof id !== "string" || id === "") throw new ComputerError("bad_input", { message: "Name the actor a correction is for." });
+        return { held: this.desktop.checkpoint({ conversation, id }) };
+      }
       case "glance":
         return this.#glance(conversation);
       case "drew":

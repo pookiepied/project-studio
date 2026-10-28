@@ -107,7 +107,7 @@ describe("the person's desktop controls", () => {
     app.route("/api/conversations", createConversationRoutes({
       conversations: { list: () => [], get: (id: string) => id === "cnv_7" ? { id } : undefined } as unknown as ConversationStore,
       database: db,
-      computer: { stop: async () => false, ...(control === undefined ? {} : { control }) },
+      computer: { stop: async () => "not_running" as const, ...(control === undefined ? {} : { control }) },
     }));
     return (path: string, body: unknown) => app.request(`http://harness.test/api/conversations/${path}`, {
       method: "POST", headers: { authorization: `Bearer ${session.credential}`, "content-type": "application/json" }, body: JSON.stringify(body),
@@ -218,7 +218,7 @@ describe("the Share screen switch", () => {
     app.route("/api/conversations", createConversationRoutes({
       conversations: { list: () => [], get: (id: string) => id === "cnv_7" ? { id } : undefined } as unknown as ConversationStore,
       database: db,
-      computer: { stop: async () => false, sharing: async (id, on) => { asked.push(`${id}:${String(on)}`); return { sharing: on }; } },
+      computer: { stop: async () => "not_running" as const, sharing: async (id, on) => { asked.push(`${id}:${String(on)}`); return { sharing: on }; } },
     }));
     const put = (path: string, body: unknown) => app.request(`http://harness.test/api/conversations/${path}`, {
       method: "PUT", headers: { authorization: `Bearer ${session.credential}`, "content-type": "application/json" }, body: JSON.stringify(body),
@@ -239,7 +239,7 @@ describe("the Share screen switch", () => {
       conversations: { list: () => [], get: (id: string) => id === "cnv_7" ? { id } : undefined } as unknown as ConversationStore,
       database: db,
       computer: {
-        stop: async () => false,
+        stop: async () => "not_running" as const,
         glance: async (id) => { asked.push(`glance:${id}`); return { glanced: true }; },
         drew: async (id, shapes) => { asked.push(`drew:${id}:${String(shapes.length)}`); return { recorded: shapes.length }; },
       },

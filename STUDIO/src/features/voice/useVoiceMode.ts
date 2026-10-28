@@ -20,9 +20,13 @@ export function useVoiceSession(
   conversationId: string | null = null,
   fresh?: VoiceFreshChat,
   onSpeechEnd?: () => void,
+  /** A final transcript before it is sent; answers what was done if it was a spoken command (D4). */
+  onFinalUtterance?: (text: string) => Promise<string | undefined>,
 ) {
   const onSpeechEndRef = useRef(onSpeechEnd)
   onSpeechEndRef.current = onSpeechEnd
+  const onFinalUtteranceRef = useRef(onFinalUtterance)
+  onFinalUtteranceRef.current = onFinalUtterance
   const [stage, setStage] = useState<VoiceStage>('connecting')
   const [note, setNote] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -165,7 +169,10 @@ export function useVoiceSession(
       setSpoken([])
       setTurn((value) => value + 1)
       endpointAt.current = endedAt
-      await owner.send(text)
+      // The whole utterance, final: a spoken command acts here, then the
+      // words still go to the agent, marked with what was already done.
+      const control = await onFinalUtteranceRef.current?.(text).catch(() => undefined)
+      await owner.send(text, control)
     }).catch(() => { if (current === epoch.current) fail('Voice input failed. Try again.') })
   }, [take, moveTo, fail, hold, release, interrupt])
 

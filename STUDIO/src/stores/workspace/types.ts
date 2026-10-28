@@ -148,9 +148,9 @@ export interface BoundClient {
   }
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
   readonly computer: {
-    stop: (conversationId: string) => Promise<HarnessResult<boolean>>
-    /** The person's hold on the desktop lease: pause, show-me, hand back (ADR 0059). */
-    control: (conversationId: string, action: 'pause' | 'resume' | 'demonstrate') => Promise<HarnessResult<void>>
+    stop: (conversationId: string) => Promise<HarnessResult<import('@/platform/harness/client/conversations').ComputerStopOutcome>>
+    /** The person's hold on the desktop lease: pause, show-me, hand back (ADR 0059). Answers the lease's word for it. */
+    control: (conversationId: string, action: 'pause' | 'resume' | 'demonstrate') => Promise<HarnessResult<string>>
     /** The voice call's Share screen switch. */
     share: (conversationId: string, on: boolean) => Promise<HarnessResult<boolean>>
     /** A picture of the display the person points at, as their speech ends. */

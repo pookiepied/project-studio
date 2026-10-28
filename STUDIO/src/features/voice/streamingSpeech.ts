@@ -25,6 +25,12 @@ export class StreamingSpeech {
   #paused = false
   /** Started-sounding news held while paused, delivered on resume. */
   #held: Array<() => void> = []
+  /**
+   * The phrases that actually began to sound, in order - not the ones
+   * rendered or queued. A phrase held behind a pause is not here until the
+   * resume plays it, because until then nobody heard it.
+   */
+  #heard: string[] = []
   readonly #sink: AudioSink
 
   constructor(options: StreamingSpeechOptions) {
@@ -95,11 +101,19 @@ export class StreamingSpeech {
   #started(phrase: string | undefined): void {
     const deliver = () => {
       if (this.#closed) return
-      if (phrase !== undefined) this.options.onPhrase?.(phrase)
+      if (phrase !== undefined) {
+        this.#heard.push(phrase)
+        this.options.onPhrase?.(phrase)
+      }
       this.options.onPlaying()
     }
     if (this.#paused) this.#held.push(deliver)
     else deliver()
+  }
+
+  /** What the listener heard of this reply, as far as the speaker knows: every phrase that began to sound. */
+  get heard(): string {
+    return this.#heard.join(' ')
   }
 
   stop(): void {

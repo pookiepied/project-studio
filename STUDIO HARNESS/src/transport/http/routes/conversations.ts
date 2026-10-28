@@ -106,11 +106,12 @@ export interface ConversationRoutesOptions {
   };
   /**
    * The person's stop for a conversation's computer control (ADR 0055 §7):
-   * the driver is ended and anything it held is released. The same shape as
-   * the browser's, for the same reason.
+   * the driver is ended and anything it held is released. Unlike the
+   * browser's it answers which of four outcomes it came to, because an
+   * unconfirmed stop of a desktop is a different fact from a stopped one.
    */
   readonly computer?: {
-    stop(conversationId: string): Promise<boolean>;
+    stop(conversationId: string): Promise<"cleanup_confirmed" | "cleanup_unconfirmed" | "not_running" | "unavailable">;
     /** Pause, resume, show-me and state: the person's own controls over the desktop lease (ADR 0059). */
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
     /** The voice call's Share screen switch; off by default and never turned on by Studio. */
@@ -392,8 +393,10 @@ export function createConversationRoutes(
   });
 
   routes.post("/:id/computer/stop", async (context) => {
-    const stopped = (await options.computer?.stop(context.req.param("id"))) ?? false;
-    return context.json({ stopped });
+    // `stopped` is the confirmed case alone; `outcome` keeps the other three
+    // apart, so a Stop button can say "stopping" without claiming "stopped".
+    const outcome = (await options.computer?.stop(context.req.param("id"))) ?? "unavailable";
+    return context.json({ stopped: outcome === "cleanup_confirmed", outcome });
   });
 
   // A button press, never a model's decision, so no language model sits

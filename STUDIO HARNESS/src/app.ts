@@ -410,6 +410,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       media,
       improver,
       voiceSettings: new VoiceSettings(database),
+      voiceTaskRefusal: (modelId) => runtime.voiceTaskRefusal(modelId),
       // Site icons, fetched by the harness once per host and kept in the
       // cache directory; the window asks here and never the site.
       favicons: new FaviconStore({ directory: studioPath("cache", "favicons") }),

@@ -8,8 +8,9 @@ import { useScreenShare } from './useScreenShare'
 const ok = <T,>(value: T) => ({ ok: true as const, value })
 const computer = {
   share: vi.fn(async (_id: string, on: boolean) => ok(on)),
-  control: vi.fn(async () => ok(undefined)),
+  control: vi.fn(async (_id: string, action: string) => ok(action === 'pause' ? 'paused' : action === 'resume' ? 'resumed' : 'demonstrating')),
   glance: vi.fn(async () => ok(undefined)),
+  stop: vi.fn(async () => ok('cleanup_confirmed')),
 }
 const platform = vi.hoisted(() => ({
   reset: vi.fn(async () => undefined),
@@ -59,6 +60,44 @@ describe('the call\'s screen switches', () => {
     expect(platform.reset).toHaveBeenCalled()
     expect(computer.control).toHaveBeenCalledWith('cnv_1', 'resume')
     expect(result.current.sharing).toBe(false)
+  })
+
+  it('pauses and resumes by what the lease said, and says when the pause reached nothing of this chat', async () => {
+    const { result } = renderHook(() => useScreenShare('cnv_1', true))
+    await act(async () => { await result.current.togglePause() })
+    expect(computer.control).toHaveBeenLastCalledWith('cnv_1', 'pause')
+    expect(result.current.paused).toBe(true)
+    await act(async () => { await result.current.togglePause() })
+    expect(computer.control).toHaveBeenLastCalledWith('cnv_1', 'resume')
+    expect(result.current.paused).toBe(false)
+    computer.control.mockResolvedValueOnce(ok('other_conversation'))
+    await act(async () => { await result.current.togglePause() })
+    expect(result.current.paused).toBe(false)
+    expect(result.current.note).toContain('Another conversation')
+  })
+
+  it('never calls an unconfirmed stop stopped', async () => {
+    const { result } = renderHook(() => useScreenShare('cnv_1', true))
+    await act(async () => { await result.current.stopComputer() })
+    expect(result.current.note).toBe('Computer stopped.')
+    computer.stop.mockResolvedValueOnce(ok('cleanup_unconfirmed'))
+    await act(async () => { await result.current.stopComputer() })
+    expect(result.current.note).toContain('could not confirm')
+    computer.stop.mockResolvedValueOnce(ok('not_running'))
+    await act(async () => { await result.current.stopComputer() })
+    expect(result.current.note).toBe('Nothing was using the computer.')
+  })
+
+  it('acts on a spoken command before the agent hears it, and tells the agent what was done', async () => {
+    const { result } = renderHook(() => useScreenShare('cnv_1', true))
+    let said: string | undefined
+    await act(async () => { said = await result.current.onFinalUtterance('Stop the computer.') })
+    expect(computer.stop).toHaveBeenCalledWith('cnv_1')
+    expect(said).toContain('(stop_computer): Computer stopped.')
+    expect(said).toContain('do not do it again')
+    await act(async () => { said = await result.current.onFinalUtterance('Can you stop the computer from sleeping?') })
+    expect(said).toBeUndefined()
+    expect(computer.stop).toHaveBeenCalledTimes(1)
   })
 
   it('says why sharing did not turn on, and stays off', async () => {

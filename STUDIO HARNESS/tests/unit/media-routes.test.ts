@@ -167,6 +167,30 @@ describe("media routes", () => {
     expect(setting.get()).toBeNull();
   });
 
+  it("keeps the voice-task model apart from the voice model, defaults it to the chat's, and refuses a model that cannot do the work", async () => {
+    const setting = new VoiceSettings(db);
+    const scoped = new Hono<AdmissionEnv>();
+    scoped.use("*", createAdmissionMiddleware(session.verifier));
+    scoped.route("/api/media", createMediaRoutes({} as MediaAdministration, {
+      voiceSettings: setting,
+      isModelServed: async (id) => id.startsWith("openrouter/"),
+      voiceTaskRefusal: (id) => id === "openrouter/blind" ? "That model cannot see images, and voice tasks read screenshots." : undefined,
+    }));
+    const headers = { authorization: `Bearer ${session.credential}`, "content-type": "application/json" };
+    const put = (modelId: string | null) => scoped.request("http://harness.test/api/media/voice-task-model", { method: "PUT", headers, body: JSON.stringify({ modelId }) });
+    expect(await (await scoped.request("http://harness.test/api/media/voice-task-model", { headers })).json()).toEqual({ modelId: null });
+    const refused = await put("openrouter/blind");
+    expect(refused.status).toBe(400);
+    expect(JSON.stringify(await refused.json())).toContain("cannot see images");
+    expect((await put("elsewhere/model")).status).toBe(400);
+    expect(setting.getTask()).toBeNull();
+    expect((await put("openrouter/worker")).status).toBe(200);
+    expect(setting.getTask()).toBe("openrouter/worker");
+    expect(setting.get()).toBeNull();
+    expect((await put(null)).status).toBe(200);
+    expect(setting.getTask()).toBeNull();
+  });
+
   it("requires the project scope", async () => {
     const limited = createAdmissionSession({ scopes: [ADMISSION_SCOPES.PROVIDER_MANAGEMENT] });
     const credentials = new InMemoryCredentialStore();

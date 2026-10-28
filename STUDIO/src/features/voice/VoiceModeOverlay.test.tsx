@@ -26,8 +26,8 @@ let questions: unknown[] = []
 let workers: unknown[] = []
 // Off and unavailable, as in a browser tab, unless a test says otherwise.
 const screenShare = {
-  available: false, sharing: false, showing: false, pending: false, note: '',
-  toggle: vi.fn(), showMe: vi.fn(), onSpeechEnd: vi.fn(),
+  available: false, sharing: false, showing: false, paused: false, pending: false, note: '',
+  toggle: vi.fn(), showMe: vi.fn(), togglePause: vi.fn(), stopComputer: vi.fn(), onSpeechEnd: vi.fn(),
 }
 
 vi.mock('@/features/screen/useScreenShare', () => ({ useScreenShare: () => screenShare }))
@@ -63,7 +63,7 @@ describe('VoiceModeOverlay', () => {
     const { rerender } = stage()
     const bar = screen.getByRole('toolbar', { name: 'Call controls' })
     const labels = [...bar.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))
-    expect(labels).toEqual(['Share your screen', 'Mute microphone', 'Interrupt', 'Deafen', 'Share your screen to draw on it'])
+    expect(labels).toEqual(['Share your screen', 'Mute microphone', 'Stop talking', 'Deafen', 'Share your screen to draw on it'])
     expect(screen.getByRole('button', { name: 'Share your screen to draw on it' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Share your screen' }))
     expect(screenShare.toggle).toHaveBeenCalled()
@@ -72,6 +72,21 @@ describe('VoiceModeOverlay', () => {
     expect(screen.getByRole('status').textContent).toContain('Sharing your screen')
     fireEvent.click(screen.getByRole('button', { name: 'Show me: draw on your screen' }))
     expect(screenShare.showMe).toHaveBeenCalled()
+  })
+
+  it('offers the computer\'s own pause and stop in words, apart from the call\'s switches', () => {
+    Object.assign(session, { stage: 'listening', muted: false, deafened: false })
+    Object.assign(screenShare, { available: true, paused: false })
+    const { rerender } = stage()
+    const bar = screen.getByRole('toolbar', { name: 'Call controls' })
+    expect(bar.textContent).not.toContain('computer')
+    fireEvent.click(screen.getByRole('button', { name: 'Pause computer' }))
+    expect(screenShare.togglePause).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop computer' }))
+    expect(screenShare.stopComputer).toHaveBeenCalled()
+    Object.assign(screenShare, { paused: true })
+    rerender(<VoiceModeOverlay open conversationId="cnv_1" onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Resume computer' })).toBeTruthy()
   })
 
   it('names the voice Studio and plays the join cue', () => {
@@ -84,10 +99,10 @@ describe('VoiceModeOverlay', () => {
   it('only interrupts while Studio thinks or speaks', () => {
     Object.assign(session, { stage: 'listening', spoken: [] })
     const { rerender } = stage()
-    expect(screen.getByRole('button', { name: 'Interrupt' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Stop talking' }).hasAttribute('disabled')).toBe(true)
     Object.assign(session, { stage: 'speaking', spoken: ['Hello,', ' ', 'world.'] })
     rerender(<VoiceModeOverlay open conversationId="cnv_1" onClose={() => {}} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop talking' }))
     expect(session.interrupt).toHaveBeenCalled()
     expect(playCue).toHaveBeenCalledTimes(1)
   })

@@ -126,19 +126,26 @@ export function BrowserPanel({
  */
 function StopBrowser({ conversationId, family }: { conversationId: string; family: ReportFamily }) {
   const { browser, computer } = useWorkspace()
-  const [state, setState] = useState<'idle' | 'busy' | 'stopped' | 'nothing'>('idle')
+  const [state, setState] = useState<'idle' | 'busy' | 'stopped' | 'unconfirmed' | 'nothing'>('idle')
 
   const stop = async () => {
     setState('busy')
-    const result = await (family.id === 'computer' ? computer : browser).stop(conversationId)
-    setState(result.ok && result.value ? 'stopped' : 'nothing')
+    if (family.id === 'computer') {
+      // The computer says which of its outcomes it came to; an unconfirmed
+      // cleanup is neither "stopped" nor "not running".
+      const result = await computer.stop(conversationId)
+      setState(!result.ok ? 'nothing' : result.value === 'cleanup_confirmed' ? 'stopped' : result.value === 'cleanup_unconfirmed' ? 'unconfirmed' : 'nothing')
+    } else {
+      const result = await browser.stop(conversationId)
+      setState(result.ok && result.value ? 'stopped' : 'nothing')
+    }
     setTimeout(() => setState('idle'), 2000)
   }
 
-  if (state === 'stopped' || state === 'nothing') {
+  if (state === 'stopped' || state === 'unconfirmed' || state === 'nothing') {
     return (
       <span className="shrink-0 text-micro text-muted-foreground" role="status">
-        {state === 'stopped' ? 'Stopped' : 'Not running'}
+        {state === 'stopped' ? 'Stopped' : state === 'unconfirmed' ? 'Stop sent, not confirmed' : 'Not running'}
       </span>
     )
   }

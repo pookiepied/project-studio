@@ -19,6 +19,9 @@ export interface VoiceFreshChat {
   readonly onAdmitted: (text: string, receipt: { readonly submissionId: string; readonly offset: string }) => void
 }
 
+/** The most of an interrupted reply carried to the next turn as heard. */
+const HEARD_LIMIT = 600
+
 /** Audio consumes only new journal events; replay never speaks or submits work. */
 export class VoiceConversation {
   private readonly options: VoiceConversationOptions
@@ -40,6 +43,13 @@ export class VoiceConversation {
   #messageIds = new Set<string>()
   #position = ''
   #holding = false
+  /**
+   * What the person heard of a reply they cut off, carried on their next
+   * utterance (D8) and then dropped. Undefined when nothing was cut off.
+   * The reply's full text stays in history; this says which part of it
+   * actually reached them.
+   */
+  #heardBeforeInterrupt: string | undefined
 
   constructor(options: VoiceConversationOptions) {
     this.options = options
@@ -100,7 +110,8 @@ export class VoiceConversation {
     }
   }
 
-  async send(text: string): Promise<void> {
+  /** `control` is what Studio already did for these words as a spoken command, if anything. */
+  async send(text: string, control?: string): Promise<void> {
     const epoch = this.#epoch
     await this.#barrier
     if (this.#closed || epoch !== this.#epoch) return
@@ -109,7 +120,13 @@ export class VoiceConversation {
     const first = this.#pendingFirst
     this.#pendingFirst = undefined
     const settings = first === undefined ? { modelId: null, reasoningLevel: null } : first.settings
-    const submission = this.options.client.submitTurn(text, { ...settings, voice: true, deliveryMode: 'steer' })
+    const heard = this.#heardBeforeInterrupt
+    this.#heardBeforeInterrupt = undefined
+    const submission = this.options.client.submitTurn(text, {
+      ...settings, voice: true, deliveryMode: 'steer',
+      ...(heard === undefined ? {} : { heardBeforeInterrupt: heard }),
+      ...(control === undefined ? {} : { control }),
+    })
     this.#submission = submission
     const result = await submission
     if (first !== undefined) {
@@ -162,6 +179,14 @@ export class VoiceConversation {
     for (const id of this.#activeSubmissions) this.#ignoredSubmissions.add(id)
     this.#activeSubmissions.clear()
     while (this.#ignoredSubmissions.size > 128) this.#ignoredSubmissions.delete(this.#ignoredSubmissions.values().next().value ?? '')
+    // Only a reply that was being given counts as cut off; an interrupt in
+    // silence has nothing to report. The tail, because the end of what was
+    // heard is what the person's next words answer.
+    const speaking = this.#output ?? this.#draining
+    if (cancelGeneration || speaking !== undefined) {
+      const heard = speaking?.heard ?? ''
+      this.#heardBeforeInterrupt = heard.length > HEARD_LIMIT ? `...${heard.slice(-HEARD_LIMIT)}` : heard
+    }
     this.#output?.stop()
     this.#draining?.stop()
     this.#draining = undefined

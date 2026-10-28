@@ -168,7 +168,7 @@ export function VoiceModeOverlay({
   insetRight?: number
 }) {
   const screen = useScreenShare(conversationId, open)
-  const session = useVoiceSession(open, conversationId, fresh, screen.onSpeechEnd)
+  const session = useVoiceSession(open, conversationId, fresh, screen.onSpeechEnd, screen.onFinalUtterance)
   const call = useCallParticipants(conversationId, open)
   // A worker parks on a permission question the chat page would show; the
   // full stage covers that page, so the stage asks it itself. The id is the
@@ -243,7 +243,7 @@ export function VoiceModeOverlay({
           <div className="flex items-center gap-1">
             <MuteButton session={session} size="md" />
             <DeafenButton session={session} size="md" />
-            <IconButton label="Interrupt" size="md" disabled={!canInterrupt(session)} onClick={session.interrupt}>
+            <IconButton label="Stop talking" size="md" disabled={!canInterrupt(session)} onClick={session.interrupt}>
               <Icons.stop size="md" />
             </IconButton>
             {screen.available ? <ShareButton screen={screen} size="md" /> : null}
@@ -418,7 +418,9 @@ export function VoiceModeOverlay({
                   {screen.available ? <ShareButton screen={screen} size="lg" /> : null}
                   <MuteButton session={session} size="lg" />
                   <IconButton
-                    label="Interrupt"
+                    // Says what it stops: Studio's voice. Tasks and the
+                    // computer carry on; they have their own stops (D4).
+                    label="Stop talking"
                     size="xl"
                     tone="solid"
                     disabled={!canInterrupt(session)}
@@ -429,7 +431,22 @@ export function VoiceModeOverlay({
                   <DeafenButton session={session} size="lg" />
                   {screen.available ? <ShowMeButton screen={screen} size="lg" /> : null}
                 </div>
-                <span className="text-micro text-muted-foreground/70">Esc to leave</span>
+                {/* The person's two other hands on the computer, quiet
+                    until needed: words rather than marks, because pause and
+                    stop of the computer must not be mistaken for the call's
+                    own switches above them. */}
+                <div className="flex items-center gap-1 text-micro text-muted-foreground/70">
+                  {screen.available ? (
+                    <>
+                      <Button variant="ghost" size="xs" onClick={() => void screen.togglePause()}>
+                        {screen.paused ? 'Resume computer' : 'Pause computer'}
+                      </Button>
+                      <Button variant="ghost" size="xs" onClick={() => void screen.stopComputer()}>Stop computer</Button>
+                      <span aria-hidden className="px-1">·</span>
+                    </>
+                  ) : null}
+                  <span>Esc to leave</span>
+                </div>
               </>
             ) : null}
           </footer>

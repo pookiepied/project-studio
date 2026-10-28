@@ -113,6 +113,36 @@ describe('voice conversation delivery', () => {
     expect(f.client.abortRun).not.toHaveBeenCalled()
   })
 
+  it('tells the next turn what the person heard of a reply they cut off, once', async () => {
+    const f = fixture()
+    await f.voice.send('Tell me a story.')
+    f.receive([f.start, f.delta, { type: 'message-delta', messageId: 'reply', kind: 'text', delta: ' Once upon a time there was' }])
+    await flush()
+    f.voice.interrupt()
+    await flush()
+    await f.voice.send('Make it shorter.')
+    expect(f.client.submitTurn).toHaveBeenLastCalledWith('Make it shorter.', expect.objectContaining({ heardBeforeInterrupt: 'Hello.' }))
+    await f.voice.send('Thanks.')
+    expect(f.client.submitTurn).toHaveBeenLastCalledWith('Thanks.', expect.not.objectContaining({ heardBeforeInterrupt: expect.anything() }))
+    f.voice.close()
+  })
+
+  it('says nothing was heard when a reply is cut off before it sounds, and nothing at all for an interrupt in silence', async () => {
+    const f = fixture()
+    await f.voice.send('Tell me a story.')
+    f.voice.interrupt()
+    await flush()
+    f.client.submitTurn.mockResolvedValueOnce({ ok: true, value: { submissionId: 'second', offset: '2' } })
+    await f.voice.send('Never mind.')
+    expect(f.client.submitTurn).toHaveBeenLastCalledWith('Never mind.', expect.objectContaining({ heardBeforeInterrupt: '' }))
+    f.receive([{ type: 'message-started', messageId: 'quiet', submissionId: 'second' }, { type: 'submission-settled', submissionId: 'second', outcome: 'completed' }])
+    f.voice.interrupt()
+    await flush()
+    await f.voice.send('Hello?')
+    expect(f.client.submitTurn).toHaveBeenLastCalledWith('Hello?', expect.not.objectContaining({ heardBeforeInterrupt: expect.anything() }))
+    f.voice.close()
+  })
+
   it('sends voice as a separate role without replacing the working-model selection', async () => {
     const f = fixture()
     await f.voice.send('Make it a square.')

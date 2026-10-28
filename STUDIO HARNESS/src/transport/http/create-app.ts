@@ -96,6 +96,8 @@ export interface CreateHttpAppOptions {
   /** Tidies a dictated passage on the default model; optional for tests. */
   readonly improver?: TextImproverPort;
   readonly voiceSettings?: VoiceSettings;
+  /** Why a model cannot run voice tasks, from the catalog; undefined when nothing says it cannot. */
+  readonly voiceTaskRefusal?: (modelId: string) => string | undefined;
   /**
    * Site icons for the transcript's search results and page reads. Optional
    * the way `improver` is: a composition without it answers no icon routes
@@ -178,7 +180,7 @@ export interface CreateHttpAppOptions {
   };
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
   readonly computer?: {
-    stop(conversationId: string): Promise<boolean>;
+    stop(conversationId: string): Promise<"cleanup_confirmed" | "cleanup_unconfirmed" | "not_running" | "unavailable">;
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
     sharing?(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }>;
     glance?(conversationId: string): Promise<unknown>;
@@ -279,6 +281,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
       ...(options.improver === undefined ? {} : { improver: options.improver }),
       ...(options.voiceSettings === undefined ? {} : { voiceSettings: options.voiceSettings }),
       isModelServed: options.isModelServed,
+      ...(options.voiceTaskRefusal === undefined ? {} : { voiceTaskRefusal: options.voiceTaskRefusal }),
     }),
   );
   app.route("/api/permissions", createApprovalRoutes(options.approvals));

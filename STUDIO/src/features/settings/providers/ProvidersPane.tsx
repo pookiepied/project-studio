@@ -281,6 +281,7 @@ function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind:
           onSet={(slot, ref) => void providers.setDefault(slot, ref)}
         />
         {kind === 'language' ? <VoiceModelSetting models={kindModels} connections={connections} /> : null}
+        {kind === 'language' ? <VoiceModelSetting models={kindModels} connections={connections} role="tasks" /> : null}
       </Section>
 
       <Section caption="Providers">

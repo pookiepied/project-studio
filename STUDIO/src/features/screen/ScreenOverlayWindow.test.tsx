@@ -6,12 +6,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { ScreenOverlayWindow } from './ScreenOverlayWindow'
 
 const monitor = { x: 1920, y: 0, width: 2000, height: 1000, scale: 2 }
-const native = vi.hoisted(() => ({
-  state: null as unknown,
-  drawn: vi.fn(async () => undefined),
-  finish: vi.fn(async () => undefined),
-  idle: vi.fn(async () => undefined),
-}))
+const native = vi.hoisted(() => {
+  const held: { state: unknown } = { state: null }
+  return Object.assign(held, {
+    drawn: vi.fn(async () => undefined),
+    finish: vi.fn(async () => undefined),
+    idle: vi.fn(async () => undefined),
+  })
+})
 
 vi.mock('@/platform/tauri/screenOverlay', () => ({
   overlayState: async () => native.state,

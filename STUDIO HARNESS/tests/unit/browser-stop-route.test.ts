@@ -29,8 +29,10 @@ afterEach(() => {
 });
 
 type Stopper = { stop(conversationId: string): Promise<boolean> };
+type StopOutcome = "cleanup_confirmed" | "cleanup_unconfirmed" | "not_running" | "unavailable";
+type ComputerStopper = { stop(conversationId: string): Promise<StopOutcome> };
 
-function build(browser?: Stopper, computer?: Stopper) {
+function build(browser?: Stopper, computer?: ComputerStopper) {
   const session = createAdmissionSession({ scopes: ALL_ADMISSION_SCOPES });
   const app = new Hono<AdmissionEnv>();
   app.use("*", createAdmissionMiddleware(session.verifier));
@@ -78,7 +80,9 @@ describe("stopping a conversation's browser", () => {
 /**
  * The computer's stop (ADR 0055 §7) is the same contract at its own path:
  * the pill on screen presses it, and the pill must be told the truth about
- * whether anything was driving.
+ * whether anything was driving. Since ADR 0059 it also says which of four
+ * outcomes the stop came to: `stopped` stays true for a confirmed exit only,
+ * and `outcome` keeps an unconfirmed one from reading as stopped.
  */
 describe("stopping a conversation's computer control", () => {
   it("asks the runtime about that conversation and answers what it said", async () => {
@@ -86,7 +90,7 @@ describe("stopping a conversation's computer control", () => {
     const { app, authorization } = build(undefined, {
       stop: (conversationId) => {
         asked.push(conversationId);
-        return Promise.resolve(true);
+        return Promise.resolve("cleanup_confirmed");
       },
     });
     const response = await app.request("http://harness.test/api/conversations/cnv_9/computer/stop", {
@@ -94,8 +98,17 @@ describe("stopping a conversation's computer control", () => {
       headers: { authorization },
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ stopped: true });
+    expect(await response.json()).toEqual({ stopped: true, outcome: "cleanup_confirmed" });
     expect(asked).toEqual(["cnv_9"]);
+  });
+
+  it("does not call an unconfirmed stop stopped", async () => {
+    const { app, authorization } = build(undefined, { stop: () => Promise.resolve("cleanup_unconfirmed") });
+    const response = await app.request("http://harness.test/api/conversations/cnv_9/computer/stop", {
+      method: "POST",
+      headers: { authorization },
+    });
+    expect(await response.json()).toEqual({ stopped: false, outcome: "cleanup_unconfirmed" });
   });
 
   it("says nothing was running when there is no runtime to ask", async () => {
@@ -104,6 +117,6 @@ describe("stopping a conversation's computer control", () => {
       method: "POST",
       headers: { authorization },
     });
-    expect(await response.json()).toEqual({ stopped: false });
+    expect(await response.json()).toEqual({ stopped: false, outcome: "unavailable" });
   });
 });

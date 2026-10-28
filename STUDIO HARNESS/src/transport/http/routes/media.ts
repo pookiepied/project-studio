@@ -115,6 +115,8 @@ export function createMediaRoutes(
     readonly improver?: TextImproverPort;
     readonly voiceSettings?: VoiceSettings;
     readonly isModelServed?: (modelId: string) => Promise<boolean>;
+    /** Why a model cannot run voice tasks - it cannot call tools or see - or undefined when nothing says it cannot. */
+    readonly voiceTaskRefusal?: (modelId: string) => string | undefined;
   } = {},
 ): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
@@ -128,6 +130,22 @@ export function createMediaRoutes(
       const modelId = parsed.output.modelId;
       if (modelId !== null && !(await options.isModelServed?.(modelId))) throw new MediaRouteError("That voice model is not connected.");
       await observeOperation("provider", "voice.settings", async () => { options.voiceSettings?.set(modelId); });
+      return context.json({ modelId });
+    } catch (error) { return context.json(failure(error), statusOf(error)); }
+  });
+
+  routes.get("/voice-task-model", (context) => context.json({ modelId: options.voiceSettings?.getTask() ?? null }));
+  routes.put("/voice-task-model", async (context) => {
+    try {
+      const parsed = v.safeParse(v.object({ modelId: v.nullable(v.string()) }), await body(context));
+      if (!parsed.success || options.voiceSettings === undefined) throw new MediaRouteError("Choose a connected model for voice tasks, or the chat's own.");
+      const modelId = parsed.output.modelId;
+      if (modelId !== null) {
+        if (!(await options.isModelServed?.(modelId))) throw new MediaRouteError("That model is not connected.");
+        const refusal = options.voiceTaskRefusal?.(modelId);
+        if (refusal !== undefined) throw new MediaRouteError(refusal);
+      }
+      await observeOperation("provider", "voice.task_settings", async () => { options.voiceSettings?.setTask(modelId); });
       return context.json({ modelId });
     } catch (error) { return context.json(failure(error), statusOf(error)); }
   });

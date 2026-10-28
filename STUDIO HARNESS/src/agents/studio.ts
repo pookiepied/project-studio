@@ -202,16 +202,17 @@ export function Studio({ id }: AgentProps) {
     useModel(studioModelSpecifier({ modelId }), { thinkingLevel: runtime.quietThinkingLevel?.(modelId) ?? "off" });
     useTool({
       name: "voice_work",
-      description: "The one tool that starts, steers or cancels voice tasks. start hands work to a task; steer delivers a correction to a running task with the user's exact transcription; status reads its result; cancel stops it. Does not wait for completion.",
-      input: v.object({ action: v.picklist(["start", "steer", "status", "cancel"]), taskId: v.optional(v.string()), context: v.optional(v.pipe(v.string(), v.maxLength(16_000))) }),
+      description: "The one tool that starts, steers, continues or cancels voice tasks. start hands work to a task; steer delivers a correction to a running task with the user's exact transcription; continue starts a new task that carries on from a finished one (taskId names the finished one); status reads its result; cancel stops it. Does not wait for completion.",
+      input: v.object({ action: v.picklist(["start", "steer", "status", "cancel", "continue"]), taskId: v.optional(v.string()), context: v.optional(v.pipe(v.string(), v.maxLength(16_000))) }),
       durable: true,
       run: async ({ data, step }) => {
         const admissionKey = await step.do("voice-coordination-identity", async () => createStudioUuid());
-        const taskId = data.action === "start" ? await step.do("voice-work-identity", async () => `voice_${createStudioUuid()}`) : data.taskId;
+        const fresh = data.action === "start" || data.action === "continue";
+        const taskId = fresh ? await step.do("voice-work-identity", async () => `voice_${createStudioUuid()}`) : data.taskId;
         return { output: await step.do("voice-work", async () => {
         if (runtime.voiceWork === undefined) throw new ProviderConfigurationError("Voice work is unavailable.");
-        if ((data.action === "start" || data.action === "steer") && !spoken) throw new ProviderConfigurationError("New instructions need a new user utterance.");
-        return runtime.voiceWork(id, spoken ? delivery.body : source, { ...data, taskId, admissionKey });
+        if ((fresh || data.action === "steer") && !spoken) throw new ProviderConfigurationError("New instructions need a new user utterance.");
+        return runtime.voiceWork(id, spoken ? delivery.body : source, { ...data, taskId, admissionKey, ...(data.action === "continue" ? { continues: data.taskId } : {}) });
       }) };
       },
     });
@@ -268,9 +269,12 @@ export function useTaskCoordination(conversationId: string, role: TaskCoordinati
 }
 
 /** Workers retain the parent's workspace/context, with their own agent authority. */
-export function renderStudio(id: string, agentId: string) {
+export function renderStudio(id: string, agentId: string, modelOverride?: string) {
   const runtime = getStudioRuntime();
-  const settings = runtime.conversationTurnSettings(id);
+  const chosen = runtime.conversationTurnSettings(id);
+  // A voice task's own model replaces the chat's; its reasoning choice is
+  // kept and clamped to what the replacement supports, like any other.
+  const settings = modelOverride === undefined ? chosen : { ...chosen, modelId: modelOverride };
   const supported = runtime.supportedReasoningLevels(settings.modelId);
   // The compaction policy rides the same hook: Flue compacts the conversation
   // when the provider's reported usage passes `window - reserve`, and the

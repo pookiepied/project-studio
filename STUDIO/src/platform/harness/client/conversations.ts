@@ -140,14 +140,16 @@ export interface ConversationIndexClient {
   stopConversationBrowser(id: string): Promise<HarnessResult<boolean>>
   /**
    * The person's stop for the conversation's computer control (ADR 0055 §7).
-   * Answers whether a driver was actually running, for the same reason.
+   * Answers which of four outcomes it came to: a confirmed stop, one asked
+   * for whose cleanup was not confirmed, nothing running, or no server to
+   * ask. A button that said "Stopped" for the second would be lying.
    */
-  stopConversationComputer(id: string): Promise<HarnessResult<boolean>>
+  stopConversationComputer(id: string): Promise<HarnessResult<ComputerStopOutcome>>
   /**
    * The person's own hold on the desktop lease (ADR 0059): pause the agent,
    * show it something, or hand it back. No model is asked.
    */
-  controlConversationComputer(id: string, action: 'pause' | 'resume' | 'demonstrate'): Promise<HarnessResult<void>>
+  controlConversationComputer(id: string, action: 'pause' | 'resume' | 'demonstrate'): Promise<HarnessResult<string>>
   /** The voice call's Share screen switch. Answers what the harness now holds. */
   shareConversationScreen(id: string, on: boolean): Promise<HarnessResult<boolean>>
   /**
@@ -172,6 +174,9 @@ export interface ConversationIndexClient {
    */
   restoreConversationSnapshot(id: string, snapshotId: string): Promise<HarnessResult<SnapshotRestore>>
 }
+
+/** What a computer Stop came to; see `stopConversationComputer`. */
+export type ComputerStopOutcome = 'cleanup_confirmed' | 'cleanup_unconfirmed' | 'not_running' | 'unavailable'
 
 function conversationPath(id: string, suffix = ''): string {
   return `${CONVERSATIONS_PATH}/${encodeURIComponent(id)}${suffix}`
@@ -320,19 +325,22 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
     },
 
     stopConversationComputer(id) {
-      return json(
-        'POST',
-        conversationPath(id, '/computer/stop'),
-        undefined,
-        (value) =>
-          typeof value === 'object' && value !== null
-            ? (value as Record<string, unknown>)['stopped'] === true
-            : false,
-      )
+      return json('POST', conversationPath(id, '/computer/stop'), undefined, (value): ComputerStopOutcome => {
+        const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+        const outcome = record['outcome']
+        if (outcome === 'cleanup_confirmed' || outcome === 'cleanup_unconfirmed' || outcome === 'not_running' || outcome === 'unavailable') return outcome
+        // A harness from before outcomes said only whether it stopped.
+        return record['stopped'] === true ? 'cleanup_confirmed' : 'not_running'
+      })
     },
 
     controlConversationComputer(id, action) {
-      return empty('POST', conversationPath(id, '/computer/control'), { action })
+      // The lease's own word for what happened - "paused", "already",
+      // "other_conversation", "not_running" - so the button can say it.
+      return json('POST', conversationPath(id, '/computer/control'), { action }, (value) => {
+        const result = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)['result'] : undefined
+        return typeof result === 'string' ? result : 'answered'
+      })
     },
 
     shareConversationScreen(id, on) {

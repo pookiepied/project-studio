@@ -96,6 +96,30 @@ routes); client `ink`, `marks`, `markCalls`, `useScreenShare`,
 `ScreenOverlayWindow`, `VoiceModeOverlay`. Not verifiable here: the overlay on
 a real display, the driver's pulse on Windows.
 
+Stage 6, the person's controls and the worker's model. Voice tasks may run on
+their own model (`GET/PUT /api/media/voice-task-model`, operation
+`voice.task_settings`; null is the chat's own, the default); the catalog's
+"unsupported" for tool calling or vision refuses a choice with a sentence.
+`voice_work continue` starts a new task carrying a settled one's result,
+admitted under the same rule as a start. A steer to a running task first
+checkpoints its desktop (operation `computer.checkpoint`, stage
+`fenced`/`not_owner`/`not_running`): the rest of its batch is refused at the
+next step and it must look again, keeping the desktop. The client carries
+`heard_before_interrupt` (phrases that began to sound, at most 600
+characters, "" when nothing did) and `control` (what a spoken command already
+did) as attributes on the `voice_input` signal - words in gated content, never
+in observation attributes. The call has Stop talking, Pause/Resume computer and
+Stop computer; a computer stop now answers one of four outcomes
+(`cleanup_confirmed`, `cleanup_unconfirmed`, `not_running`, `unavailable`) and
+no surface rounds an unconfirmed one up to "Stopped". Spoken commands match
+whole final transcripts only (`controlMatcher.ts`). Closing a call needs no new
+release: the voice turn's settlement already releases its actor, sharing goes
+off and the overlay resets.
+Coverage: `computer-lease.test.ts` (checkpoint), `media-routes.test.ts`,
+`browser-stop-route.test.ts`, `agent-slots.test.ts`; client `conversation`,
+`controlMatcher`, `useScreenShare`, `BrowserPanel`, `VoiceModelSetting`,
+`VoiceModeOverlay`, harness `conversation` wire.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in

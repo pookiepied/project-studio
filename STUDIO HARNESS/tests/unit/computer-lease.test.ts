@@ -447,3 +447,27 @@ describe("the shared screen between pictures", () => {
     expect(said(worker)).toContain("not for tasks");
   });
 });
+
+describe("a correction reaching a task at the desktop", () => {
+  it("stops the rest of the task's batch at the next step, keeps its desktop, and makes it look again", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const batch = computer.call("studio_computer_batch", { steps: [{ tool: "type", text: "slow" }, { tool: "key", keys: "return" }] }, hazel);
+    await vi.waitFor(() => expect(spawned.ops).toContain("type"));
+    expect(await computer.control({ input: { action: "checkpoint", actor: "voice_hazel" }, _meta: { "studio/conversation": CHAT } })).toEqual({ held: true });
+    const answer = await batch;
+    expect(said(answer)).toContain("a correction from the person arrived");
+    expect(spawned.ops).not.toContain("key");
+    expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel))).toBe("observe_first");
+    expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, voice))).toBe("not_owner");
+    await computer.call("studio_computer_screenshot", {}, hazel);
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel)).isError).toBeUndefined();
+  });
+
+  it("does nothing to a desktop the corrected task does not hold", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    expect(await computer.control({ input: { action: "checkpoint", actor: "voice_juniper" }, _meta: { "studio/conversation": CHAT } })).toEqual({ held: false });
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel)).isError).toBeUndefined();
+  });
+});

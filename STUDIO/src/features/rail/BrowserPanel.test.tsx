@@ -15,7 +15,7 @@ import { BrowserPanel } from './BrowserPanel'
  */
 
 const stop = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
-const stopComputer = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
+const stopComputer = vi.fn<(conversationId: string) => Promise<{ ok: true; value: 'cleanup_confirmed' | 'cleanup_unconfirmed' | 'not_running' }>>()
 const openBrowser = vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined)
 vi.mock('@/platform/tauri', async (original) => ({ ...await original<object>(), openBrowserWindow: (id: string) => openBrowser(id) }))
 
@@ -89,7 +89,7 @@ describe('BrowserPanel', () => {
   })
 
   it("stops the computer, not the browser, when the entry is the computer's report", async () => {
-    stopComputer.mockResolvedValue({ ok: true, value: true })
+    stopComputer.mockResolvedValue({ ok: true, value: 'cleanup_confirmed' })
     render(<BrowserPanel entry={entry('computer')} />)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Stop computer' }))
@@ -97,5 +97,14 @@ describe('BrowserPanel', () => {
     expect(stopComputer).toHaveBeenCalledWith('cnv_1')
     expect(stop).not.toHaveBeenCalled()
     expect(screen.getByRole('status').textContent).toBe('Stopped')
+  })
+
+  it('does not say Stopped, or Not running, for a stop whose cleanup was not confirmed', async () => {
+    stopComputer.mockResolvedValue({ ok: true, value: 'cleanup_unconfirmed' })
+    render(<BrowserPanel entry={entry('computer')} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Stop computer' }))
+    })
+    expect(screen.getByRole('status').textContent).toBe('Stop sent, not confirmed')
   })
 })

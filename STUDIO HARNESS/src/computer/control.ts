@@ -181,7 +181,7 @@ export class DesktopControl {
     const guard: Guard = {
       check: () => {
         if (this.#generation === generation && this.#owner?.actor !== undefined && keyOf(this.#owner.actor) === key) return undefined;
-        return "Desktop control changed during this call: it was paused, stopped or handed over. The steps after this point were not sent. Get status and look at the screen before deciding anything; do not replay them automatically.";
+        return "Desktop control changed during this call: it was paused, stopped or handed over, or a correction from the person arrived. The steps after this point were not sent. Get status and look at the screen before deciding anything; do not replay them automatically.";
       },
     };
     return guards.run(guard, async () => {
@@ -323,6 +323,23 @@ export class DesktopControl {
     this.#changes++;
     this.#notify();
     return "acquired";
+  }
+
+  /**
+   * A correction is on its way to this actor (D4, redirect). It keeps the
+   * desktop - nothing was handed over - but the rest of what it already sent
+   * is refused at the next step, and it looks again before any new input,
+   * so the correction lands at a boundary rather than after a batch that
+   * ignored it. Answers whether the actor held the desktop.
+   */
+  checkpoint(actor: ActorIdentity): boolean {
+    const owner = this.#owner;
+    if (owner === undefined || keyOf(owner.actor) !== keyOf(actor)) return false;
+    this.#generation++;
+    this.#changes++;
+    this.#revoked.set(keyOf(actor), this.#generation);
+    this.#notify();
+    return true;
   }
 
   /** Stop is starting for this conversation: its owner's queued and later calls are fenced. */

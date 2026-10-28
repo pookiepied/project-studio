@@ -182,6 +182,23 @@ describe('submitting a turn', () => {
     expect(JSON.parse(later.body)).not.toHaveProperty('projectId')
   })
 
+  it('carries what was heard of an interrupted reply on the voice signal, and says so when nothing was', async () => {
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+    await client.submitTurn('shorter', { modelId: null, reasoningLevel: null, voice: true, heardBeforeInterrupt: 'Once upon a time' })
+    await client.submitTurn('never mind', { modelId: null, reasoningLevel: null, voice: true, heardBeforeInterrupt: '' })
+    await client.submitTurn('typed', { modelId: null, reasoningLevel: null, heardBeforeInterrupt: 'ignored' })
+    const bodies = calls.map((call) => JSON.parse((call.args['init'] as { body: string }).body) as Record<string, unknown>)
+    expect(bodies[0]).toMatchObject({ kind: 'signal', type: 'voice_input', attributes: { heard_before_interrupt: 'Once upon a time' } })
+    expect(bodies[1]).toMatchObject({ attributes: { heard_before_interrupt: '(nothing; cut off before it sounded)' } })
+    expect(bodies[2]).not.toHaveProperty('attributes')
+    await client.submitTurn('stop the computer', { modelId: null, reasoningLevel: null, voice: true, control: 'Computer stopped.' })
+    const commanded = JSON.parse((calls[3]?.args['init'] as { body: string }).body) as Record<string, unknown>
+    expect(commanded['attributes']).toEqual({ control: 'Computer stopped.' })
+  })
+
   it('carries the permission mode in the harness vocabulary, and omits it when the stored mode stands', async () => {
     const { invoke, calls } = scriptedInvoke({
       service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
