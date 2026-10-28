@@ -179,6 +179,7 @@ export interface CreateHttpAppOptions {
   readonly computer?: {
     stop(conversationId: string): Promise<boolean>;
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
+    sharing?(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }>;
   };
   /**
    * The application database. The conversation routes own the purge of

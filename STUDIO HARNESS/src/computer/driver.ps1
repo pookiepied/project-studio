@@ -166,6 +166,11 @@ function Take-Screenshot($display, $region, $max, $format, $quality, $window, $b
   $bmp = New-Object System.Drawing.Bitmap $w, $h
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   try { $g.CopyFromScreen($x, $y, 0, 0, (New-Object System.Drawing.Size $w, $h)) } finally { $g.Dispose() }
+  # Sampled straight after the pixels and before encoding, so "what am I
+  # pointing at" pairs this picture with this pointer, never an older one.
+  $pointer = Get-Cursor
+  $frontRow = $null
+  try { $frontRow = Window-Row (Root-Of ([int64][Studio.Native]::GetForegroundWindow())) } catch {}
   $limit = if (-not (Given $max)) { 1568 } else { [int]$max }
   $scale = 1.0
   $longest = [Math]::Max($w, $h)
@@ -190,6 +195,7 @@ function Take-Screenshot($display, $region, $max, $format, $quality, $window, $b
     x = $x - $b.X; y = $y - $b.Y; width = $w; height = $h
     imageWidth = $picture.width; imageHeight = $picture.height
     mimeType = $picture.mime; data = $picture.data
+    pointer = $pointer; front = $frontRow
   }
   if ($null -ne $picture.note) { $answer.note = $picture.note }
   return $answer

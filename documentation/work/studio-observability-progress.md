@@ -37,6 +37,29 @@ Coverage: `computer-lease.test.ts` (driver stand-in through the real session),
 `computer-control-wiring.test.ts`, updated `computer-activity`, `computer-batch`
 and `computer-server` tests.
 
+Stage 3, screen awareness for the voice agent. The driver samples the pointer
+and the front window in the same operation as a screenshot's pixels. Each
+conversation keeps one shared observation (`computer/observations.ts`): the
+newest picture with who took it, its frame and scaling, that pointer, and the
+desktop change count at capture; staleness is derived when read (input or a
+control change since, or older than 15 s). Pictures are kept for the eight
+most recent conversations only; nothing queues, and task status still carries
+no bytes. `studio_computer_control action latest` hands any actor of the same
+conversation that picture; it never counts as the reader's own look. Screen
+sharing is the person's switch (`PUT /api/conversations/:id/computer/sharing`,
+operation `computer.sharing`, stage `on`/`off`), off by default, process memory
+only, carried on each voice call in `_meta` and pushed to the server when
+turned off; a voice call's picture that completes after sharing ended is
+discarded rather than delivered. While sharing is on, the voice role is offered
+the short computer list in `contracts/voice-computer.ts` (enforced by the
+harness tool list and the server), with batches capped at 6 steps. Each voice
+turn starts with one `interaction_context` signal (at most 1,500 characters:
+sharing, lease, the latest picture's provenance and freshness, the window
+title quoted and labelled untrusted). No new diagnostic content: screenshots
+and titles stay in tool results under the existing gated MCP capture.
+Coverage: `computer-lease.test.ts` (shared picture, sharing),
+`computer-control-wiring.test.ts` (offered tools, context block, sharing route).
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in

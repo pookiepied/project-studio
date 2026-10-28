@@ -240,6 +240,11 @@ export class DesktopControl {
     for (const listener of [...this.#listeners]) listener();
   }
 
+  /** How many times the screen may have changed; a shared picture records it to judge staleness. */
+  get changes(): number {
+    return this.#changes;
+  }
+
   /** The person's own clicks, keys or wheel since the last answer: everyone looks again. */
   noteHumanInput(): void {
     this.#changes++;

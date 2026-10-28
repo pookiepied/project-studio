@@ -112,6 +112,8 @@ export interface ConversationRoutesOptions {
     stop(conversationId: string): Promise<boolean>;
     /** Pause, resume, show-me and state: the person's own controls over the desktop lease (ADR 0059). */
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
+    /** The voice call's Share screen switch; off by default and never turned on by Studio. */
+    sharing?(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }>;
   };
 }
 
@@ -395,6 +397,19 @@ export function createConversationRoutes(
     }
     if (options.computer?.control === undefined) return context.json({ error: { message: "Desktop control is unavailable." } }, 503);
     return context.json(await options.computer.control(id, parsed.output.action));
+  });
+
+  routes.put("/:id/computer/sharing", async (context) => {
+    context.header("Cache-Control", "no-store");
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
+    const parsed = v.safeParse(v.object({ on: v.boolean() }), await body(context));
+    if (!parsed.success) {
+      const error = invalidBody("Screen sharing must be { \"on\": true } or { \"on\": false }.");
+      return context.json(failure(error), statusOf(error));
+    }
+    if (options.computer?.sharing === undefined) return context.json({ error: { message: "Screen sharing is unavailable." } }, 503);
+    return context.json(await options.computer.sharing(id, parsed.output.on));
   });
 
   routes.post("/", async (context) => {

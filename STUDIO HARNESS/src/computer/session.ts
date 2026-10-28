@@ -13,6 +13,10 @@ import { ComputerError } from "./errors.js";
 import { windowsPowerShell } from "./resolve.js";
 import { InputUpdates } from "./input.js";
 import { checkDesktopGuard } from "./control.js";
+import type { SharedObservation } from "./observations.js";
+
+/** A picture before the server knows who took it and against which desktop state. */
+export type OfferedObservation = Omit<SharedObservation, "by" | "changes">;
 import type { ToolAnswer } from "./tools.js";
 
 /**
@@ -163,6 +167,33 @@ export class ComputerSession {
 
   /** A native request is out and unanswered: its outcome is not yet known. */
   get busy(): boolean { return this.#pending.size > 0; }
+
+  #offered: OfferedObservation | undefined;
+  #latest: SharedObservation | undefined;
+
+  /**
+   * A picture the running call took. It becomes the conversation's shared
+   * observation only when the server commits it with who took it and the
+   * desktop's change count, so a half-finished call never shows a reader an
+   * observation without its provenance.
+   */
+  offerObservation(observation: OfferedObservation): void {
+    this.#offered = observation;
+  }
+
+  takeOffered(): OfferedObservation | undefined {
+    const offered = this.#offered;
+    this.#offered = undefined;
+    return offered;
+  }
+
+  commitObservation(observation: SharedObservation | undefined): void {
+    this.#latest = observation;
+  }
+
+  get latestObservation(): SharedObservation | undefined {
+    return this.#latest;
+  }
 
   /** The frame of the last screenshot, so an acting result can name it. */
   get lastFrame(): { display: number; width: number; height: number } | undefined {

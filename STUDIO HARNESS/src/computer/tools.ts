@@ -1,6 +1,8 @@
 import { ComputerError } from "./errors.js";
 import type { ComputerSession } from "./session.js";
 import { refusalMessage, type Actor, type DesktopControl, type DesktopState } from "./control.js";
+import { describeObservation, frontFrom, pointerFrom, staleReasons } from "./observations.js";
+import { createStudioUuid } from "../contracts/uuid.js";
 import { AFTER_ACTION_SIDE_PX, SCREENSHOT_MAX_BYTES, SCREENSHOT_SIDE_PX } from "../contracts/media-limits.js";
 
 /**
@@ -214,8 +216,18 @@ async function picture(
   session: ComputerSession,
   args: Record<string, unknown>,
 ): Promise<{ readonly line: string; readonly image: { type: "image"; data: string; mimeType: string } }> {
-  const shot = asPicture(await session.request("screenshot", { ...args, budget: SCREENSHOT_MAX_BYTES }));
+  const raw = await session.request("screenshot", { ...args, budget: SCREENSHOT_MAX_BYTES });
+  const shot = asPicture(raw);
   session.rememberFrame({ display: shot.display, width: shot.frameWidth, height: shot.frameHeight });
+  session.offerObservation({
+    id: createStudioUuid(), capturedAt: Date.now(), display: shot.display,
+    frame: { width: shot.frameWidth, height: shot.frameHeight },
+    region: { x: shot.x, y: shot.y, width: shot.width, height: shot.height },
+    image: { width: shot.imageWidth, height: shot.imageHeight, mimeType: shot.mimeType },
+    pointer: isRecord(raw) ? pointerFrom(raw["pointer"]) : null,
+    front: isRecord(raw) ? frontFrom(raw["front"]) : null,
+    data: shot.data,
+  });
   return {
     line: frameLine(shot),
     image: { type: "image", data: shot.data, mimeType: shot.mimeType },
@@ -989,13 +1001,26 @@ export const TOOLS: readonly ToolDefinition[] = [
       "acquire: take a free desktop without sending anything; after a pause it hands a paused task's desktop to the agent the person is talking to. " +
       "release: give the desktop back when your desktop work is done, letting go of anything Studio holds. " +
       "wait: while paused or while the person shows something, wait up to 20 seconds for that to change, then read status again. " +
+      "latest: the newest picture anyone in this conversation took (a task's included), with who took it, when, the pointer sampled with it, " +
+      "and whether it may be stale. It is evidence from then, not the screen now: it never counts as your look before input. " +
       "Holding the desktop is not permission: each action is still approved on its own. A refusal means no input was sent; " +
       "never route the same input through another tool or a delegate to get around it.",
-    inputSchema: object({ action: { type: "string", enum: ["status", "acquire", "release", "wait"] } }, ["action"]),
+    inputSchema: object({ action: { type: "string", enum: ["status", "acquire", "release", "wait", "latest"] } }, ["action"]),
     run: async (session, input, context) => {
       if (context === undefined) throw new ComputerError("internal", { message: "Desktop control was called without its lease." });
       const { actor, desktop } = context;
       const action = required(input, "action");
+      if (action === "latest") {
+        const latest = session.latestObservation;
+        const state = desktop.state(actor);
+        if (latest === undefined) return controlAnswer(state, "No picture has been taken in this conversation yet; take a screenshot.");
+        const now = Date.now();
+        const { data, ...meta } = latest;
+        return {
+          content: [text(describeObservation(latest, desktop.changes, now)), { type: "image", data, mimeType: latest.image.mimeType }],
+          structuredContent: { desktop: state, observation: { ...meta, stale: staleReasons(latest, desktop.changes, now) } },
+        };
+      }
       if (action === "wait") await desktop.waitForChange(20_000, context.signal);
       else if (action === "acquire") {
         // A paused owner of this conversation hands over only to the agent the person talks to.
@@ -1011,7 +1036,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           try { await session.request("release_held"); }
           catch { return controlAnswer(desktop.state(actor), "Released the desktop, but releasing held input was not confirmed. Look at the screen before assuming nothing is still pressed."); }
         }
-      } else if (action !== "status") throw new ComputerError("bad_input", { message: "action must be status, acquire, release or wait." });
+      } else if (action !== "status") throw new ComputerError("bad_input", { message: "action must be status, acquire, release, wait or latest." });
       return controlAnswer(desktop.state(actor));
     },
   },

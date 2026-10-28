@@ -120,6 +120,8 @@ import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
 import { init, observe } from "@flue/runtime";
 import { steerTask } from "../agents/task-control.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
+import { voiceToolOffered } from "../contracts/voice-computer.js";
+import { interactionContextText } from "../context/interaction-context.js";
 import { voiceImagePath } from "../conversations/voice-policy.js";
 import { ProviderConfigurationError } from "../contracts/models.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
@@ -620,6 +622,8 @@ export interface AgentHost {
   conversationCapabilityInventory?(conversationId: string): string;
   /** The voice agent's names-and-counts view of what a task's agent can use. */
   voiceCapabilityOverview?(conversationId: string): string;
+  /** The bounded interaction snapshot a voice turn starts with (ADR 0059). */
+  interactionContext?(conversationId: string): Promise<string>;
   /**
    * The skills switched on for one conversation, ready for `useSkill`.
    *
@@ -865,6 +869,12 @@ export class StudioRuntime implements AgentHost {
    */
   readonly #taskProjector: TaskProjector;
   #unsubscribeDesktop: (() => void) | undefined;
+  /**
+   * The voice calls whose person is sharing the screen. Process memory and
+   * off by default: a restart, or closing voice, ends sharing, and opening
+   * voice never turns it on (ADR 0059).
+   */
+  readonly #screenSharing = new Set<string>();
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -930,7 +940,7 @@ export class StudioRuntime implements AgentHost {
           .resolve("mcp", serverId, this.#enablementContext(conversationId))
           .enabled,
       actorMeta: (scope) => systemActorMeta(scope, currentExecutionContext()?.flueInstanceId,
-        (instanceId) => this.#tasks.get(instanceId)?.title),
+        (instanceId) => this.#tasks.get(instanceId)?.title, (conversationId) => this.#screenSharing.has(conversationId)),
     });
     this.#supervisor = new McpSupervisor({
       launch: createMcpLauncher({
@@ -1832,6 +1842,33 @@ export class StudioRuntime implements AgentHost {
     }, { action }, conversationId);
   }
 
+  /**
+   * The person's Share screen switch in a voice call. Off is pushed to the
+   * computer server at once, so a picture already being taken is discarded
+   * rather than delivered; on reaches it with the next call.
+   */
+  async setScreenSharing(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }> {
+    return observeOperation("mcp", "computer.sharing", async () => {
+      if (on) this.#screenSharing.add(conversationId);
+      else this.#screenSharing.delete(conversationId);
+      await this.#computerRpc(conversationId, { action: "sharing", on });
+      return { sharing: this.#screenSharing.has(conversationId) };
+    }, { stage: on ? "on" : "off" }, conversationId);
+  }
+
+  /**
+   * What the voice agent is told before it decides anything, as one bounded
+   * block: whether the screen is shared, who has the desktop and in what
+   * mode, and the latest picture's provenance and freshness. Screen text in
+   * it is labelled untrusted. A snapshot - the tool boundary checks again.
+   */
+  async interactionContext(conversationId: string): Promise<string> {
+    const sharing = this.#screenSharing.has(conversationId);
+    let state: unknown;
+    try { state = await this.#computerRpc(conversationId, { action: "context" }); } catch { state = undefined; }
+    return interactionContextText(sharing, state);
+  }
+
   /** A settled actor gives the desktop back, and anything it still held. */
   async #releaseDesktopActor(conversationId: string, actor: string): Promise<void> {
     await observeOperation("mcp", "computer.release", async () => {
@@ -2465,7 +2502,10 @@ export class StudioRuntime implements AgentHost {
         );
         const names = new Set<string>();
         return gate.list().flatMap((descriptor) => {
-          if (options.voiceOnly && (descriptor.id.namespace !== "native" || descriptor.id.name !== "read")) return [];
+          // The voice role's surface stays intentional (ADR 0059): conversation
+          // images through `read`, and the short computer list only while the
+          // person shares the screen. Everything else is a task's.
+          if (options.voiceOnly && !voiceToolOffered(descriptor.id.namespace, descriptor.id.name, this.#screenSharing.has(options.conversationId))) return [];
           // The per-acting-agent filter, applied before the name-conflict
           // check so a hidden tool never claims its name in this assembly.
           // Visibility is authority's mirror, not authority itself: what
@@ -2493,7 +2533,7 @@ export class StudioRuntime implements AgentHost {
               input: unknown,
               signal?: AbortSignal,
             ): Promise<ModelToolResult> => {
-              if (options.voiceOnly) {
+              if (options.voiceOnly && descriptor.id.namespace === "native") {
                 voiceImagePath(input, [attachmentsRoot, artifactsRoot]);
               }
               // Who is acting, answered again at call time rather than read

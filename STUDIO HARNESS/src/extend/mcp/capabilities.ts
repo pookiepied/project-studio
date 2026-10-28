@@ -45,10 +45,15 @@ export function systemActorMeta(
   scope: ExecutionScope,
   instanceId: string | undefined,
   taskName: (instanceId: string) => string | undefined,
+  sharing: (conversationId: string) => boolean = () => false,
 ): Readonly<Record<string, string>> {
   const actor = instanceId === undefined || instanceId === "" ? scope.conversationId : instanceId;
   if (actor === scope.conversationId) {
-    return { "studio/actor": actor, "studio/role": scope.agentId === "voice" ? "voice" : "conversation" };
+    // The voice role also says whether the person is sharing the screen:
+    // the switch is theirs, and the computer server enforces it per call.
+    return scope.agentId === "voice"
+      ? { "studio/actor": actor, "studio/role": "voice", "studio/sharing": sharing(scope.conversationId) ? "on" : "off" }
+      : { "studio/actor": actor, "studio/role": "conversation" };
   }
   const name = taskName(actor);
   return { "studio/actor": actor, "studio/role": "worker", ...(name === undefined ? {} : { "studio/actor-name": name }) };

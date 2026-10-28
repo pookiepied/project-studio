@@ -215,6 +215,14 @@ export function Studio({ id }: AgentProps) {
       }) };
       },
     });
+    // What is true right now - sharing, the desktop's owner and mode, the
+    // latest picture and how stale it is - delivered as a signal at the turn's
+    // start rather than written into the instructions, which would move the
+    // cached prefix every time the pointer did (ADR 0059).
+    useAgentStart(async ({ append }) => {
+      const body = await runtime.interactionContext?.(id);
+      if (body !== undefined) append({ kind: "signal", type: "interaction_context", tagName: "interaction_context", body });
+    });
     const folders = runtime.conversationProjectFolders?.(id) ?? [];
     useSandbox(runtime.createAgentSandbox({ agentId: "voice", conversationId: id,
       projectRoot: folders[0] ?? conversationWorkspaceDirectory(id), voiceOnly: true }));

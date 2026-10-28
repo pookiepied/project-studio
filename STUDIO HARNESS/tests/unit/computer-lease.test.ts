@@ -19,11 +19,13 @@ vi.mock("node:child_process", async (load) => {
   return { ...actual, spawn: () => {
     const child = actual.spawn(process.execPath, ["-e", `
     const lines = require('node:readline').createInterface({ input: process.stdin });
-    let busy = 0, closing = false;
+    let busy = 0, closing = false, shots = 0;
     console.log(JSON.stringify({ id: 'ready', ok: true }));
     const answer = (request) => {
+      shots++;
       const result = request.op === 'screenshot'
-        ? { display: 0, frameWidth: 100, frameHeight: 100, x: 0, y: 0, width: 100, height: 100, imageWidth: 100, imageHeight: 100, mimeType: 'image/jpeg', data: 'AAAA' }
+        ? { display: 0, frameWidth: 100, frameHeight: 100, x: 0, y: 0, width: 100, height: 100, imageWidth: 100, imageHeight: 100, mimeType: 'image/jpeg', data: 'SHOT' + shots,
+            pointer: { x: 7, y: 8, display: 0 }, front: { title: 'Form', app: 'app', handle: 42 } }
         : request.op === 'cursor' ? { x: 1, y: 2, display: 0 }
         : request.op === 'status' ? { target: null, front: null, cursor: { x: 1, y: 2, display: 0 }, displays: [] }
         : { said: 'Sent.', typed: 5, done: true, released: true, observation: { available: true, refsInvalidated: true } };
@@ -55,8 +57,10 @@ vi.mock("node:child_process", async (load) => {
 });
 
 const services: ComputerService[] = [];
-function service(): ComputerService {
+/** Sharing is on for the chat here: these tests are about the lease, and sharing has its own below. */
+function service(sharing = true): ComputerService {
   const created = new ComputerService();
+  if (sharing) created.setSharing(CHAT, true);
   services.push(created);
   return created;
 }
@@ -278,5 +282,96 @@ describe("pause, handoff and stop", () => {
     expect((await computer.call("studio_computer_screenshot", {}, voice)).isError).toBeUndefined();
     await computer.control({ input: { action: "resume" }, _meta: { "studio/conversation": CHAT } });
     expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel))).toBe("observe_first");
+  });
+});
+
+function image(answer: { content: readonly { readonly type: string; readonly [key: string]: unknown }[] }): unknown {
+  return answer.content.find((block) => block.type === "image")?.["data"];
+}
+
+describe("one shared picture per conversation", () => {
+  it("lets the voice agent see the worker's actual picture, with who took it and the pointer sampled with it", async () => {
+    const computer = service();
+    const shot = await computer.call("studio_computer_screenshot", {}, hazel);
+    // A later pointer read is not paired with the older picture.
+    await computer.call("studio_computer_cursor", {}, hazel);
+    const latest = await computer.call("studio_computer_control", { action: "latest" }, voice);
+    expect(image(latest)).toBe(image(shot));
+    expect(said(latest)).toContain("by Hazel (task voice_hazel)");
+    expect(said(latest)).toContain("pointer was at (7,8) on display 0 when it was taken");
+    expect(said(latest)).toContain("untrusted screen text");
+    expect(latest.structuredContent).toMatchObject({ observation: { pointer: { x: 7, y: 8, display: 0 }, by: { role: "worker", id: "voice_hazel" }, stale: [] } });
+    expect(JSON.stringify(latest.structuredContent)).not.toContain(String(image(shot)));
+  });
+
+  it("says a picture may be stale once someone has acted, and never counts it as the reader's own look", async () => {
+    const computer = service();
+    await computer.call("studio_computer_screenshot", {}, hazel);
+    await computer.call("studio_computer_windows", {}, hazel);
+    const latest = await computer.call("studio_computer_control", { action: "latest" }, voice);
+    expect(latest.structuredContent).toMatchObject({ observation: { stale: ["changed_since"] } });
+    expect(said(latest)).toContain("Take a new screenshot before relying on it");
+    expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, voice))).toBe("observe_first");
+  });
+
+  it("keeps each conversation's picture to itself", async () => {
+    const computer = service();
+    await computer.call("studio_computer_screenshot", {}, hazel);
+    expect(said(await computer.call("studio_computer_control", { action: "latest" }, elsewhere))).toContain("No picture has been taken in this conversation yet");
+  });
+
+  it("keeps pictures for only the most recent conversations", async () => {
+    const computer = service();
+    for (let index = 0; index < 9; index += 1) await computer.call("studio_computer_screenshot", {}, { "studio/conversation": `conv_many_${String(index)}` });
+    expect(said(await computer.call("studio_computer_control", { action: "latest" }, { "studio/conversation": "conv_many_0" }))).toContain("No picture");
+    expect(image(await computer.call("studio_computer_control", { action: "latest" }, { "studio/conversation": "conv_many_8" }))).toBeDefined();
+  });
+
+  it("answers a bounded context snapshot with provenance and freshness, never the bytes", async () => {
+    const computer = service();
+    await computer.call("studio_computer_screenshot", {}, hazel);
+    const context = computer.context(CHAT);
+    expect(context).toMatchObject({ sharing: true, latest: { by: { role: "worker", taskId: "voice_hazel", name: "Hazel" }, pointer: { x: 7, y: 8 }, stale: [] } });
+    const serialized = JSON.stringify(context);
+    expect(serialized).not.toContain("SHOT");
+    expect(serialized.length).toBeLessThan(1_500);
+  });
+});
+
+describe("screen sharing in a voice call", () => {
+  it("refuses the voice agent's looks and actions while sharing is off, sending nothing, and leaves workers alone", async () => {
+    const computer = service(false);
+    const refused = await computer.call("studio_computer_screenshot", {}, voice);
+    expect(refused.isError).toBe(true);
+    expect(said(refused)).toContain("Screen sharing is off");
+    expect(spawned.ops).toEqual([]);
+    expect((await computer.call("studio_computer_control", { action: "status" }, voice)).isError).toBeUndefined();
+    expect(image(await computer.call("studio_computer_screenshot", {}, hazel))).toBeDefined();
+    expect((await computer.call("studio_computer_control", { action: "latest" }, voice)).isError).toBe(true);
+  });
+
+  it("discards a picture that finishes after sharing was turned off, and does not share it", async () => {
+    const computer = service();
+    await computer.call("studio_computer_screenshot", {}, voice);
+    const before = computer.context(CHAT)["latest"];
+    const typing = computer.call("studio_computer_batch", { steps: [{ tool: "type", text: "slow" }] }, voice);
+    await vi.waitFor(() => expect(spawned.ops).toContain("type"));
+    computer.setSharing(CHAT, false);
+    const answer = await typing;
+    expect(image(answer)).toBeUndefined();
+    expect(said(answer)).toContain("its picture was discarded");
+    expect(said(answer)).toContain("Input already sent stays sent");
+    computer.setSharing(CHAT, true);
+    expect(computer.context(CHAT)["latest"]).toEqual(expect.objectContaining({ id: (before as { id: string }).id }));
+  });
+
+  it("keeps the voice agent's tools short and its own", async () => {
+    const computer = service();
+    await computer.call("studio_computer_screenshot", {}, voice);
+    const long = await computer.call("studio_computer_batch", { steps: Array.from({ length: 7 }, () => ({ tool: "key", keys: "a" })) }, voice);
+    expect(said(long)).toContain("at most 6 steps");
+    expect(said(await computer.call("studio_computer_drag", { from: [0, 0], to: [1, 1] }, voice))).toContain("not offered");
+    expect(said(await computer.call("studio_computer_stop", {}, voice))).toContain("not offered");
+    expect(spawned.ops).not.toContain("key");
   });
 });
