@@ -38,6 +38,9 @@ src/
   application/   wiring and the ports the routes take: runtime, brokers, management services
   auth/          sign-in to the Studio account: PKCE against Google, the session in the keychain
   browser/       the browser capability, as an MCP server in its own process
+  computer/      the desktop capability, as an MCP server driving a Windows driver: the one-hand
+                 lease (control), the shared latest picture (observations), the screen watch
+                 between pictures (screen-watch), and marks shown on screen (marks); ADR 0059
   context/       what the model is told: system, title and improve prompts, the capability inventory
   contracts/     shared types and the tables that decide: capabilities, effects, errors, models,
                  providers, conversations, media, and the UUID Studio-owned records carry

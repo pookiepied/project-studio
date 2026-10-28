@@ -49,6 +49,8 @@ number.
 | 10 | Detached browser address/frame reads — `features/browser/useLiveBrowser.ts` | five retries for unavailable addresses or transport failures, delays 500ms through 2500ms; success resets the budget; refused/malformed replies end recovery | viewer-local bounded schedule | Yes — Reconnecting, then the precise failure with Reconnect; input is never replayed |
 | 11 | Voice/task coordination — Flue durable tool steps | No application retry loop. A worker uses one attempt; an indexed start is never automatically resent. Steering retains a UUID admission key in a preceding durable step so recovery cannot duplicate that correction. HTTP steering has no automatic retry. | Flue durable steps and dispatch idempotency | Yes — admission, unavailable/settled state and cancellation request are distinct from actual execution/settlement |
 
+| 12 | Desktop controls, glance and screen pulse — `src/computer/service.ts`, `features/screen/` (ADR 0059) | none. A pause, resume, show-me, stop, glance or drawing that did not arrive is shown as not arrived, and pressing again is the person's. The pulse is periodic sampling, not a retry: a sample is skipped while a call runs, and three failed samples in a row stop the watch, which the next turn reads as "live pointer updates are unavailable" | — | Yes — every control answers what the lease said; a stop answers one of four outcomes and none is rounded up |
+
 Corrections the code forced on the working version of this table:
 
 - Row 1 stopped being one number in Task 30, and the split of labour is the

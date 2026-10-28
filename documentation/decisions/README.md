@@ -106,6 +106,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0053](0053-dictation-is-live-by-segments.md) | Dictation is live by segments, on the transcribers that exist — the take cut at its pauses, text in speaking order, Improve offered afterwards and undoable |
 | [0054](0054-the-microphone-is-studio-s-to-grant.md) | The microphone is Studio's to grant — WebView2's permission question answered by the app on every webview; no stall, no borrowed prompt |
 | [0055](0055-the-desktop-is-driven-by-what-windows-already-has.md) | The desktop is driven by what Windows already has — the computer server, and the rule that it never acts on a window it did not open, focus, read or click |
+| [0059](0059-the-desktop-has-one-hand.md) | The desktop has one hand — a lease per actor, the person's controls with no model between, sharing as the person's switch, events between pictures, and pointing both ways on the real screen |
 
 ### Skills
 | | |

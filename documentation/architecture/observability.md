@@ -365,6 +365,22 @@ conversations still has no desktop-wide arbitration in this driver.
 click dispatch with native input replaced by doubles; `computer-observation.test.ts`
 covers delivery failures, identity propagation, serialization and cancellation.
 
+Desktop control, screen sharing and pointing (ADR 0059) add no new identity
+kind. The lease keys an actor by conversation and Flue instance id, both
+existing; the shared picture keeps the driver's product observation UUID; a
+mark set and a glance's picture take new Studio UUIDs from `contracts/uuid.ts`
+and are product ids, not execution ids. Every person control is its own
+observed operation under the HTTP execution parent (listed in the standard
+path above) with fixed stage names; none is retried. What is on the screen -
+pictures, titles, pointer positions, drawn shapes, mark labels - is tool-result
+or signal content under existing gated capture, never an attribute. Settlement
+releases are observed and never fail the settlement. Unsupported and stated:
+the overlay's paint, the driver pulse's timing, sampled-input completeness
+between pulses, and whether a mark was seen. `computer-lease.test.ts`,
+`computer-control-wiring.test.ts`, `screen-watch.test.ts`, `computer-marks.test.ts`
+and the client `screen`/`voice` suites cover refusal, fencing, privacy and the
+person-visible outcomes.
+
 Image read disclosures reuse native `read` results and their existing tool-call
 and conversation identities. Only returned PNG/JPEG/GIF/WebP image blocks earn
 a viewed-image row; text reads and refused/pending reads retain their existing
@@ -432,6 +448,27 @@ UUID remains the product observation identity; activity counts are not
 execution/event IDs. Session-local accumulation keeps reports from internal
 cursor/screenshot requests with their originating tool and preserves the actual
 result or refusal. Unsupported monitoring/state is explicit.
+
+Since ADR 0059 the lease is per actor, not per conversation: the actor is the
+Flue instance id the harness puts in a system server's `_meta`, never a model
+argument, and it is coordination, not a permission grant. The person's controls
+reach the server through admitted conversation routes and the private
+`studio/computer` RPC with no model between: `computer.control` (pause, resume,
+show-me, state; result and held-input outcome as attributes), `computer.stop`
+(stage `cleanup_confirmed`/`cleanup_unconfirmed`/`not_running`/`unavailable`,
+never rounded up), `computer.sharing` (`on`/`off`), `computer.glance`
+(`glanced`/`current`/`sharing_off`/`failed`/`not_running`), `computer.drew`
+(shape counts only), `computer.checkpoint` (`fenced`/`not_owner`/`not_running`)
+and `computer.release`; settlement releases an actor under `computer.release`.
+Only sharing on starts the server; every other control answers `not_running`
+rather than starting one. Screen pictures, window titles, drawn shapes and
+pointer positions stay in tool results and the turn's `interaction_context`
+signal, under the existing gated MCP capture, never in attributes. The screen
+pulse (twice a second, sharing only) is product sampling, not a diagnostic
+recording, and is not observed per sample. The native `screen_overlay_*`
+commands record arrival under the fixed allowlist; the overlay's own state and
+idle reads are excluded as housekeeping. The voice signal's
+`heard_before_interrupt` and `control` attributes are conversation content.
 
 The browser's existing private admitted interaction route also accepts bounded
 viewer-presence samples without claiming control or injecting page input. Browser
