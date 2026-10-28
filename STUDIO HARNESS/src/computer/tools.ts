@@ -1,14 +1,16 @@
 import { ComputerError } from "./errors.js";
 import type { ComputerSession } from "./session.js";
+import { refusalMessage, type Actor, type DesktopControl, type DesktopState } from "./control.js";
 import { AFTER_ACTION_SIDE_PX, SCREENSHOT_MAX_BYTES, SCREENSHOT_SIDE_PX } from "../contracts/media-limits.js";
 
 /**
  * The tools, as the model sees them.
  *
- * Twenty-seven, named `studio_computer_*`, and each one earns its schema with
+ * Twenty-eight, named `studio_computer_*`, and each one earns its schema with
  * a job the capability exists for: see what is on screen, point and click,
  * type, find and drive windows, read a window's controls and act on them by
- * reference, and read or write the clipboard. The list a person handed over
+ * reference, read or write the clipboard, and take or give back the one
+ * desktop (`control`, ADR 0059). The list a person handed over
  * as "the common pattern" had thirty; the difference is folding (ADR 0013,
  * one tool per capability): five kinds of click are one `click` with a
  * button and a count, two mouse-button tools are one, two clipboard tools
@@ -32,11 +34,18 @@ export interface ToolAnswer {
   readonly structuredContent?: Record<string, unknown>;
 }
 
+/** Who is calling and the lease they call under; only the control tool reads it. */
+export interface ToolContext {
+  readonly actor: Actor;
+  readonly desktop: DesktopControl;
+  readonly signal?: AbortSignal | undefined;
+}
+
 export interface ToolDefinition {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: Record<string, unknown>;
-  readonly run: (session: ComputerSession, input: Record<string, unknown>) => Promise<ToolAnswer>;
+  readonly run: (session: ComputerSession, input: Record<string, unknown>, context?: ToolContext) => Promise<ToolAnswer>;
 }
 
 function object(
@@ -972,6 +981,42 @@ export const TOOLS: readonly ToolDefinition[] = [
   },
 
   {
+    name: "studio_computer_control",
+    description:
+      "Who has the desktop, and taking or giving it back. One actor at a time may send input: this conversation's own agent, " +
+      "one of its tasks, or another conversation. Looking (screenshot, status, zoom, cursor, windows) is open to every actor; input is the owner's. " +
+      "status: the mode (active, paused, demonstrating, stopping), the owner, and whether you have looked since the screen last may have changed. " +
+      "acquire: take a free desktop without sending anything; after a pause it hands a paused task's desktop to the agent the person is talking to. " +
+      "release: give the desktop back when your desktop work is done, letting go of anything Studio holds. " +
+      "wait: while paused or while the person shows something, wait up to 20 seconds for that to change, then read status again. " +
+      "Holding the desktop is not permission: each action is still approved on its own. A refusal means no input was sent; " +
+      "never route the same input through another tool or a delegate to get around it.",
+    inputSchema: object({ action: { type: "string", enum: ["status", "acquire", "release", "wait"] } }, ["action"]),
+    run: async (session, input, context) => {
+      if (context === undefined) throw new ComputerError("internal", { message: "Desktop control was called without its lease." });
+      const { actor, desktop } = context;
+      const action = required(input, "action");
+      if (action === "wait") await desktop.waitForChange(20_000, context.signal);
+      else if (action === "acquire") {
+        // A paused owner of this conversation hands over only to the agent the person talks to.
+        const taken = actor.role === "worker" ? "not_paused" : desktop.takeOver(session, actor);
+        const result = taken === "acquired" ? "acquired" : desktop.acquire(session, actor);
+        if (result !== "acquired" && result !== "already") {
+          const state = { ...desktop.state(actor), refused: result };
+          return { isError: true, content: [text(refusalMessage(state))], structuredContent: { desktop: state } };
+        }
+      } else if (action === "release") {
+        if (desktop.release(actor) && session.running) {
+          // Let go of a button or key Studio still holds; failing to is said, not hidden.
+          try { await session.request("release_held"); }
+          catch { return controlAnswer(desktop.state(actor), "Released the desktop, but releasing held input was not confirmed. Look at the screen before assuming nothing is still pressed."); }
+        }
+      } else if (action !== "status") throw new ComputerError("bad_input", { message: "action must be status, acquire, release or wait." });
+      return controlAnswer(desktop.state(actor));
+    },
+  },
+
+  {
     name: "studio_computer_stop",
     description:
       "Stop new computer input for this conversation. Let the active call finish within its deadline, then release held input and close the driver. " +
@@ -987,6 +1032,27 @@ export const TOOLS: readonly ToolDefinition[] = [
     },
   },
 ];
+
+/** The lease as words and as structure, so a caller never infers ownership from prose. */
+export function describeDesktop(state: DesktopState): string {
+  const owner = state.owner === null ? "Nobody has the desktop."
+    : state.owner.self ? "You have the desktop."
+    : !state.owner.sameConversation ? "Another conversation has the desktop."
+    : state.owner.role === "worker" ? `${state.owner.name ?? "A task"}${state.owner.taskId === undefined ? "" : ` (task ${state.owner.taskId})`} has the desktop.`
+    : "This conversation's own agent has the desktop.";
+  const mode = {
+    active: "",
+    paused: " Computer work is paused by the person.",
+    demonstrating: " The person is showing something; automation is held back.",
+    stopping: " Computer control is stopping; cleanup is not yet confirmed.",
+  }[state.mode];
+  const look = state.fresh ? " Your last look is current." : " Look at the screen before any input: it may have changed since your last look.";
+  return `${owner}${mode}${look}`;
+}
+
+function controlAnswer(state: DesktopState, note?: string): ToolAnswer {
+  return { content: [text(note === undefined ? describeDesktop(state) : `${describeDesktop(state)} ${note}`)], structuredContent: { desktop: state } };
+}
 
 export function toolByName(name: string): ToolDefinition | undefined {
   return TOOLS.find((tool) => tool.name === name);

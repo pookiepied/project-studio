@@ -12,6 +12,31 @@ only; no words, audio or levels. Baselines on this container: harness 2,618
 passed, 10 failed for environment reasons (listed in the plan), 62 skipped;
 client 1,666 passed.
 
+Stage 2, the desktop lease (ADR 0059). `computer/control.ts` now keys
+ownership by actor (conversation plus agent instance; a delegate rides its
+starter's instance), with a generation per ownership interval, per-actor
+revocations that refuse calls queued before a loss, and a change counter that
+makes an actor look before input after anyone else's input, a mode change or
+the person's own clicks and keys. Every driver request inside a call rechecks
+the lease, so a batch stops between steps. Observations are admitted for any
+actor and no longer wait behind another conversation's work. A tool error now
+fences only its own actor's queued calls. New: `studio_computer_control`
+(status, acquire, release, wait), driver op `release_held`, the private
+`studio/computer` method (state, pause, demonstrate, resume, release_actor),
+`POST /api/conversations/:id/computer/control`, and release on settlement
+(a worker's original submission, or any run of the conversation's own agent).
+Operations: `computer.control` (attribute `action`; progress event
+`computer.control.result` with `stage`, `result`, `heldInput`,
+`inFlightUncertain`), `computer.stop` (progress `computer.stop.result`:
+`cleanup_confirmed`, `cleanup_unconfirmed`, `not_running`, `unavailable`) and
+`computer.release` (attribute `agentInstanceId`); all inherit the HTTP or
+runtime execution parent and carry no screen, window or task content. The
+actor reaches only system servers, in `_meta`, never third-party ones. No
+retry is added: a refused or uncertain input is reported, never resent.
+Coverage: `computer-lease.test.ts` (driver stand-in through the real session),
+`computer-control-wiring.test.ts`, updated `computer-activity`, `computer-batch`
+and `computer-server` tests.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in

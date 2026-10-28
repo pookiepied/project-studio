@@ -1,4 +1,5 @@
 import { StudioError } from "../contracts/errors.js";
+import type { DesktopState } from "./control.js";
 
 /**
  * What can go wrong driving a desktop, in the vocabulary a caller can act on.
@@ -21,6 +22,12 @@ export type ComputerFailure =
   | "no_element"
   /** Windows refused the input, almost always an elevated window. */
   | "refused"
+  /**
+   * The desktop lease refused it: another actor holds the desktop, the
+   * person paused it, or the caller has not looked since the screen changed.
+   * Coordination, not permission - the kernel already allowed the call.
+   */
+  | "control"
   /** A mistake in our own wiring, not something anyone can act on. */
   | "internal";
 
@@ -30,18 +37,22 @@ const MESSAGE_BY_FAILURE: Record<ComputerFailure, string> = {
   bad_input: "That call did not say what to act on.",
   no_element: "That element is not on screen.",
   refused: "Windows refused that input.",
+  control: "Desktop control refused that input; nothing was sent.",
   internal: "Something is wired incorrectly inside Project Studio's computer use.",
 };
 
 export class ComputerError extends StudioError {
   readonly domain = "computer" as const;
   declare readonly kind: ComputerFailure;
+  /** The lease's view for the refused caller, answered as structured content. */
+  readonly desktop: DesktopState | undefined;
 
-  constructor(kind: ComputerFailure, options: { message?: string } = {}) {
+  constructor(kind: ComputerFailure, options: { message?: string; desktop?: DesktopState } = {}) {
     // Nothing here is worth retrying unchanged: a driver that died is
     // relaunched by the next call on its own, and every other failure needs
     // a different call, not the same one again.
     super(kind, options.message ?? MESSAGE_BY_FAILURE[kind], { retryable: false });
     this.name = "ComputerError";
+    this.desktop = options.desktop;
   }
 }

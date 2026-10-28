@@ -53,6 +53,8 @@ export interface StdioServerOptions {
   readonly finish: () => Promise<void>;
   /** Studio-owned UI RPCs, separate from the model's discoverable tools. */
   readonly control?: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+  /** The one method name `control` answers; each server owns its own. Default `studio/browser`. */
+  readonly controlMethod?: string;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -157,11 +159,11 @@ async function handle(options: StdioServerOptions, message: Record<string, unkno
     }
 
     default: {
-      if (!isNotification && method === "studio/browser" && options.control !== undefined) {
+      if (!isNotification && method === (options.controlMethod ?? "studio/browser") && options.control !== undefined) {
         try {
           reply(id, await options.control(method, params));
         } catch (error) {
-          fail(id, -32602, error instanceof Error ? error.message : "The browser request failed.");
+          fail(id, -32602, error instanceof Error ? error.message : "The control request failed.");
         }
         return;
       }

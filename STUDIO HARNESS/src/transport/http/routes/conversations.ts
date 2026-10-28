@@ -110,6 +110,8 @@ export interface ConversationRoutesOptions {
    */
   readonly computer?: {
     stop(conversationId: string): Promise<boolean>;
+    /** Pause, resume, show-me and state: the person's own controls over the desktop lease (ADR 0059). */
+    control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
   };
 }
 
@@ -377,6 +379,22 @@ export function createConversationRoutes(
   routes.post("/:id/computer/stop", async (context) => {
     const stopped = (await options.computer?.stop(context.req.param("id"))) ?? false;
     return context.json({ stopped });
+  });
+
+  // A button press, never a model's decision, so no language model sits
+  // between the person and the fence. Inputs are not retried: a pause that
+  // did not arrive is shown as not arrived, and pressing again is the person's.
+  routes.post("/:id/computer/control", async (context) => {
+    context.header("Cache-Control", "no-store");
+    const id = context.req.param("id");
+    if (store.get(id) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
+    const parsed = v.safeParse(v.object({ action: v.picklist(["state", "pause", "resume", "demonstrate"]) }), await body(context));
+    if (!parsed.success) {
+      const error = invalidBody("The desktop control must be state, pause, resume or demonstrate.");
+      return context.json(failure(error), statusOf(error));
+    }
+    if (options.computer?.control === undefined) return context.json({ error: { message: "Desktop control is unavailable." } }, 503);
+    return context.json(await options.computer.control(id, parsed.output.action));
   });
 
   routes.post("/", async (context) => {

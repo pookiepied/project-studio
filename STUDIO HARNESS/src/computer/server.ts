@@ -1,8 +1,6 @@
-import { conversationKey, serveStdio } from "../serve/stdio.js";
-import { ComputerError } from "./errors.js";
-import { ComputerSession } from "./session.js";
+import { serveStdio } from "../serve/stdio.js";
+import { ComputerService } from "./service.js";
 import { definitions, toolByName } from "./tools.js";
-import { DesktopControl } from "./control.js";
 
 /**
  * The computer-use capability, as an MCP server in its own process.
@@ -15,46 +13,24 @@ import { DesktopControl } from "./control.js";
  * **Nothing here starts a driver.** Connecting, discovering and listing all
  * happen with no PowerShell anywhere; the first `tools/call` is what costs
  * something.
- */
-
-/**
- * One driver per conversation, when the caller says which conversation.
  *
- * The refs `read_ui` hands out live in the driver's memory, so two
- * conversations on one driver would see each other's `ui_12`. Studio's own
- * client sends the conversation in `_meta`; any other caller shares one.
+ * One driver per conversation, when the caller says which conversation: the
+ * refs `read_ui` hands out live in the driver's memory, so two conversations
+ * on one driver would see each other's `ui_12`. Studio's own client sends the
+ * conversation, and the acting agent, in `_meta`; any other caller shares one.
+ * One desktop lease over all of them (`control.ts`).
  */
-const sessions = new Map<string, ComputerSession>();
-const desktop = new DesktopControl();
-
-function sessionFor(meta: unknown): ComputerSession {
-  const key = conversationKey(meta);
-  const existing = sessions.get(key);
-  if (existing !== undefined) return existing;
-  const created = new ComputerSession(key);
-  sessions.set(key, created);
-  return created;
-}
+const service = new ComputerService();
 
 serveStdio({
   info: { name: "studio-computer", version: "1.0.0" },
   definitions,
   has: (name) => toolByName(name) !== undefined,
-  call: async (name, args, meta) => {
-    const tool = toolByName(name);
-    // Unreachable through `serveStdio`, which asks `has` first; kept as a
-    // typed refusal so the taxonomy holds even for the impossible branch.
-    if (tool === undefined) throw new ComputerError("bad_input", { message: `There is no tool called "${name}".` });
-    const session = sessionFor(meta);
-    // Stop bypasses the queue so cancellation invalidates queued input.
-    return name === "studio_computer_stop"
-      ? tool.run(session, args)
-      : session.runTool(() => desktop.run(session, name, () => tool.run(session, args)));
-  },
+  call: (name, args, meta) => service.call(name, args, meta),
+  controlMethod: "studio/computer",
+  control: (_method, params) => service.control(params),
   // A driver with nobody to answer to is a PowerShell doing nothing, and one
   // that dies mid-hold leaves a key held. Closing before exit is what keeps
   // both out of the person's way after Studio quits.
-  finish: async () => {
-    await Promise.all([...sessions.values()].map((session) => session.close()));
-  },
+  finish: () => service.finish(),
 });

@@ -12,7 +12,7 @@ import { definitions, TOOLS, toolByName } from "../../src/computer/tools.js";
 /**
  * The computer-use capability, tested at the seams that can break silently.
  *
- * **The surface**: twenty-seven tools, folded the way ADR 0013 folds, each
+ * **The surface**: twenty-eight tools, folded the way ADR 0013 folds, each
  * one described because the schema is the manual.
  *
  * **The wire**, driven as a real process over real stdio, because what the
@@ -35,7 +35,9 @@ describe("the tool surface", () => {
   it("is the set that was designed, named as Studio's own", () => {
     for (const tool of TOOLS) expect(tool.name.startsWith("studio_computer_")).toBe(true);
     expect(new Set(TOOLS.map((tool) => tool.name)).size).toBe(TOOLS.length);
-    expect(TOOLS).toHaveLength(27);
+    // 27 until desktop control (ADR 0059) added `control`: the lease is a
+    // capability a model must be able to read and hand back.
+    expect(TOOLS).toHaveLength(28);
   });
 
   it("covers the jobs the capability exists for", () => {
@@ -263,14 +265,31 @@ describe.skipIf(!existsSync(BUNDLE))("the server on the wire", () => {
     expect(text).toBe("Computer control was not running.");
   });
 
+  // An input tool's bad arguments are now answered after the desktop lease
+  // (ADR 0059), which refuses a caller that has not looked - also as a tool
+  // result, also before any driver. An observation tool still meets its own
+  // validation first, and click's count rule is pinned on the tool below.
   it("refuses bad input as a tool result before any driver exists", async () => {
     const result = await call("tools/call", {
-      name: "studio_computer_click",
-      arguments: { x: 1, y: 1, count: 7 },
+      name: "studio_computer_zoom",
+      arguments: { region: [1] },
     });
     const answer = result["result"] as { isError?: boolean; content: { text?: string }[] };
     expect(answer.isError).toBe(true);
-    expect(answer.content[0]?.text).toContain("count must be 1, 2 or 3");
+    expect(answer.content[0]?.text).toContain("Give region as [left, top, right, bottom]");
+    const blind = await call("tools/call", { name: "studio_computer_click", arguments: { x: 1, y: 1, count: 7 } });
+    const refused = blind["result"] as { isError?: boolean; content: { text?: string }[] };
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.text).toContain("No input was sent");
+  });
+
+  it("refuses a click count it cannot send, before asking the driver", async () => {
+    const click = toolByName("studio_computer_click");
+    if (click === undefined) throw new Error("click is missing");
+    const asked: string[] = [];
+    const session = { request: async (op: string) => { asked.push(op); return {}; } } as unknown as ComputerSession;
+    await expect(click.run(session, { x: 1, y: 1, count: 7 })).rejects.toThrow("count must be 1, 2 or 3");
+    expect(asked).toEqual([]);
   });
 
   it("answers a tool that does not exist without dying", async () => {

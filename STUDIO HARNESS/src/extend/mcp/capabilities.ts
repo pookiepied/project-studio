@@ -27,6 +27,31 @@ export interface McpCapabilityCatalogOptions {
    * not once at registration.
    */
   readonly isServerEnabled?: (serverId: string, conversationId: string) => boolean;
+  /**
+   * Who inside the conversation is calling, for Studio's own servers only:
+   * the computer server's desktop lease tells the voice agent, a worker and
+   * a second worker of one chat apart by it (ADR 0059). Read at call time
+   * from the harness's own execution context, never from a model argument.
+   */
+  readonly actorMeta?: (scope: ExecutionScope) => Readonly<Record<string, string>>;
+}
+
+/**
+ * The actor `_meta` for one system-server call. The agent instance is the
+ * actor - a delegate rides its starter's instance (ADR 0058 §3) - and a
+ * worker is any instance other than the conversation's own.
+ */
+export function systemActorMeta(
+  scope: ExecutionScope,
+  instanceId: string | undefined,
+  taskName: (instanceId: string) => string | undefined,
+): Readonly<Record<string, string>> {
+  const actor = instanceId === undefined || instanceId === "" ? scope.conversationId : instanceId;
+  if (actor === scope.conversationId) {
+    return { "studio/actor": actor, "studio/role": scope.agentId === "voice" ? "voice" : "conversation" };
+  }
+  const name = taskName(actor);
+  return { "studio/actor": actor, "studio/role": "worker", ...(name === undefined ? {} : { "studio/actor-name": name }) };
 }
 
 interface McpToolEntry {
@@ -213,6 +238,7 @@ function createTool(
   entry: McpToolEntry,
   connection: McpCapabilityConnection,
   available: (scope: ExecutionScope) => boolean,
+  actorMeta: (scope: ExecutionScope) => Readonly<Record<string, string>>,
 ): McpTool {
   return defineStudioTool({
     descriptor: descriptor(record, entry),
@@ -245,7 +271,7 @@ function createTool(
             // any use for it, and one that started keying behaviour on it
             // would be tracking a person across their work.
             ...(record.provenance === "system"
-              ? { _meta: { "studio/conversation": context.scope.conversationId } }
+              ? { _meta: { ...actorMeta(context.scope), "studio/conversation": context.scope.conversationId } }
               : {}),
           },
           context.signal,
@@ -259,6 +285,7 @@ function createTool(
 export class McpCapabilityCatalog {
   readonly #diagnostic: (message: string, serverId: string) => void;
   readonly #isServerEnabled: (serverId: string, conversationId: string) => boolean;
+  readonly #actorMeta: (scope: ExecutionScope) => Readonly<Record<string, string>>;
   readonly #tools = new Map<string, readonly McpTool[]>();
   readonly #availableNames = new Map<string, ReadonlySet<string>>();
   readonly #connections = new Map<string, McpCapabilityConnection>();
@@ -267,6 +294,7 @@ export class McpCapabilityCatalog {
   constructor(options: McpCapabilityCatalogOptions = {}) {
     this.#diagnostic = options.diagnostic ?? (() => undefined);
     this.#isServerEnabled = options.isServerEnabled ?? (() => true);
+    this.#actorMeta = options.actorMeta ?? (() => ({}));
   }
 
   async refresh(
@@ -300,7 +328,7 @@ export class McpCapabilityCatalog {
           this.#connections.get(record.id) === connection &&
           this.#isServerEnabled(record.id, scope.conversationId) &&
           this.#availableNames.get(record.id)?.has(entry.name) === true,
-        ),
+        this.#actorMeta),
       );
     }
 

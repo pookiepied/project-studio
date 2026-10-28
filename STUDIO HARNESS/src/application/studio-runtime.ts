@@ -27,14 +27,14 @@ import { ExtendError } from "../extend/errors.js";
 import type { BrowserInteraction } from "../browser/interaction.js";
 import { BrowserError } from "../browser/errors.js";
 import { observeOperation } from "../observability/operation.js";
-import { recordObservation } from "../observability/recorder.js";
+import { createObservationWriter, recordObservation } from "../observability/recorder.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
 import {
   CapabilityInventory,
   type CapabilityInventoryEntry,
 } from "../context/capability-inventory.js";
-import { McpCapabilityCatalog } from "../extend/mcp/capabilities.js";
+import { McpCapabilityCatalog, systemActorMeta } from "../extend/mcp/capabilities.js";
 import type { McpTool } from "../extend/mcp/capabilities.js";
 import { BROWSER_SERVER_ID, COMPUTER_SERVER_ID, registerBuiltInServers } from "../extend/mcp/builtin.js";
 import { createMcpLauncher } from "../extend/mcp/launcher.js";
@@ -117,8 +117,9 @@ import type { LibraryStore } from "../library/store.js";
 import { ConversationStore } from "../conversations/store.js";
 import { VoiceSettings } from "../gateway/language/voice-settings.js";
 import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
-import { init } from "@flue/runtime";
+import { init, observe } from "@flue/runtime";
 import { steerTask } from "../agents/task-control.js";
+import { STUDIO_AGENT_ID } from "../contracts/agents.js";
 import { voiceImagePath } from "../conversations/voice-policy.js";
 import { ProviderConfigurationError } from "../contracts/models.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
@@ -137,6 +138,30 @@ function voiceTaskBody(context: string | undefined, source: string): string {
     "Original user transcription follows verbatim. Preserve its constraints; clarify ambiguity rather than guessing:",
     source].join("\n\n");
 }
+
+/**
+ * Which desktop actor a settlement frees, if any: a voice worker when its
+ * original submission settles (a steer's receipt is not the worker ending),
+ * or the conversation's own agent when any of its runs settles.
+ */
+export function desktopReleaseFor(
+  observation: FlueObservation,
+  taskOf: (instanceId: string) => { readonly agentName: string; readonly parentConversationId: string | undefined; readonly originSubmissionId?: string | undefined } | undefined,
+): { readonly conversationId: string; readonly actor: string } | undefined {
+  if (observation.type !== "submission_settled") return undefined;
+  const instanceId = observation.instanceId;
+  if (typeof instanceId !== "string" || instanceId === "") return undefined;
+  const task = taskOf(instanceId);
+  if (task !== undefined) {
+    if (task.agentName !== "voice-work" || task.parentConversationId === undefined) return undefined;
+    if (task.originSubmissionId !== undefined && task.originSubmissionId !== observation.submissionId) return undefined;
+    return { conversationId: task.parentConversationId, actor: instanceId };
+  }
+  return observation.agentName === STUDIO_AGENT_ID ? { conversationId: instanceId, actor: instanceId } : undefined;
+}
+
+/** The person's desktop controls, as the computer server's lease names them. */
+export type ComputerControlAction = "state" | "pause" | "resume" | "demonstrate";
 
 export interface StudioRuntimeOptions {
   /**
@@ -839,6 +864,7 @@ export class StudioRuntime implements AgentHost {
    * dispatch) and stopped in `stop()`.
    */
   readonly #taskProjector: TaskProjector;
+  #unsubscribeDesktop: (() => void) | undefined;
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -903,6 +929,8 @@ export class StudioRuntime implements AgentHost {
         this.#selection
           .resolve("mcp", serverId, this.#enablementContext(conversationId))
           .enabled,
+      actorMeta: (scope) => systemActorMeta(scope, currentExecutionContext()?.flueInstanceId,
+        (instanceId) => this.#tasks.get(instanceId)?.title),
     });
     this.#supervisor = new McpSupervisor({
       launch: createMcpLauncher({
@@ -1059,6 +1087,15 @@ export class StudioRuntime implements AgentHost {
         : { subscribe: options.subscribeTaskSettlements }),
     });
     this.#taskProjector.start();
+    // A finished run gives the desktop back (ADR 0059): otherwise the voice
+    // agent's one click would hold a worker of the same chat off the mouse
+    // until the driver idled out. A worker is finished only when its original
+    // submission settles - a steer's receipt settling is not the worker ending.
+    const subscribe = options.subscribeTaskSettlements ?? ((handler: (observation: FlueObservation) => void) => observe(handler));
+    this.#unsubscribeDesktop = subscribe((observation) => {
+      const release = desktopReleaseFor(observation, (id) => this.#tasks.get(id));
+      if (release !== undefined) void this.#releaseDesktopActor(release.conversationId, release.actor);
+    });
   }
 
   /** The MCP administration surface, for the HTTP layer. */
@@ -1761,8 +1798,52 @@ export class StudioRuntime implements AgentHost {
    * ends. Answers whether a driver was running.
    */
   async stopComputer(conversationId: string): Promise<boolean> {
-    const text = await this.#askSystemServer(COMPUTER_SERVER_ID, "studio_computer_stop", conversationId);
-    return text.includes("has stopped");
+    return observeOperation("mcp", "computer.stop", async () => {
+      const record = createObservationWriter();
+      const text = await this.#askSystemServer(COMPUTER_SERVER_ID, "studio_computer_stop", conversationId);
+      // A requested stop, a confirmed one and an unconfirmed one are three
+      // different facts; the driver's exit is what separates the last two.
+      const result = text.includes("has stopped") ? "cleanup_confirmed"
+        : text.includes("not confirmed") ? "cleanup_unconfirmed"
+        : text.includes("was not running") ? "not_running" : "unavailable";
+      record({ name: "computer.stop.result", phase: "progress", attributes: { stage: result } });
+      return result === "cleanup_confirmed";
+    }, { stage: "stop_requested" }, conversationId);
+  }
+
+  /**
+   * The person's desktop controls - pause, resume, show-me, state - straight
+   * to the computer server's lease, with no model in the way (ADR 0059). A
+   * server that is not running has no lease to change; asking never starts one.
+   */
+  async controlComputer(conversationId: string, action: ComputerControlAction): Promise<unknown> {
+    return observeOperation("mcp", "computer.control", async () => {
+      const record = createObservationWriter();
+      const answer = await this.#computerRpc(conversationId, { action });
+      const outcome = isRecord(answer) && typeof answer["result"] === "string" ? answer["result"] : answer === undefined ? "not_running" : "answered";
+      // Operational facts only: the action, what the lease said, and whether
+      // held input was let go. No window, screen or task content.
+      record({ name: "computer.control.result", phase: "progress", attributes: {
+        stage: action, result: outcome,
+        ...(isRecord(answer) && typeof answer["heldInput"] === "string" ? { heldInput: answer["heldInput"] } : {}),
+        ...(isRecord(answer) && typeof answer["inFlightUncertain"] === "boolean" ? { inFlightUncertain: answer["inFlightUncertain"] } : {}),
+      } });
+      return answer ?? { result: "not_running" };
+    }, { action }, conversationId);
+  }
+
+  /** A settled actor gives the desktop back, and anything it still held. */
+  async #releaseDesktopActor(conversationId: string, actor: string): Promise<void> {
+    await observeOperation("mcp", "computer.release", async () => {
+      await this.#computerRpc(conversationId, { action: "release_actor", actor });
+    }, { agentInstanceId: actor }, conversationId).catch(() => undefined);
+  }
+
+  async #computerRpc(conversationId: string, input: Record<string, unknown>): Promise<unknown> {
+    const record = this.#registry.get(COMPUTER_SERVER_ID);
+    if (record?.provenance !== "system" || this.#supervisor.status(record.id)?.state !== "ready") return undefined;
+    const connection = await this.#supervisor.ensure(record);
+    return connection.request("studio/computer", { input, _meta: { "studio/conversation": conversationId } });
   }
 
   /**
@@ -2530,6 +2611,8 @@ export class StudioRuntime implements AgentHost {
     // Before the work below, so a settlement arriving during the drain
     // writes a row but announces nothing to a runtime already going quiet.
     this.#taskProjector.stop();
+    this.#unsubscribeDesktop?.();
+    this.#unsubscribeDesktop = undefined;
     // Before the supervisor, because these are the children nothing else
     // knows about: a dev server the model started still holding port 3000
     // after Studio has closed is a process the person never started and

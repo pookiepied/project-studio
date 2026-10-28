@@ -68,31 +68,44 @@ describe("shared desktop ownership", () => {
   it("refuses another conversation's input until the owner's driver ends", async () => {
     const control = new DesktopControl();
     const first = new RunningSession("first"); const second = new RunningSession("second");
+    await control.run(first, "studio_computer_screenshot", async () => "looked");
     await control.run(first, "studio_computer_click", async () => "first");
     let sent = false;
     await expect(control.run(second, "studio_computer_type", async () => { sent = true; })).rejects.toThrow("Another conversation");
     expect(sent).toBe(false);
     expect(await control.run(second, "studio_computer_status", async () => "observed")).toBe("observed");
     first.active = false;
+    // The first conversation's click came after that status, so the second
+    // must look again before typing into whatever is there now.
+    await expect(control.run(second, "studio_computer_type", async () => "second")).rejects.toThrow("Take a screenshot");
+    await control.run(second, "studio_computer_screenshot", async () => "looked");
     expect(await control.run(second, "studio_computer_type", async () => "second")).toBe("second");
   });
-  it("serializes observations across conversations without cancelling the active owner's work", async () => {
+  // Until ADR 0059 every desktop tool of every conversation shared one queue,
+  // so a picture in one chat waited out another chat's whole batch. Separate
+  // conversations have separate drivers, and input is refused to all but the
+  // owner anyway; an observation has nothing to wait for.
+  it("does not hold another conversation's observation behind the owner's input", async () => {
     const control = new DesktopControl(); const current = new RunningSession("first");
+    await control.run(current, "studio_computer_screenshot", async () => undefined);
     let release = () => {};
     const barrier = new Promise<void>((resolve) => { release = resolve; });
     const order: string[] = [];
     const first = control.run(current, "studio_computer_click", async () => { order.push("input"); await barrier; order.push("observed"); });
     const second = control.run(new RunningSession("second"), "studio_computer_screenshot", async () => { order.push("picture"); });
-    await Promise.resolve(); expect(order).toEqual(["input"]);
-    release(); await Promise.all([first, second]); expect(order).toEqual(["input", "observed", "picture"]);
+    await second; expect(order).toEqual(["input", "picture"]);
+    release(); await first; expect(order).toEqual(["input", "picture", "observed"]);
   });
   it("retains ownership until release finishes and invalidates queued input when stopped", async () => {
     const control = new DesktopControl(); const owner = new RunningSession("owner");
     const other = new RunningSession("other");
+    await control.run(owner, "studio_computer_screenshot", async () => undefined);
     await control.run(owner, "studio_computer_click", async () => {});
     owner.active = false; owner.cleaning = true;
     await expect(control.run(other, "studio_computer_click", async () => {})).rejects.toThrow("Another conversation");
     owner.cleaning = false;
+    // Its driver ended, so it lost the desktop and looks again like anyone.
+    await control.run(owner, "studio_computer_screenshot", async () => undefined);
     let release = () => {};
     const barrier = new Promise<void>((resolve) => { release = resolve; });
     const first = owner.runTool(() => control.run(owner, "studio_computer_click", async () => { await barrier; return { content: [] }; }));

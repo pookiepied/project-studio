@@ -176,7 +176,10 @@ export interface CreateHttpAppOptions {
     interact?(conversationId: string, input: import("../../browser/interaction.js").BrowserInteraction): Promise<unknown>;
   };
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
-  readonly computer?: { stop(conversationId: string): Promise<boolean> };
+  readonly computer?: {
+    stop(conversationId: string): Promise<boolean>;
+    control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
+  };
   /**
    * The application database. The conversation routes own the purge of
    * conversation-scoped rows through it; everything else keeps reaching only

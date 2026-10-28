@@ -10,7 +10,7 @@ const observation = { observationId: "11111111-1111-4111-8111-111111111111", ava
 /** A driver stand-in: records each operation, fails the ones named. */
 class ScriptedSession extends ComputerSession {
   readonly calls: string[] = [];
-  constructor(readonly failing: ReadonlySet<string> = new Set()) { super("isolated-batch-test"); }
+  constructor(readonly failing: ReadonlySet<string> = new Set(), key = "isolated-batch-test") { super(key); }
   override async request(op: string): Promise<unknown> {
     this.calls.push(op);
     if (this.failing.has(op)) throw new Error(`The driver refused ${op}.`);
@@ -75,8 +75,9 @@ describe("a batch of computer steps", () => {
     const control = new DesktopControl();
     const owner = new ScriptedSession();
     Object.defineProperty(owner, "running", { get: () => true });
+    await control.run(owner, "studio_computer_screenshot", async () => undefined);
     await control.run(owner, "studio_computer_click", async () => undefined);
-    const other = new ScriptedSession();
+    const other = new ScriptedSession(new Set(), "isolated-batch-other");
     await expect(control.run(other, "studio_computer_batch", async () => undefined)).rejects.toThrow(/Another conversation/);
   });
 

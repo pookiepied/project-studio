@@ -1363,6 +1363,10 @@ try { while ($true) {
       "select_text" { Answer $id ([ordered]@{ said = (Ui-SelectText $a.ref $a.start $a.end) }) }
       "clipboard" { Answer $id (Clipboard-Op $a.action $a.text) }
       "ping" { Answer $id ([ordered]@{ pong = $true }) }
+      # A pause or handoff lets go of whatever Studio still holds - a button
+      # pressed by mouse_button, a modifier - without closing the driver, so
+      # the task keeps its place while the person or another actor works.
+      "release_held" { Release-HeldInput; Answer $id ([ordered]@{ released = $true }) }
       default { Refuse $id ("Unknown operation `"" + $req.op + "`".") }
     }
   } catch {

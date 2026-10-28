@@ -12,6 +12,7 @@ import activitySource from "./activity.cs?raw";
 import { ComputerError } from "./errors.js";
 import { windowsPowerShell } from "./resolve.js";
 import { InputUpdates } from "./input.js";
+import { checkDesktopGuard } from "./control.js";
 import type { ToolAnswer } from "./tools.js";
 
 /**
@@ -106,20 +107,33 @@ export class ComputerSession {
   #lastFrame: { display: number; width: number; height: number } | undefined;
   #toolTail: Promise<void> = Promise.resolve();
   #interactionEpoch = 0;
+  /**
+   * One failure fences the queued calls of the actor that failed, not its
+   * siblings: a worker's refused click says nothing about whether the voice
+   * agent's queued screenshot is still wanted. The driver ending fences all.
+   */
+  readonly #actorEpochs = new Map<string, number>();
   readonly #toolContext = new AsyncLocalStorage<{ epoch: number; input: InputUpdates }>();
 
   /** @param key Which conversation this driver belongs to. */
   constructor(readonly key: string) {}
 
   /** Keep an action and its observation together; stop/failure cancels queued input. */
-  run<T>(operation: () => Promise<T>): Promise<T> {
+  run<T>(operation: () => Promise<T>, actor = ""): Promise<T> {
     const epoch = this.#interactionEpoch;
+    const own = this.#actorEpochs.get(actor) ?? 0;
     const result = this.#toolTail.then(async () => {
-      if (epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer state changed while this call was queued. Observe status before sending new input." });
+      if (epoch !== this.#interactionEpoch || own !== (this.#actorEpochs.get(actor) ?? 0)) {
+        throw new ComputerError("refused", { message: "Computer state changed while this call was queued. Observe status before sending new input." });
+      }
       try {
         return await this.#toolContext.run({ epoch, input: new InputUpdates() }, operation);
       } catch (error) {
-        this.#interactionEpoch++;
+        this.#actorEpochs.set(actor, (this.#actorEpochs.get(actor) ?? 0) + 1);
+        // Bounded: a long chat with many settled workers forgets the oldest.
+        // A call still queued for a forgotten actor reads a changed epoch and
+        // is refused, which is the safe direction to be wrong in.
+        if (this.#actorEpochs.size > 64) this.#actorEpochs.delete(this.#actorEpochs.keys().next().value ?? "");
         throw error;
       }
     });
@@ -127,14 +141,14 @@ export class ComputerSession {
     return result;
   }
 
-  async runTool(operation: () => Promise<ToolAnswer>): Promise<ToolAnswer> {
+  async runTool(operation: () => Promise<ToolAnswer>, actor = ""): Promise<ToolAnswer> {
     let updates: InputUpdates | undefined;
     try {
       return await this.run(async () => {
         updates = this.#toolContext.getStore()?.input;
         const result = await operation();
         return updates?.decorate(result) ?? result;
-      });
+      }, actor);
     } catch (error) {
       if (updates === undefined || !updates.hasUpdates) throw error;
       return updates.decorate({ isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "Computer input failed." }] });
@@ -146,6 +160,9 @@ export class ComputerSession {
   }
 
   get releasing(): boolean { return this.#closing !== undefined; }
+
+  /** A native request is out and unanswered: its outcome is not yet known. */
+  get busy(): boolean { return this.#pending.size > 0; }
 
   /** The frame of the last screenshot, so an acting result can name it. */
   get lastFrame(): { display: number; width: number; height: number } | undefined {
@@ -276,8 +293,10 @@ export class ComputerSession {
       throw new ComputerError("refused", { message: "The previous driver has not confirmed orderly shutdown. Wait for it to exit and observe the desktop again before sending input." });
     }
     if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control was stopped or replaced. Observe status before continuing." });
+    checkDesktopGuard();
     const child = await this.#launch();
     if (epoch !== undefined && epoch !== this.#interactionEpoch) throw new ComputerError("refused", { message: "Computer control changed while the driver started. Observe status again." });
+    checkDesktopGuard();
     this.#touch();
     const id = this.#next++;
     return new Promise<unknown>((resolve, reject) => {
