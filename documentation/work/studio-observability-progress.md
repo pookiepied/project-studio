@@ -135,6 +135,21 @@ were added. Regression coverage: `workspace-lifecycle.test.tsx`,
 Inline delegates without a public stream and persisted worker attachment
 previews remain unsupported. Native GUI execution is not covered by these tests.
 
+## Reply presentation integration (2026-10-29)
+
+The pending workspace and reply renderers are integrated with the voice/computer
+work on main. Admitted `GET /api/media/workspace/:conversationId` and
+`GET /api/web/image` reuse HTTP request identity and the existing checked binary
+network transport. File roots are resolved before delivery; URLs, paths, image
+bytes and visual data never enter observation attributes. No new retry authority,
+capture switch or permission concept is introduced. Primary task inspection
+retains its image conversation scope; worker inspection explicitly clears it.
+Regression evidence and commit IDs are in `report/side-workspace-integration.md`.
+Coverage includes malformed addresses, reserved file-URL characters, linked
+directory escape, finite visual numbers and image-scope separation. Image paint,
+provider compliance with visual prompts, native workspace animation and the live
+voice/overlay scenarios remain unverified by these checks.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in

@@ -130,9 +130,37 @@ The plan asked for one row per scenario, covering:
   - Each one is listed in the progress tracker's stage paragraphs and in the stage
     commits' tests.
 
+## Verified on Windows
+
+The 2026-10-29 follow-up runs on Windows 11 Home, version 10.0.26200,
+build 26200, with Node 24.19.0. The person prioritised integrating the pending
+conversation workspace before continuing live voice testing. The integration
+and its regression evidence are in [the integration report](side-workspace-integration.md).
+Commits `87c522d0`, `841dd5b0`, `e9cf910e`, `244cd8f6` and `9c0bdb88` retain
+the new voice/computer controls alongside that work.
+
+- The first full Windows harness invocation passed 2,727 tests, skipped 28,
+  and failed none. Integration happened while it ran; final rebuilt results
+  are recorded separately in the integration report.
+- `cargo test --no-run --locked` compiled the native Windows test binaries.
+  Compilation does not establish overlay focus, capture or DPI behaviour.
+- The integrated conversation renderer displayed in Chrome with fixture data.
+  Focused tests reproduced and fixed reply-image scope, malformed image URLs,
+  reserved filename characters in file URLs, and overflowing visual numbers.
+
+Monitors and DPI scales were not measured, no provider/model was exercised in
+a voice call, and no latency samples were collected in this integration pass.
+Computer Use stopped further UI interaction because it could not determine
+Chrome's current URL confidently enough to enforce its policy. The live
+scenario table above remains an expected-behaviour table, not a record of
+Windows scenario executions. None of the hands-on items below is promoted to
+verified by a passing automated suite.
+
 ## Not verified here, and how to verify it
 
-Everything below needs a Windows machine with a display, a microphone and a provider key.
+Everything below still needs hands-on verification on a Windows machine with a
+display, a microphone and a provider key. The integration pass above did not
+exercise these paths.
 
 - **The PowerShell driver's new code has never run:**
   - the `pulse` op;
