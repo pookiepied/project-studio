@@ -49,4 +49,9 @@ describe('pictures in a reply', () => {
     expect(harnessBytesDataUrl).not.toHaveBeenCalled()
   })
 
+  it('keeps a malformed local image address from breaking the conversation', () => {
+    inConversation('![Plot](studio-file:%ZZ)')
+    expect(screen.getByRole('img', { name: 'Image unavailable: Plot' })).toBeTruthy()
+    expect(harnessBytesDataUrl).not.toHaveBeenCalled()
+  })
 })

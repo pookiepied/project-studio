@@ -67,8 +67,13 @@ export function replyImageSource(url: string): string {
 function harnessPath(src: string, conversationId: string | null): string | null {
   if (src.startsWith(LOCAL_IMAGE)) {
     if (conversationId === null) return null
-    const path = decodeURIComponent(src.slice(LOCAL_IMAGE.length))
-    return `/api/media/workspace/${encodeURIComponent(conversationId)}?path=${encodeURIComponent(path)}`
+    try {
+      const path = decodeURIComponent(src.slice(LOCAL_IMAGE.length))
+      return `/api/media/workspace/${encodeURIComponent(conversationId)}?path=${encodeURIComponent(path)}`
+    } catch {
+      // An unreadable model address costs its picture, not the conversation.
+      return null
+    }
   }
   if (WEB.test(src)) return `/api/web/image?url=${encodeURIComponent(src)}`
   return null
