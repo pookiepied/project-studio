@@ -139,11 +139,13 @@ and its regression evidence are in [the integration report](side-workspace-integ
 Commits `87c522d0`, `841dd5b0`, `e9cf910e`, `244cd8f6` and `9c0bdb88` retain
 the new voice/computer controls alongside that work.
 
-- The first full Windows harness invocation passed 2,727 tests, skipped 28,
-  and failed none. Integration happened while it ran; final rebuilt results
-  are recorded separately in the integration report.
-- `cargo test --no-run --locked` compiled the native Windows test binaries.
-  Compilation does not establish overlay focus, capture or DPI behaviour.
+- Final rebuilt checks ran sequentially: harness typecheck/lint/build and
+  2,736 tests passed (28 skipped); client typecheck/lint and 1,761 tests passed;
+  `cargo test --locked` passed 161 native tests. All had zero failures. This
+  replaces the Linux environment failures with a green Windows gate; the
+  integration report records the intermediate fixture failure and its fix.
+- The native Windows test binaries compiled and their automated tests passed.
+  These do not establish overlay focus, capture or DPI behaviour.
 - The integrated conversation renderer displayed in Chrome with fixture data.
   Focused tests reproduced and fixed reply-image scope, malformed image URLs,
   reserved filename characters in file URLs, and overflowing visual numbers.

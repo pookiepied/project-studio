@@ -3,11 +3,23 @@
 Date: 2026-10-29
 
 The person asked to finish and integrate the pending side-workspace work before
-continuing live voice testing. The original checkout remains on
-`codex/side-workspace`, with its unrelated edits preserved. Integration runs on
-`main` in `C:/pookiepied/Dev Workspace/Project Studio Windows Validation`, starting
-at `1808e658`. A Git stash also retains the original pending feature changes:
+continuing live voice testing. The original checkout started on
+`codex/side-workspace`. Integration ran on `main` in
+`C:/pookiepied/Dev Workspace/Project Studio Windows Validation`, starting at
+`1808e658`. A Git stash retains the original pending feature changes:
 `06177bf5073388b78560d9058479f487397d2f44`.
+
+The original project folder is now on the integrated `main`. Before switching,
+its tracked feature edits and all 37 untracked feature files were compared with
+the saved snapshot and matched. A second stash retains that integrated copy:
+`30d6ff11d521c67a5be5ef50ed17606d926bab0a`. The four unrelated launch/CLAUDE.md
+deletions and `STUDIO HARNESS/.studio-transcript-patch/` remain in the original
+working tree. Only the stale metadata for a missing older main worktree was
+pruned; its missing checkout was not recreated or deleted.
+After the gates passed, the temporary validation worktree was unregistered.
+Git could not finish deleting its files because of a long filename; automatic
+approval review rejected the subsequent native cleanup request as blocked by
+policy. The remaining temporary folder was left in place.
 
 ## Scope
 
@@ -49,6 +61,24 @@ values. No dependency was added.
 
 ## Evidence and limits
 
+The final rebuilt gates passed sequentially on Windows:
+
+- `CI=true pnpm -C "STUDIO HARNESS" check`: typecheck, lint and build passed;
+  211 test files passed, 2 skipped; 2,736 tests passed, 28 skipped, zero failures.
+- `CI=true pnpm -C STUDIO check`: typecheck and lint passed; all 208 test files
+  and 1,761 tests passed. jsdom reported its unsupported scrollTo method twice.
+- `cargo test --locked` under `STUDIO/src-tauri`: 161 tests passed, zero failed
+  or ignored. The binary and documentation targets contained no tests.
+- Production harness and client builds also passed from the original main
+  checkout. The client retains its existing large-chunk warning.
+- `git diff --check` passed. All eight negative controls documented here caught
+  their broken mechanism, and each mechanism was restored before the final gates.
+
+The final logs are `studio-windows-harness-green.log`,
+`studio-windows-client-final.log` and `studio-windows-native-final.log` in the
+Windows temporary directory. Final harness duration was 1,389.89 seconds;
+client duration was 96.37 seconds; native test execution was 25.49 seconds.
+
 Both TypeScript checks and client lint passed after resolving the conflicts.
 The first focused client run passed 116 tests in 16 files. The updated visual
 suite passed 12 tests, reply-image suite 6, and workspace overview suite 2.
@@ -69,7 +99,7 @@ skill activation fixture (210 passed files, 1 failed, 2 skipped; 1,367 seconds).
 Its corrected focused integration run passed. Negative controls also removed
 the default-on skill and then overwrote an explicit off choice: the bundled
 skill test failed at each corresponding assertion, and passed after restoration.
-The complete gates are being rerun against that corrected tree.
+The final gate above includes the corrected fixture.
 
 Chrome displayed the integrated conversation specimen in dark mode on Windows.
 This uses production renderers with fixture data, not a live provider worker.
@@ -77,7 +107,10 @@ Further UI interaction stopped when Computer Use could not determine Chrome's
 current URL confidently enough to enforce its policy. Live worker cancellation,
 native resizing, voice, microphone, overlay/DPI and latency remain unverified.
 
-Full check results and final commits will be recorded after the gates finish.
+The house rules reference `documentation/mental-model.md`, which is absent.
+The README, project map and documentation structure were read; no replacement
+document was invented. No pristine pre-integration client/native baseline was
+measured after the person prioritised finishing the pending workspace.
 
 ## Commits
 
@@ -89,4 +122,8 @@ Full check results and final commits will be recorded after the gates finish.
 - `2d2d2679`: isolate the hello activation probe from the bundled visual default.
 
 All commits are directly on `main`, as explicitly requested. No branch or PR was
-created for this integration. The original side-workspace checkout is retained.
+created for this integration. The original side-workspace branch is retained.
+The repository's existing post-commit hook pushes each commit immediately; remote
+main was checked after discovering this behaviour. The final gate above records
+verification separately from that automatic backup. Passing it does not complete
+the unexecuted live voice, overlay, DPI or latency scenarios.

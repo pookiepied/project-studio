@@ -150,6 +150,11 @@ directory escape, finite visual numbers and image-scope separation. Image paint,
 provider compliance with visual prompts, native workspace animation and the live
 voice/overlay scenarios remain unverified by these checks.
 
+Final Windows gates passed sequentially: 2,736 harness tests (28 skipped),
+1,761 client tests and 161 native tests, with zero failures. These counts close
+the automated integration gate, not the remaining live voice/overlay scenarios
+or the broader Studio readiness inventory.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in
