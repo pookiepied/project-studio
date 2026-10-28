@@ -5,6 +5,7 @@ import type { WorkspaceTask } from './workspaceTasks'
 import { familyById, familyOf } from '@/features/chat/transcript/live/reportFamily'
 import { ToolGroups } from '@/features/chat/transcript/live/ToolGroups'
 import { StreamedMarkdown } from '@/features/chat/streaming'
+import { ReplyConversation } from '@/features/chat/markdown/ReplyImage'
 import { ChangesPanel } from '@/features/changes/ChangesPanel'
 import { recordedChanges } from '@/features/changes/recordedChanges'
 import { TasksSection } from '@/features/jobs/TasksSection'
@@ -112,7 +113,7 @@ export function WorkspaceOverview({ onInspectAgent }: { onInspectAgent: (task: A
 
 export function WorkspaceTaskDetail({ task, worker = false }: { task: WorkspaceTask; worker?: boolean }) {
   const changes = recordedChanges(task.calls)
-  return <div className="flex min-w-0 flex-col gap-4">
+  return <ReplyConversation.Provider value={worker ? null : task.conversationId}><div className="flex min-w-0 flex-col gap-4">
     <div className="text-micro text-muted-foreground"><span className="capitalize">{task.status}</span> / {worker ? 'Delegated agent' : 'Primary agent'}
       {task.timestamp ? <time className="block" dateTime={task.timestamp}>{new Date(task.timestamp).toLocaleString()}</time> : null}
       {task.messages.some((message) => message.usage?.totalTokens !== null && message.usage?.totalTokens !== undefined) ? <p>{task.messages.reduce((total, message) => total + (message.usage?.totalTokens ?? 0), 0).toLocaleString()} reported tokens</p> : null}
@@ -128,5 +129,5 @@ export function WorkspaceTaskDetail({ task, worker = false }: { task: WorkspaceT
         : <details key={segment.id}><summary className="cursor-pointer text-caption text-muted-foreground">Recorded reasoning</summary><div className="studio-prose"><StreamedMarkdown text={segment.text} streaming={false} /></div></details>)}
       {message.end.state === 'failed' || message.end.state === 'aborted' ? <p className="text-caption text-danger">{message.end.reason ?? 'No further diagnostic information was recorded.'}</p> : null}
     </div>)}
-  </div>
+  </div></ReplyConversation.Provider>
 }
