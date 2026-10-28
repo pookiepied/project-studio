@@ -135,6 +135,7 @@ interface QueuedVoiceTask { readonly id: string; readonly conversationId: string
 function voiceTaskBody(context: string | undefined, source: string): string {
   return ["Work requested by the user in the parent conversation.",
     "Your final message is handed to a voice agent who tells the user the result. End with the answer itself: lead with the key result, keep supporting detail brief, and leave out your working notes.",
+    "The person may be talking with the voice agent while you work, and both of them may use the same desktop. If you use the computer, hold it only while you need it and follow its refusals.",
     "Relevant preceding context, supplied by the conversational model (a fallible summary):",
     context ?? "No additional context supplied.",
     "Original user transcription follows verbatim. Preserve its constraints; clarify ambiguity rather than guessing:",

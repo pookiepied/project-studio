@@ -209,8 +209,9 @@ export function voiceCapabilityOverview(
   const lines = [
     "# What the working agent can use",
     "",
-    "You cannot call any of these. They belong to the Studio agent a voice_work",
-    "task runs; work that needs them is a task to start.",
+    "A voice_work task's Studio agent can call all of these. You call none of",
+    "them yourself, except the short list of studio-computer tools you hold while",
+    "the person shares their screen; other work that needs them is a task to start.",
     "",
     `- Native tools (${nativeNames.length}): ${nativeNames.join(", ")}.`,
   ];

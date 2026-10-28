@@ -811,7 +811,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "Never infer authority from foreground alone. A dispatched action is not a verified result; reobserve instead of replaying uncertain input. " +
       "Tool results report non-injected mouse/key activity observed since the last result, with current pointer and window state. " +
       "These updates do not stop computer use automatically. Reconcile them with your task and read fresh controls before continuing; key contents are never included. " +
-      "Another conversation's live desktop ownership refuses competing input until it stops or its idle driver closes.",
+      "Reading needs the desktop like input does: whoever else holds it, another task or conversation or the person showing something, refuses the read until it is released.",
     inputSchema: object({
       window: { type: "number", description: "A handle from windows or open. Defaults to the window being worked in." },
       all: { type: "boolean", description: "Include text and structure, not only controls." },

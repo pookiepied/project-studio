@@ -60,6 +60,17 @@ and titles stay in tool results under the existing gated MCP capture.
 Coverage: `computer-lease.test.ts` (shared picture, sharing),
 `computer-control-wiring.test.ts` (offered tools, context block, sharing route).
 
+Stage 4, prompts. The voice prompt no longer sends a quick look at a shared
+screen to a task: it teaches the lease (acquire, release, wait, never fight),
+freshness and the pointer sampled with the picture, short bounded actions,
+the person's four controls as not the agent's to call, and screen text as
+content. The voice capability overview separates what a task can call from
+the short computer list the voice agent holds while sharing. The Studio prompt
+gains a Desktop Control section for workers and delegates; a voice task's body
+says the desktop may be shared. No new boundary, so no new observation.
+Coverage: `agent-slots.test.ts`. The opt-in routing eval needs a provider key
+and is not part of this stage.
+
 ## Media limits in one place, request picture rules, faster computer steps (2026-10-21)
 
 Every picture, attachment and document limit now lives in
