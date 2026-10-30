@@ -356,6 +356,7 @@ export class ComputerService {
    */
   async control(params: Record<string, unknown>): Promise<unknown> {
     const input = isRecord(params["input"]) ? params["input"] : {};
+    if (input["action"] === "activity") return this.desktop.activity();
     const conversation = conversationKey(params["_meta"]);
     const action = input["action"];
     const asking = conversationActor(conversation);

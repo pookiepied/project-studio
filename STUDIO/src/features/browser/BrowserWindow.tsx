@@ -225,12 +225,12 @@ function BrowserSurface({ state, manual, send }: {
           animate={{ x: cursor.x * picture.width * scale, y: cursor.y * picture.height * scale }}
           transition={{ duration: DURATION.fast, ease: EASE_OUT }}>
           {cursor.pressed ? <span className="absolute -left-3 -top-3 size-7 rounded-full border-2 border-foreground/60 bg-foreground/10 outline outline-1 outline-background" /> : null}
-          <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" className={cursor.kind === 'text' ? '-translate-x-1/2 -translate-y-1/2' : undefined}>
+          <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true" className={cn('overflow-visible', cursor.kind === 'text' && '-translate-x-1/2 -translate-y-1/2')}>
             {cursor.kind === 'text'
-              ? <><path d="M6 2H16M11 2V23M6 23H16" className="stroke-background" strokeWidth="4" /><path d="M6 2H16M11 2V23M6 23H16" className="stroke-foreground" strokeWidth="2" /></>
-              : <path d={cursor.kind === 'pointer' ? 'M7 13V3Q7 0 10 2V10L12 9L14 10L16 10L19 13L17 23H8L3 16Q2 13 5 13L7 15Z' : 'M2 2L19 15L11 16L7 23Z'} className="fill-foreground stroke-background" strokeWidth="1.5" strokeLinejoin="round" />}
+              ? <><path d="M8 2H18M13 2V24M8 24H18" className="stroke-background" strokeWidth="4" /><path d="M8 2H18M13 2V24M8 24H18" className="stroke-foreground" strokeWidth="2" /></>
+              : <path d="M0 0L8 22L11 13L20 10Z" fill="#1e1e1e" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />}
           </svg>
-          <span className="ml-3 rounded-full bg-foreground px-2 py-0.5 text-micro text-background">Studio</span>
+          <span className="ml-3 inline-flex h-5 items-center rounded-full bg-[#1e1e1e] px-2.5 text-[10px] font-medium tracking-wide text-white shadow-sm">Studio</span>
         </motion.div> : null}
       </div>
     </div>

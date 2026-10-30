@@ -183,6 +183,7 @@ export interface CreateHttpAppOptions {
   };
   /** The person's stop for a conversation's computer control (ADR 0055 §7). */
   readonly computer?: {
+    activity?(): Promise<unknown>;
     stop(conversationId: string): Promise<"cleanup_confirmed" | "cleanup_unconfirmed" | "not_running" | "unavailable">;
     control?(conversationId: string, action: "state" | "pause" | "resume" | "demonstrate"): Promise<unknown>;
     sharing?(conversationId: string, on: boolean): Promise<{ readonly sharing: boolean }>;
@@ -303,6 +304,10 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   if (options.plans !== undefined) {
     app.route("/api/plans", createPlanRoutes(options.plans));
   }
+  app.get("/api/computer/activity", async (context) => {
+    context.header("Cache-Control", "no-store");
+    return context.json(await options.computer?.activity?.() ?? { conversationId: null, mode: "active" });
+  });
   if (options.tasks !== undefined && options.taskControl !== undefined) {
     app.route("/api/tasks", createTaskRoutes(options.tasks, options.taskControl));
   }

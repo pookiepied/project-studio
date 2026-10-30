@@ -36,5 +36,15 @@ try {
   $graphics.Clear([System.Drawing.Color]::White)
   [Studio.Activity]::PaintCursor($graphics, (New-Object System.Drawing.Point(91, 55)), $bitmap.Size)
   $checks.edgeBadgeVisible = $bitmap.GetPixel(42, 40).R -lt 100
+  $graphics.Clear([System.Drawing.Color]::Transparent)
+  [Studio.Activity]::PaintCursor($graphics, (New-Object System.Drawing.Point(2, 2)), $bitmap.Size)
+  $checks.transparentBackground = $bitmap.GetPixel(0, 55).A -eq 0
+  $checks.neutralEdges = $true
+  for ($x = 0; $x -lt $bitmap.Width; $x++) {
+    for ($y = 0; $y -lt $bitmap.Height; $y++) {
+      $pixel = $bitmap.GetPixel($x, $y)
+      if ($pixel.A -gt 0 -and ($pixel.R -ne $pixel.G -or $pixel.G -ne $pixel.B)) { $checks.neutralEdges = $false }
+    }
+  }
 } finally { $graphics.Dispose(); $bitmap.Dispose() }
 ConvertTo-Json $checks -Compress -Depth 5

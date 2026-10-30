@@ -5,6 +5,10 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { BrowserPanel } from './BrowserPanel'
+import type { ComputerPresence } from '@/features/screen/useComputerPresence'
+
+let presence: ComputerPresence | null = { conversationId: 'cnv_1', mode: 'active' }
+vi.mock('@/features/screen/useComputerPresence', () => ({ useComputerPresence: () => presence }))
 
 /**
  * The person's stop for a conversation's browser (ADR 0049 §4).
@@ -15,7 +19,7 @@ import { BrowserPanel } from './BrowserPanel'
  */
 
 const stop = vi.fn<(conversationId: string) => Promise<{ ok: true; value: boolean }>>()
-const stopComputer = vi.fn<(conversationId: string) => Promise<{ ok: true; value: 'cleanup_confirmed' | 'cleanup_unconfirmed' | 'not_running' }>>()
+const stopComputer = vi.fn<(conversationId: string) => Promise<{ ok: true; value: 'cleanup_confirmed' | 'cleanup_unconfirmed' | 'not_running' | 'unavailable' } | { ok: false; error: { message: string } }>>()
 const openBrowser = vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined)
 vi.mock('@/platform/tauri', async (original) => ({ ...await original<object>(), openBrowserWindow: (id: string) => openBrowser(id) }))
 
@@ -46,10 +50,28 @@ afterEach(() => {
   stop.mockReset()
   stopComputer.mockReset()
   openBrowser.mockClear()
+  presence = { conversationId: 'cnv_1', mode: 'active' }
   vi.useRealTimers()
 })
 
 describe('BrowserPanel', () => {
+  it('reports a failed computer stop without claiming nothing is running', async () => {
+    stopComputer.mockResolvedValue({ ok: false, error: { message: 'Disconnected' } })
+    render(<BrowserPanel entry={entry('computer')} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop computer' })))
+    expect(screen.getByRole('status').textContent).toBe('Could not stop. Try again.')
+  })
+  it('removes computer Stop when its lease ends or belongs to another chat, and reports missing evidence', () => {
+    const view = render(<BrowserPanel entry={entry('computer')} />)
+    expect(screen.getByRole('button', { name: 'Stop computer' })).toBeTruthy()
+    presence = { conversationId: 'other-chat', mode: 'active' }
+    view.rerender(<BrowserPanel entry={entry('computer')} />)
+    expect(screen.queryByRole('button', { name: 'Stop computer' })).toBeNull()
+    expect(screen.getByText('Not using computer')).toBeTruthy()
+    presence = null
+    view.rerender(<BrowserPanel entry={entry('computer')} />)
+    expect(screen.getByText('Status unavailable')).toBeTruthy()
+  })
   it('opens the live conversation browser and keeps recorded and computer previews read-only', async () => {
     const view = render(<BrowserPanel entry={entry()} />)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open browser in new window' })))

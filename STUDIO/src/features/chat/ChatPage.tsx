@@ -414,9 +414,8 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     showResources(conversation.id, conversation.title ?? 'Conversation', plan.hasPlan, jobs.jobs.length > 0 || agents.tasks.length > 0)
   }, [conversation.id, conversation.title, plan.hasPlan, jobs.jobs.length, agents.tasks.length, showResources])
 
-  // The sign on the desktop that Studio is at the keyboard, up for exactly as
-  // long as this turn, or one of its delegates or voice tasks, is driving the
-  // computer. Its Stop ends the run here.
+  // Chat Stop includes driver cleanup. The desktop sign itself lives above
+  // navigation and follows the live lease through ComputerPresenceMonitor.
   const delegatedComputerUse = useDelegatedComputerUse(conversation.id)
   const stopWithComputerCleanup = useComputerIndicator(conversation.id, live.items, running, stopTurn, delegatedComputerUse)
 

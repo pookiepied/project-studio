@@ -120,14 +120,15 @@ namespace Studio {
             GraphicsState state = graphics.Save();
             try {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 using (Brush fill = new SolidBrush(Color.FromArgb(30, 30, 30)))
                 using (Brush ink = new SolidBrush(Color.White))
                 using (Pen outline = new Pen(Color.White, 1.5f))
                 using (Font font = new Font("Segoe UI", 8, FontStyle.Regular, GraphicsUnit.Point))
                 using (GraphicsPath arrow = new GraphicsPath())
                 using (GraphicsPath badge = new GraphicsPath()) {
-                    arrow.AddPolygon(new Point[] { new Point(hotspot.X, hotspot.Y), new Point(hotspot.X + 17, hotspot.Y + 13),
-                        new Point(hotspot.X + 9, hotspot.Y + 14), new Point(hotspot.X + 5, hotspot.Y + 21) });
+                    arrow.AddPolygon(new Point[] { new Point(hotspot.X, hotspot.Y), new Point(hotspot.X + 8, hotspot.Y + 22),
+                        new Point(hotspot.X + 11, hotspot.Y + 13), new Point(hotspot.X + 20, hotspot.Y + 10) });
                     outline.LineJoin = LineJoin.Round;
                     graphics.FillPath(fill, arrow); graphics.DrawPath(outline, arrow);
                     int x = Math.Max(0, Math.Min(size.Width - 56, hotspot.X + 12));
@@ -141,19 +142,49 @@ namespace Studio {
         }
 
         private sealed class Marker : Form {
+            [StructLayout(LayoutKind.Sequential)] private struct Blend {
+                public byte Operation, Flags, Alpha, Format;
+            }
+            [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr window);
+            [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr window, IntPtr dc);
+            [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+            [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
+            [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr value);
+            [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
+            [DllImport("user32.dll")] private static extern bool UpdateLayeredWindow(IntPtr window, IntPtr screen, ref Point position,
+                ref Size size, IntPtr source, ref Point origin, int key, ref Blend blend, int flags);
             public readonly IntPtr NativeHandle;
             private Point hotspot = new Point(2, 2);
             public Marker() {
                 FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
-                BackColor = Color.Magenta; TransparencyKey = Color.Magenta;
                 ClientSize = new Size(92, 56); DoubleBuffered = true; NativeHandle = Handle;
             }
             public void Follow(Point point, Rectangle area) {
                 Point location = new Point(Math.Max(area.Left, Math.Min(area.Right - Width, point.X - 2)),
                     Math.Max(area.Top, Math.Min(area.Bottom - Height, point.Y - 2)));
                 Point next = new Point(point.X - location.X, point.Y - location.Y);
-                if (hotspot != next) { hotspot = next; Invalidate(); }
+                bool redraw = hotspot != next || !Visible;
+                hotspot = next;
                 Location = location;
+                if (redraw) PaintLayer();
+            }
+            // Per-pixel alpha keeps antialiased edges neutral instead of blending into a colour key.
+            private void PaintLayer() {
+                using (Bitmap bitmap = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb)) {
+                    using (Graphics graphics = Graphics.FromImage(bitmap)) {
+                        graphics.Clear(Color.Transparent);
+                        PaintCursor(graphics, hotspot, ClientSize);
+                    }
+                    IntPtr screen = GetDC(IntPtr.Zero), source = CreateCompatibleDC(screen);
+                    IntPtr pixels = bitmap.GetHbitmap(Color.FromArgb(0)), previous = SelectObject(source, pixels);
+                    try {
+                        Point position = Location, origin = Point.Empty; Size size = ClientSize;
+                        Blend blend = new Blend { Alpha = 255, Format = 1 };
+                        UpdateLayeredWindow(Handle, screen, ref position, ref size, source, ref origin, 0, ref blend, 2);
+                    } finally {
+                        SelectObject(source, previous); DeleteObject(pixels); DeleteDC(source); ReleaseDC(IntPtr.Zero, screen);
+                    }
+                }
             }
             protected override bool ShowWithoutActivation { get { return true; } }
             protected override CreateParams CreateParams {
@@ -163,9 +194,6 @@ namespace Studio {
                 if (message.Msg == 0x84) { message.Result = new IntPtr(-1); return; }
                 if (message.Msg == 0x21) { message.Result = new IntPtr(3); return; }
                 base.WndProc(ref message);
-            }
-            protected override void OnPaint(PaintEventArgs args) {
-                PaintCursor(args.Graphics, hotspot, ClientSize);
             }
         }
     }

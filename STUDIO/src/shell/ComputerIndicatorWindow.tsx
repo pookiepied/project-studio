@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { StudioMark } from '@/components/brand'
+import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
-import { requestComputerStop } from '@/platform/tauri'
+import { onComputerIndicatorChanged, onComputerIndicatorStatus, onComputerStopResult, requestComputerStop } from '@/platform/tauri'
+import { newUuid } from '@/lib/id'
 
 /**
  * The pill that says Studio is using the computer (ADR 0055 §7).
@@ -39,10 +40,47 @@ import { requestComputerStop } from '@/platform/tauri'
  */
 export function ComputerIndicatorWindow() {
   const [stopping, setStopping] = useState(false)
+  const [mode, setMode] = useState('active')
+  const [stopFailed, setStopFailed] = useState(false)
+  const pending = useRef<string | null>(null)
+  useEffect(() => {
+    let live = true
+    let unlisten: (() => void) | undefined
+    let unlistenStatus: (() => void) | undefined
+    let unlistenResult: (() => void) | undefined
+    void onComputerIndicatorChanged(() => {
+      if (!live) return
+      pending.current = null
+      setStopping(false)
+      setStopFailed(false)
+    }).then((stop) => {
+      if (live) unlisten = stop
+      else stop()
+    })
+    void onComputerIndicatorStatus((status) => { if (live) setMode(status) }).then((stop) => {
+      if (live) unlistenStatus = stop
+      else stop()
+    })
+    void onComputerStopResult((requestId, failed) => {
+      if (!live || requestId !== pending.current || !failed) return
+      pending.current = null
+      setStopping(false)
+      setStopFailed(true)
+    }).then((stop) => { if (live) unlistenResult = stop; else stop() })
+    return () => { live = false; pending.current = null; unlisten?.(); unlistenStatus?.(); unlistenResult?.() }
+  }, [])
 
   const stop = () => {
+    const requestId = newUuid()
+    pending.current = requestId
+    setStopFailed(false)
     setStopping(true)
-    void requestComputerStop()
+    void requestComputerStop(requestId).catch(() => {
+      if (pending.current !== requestId) return
+      pending.current = null
+      setStopping(false)
+      setStopFailed(true)
+    })
   }
 
   return (
@@ -52,14 +90,10 @@ export function ComputerIndicatorWindow() {
         aria-live="polite"
         className="flex h-10 items-center gap-3 rounded-full border border-hairline bg-surface pl-3 pr-1.5 text-foreground shadow-panel"
       >
-        <StudioMark busy size={14} className="text-foreground" />
-        <span className="text-ui whitespace-nowrap">Studio is using your computer</span>
-        <span
-          aria-hidden
-          className="size-1.5 rounded-full bg-foreground/70 motion-safe:animate-pulse"
-        />
-        <Button size="xs" variant="ghost" busy={stopping} onClick={stop}>
-          {stopping ? 'Stopping' : 'Stop'}
+        <Icons.computerUse className="size-4 text-muted-foreground" />
+        <span className="text-caption whitespace-nowrap font-medium">{stopFailed ? 'Could not stop. Try again.' : mode === 'paused' ? 'Computer work is paused' : mode === 'demonstrating' ? 'You have computer control' : mode === 'stopping' ? 'Studio is releasing your computer' : 'Studio is using your computer'}</span>
+        <Button size="xs" variant="ghost" busy={stopping || mode === 'stopping'} onClick={stop}>
+          {stopping || mode === 'stopping' ? 'Stopping' : 'Stop'}
         </Button>
       </div>
     </div>

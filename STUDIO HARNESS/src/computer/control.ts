@@ -365,6 +365,15 @@ export class DesktopControl {
     return this.#owner?.session;
   }
 
+  /** Product presence follows the lease, including confirmed driver exit. */
+  activity(): { readonly conversationId: string | null; readonly mode: DesktopMode } {
+    this.#settleOwner();
+    return {
+      conversationId: this.#owner?.actor.conversation ?? null,
+      mode: this.#owner?.session.releasing === true ? "stopping" : this.#mode,
+    };
+  }
+
   ownerIs(actor: Actor): boolean {
     return this.#owner !== undefined && keyOf(this.#owner.actor) === keyOf(actor);
   }

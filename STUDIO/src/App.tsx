@@ -13,6 +13,7 @@ import {
 } from '@/platform/tauri'
 import { AppShell } from '@/shell/AppShell'
 import { ComputerIndicatorWindow } from '@/shell/ComputerIndicatorWindow'
+import { ComputerPresenceMonitor } from '@/shell/ComputerPresenceMonitor'
 import { ScreenOverlayWindow } from '@/features/screen/ScreenOverlayWindow'
 import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { CaptureMonitor } from '@/shell/CaptureMonitor'
@@ -119,6 +120,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
             <NavigationProvider>
               <ConversationWorkspace detached={detached}>
                 <CaptureMonitor />
+                {detached === null && browserConversation === null ? <ComputerPresenceMonitor /> : null}
                 {browserConversation ? <BrowserWindow conversationId={browserConversation} /> : detached ? <DetachedShell conversationId={detached} /> : <StudioApp />}
               </ConversationWorkspace>
             </NavigationProvider>

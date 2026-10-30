@@ -519,6 +519,25 @@ Studio badge. Screen-edge placement keeps the badge visible and arrow hotspot
 aligned. It does not replace the OS-wide cursor. Offscreen drawing tests exercise
 the shipped renderer; these are not evidence of live desktop focus or hook delivery.
 
+Desktop presence uses admitted `GET /api/computer/activity`, the child operation
+`computer.activity`, and the existing private `studio/computer` RPC. The desktop
+lease owns the returned existing conversation ID and mode; no new entity ID,
+screen sampling, content attribute, permission or automatic resend is introduced.
+An unavailable server has no owner; a failed read remains unavailable rather than
+proving exit. The shared client poll drives the main window's native indicator
+and rail controls independently of transcript replay and navigation. Native sign
+renewal expires after four seconds without the UI, and pointer-monitor placement
+uses physical work-area coordinates. Renewal, placement and paint remain
+housekeeping rather than diagnostic events; existing native commands retain
+their arrival observations. Driver release, submission settlement and confirmed
+exit remain the authority for lease loss. Physical monitor switching, overlay
+alpha composition and focus behaviour still require hands-on validation.
+The pill's Stop carries a client request UUID through its existing native event;
+the main window returns delivery failure under that same UUID. Late replies from
+an older press or owner are ignored. A successful dispatch or unconfirmed cleanup
+does not claim exit; the live lease still controls visibility. This event join is
+product coordination, not an execution-parent join or authority to resend input.
+
 All window kinds share appearance updates through the existing preference-store
 subscription (browser windows use storage events). Receiving an update emits
 only `client.window` / `appearance_received`, under the existing capture policy;

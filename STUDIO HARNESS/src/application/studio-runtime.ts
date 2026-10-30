@@ -1880,13 +1880,21 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
-   * Ends one conversation's computer control, at the person's request.
-   *
-   * ADR 0055 §7: the pill on screen says the computer is being driven and
-   * offers a stop, and this is that stop - the model's own
-   * `studio_computer_stop`, which releases anything held before the driver
-   * ends. Answers whether a driver was running.
+   * Reads live desktop ownership without starting a server or driver. This
+   * global product projection contains no window, pointer or screen content.
    */
+  async computerActivity(): Promise<unknown> {
+    return observeOperation("mcp", "computer.activity", async () => {
+      const record = this.#registry.get(COMPUTER_SERVER_ID);
+      if (record?.provenance !== "system" || this.#supervisor.status(record.id)?.state !== "ready") {
+        return { conversationId: null, mode: "active" };
+      }
+      const connection = await this.#supervisor.ensure(record);
+      return connection.request("studio/computer", { input: { action: "activity" } });
+    });
+  }
+
+  /** Ends the addressed driver and reports whether held-input cleanup was confirmed. */
   async stopComputer(conversationId: string): Promise<ComputerStopOutcome> {
     return observeOperation("mcp", "computer.stop", async () => {
       const record = createObservationWriter();

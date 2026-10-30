@@ -8,6 +8,7 @@ import type { RailEntry } from '@/stores/rail'
 import { openBrowserWindow } from '@/platform/tauri'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives/IconButton/IconButton'
+import { useComputerPresence } from '@/features/screen/useComputerPresence'
 
 /**
  * The browser preview, at a size worth looking at.
@@ -77,7 +78,7 @@ export function BrowserPanel({
               void openBrowserWindow(entry.conversationId).catch(() => setOpenError('The browser window could not open. Try again.'))
             }}><Icons.openExternal /></IconButton>
           )}
-          {entry.recorded ? null : <StopBrowser conversationId={entry.conversationId} family={family} />}
+          {entry.recorded ? null : <StopBrowser key={`${entry.conversationId}:${family.id}`} conversationId={entry.conversationId} family={family} />}
         </div>
       </div>
       {openError ? <p role="alert" className="text-caption text-muted-foreground">{openError}</p> : null}
@@ -118,15 +119,16 @@ export function BrowserPanel({
  *
  * The browser is a process a person could otherwise only find in a task
  * manager; this is the place in Studio where it can be found and ended. The
- * panel does not know whether one is running - that is the server's to know,
- * and asking on every render would be a poll for a button - so the button is
- * always here, and the answer says what happened: "Stopped" when a browser
+ * browser button is always here, and the answer says what happened: "Stopped" when a browser
  * was running, "Not running" when there was nothing to stop. Both settle
- * back to the button after a moment, so a second press is possible.
+ * back to the button after a moment, so a second press is possible. Computer
+ * controls instead follow the shared live desktop lease; a historical frame
+ * cannot prove that someone still owns the desktop.
  */
 function StopBrowser({ conversationId, family }: { conversationId: string; family: ReportFamily }) {
   const { browser, computer } = useWorkspace()
-  const [state, setState] = useState<'idle' | 'busy' | 'stopped' | 'unconfirmed' | 'nothing'>('idle')
+  const presence = useComputerPresence()
+  const [state, setState] = useState<'idle' | 'busy' | 'stopped' | 'unconfirmed' | 'nothing' | 'failed'>('idle')
 
   const stop = async () => {
     setState('busy')
@@ -134,20 +136,23 @@ function StopBrowser({ conversationId, family }: { conversationId: string; famil
       // The computer says which of its outcomes it came to; an unconfirmed
       // cleanup is neither "stopped" nor "not running".
       const result = await computer.stop(conversationId)
-      setState(!result.ok ? 'nothing' : result.value === 'cleanup_confirmed' ? 'stopped' : result.value === 'cleanup_unconfirmed' ? 'unconfirmed' : 'nothing')
+      setState(!result.ok || result.value === 'unavailable' ? 'failed' : result.value === 'cleanup_confirmed' ? 'stopped' : result.value === 'cleanup_unconfirmed' ? 'unconfirmed' : 'nothing')
     } else {
       const result = await browser.stop(conversationId)
-      setState(result.ok && result.value ? 'stopped' : 'nothing')
+      setState(!result.ok ? 'failed' : result.value ? 'stopped' : 'nothing')
     }
     setTimeout(() => setState('idle'), 2000)
   }
 
-  if (state === 'stopped' || state === 'unconfirmed' || state === 'nothing') {
+  if (state === 'stopped' || state === 'unconfirmed' || state === 'nothing' || state === 'failed') {
     return (
       <span className="shrink-0 text-micro text-muted-foreground" role="status">
-        {state === 'stopped' ? 'Stopped' : state === 'unconfirmed' ? 'Stop sent, not confirmed' : 'Not running'}
+        {state === 'stopped' ? 'Stopped' : state === 'unconfirmed' ? 'Stop sent, not confirmed' : state === 'failed' ? 'Could not stop. Try again.' : 'Not running'}
       </span>
     )
+  }
+  if (family.id === 'computer' && (presence === null || presence.conversationId !== conversationId)) {
+    return <span role="status" className="text-micro text-muted-foreground">{presence === null ? 'Status unavailable' : 'Not using computer'}</span>
   }
   return (
     <button

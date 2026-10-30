@@ -481,6 +481,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         interact: (conversationId, input) => runtime.interactBrowser(conversationId, input),
       },
       computer: {
+        activity: () => runtime.computerActivity(),
         stop: (conversationId) => runtime.stopComputer(conversationId),
         control: (conversationId, action) => runtime.controlComputer(conversationId, action),
         sharing: (conversationId, on) => runtime.setScreenSharing(conversationId, on),

@@ -121,6 +121,7 @@ describe("Harness HTTP admission", () => {
     let conversationEntered = 0;
     let projectEntered = 0;
     let grantsEntered = 0;
+    let activityEntered = 0;
 
     const app = createHttpApp({
       // A port, so the double is the three lines the route actually uses
@@ -195,6 +196,10 @@ describe("Harness HTTP admission", () => {
         },
       } as unknown as ProjectStore,
       database,
+      computer: {
+        stop: async () => "not_running",
+        activity: async () => { activityEntered += 1; return { conversationId: "conv-owner", mode: "active" }; },
+      },
       admission: session.verifier,
       // No submission in this suite carries turn settings; "nothing is
       // served" is the honest answer for the one check the middleware makes.
@@ -217,6 +222,7 @@ describe("Harness HTTP admission", () => {
       "/api/conversations",
       "/api/conversations/conv-1/snapshots",
       "/api/projects",
+      "/api/computer/activity",
     ]) {
       const response = await app.request(`http://harness.test${path}`, {
         method: "POST",
@@ -242,6 +248,14 @@ describe("Harness HTTP admission", () => {
     expect(conversationEntered).toBe(0);
     expect(projectEntered).toBe(0);
     expect(grantsEntered).toBe(0);
+    expect(activityEntered).toBe(0);
+    const activity = await app.request("http://harness.test/api/computer/activity", {
+      headers: { authorization: `Bearer ${session.credential}` },
+    });
+    expect(activity.status).toBe(200);
+    expect(activity.headers.get("cache-control")).toBe("no-store");
+    expect(await activity.json()).toEqual({ conversationId: "conv-owner", mode: "active" });
+    expect(activityEntered).toBe(1);
 
     // The boundary is provably BEFORE the agent mount: an admitted request
     // to a mounted path is no longer answered by admission at all. Without

@@ -1,187 +1,60 @@
-/**
- * @vitest-environment jsdom
- */
+/** @vitest-environment jsdom */
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { present } from '@/platform/harness/contracts/chunks'
-import type { TranscriptItem } from '@/features/chat/transcript/projection'
-
 import { useComputerIndicator } from './useComputerIndicator'
+import type { ComputerPresence } from '@/features/screen/useComputerPresence'
+import type { TranscriptItem } from '@/features/chat/transcript/projection'
+import { present } from '@/platform/harness/contracts/chunks'
 
-/**
- * The sign that Studio is at the keyboard (ADR 0055 §7).
- *
- * What is pinned: the pill goes up only for a running turn that has touched
- * the computer, comes down when that turn ends, and its Stop ends this
- * conversation's driver and run - and nobody else's.
- */
+let presence: ComputerPresence | null = null
+vi.mock('@/features/screen/useComputerPresence', () => ({ useComputerPresence: () => presence }))
 
-const show = vi.fn<(conversationId: string) => Promise<void>>().mockResolvedValue(undefined)
-const hide = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
-const stopComputer = vi.fn<(conversationId: string) => Promise<unknown>>().mockResolvedValue({})
-let stopHandler: ((conversationId: string) => void) | null = null
-
-vi.mock('@/platform/tauri', () => ({
-  showComputerIndicator: (id: string) => show(id),
-  hideComputerIndicator: () => hide(),
-  onComputerStopRequested: (handler: (conversationId: string) => void) => {
-    stopHandler = handler
-    return Promise.resolve(() => {
-      stopHandler = null
-    })
-  },
-}))
-const cancelTask = vi.fn<(taskId: string) => Promise<unknown>>().mockResolvedValue({})
-vi.mock('@/stores/workspace', () => ({
-  useWorkspace: () => ({ computer: { stop: stopComputer }, tasks: { cancel: cancelTask } }),
-}))
+const computerStop = vi.fn().mockResolvedValue({ ok: true, value: 'cleanup_confirmed' })
+const cancel = vi.fn().mockResolvedValue({ ok: true, value: true })
+vi.mock('@/stores/workspace', () => ({ useWorkspace: () => ({ computer: { stop: computerStop }, tasks: { cancel } }) }))
+afterEach(() => { cleanup(); presence = null; vi.clearAllMocks() })
 
 function turnWith(toolName: string): TranscriptItem[] {
-  return [
-    {
-      kind: 'assistant',
-      id: 'msg_1',
-      segments: [
-        {
-          kind: 'tools',
-          groups: [
-            {
-              id: 'grp_1',
-              calls: [
-                {
-                  toolCallId: 'call_1',
-                  toolName,
-                  input: present({}),
-                  output: null,
-                  errorText: null,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    } as unknown as TranscriptItem,
-  ]
+  return [{ kind: 'assistant', id: 'msg_1', segments: [{ kind: 'tools', groups: [{ id: 'grp_1', calls: [{
+    toolCallId: 'call_1', toolName, input: present({}), output: null, errorText: null,
+  }] }] }] }] as unknown as TranscriptItem[]
 }
 
-afterEach(() => {
-  cleanup()
-  show.mockClear()
-  hide.mockClear()
-  stopComputer.mockClear()
-  cancelTask.mockClear()
-  stopHandler = null
-})
-
-describe('useComputerIndicator', () => {
-  it('shows the pill for a running turn that drives the computer, and hides it when the turn ends', () => {
-    const stopTurn = vi.fn()
-    const { rerender } = renderHook(
-      ({ running }: { running: boolean }) =>
-        useComputerIndicator('cnv_1', turnWith('mcp__15_studio-computer__3_studio_computer_open'), running, stopTurn),
-      { initialProps: { running: true } },
-    )
-    expect(show).toHaveBeenCalledWith('cnv_1')
-    expect(hide).not.toHaveBeenCalled()
-
-    rerender({ running: false })
-    expect(hide).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows nothing for a turn that only browsed', () => {
-    renderHook(() =>
-      useComputerIndicator('cnv_1', turnWith('mcp__14_studio-browser__19_studio_browser_open'), true, () => undefined),
-    )
-    expect(show).not.toHaveBeenCalled()
-    expect(hide).not.toHaveBeenCalled()
-  })
-
-  it('lets chat Stop cancel the run and request driver cleanup together', () => {
-    const stopTurn = vi.fn()
-    const { result } = renderHook(() =>
-      useComputerIndicator('cnv_1', turnWith('mcp__15_studio-computer__3_studio_computer_type'), true, stopTurn),
-    )
+describe('chat computer cleanup', () => {
+  it('cleans up a live lease even before its tool call arrives in the transcript', () => {
+    presence = { conversationId: 'chat', mode: 'active' }
+    const { result } = renderHook(() => useComputerIndicator('chat', [], true, vi.fn()))
     act(() => result.current())
-    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
-    expect(stopTurn).toHaveBeenCalledTimes(1)
+    expect(computerStop).toHaveBeenCalledWith('chat')
   })
-
-  it('stops a normal chat without starting a computer driver', () => {
-    const stopTurn = vi.fn()
-    const { result } = renderHook(() => useComputerIndicator('cnv_1', [], true, stopTurn))
-    act(() => result.current())
-    expect(stopComputer).not.toHaveBeenCalled()
-    expect(stopTurn).toHaveBeenCalledTimes(1)
-  })
-
-  it('keeps the native Stop listener attached while streamed content changes', async () => {
-    const first = vi.fn()
-    const latest = vi.fn()
-    const { rerender } = renderHook(({ stopTurn }) =>
-      useComputerIndicator('cnv_1', [], true, stopTurn), { initialProps: { stopTurn: first } },
-    )
-    await act(async () => { await Promise.resolve() })
-    const listener = stopHandler
-    rerender({ stopTurn: latest })
-    expect(stopHandler).toBe(listener)
-    act(() => stopHandler?.('cnv_1'))
-    expect(first).not.toHaveBeenCalled()
-    expect(latest).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows the pill while a delegate or voice task drives the computer, with no main turn running', () => {
-    const { rerender } = renderHook(
-      ({ delegated }: { delegated: { id: string; agentName: string }[] }) =>
-        useComputerIndicator('cnv_1', [], false, () => undefined, delegated),
-      { initialProps: { delegated: [{ id: 'voice_1', agentName: 'voice-work' }] } },
-    )
-    expect(show).toHaveBeenCalledWith('cnv_1')
-    rerender({ delegated: [] })
-    expect(hide).toHaveBeenCalledTimes(1)
-  })
-
-  it("stops a voice task's computer use from the pill: driver cleanup and the task's cancellation", async () => {
-    const stopTurn = vi.fn()
-    renderHook(() =>
-      useComputerIndicator('cnv_1', [], false, stopTurn, [{ id: 'voice_1', agentName: 'voice-work' }, { id: 'child', agentName: 'general' }]),
-    )
-    await act(async () => { await Promise.resolve() })
-    act(() => stopHandler?.('cnv_1'))
-    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
-    // An inline delegate ends with its parent's turn; only the worker has a task to cancel.
-    expect(cancelTask.mock.calls).toEqual([['voice_1']])
-    expect(stopTurn).toHaveBeenCalledTimes(1)
-  })
-
-  it("stops a voice task's own delegate at the computer by cancelling the voice task, once", async () => {
-    renderHook(() =>
-      useComputerIndicator('cnv_1', [], false, () => undefined, [
-        { id: 'inner', agentName: 'general', owner: 'voice_2' },
-        { id: 'voice_2', agentName: 'voice-work' },
-      ]),
-    )
-    await act(async () => { await Promise.resolve() })
-    act(() => stopHandler?.('cnv_1'))
-    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
-    expect(cancelTask.mock.calls).toEqual([['voice_2']])
-  })
-
-  it("answers the pill's Stop for this conversation only", async () => {
-    const stopTurn = vi.fn()
-    renderHook(() =>
-      useComputerIndicator('cnv_1', turnWith('mcp__15_studio-computer__3_studio_computer_type'), true, stopTurn),
-    )
-    await act(async () => {
-      await Promise.resolve()
+  it('joins direct computer cleanup to chat Stop but does not stop the computer for browser-only calls', () => {
+    const stop = vi.fn()
+    const { result, rerender } = renderHook(({ toolName }) => useComputerIndicator('chat', turnWith(toolName), true, stop), {
+      initialProps: { toolName: 'mcp__14_studio-browser__19_studio_browser_open' },
     })
-    expect(stopHandler).not.toBeNull()
-
-    act(() => stopHandler?.('cnv_other'))
-    expect(stopComputer).not.toHaveBeenCalled()
-    expect(stopTurn).not.toHaveBeenCalled()
-
-    act(() => stopHandler?.('cnv_1'))
-    expect(stopComputer).toHaveBeenCalledWith('cnv_1')
-    expect(stopTurn).toHaveBeenCalledTimes(1)
+    act(() => result.current())
+    expect(computerStop).not.toHaveBeenCalled()
+    rerender({ toolName: 'mcp__15_studio-computer__3_studio_computer_type' })
+    act(() => result.current())
+    expect(computerStop).toHaveBeenCalledWith('chat')
+    expect(stop).toHaveBeenCalledTimes(2)
+  })
+  it('stops an ordinary chat without creating computer work', () => {
+    const stop = vi.fn()
+    const { result } = renderHook(() => useComputerIndicator('chat', [], true, stop))
+    act(() => result.current())
+    expect(stop).toHaveBeenCalledOnce()
+    expect(computerStop).not.toHaveBeenCalled()
+  })
+  it('cleans up delegated computer use and cancels its owning voice worker once', () => {
+    const stop = vi.fn()
+    const { result } = renderHook(() => useComputerIndicator('chat', [], false, stop, [
+      { id: 'child', agentName: 'general', owner: 'voice_1' },
+      { id: 'voice_1', agentName: 'voice-work' },
+    ]))
+    act(() => result.current())
+    expect(computerStop).toHaveBeenCalledWith('chat')
+    expect(cancel.mock.calls).toEqual([['voice_1']])
+    expect(stop).toHaveBeenCalledOnce()
   })
 })

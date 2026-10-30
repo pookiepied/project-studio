@@ -27,9 +27,32 @@ describe.skipIf(process.platform !== "win32")("native physical input policy with
   it("draws the browser-style arrow and custom rounded badge, including at screen edges", () => {
     expect(checks).toMatchObject({ arrowPainted: true, badgePainted: true, badgeRounded: true, edgeBadgeVisible: true });
   });
+  it("renders neutral antialiased edges on transparent pixels without a colour key", () => {
+    expect(checks).toMatchObject({ transparentBackground: true, neutralEdges: true });
+  });
 });
 
 describe("physical input product updates", () => {
+  it("projects the lease owner, retains stopping until exit, and clears on settlement or crash", async () => {
+    const control = new DesktopControl();
+    const session = new RunningSession("chat");
+    expect(control.activity()).toEqual({ conversationId: null, mode: "active" });
+    await control.run(session, "studio_computer_screenshot", async () => undefined);
+    expect(control.activity().conversationId).toBeNull();
+    await control.run(session, "studio_computer_click", async () => undefined);
+    expect(control.activity()).toEqual({ conversationId: "chat", mode: "active" });
+    control.pause("chat");
+    expect(control.activity().mode).toBe("paused");
+    session.active = false; session.cleaning = true;
+    expect(control.activity()).toEqual({ conversationId: "chat", mode: "stopping" });
+    session.cleaning = false;
+    expect(control.activity().conversationId).toBeNull();
+    control.resume("chat"); session.active = true;
+    await control.run(session, "studio_computer_screenshot", async () => undefined);
+    await control.run(session, "studio_computer_click", async () => undefined);
+    control.release({ conversation: "chat", id: "chat" });
+    expect(control.activity().conversationId).toBeNull();
+  });
   it("preserves the tool result and observation, bounds counts, and projects no key or text values", () => {
     const updates = new InputUpdates();
     updates.add({ available: true, keys: 2, moves: 1, text: "private", key: "private", stateAvailable: true, front: { handle: 20, title: "Current", secret: "private" }, cursor: { x: 10, y: 20, display: 1 } });

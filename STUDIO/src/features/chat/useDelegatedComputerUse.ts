@@ -27,8 +27,8 @@ export function parseDelegatedComputerUse(value: unknown): DelegatedComputerUse[
  * computer. Their tool calls never reach this conversation's transcript - a
  * delegate's are inside its `task` call, a voice task runs on an instance of
  * its own - so the harness's task activity is the only witness, read on the
- * same cadence the call stage reads it. Unreadable means none: the pill is a
- * sign, and the main turn's own rule still raises it for the main agent.
+ * same cadence the call stage reads it. Chat Stop uses this to cancel the
+ * owning voice workers; desktop presence itself follows the live lease.
  */
 export function useDelegatedComputerUse(conversationId: string): readonly DelegatedComputerUse[] {
   const [driving, setDriving] = useState<readonly DelegatedComputerUse[]>([])

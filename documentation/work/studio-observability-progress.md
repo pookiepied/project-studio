@@ -1,5 +1,31 @@
 # Studio observability implementation tracker
 
+## Desktop presence and cursor refinement (2026-10-30)
+
+`GET /api/computer/activity` and `computer.activity` expose only the live lease's
+existing conversation ID and mode through the existing private computer RPC.
+The operation inherits HTTP execution context and MCP request/connection
+observations; no screen content, new capture policy or action retry is added.
+The main client window owns pill renewal across navigation; the rail shares its
+bounded poll and distinguishes idle from missing evidence. Native renewal has a
+four-second expiry and placement follows the pointer's monitor work area using
+physical coordinates, including negative origins and mixed scaling. The desktop
+cursor uses per-pixel alpha instead of magenta colour-key transparency and shares
+the browser's custom dart geometry and compact neutral badge.
+Stop delivery failure returns under the initiating client request UUID so a late
+reply cannot change another press or owner's button state; only the live lease
+controls exit visibility. Existing native arrival observations still omit args.
+
+Coverage: `computer-activity.test.ts` (lease exit/release/stopping and transparent
+neutral rendering), `http-admission.test.ts` (presence admission), client
+`useComputerPresence`, `ComputerPresenceMonitor`, `useComputerIndicator` and
+`BrowserPanel` and `ComputerIndicatorWindow` suites, and native `indicator_tests`
+(monitor coordinates and stale renewal expiry).
+The former transcript-derived pill assertions move to the live-presence monitor;
+chat Stop cleanup remains covered independently. Live monitor switching, native
+alpha composition and focus preservation are not established by these fixtures.
+This change does not close the overall Studio readiness gate.
+
 ## Interactive voice and computer use (in progress, 2026-10-28)
 
 The plan, its verified starting state and its completion criteria are in

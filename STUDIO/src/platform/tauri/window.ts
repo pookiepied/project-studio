@@ -1,7 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { emit, listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 
 /**
@@ -143,9 +143,9 @@ export function indicatorKind(): string | null {
  * Put up the pill that says Studio is using the computer, for a conversation.
  * Nothing outside Tauri: a browser tab has no desktop to indicate on.
  */
-export async function showComputerIndicator(conversationId: string): Promise<void> {
+export async function showComputerIndicator(conversationId: string, mode = 'active'): Promise<void> {
   if (!isTauri()) return
-  await invoke('computer_indicator_show', { conversationId })
+  await invoke('computer_indicator_show', { conversationId, mode })
 }
 
 /** Take the pill down. */
@@ -155,9 +155,29 @@ export async function hideComputerIndicator(): Promise<void> {
 }
 
 /** The pill's own Stop: asks the native side to tell the conversation. */
-export async function requestComputerStop(): Promise<void> {
+export async function requestComputerStop(requestId: string): Promise<void> {
   if (!isTauri()) return
-  await invoke('computer_indicator_stop')
+  await invoke('computer_indicator_stop', { requestId })
+}
+
+export async function onComputerIndicatorChanged(handler: () => void): Promise<() => void> {
+  if (!isTauri()) return () => undefined
+  return listen('studio://computer-indicator/changed', handler)
+}
+
+export async function onComputerIndicatorStatus(handler: (mode: string) => void): Promise<() => void> {
+  if (!isTauri()) return () => undefined
+  return listen<string>('studio://computer-indicator/status', (event) => handler(event.payload))
+}
+
+export async function reportComputerStopResult(requestId: string, failed: boolean): Promise<void> {
+  if (!isTauri()) return
+  await emit('studio://computer-indicator/stop-result', { requestId, failed })
+}
+
+export async function onComputerStopResult(handler: (requestId: string, failed: boolean) => void): Promise<() => void> {
+  if (!isTauri()) return () => undefined
+  return listen<{ requestId: string; failed: boolean }>('studio://computer-indicator/stop-result', (event) => handler(event.payload.requestId, event.payload.failed))
 }
 
 /**
@@ -166,11 +186,11 @@ export async function requestComputerStop(): Promise<void> {
  * Returns the unlisten, or a no-op outside Tauri.
  */
 export async function onComputerStopRequested(
-  handler: (conversationId: string) => void,
+  handler: (conversationId: string, requestId: string) => void,
 ): Promise<() => void> {
   if (!isTauri()) return () => undefined
-  return listen<string>('studio://computer-indicator/stop', (event) => {
-    handler(event.payload)
+  return listen<{ conversationId: string; requestId: string }>('studio://computer-indicator/stop', (event) => {
+    handler(event.payload.conversationId, event.payload.requestId)
   })
 }
 
