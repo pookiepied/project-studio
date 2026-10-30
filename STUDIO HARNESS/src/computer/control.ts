@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { isRecord } from "../serve/stdio.js";
 import { ComputerError } from "./errors.js";
 import type { ComputerSession } from "./session.js";
 
@@ -32,6 +33,12 @@ import type { ComputerSession } from "./session.js";
  *   actor whose last look predates the latest change must look again before
  *   it sends input. Its own input does not count against it.
  *
+ * A coordinate is read off a picture, so a coordinate call names the frame
+ * it was read from (`frameId`), and the frame - not a bare "have you looked"
+ * - is what admits it: one the caller was given, taken at the current change
+ * count, of the display the point is on. A status call is still a look for
+ * keys and references; it is never a frame, because it shows no pixels.
+ *
  * Scope: this is one computer MCP process. It does not exclude independent
  * programs, a second harness, or the person - and it does not try to.
  */
@@ -56,7 +63,12 @@ export type ControlRefusal =
   | "demonstrating"
   | "stopping"
   | "observe_first"
-  | "revoked";
+  | "revoked"
+  | "frame_required"
+  | "frame_unknown"
+  | "frame_stale"
+  | "frame_display"
+  | "escape";
 
 /** What one actor is told about the desktop. Another chat is only ever "another chat". */
 export interface DesktopState {
@@ -85,9 +97,82 @@ const NEEDS_NO_LOOK = new Set(["read_ui", "wait_for_window"]);
 /** Answers that are a fresh look at the screen, clearing an actor's staleness. */
 const LOOKS = new Set(["screenshot", "zoom", "status", "read_ui", "wait"]);
 
+/** Tools whose point is read off a picture, so they name the frame it came from. */
+const FRAME_TOOLS = new Set(["move", "click", "drag", "mouse_button", "scroll"]);
+
+/** How many frames the lease remembers across all actors; an older one is refused as unknown. */
+const MAX_FRAMES = 32;
+
+/** How many actors' turns the lease remembers; a forgotten actor's next call starts a turn. */
+const MAX_TURNS = 64;
+
 /** The bare tool name a call or a batch step uses. */
 export function bareTool(name: string): string {
   return name.replace(/^studio_computer_/, "");
+}
+
+/**
+ * Letting go of a held button or key: how input stops, so it never waits for
+ * a look or a frame, including while Stop is recovering a failed driver.
+ */
+function isRelease(bare: string, args: Record<string, unknown>): boolean {
+  return (bare === "mouse_button" || bare === "hold_key") && args["action"] === "up";
+}
+
+/**
+ * Whether a call's coordinates must be bound to a frame. A release is never
+ * bound, and a scroll by element reference names no point.
+ */
+function needsFrame(bare: string, args: Record<string, unknown>): boolean {
+  if (!FRAME_TOOLS.has(bare) || isRelease(bare, args)) return false;
+  return !(bare === "scroll" && args["ref"] !== undefined && args["x"] === undefined);
+}
+
+/**
+ * A batch step's arguments with the batch's frame, when the step is a
+ * coordinate step that names none of its own. The one rule both the lease
+ * (which admits the batch) and the batch (which runs the step) apply.
+ */
+export function withBatchFrame(step: string, args: Record<string, unknown>, frameId: unknown): Record<string, unknown> {
+  if (!needsFrame(bareTool(step), args) || args["frameId"] !== undefined || typeof frameId !== "string") return args;
+  return { ...args, frameId };
+}
+
+/** A frame a coordinate call depends on, and the display it names for the point. */
+interface FrameUse {
+  readonly frameId: unknown;
+  readonly display: unknown;
+}
+
+/** The frames a call's coordinates depend on: its own, or every coordinate step's in a batch. */
+export function frameUses(name: string, args: Record<string, unknown>): readonly FrameUse[] {
+  const bare = bareTool(name);
+  if (bare !== "batch") return needsFrame(bare, args) ? [{ frameId: args["frameId"], display: args["display"] }] : [];
+  const steps: unknown[] = Array.isArray(args["steps"]) ? args["steps"] : [];
+  return steps.flatMap((step): FrameUse[] => {
+    if (!isRecord(step) || typeof step["tool"] !== "string") return [];
+    const bound = withBatchFrame(step["tool"], step, args["frameId"]);
+    return needsFrame(step["tool"], bound) ? [{ frameId: bound["frameId"], display: bound["display"] }] : [];
+  });
+}
+
+/** A frame as the call that took it records it: its id, the displays it shows, and the change count its pixels were taken at. */
+export interface FrameRecord {
+  readonly id: string;
+  readonly displays: readonly number[];
+  readonly changes: number;
+}
+
+/** The change count of the admitted call running now, read by `captureChanges`. */
+const capture = new AsyncLocalStorage<() => number>();
+
+/**
+ * The desktop's change count now, for a call about to capture a frame;
+ * undefined outside an admitted call. Sampled before the pixels, so anything
+ * that happens while they are taken leaves the frame stale rather than fresh.
+ */
+export function captureChanges(): number | undefined {
+  return capture.getStore()?.();
 }
 
 export function isOwnerTool(name: string): boolean {
@@ -136,7 +221,11 @@ export class DesktopControl {
   #generation = 0;
   #changes = 0;
   readonly #seen = new Map<string, number>();
+  readonly #frames = new Map<string, { readonly key: string; readonly displays: readonly number[]; readonly changes: number }>();
   readonly #revoked = new Map<string, number>();
+  readonly #turns = new Map<string, string>();
+  /** Why the desktop is paused: the person's control, or their held Escape. */
+  #pausedBy: "control" | "escape" = "control";
   readonly #listeners = new Set<() => void>();
 
   /**
@@ -167,7 +256,7 @@ export class DesktopControl {
     const key = keyOf(actor);
     if (!OWNER_TOOLS.has(name)) {
       const lookedAt = this.#changes;
-      return operation().then((result) => {
+      return capture.run(() => this.#changes, operation).then((result) => {
         if (LOOKS.has(name) && lookedAt === this.#changes) this.#seen.set(key, this.#changes);
         return result;
       });
@@ -175,23 +264,45 @@ export class DesktopControl {
     const refusal = this.#admit(session, actor, ticket, name, args);
     if (refusal !== undefined) return Promise.reject(this.#refusalError(actor, refusal));
     const generation = this.#generation;
-    // Releasing a held button is cleanup and must not wait for a look.
-    const cleanup = name === "mouse_button" && args["action"] === "up";
+    // Letting go is cleanup and must not wait for a look.
+    const cleanup = isRelease(name, args);
     if (name !== "read_ui" && name !== "wait_for_window" && !cleanup) this.#input(key);
     const guard: Guard = {
       check: () => {
         if (this.#generation === generation && this.#owner?.actor !== undefined && keyOf(this.#owner.actor) === key) return undefined;
+        if (this.stoppedByPerson) return refusalMessage({ ...this.state(actor), refused: "escape" });
         return "Desktop control changed during this call: it was paused, stopped or handed over, or a correction from the person arrived. The steps after this point were not sent. Get status and look at the screen before deciding anything; do not replay them automatically.";
       },
     };
     return guards.run(guard, async () => {
-      const result = await operation();
+      const result = await capture.run(() => this.#changes, operation);
       if (name === "read_ui" && this.#generation === generation) this.#seen.set(key, this.#changes);
       return result;
     });
   }
 
   #admit(session: ComputerSession, actor: Actor, ticket: Ticket, name: string, args: Record<string, unknown>): ControlRefusal | undefined {
+    const refusal = this.#check(actor, ticket, name, args);
+    if (refusal === undefined && this.#owner === undefined) {
+      this.#owner = { actor, session };
+      this.#generation++;
+      this.#notify();
+    }
+    return refusal;
+  }
+
+  /**
+   * What admitting this call now would answer, without taking the desktop
+   * or counting anything. For a check that must run first and only for a
+   * call that would be admitted - the person is not asked about input the
+   * lease would refuse anyway.
+   */
+  wouldRefuse(actor: Actor, tool: string, args: Record<string, unknown>, ticket: Ticket): ControlRefusal | undefined {
+    const name = bareTool(tool);
+    return OWNER_TOOLS.has(name) ? this.#check(actor, ticket, name, args) : undefined;
+  }
+
+  #check(actor: Actor, ticket: Ticket, name: string, args: Record<string, unknown>): ControlRefusal | undefined {
     this.#settleOwner();
     const key = keyOf(actor);
     const revokedAt = this.#revoked.get(key);
@@ -199,19 +310,69 @@ export class DesktopControl {
     const owner = this.#owner;
     if (owner !== undefined && owner.session.releasing && owner.actor.conversation !== actor.conversation) return "other_conversation";
     if (owner !== undefined && owner.session.releasing) return "stopping";
-    if (this.#mode === "paused") return "paused";
+    if (this.#mode === "paused") return this.#pausedBy === "escape" ? "escape" : "paused";
     if (this.#mode === "demonstrating") return "demonstrating";
     if (owner !== undefined && keyOf(owner.actor) !== key) {
       return owner.actor.conversation === actor.conversation ? "not_owner" : "other_conversation";
     }
-    const cleanup = name === "mouse_button" && args["action"] === "up";
-    if (!NEEDS_NO_LOOK.has(name) && !cleanup && this.#seen.get(key) !== this.#changes) return "observe_first";
-    if (owner === undefined) {
-      this.#owner = { actor, session };
-      this.#generation++;
-      this.#notify();
+    const cleanup = isRelease(name, args);
+    if (!NEEDS_NO_LOOK.has(name) && !cleanup) {
+      // A valid frame is a look at the current screen. Without one, a stale
+      // look is named first, because looking again is what fixes both.
+      const uses = frameUses(name, args);
+      const framed = uses.length === 0 ? undefined : this.#frameRefusal(key, uses);
+      if ((uses.length === 0 || framed !== undefined) && this.#seen.get(key) !== this.#changes) return "observe_first";
+      if (framed !== undefined) return framed;
     }
     return undefined;
+  }
+
+  /**
+   * A call from this actor in the named turn (the harness's submission id,
+   * never a model's word). A new turn ends what the last one could rely on:
+   * its looks and its frames, so the first input of a turn follows a look
+   * taken in it. Answers whether a turn began, so the caller can let go of
+   * the driver's element references too. No turn named changes nothing.
+   */
+  beginTurn(actor: ActorIdentity, turn: string | undefined): boolean {
+    if (turn === undefined || turn === "") return false;
+    const key = keyOf(actor);
+    if (this.#turns.get(key) === turn) return false;
+    this.#turns.delete(key);
+    this.#turns.set(key, turn);
+    while (this.#turns.size > MAX_TURNS) this.#turns.delete(this.#turns.keys().next().value ?? "");
+    this.#seen.delete(key);
+    for (const [id, frame] of this.#frames) if (frame.key === key) this.#frames.delete(id);
+    return true;
+  }
+
+  #frameRefusal(key: string, uses: readonly FrameUse[]): ControlRefusal | undefined {
+    for (const use of uses) {
+      if (typeof use.frameId !== "string" || use.frameId === "") return "frame_required";
+      const frame = this.#frames.get(use.frameId);
+      if (frame === undefined || frame.key !== key) return "frame_unknown";
+      if (frame.changes !== this.#changes) return "frame_stale";
+      const display = typeof use.display === "number" ? use.display : undefined;
+      if (display === undefined ? frame.displays.length !== 1 : !frame.displays.includes(display)) return "frame_display";
+    }
+    return undefined;
+  }
+
+  /**
+   * A frame this actor was given. Only the actor's own: a picture another
+   * actor took is evidence it may read (`control latest`), never a frame its
+   * coordinates may claim.
+   */
+  recordFrame(actor: ActorIdentity, frame: FrameRecord): void {
+    this.#frames.delete(frame.id);
+    this.#frames.set(frame.id, { key: keyOf(actor), displays: [...new Set(frame.displays)], changes: frame.changes });
+    while (this.#frames.size > MAX_FRAMES) this.#frames.delete(this.#frames.keys().next().value ?? "");
+  }
+
+  /** The displays one of this actor's frames shows, so a point that names no display lands on the frame's. */
+  frameDisplays(actor: ActorIdentity, id: string): readonly number[] | undefined {
+    const frame = this.#frames.get(id);
+    return frame === undefined || frame.key !== keyOf(actor) ? undefined : frame.displays;
   }
 
   /** The screen may have changed because of this actor's input: others must look again. */
@@ -279,8 +440,29 @@ export class DesktopControl {
     if (owner !== undefined && owner.actor.conversation !== conversation) return "other_conversation";
     if (this.#mode === "paused") return "already";
     this.#mode = "paused";
+    this.#pausedBy = "control";
     this.#fenceAll();
     return "paused";
+  }
+
+  /**
+   * The person held Escape while Studio acted (P1-6): a deliberate stop, not
+   * a touch. It pauses the desktop for everyone whatever chat holds it, since
+   * the key is on the one physical keyboard, and every step still queued is
+   * refused. Only the person resumes it. A touch stays what it was: the
+   * screen is stale and work continues after a look.
+   */
+  personStop(): "paused" | "already" {
+    if (this.#mode === "paused" && this.#pausedBy === "escape") return "already";
+    this.#mode = "paused";
+    this.#pausedBy = "escape";
+    this.#fenceAll();
+    return "paused";
+  }
+
+  /** Whether the current pause came from the person's held Escape. */
+  get stoppedByPerson(): boolean {
+    return this.#mode === "paused" && this.#pausedBy === "escape";
   }
 
   /** Hands the desktop to the person to show something. Automation is fenced until done. */
@@ -447,6 +629,16 @@ export function refusalMessage(state: DesktopState): string {
       return "No input was sent: the screen may have changed since you last looked (a handoff, a pause, someone else's input, or the person's own). Take a screenshot or get status first, then decide.";
     case "revoked":
       return "This call was queued before you lost the desktop, so it was refused and nothing was sent. Look at the screen again before deciding what to do; never replay it automatically.";
+    case "frame_required":
+      return "No input was sent: a point must name the frameId of the picture it was read from. Take a screenshot (or read_ui) and give its frameId with the coordinates.";
+    case "frame_unknown":
+      return "No input was sent: that frameId is not one of your recent pictures, and a picture another actor took does not count. Take a screenshot and use the frameId it gives.";
+    case "frame_stale":
+      return "No input was sent: the screen may have changed since that frame was taken (input, a control change, or the person's own). Look again and use the new frameId.";
+    case "frame_display":
+      return "No input was sent: that frame does not show the display the point names. Give the display the frame shows, or take a picture of the display you mean.";
+    case "escape":
+      return "The person held Escape to stop computer use. No input was sent from here on. Stop and report what was done; when they resume, look at the screen again before any input, and never replay what was stopped.";
     default:
       return "Desktop control refused this input. No input was sent.";
   }

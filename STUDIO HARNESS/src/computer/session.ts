@@ -9,10 +9,10 @@ import { createStudioUuid } from "../contracts/uuid.js";
 
 import driverSource from "./driver.ps1?raw";
 import activitySource from "./activity.cs?raw";
-import { ComputerError } from "./errors.js";
+import { ComputerError, type ComputerFailure } from "./errors.js";
 import { windowsPowerShell } from "./resolve.js";
 import { InputUpdates } from "./input.js";
-import { checkDesktopGuard } from "./control.js";
+import { checkDesktopGuard, type FrameRecord } from "./control.js";
 import type { SharedObservation } from "./observations.js";
 
 /** A picture before the server knows who took it and against which desktop state. */
@@ -43,8 +43,45 @@ import type { ToolAnswer } from "./tools.js";
 /** How long a driver may sit unused before it closes itself. */
 const IDLE_MS = 5 * 60 * 1000;
 
-/** How long one request may take before the driver is presumed wedged. */
+/** How long a request with no budget of its own may take before the driver is presumed wedged. */
 const REQUEST_MS = 60 * 1000;
+
+/**
+ * How long each operation may take before the driver is presumed wedged.
+ * Every answer that sends input also waits for the screen to settle (at
+ * most 0.8 s) and reads the window state around it, so input ops budget for
+ * that too. A hung click must not hold the desktop for a minute.
+ */
+const OP_MS: Readonly<Record<string, number>> = {
+  ping: 5_000, cursor: 2_000, pulse: 2_000, sensitivity: 5_000, displays: 5_000, status: 5_000, release_held: 5_000, reset_refs: 5_000,
+  move: 5_000, click: 8_000, button: 5_000, scroll: 8_000, key: 8_000, drag: 10_000,
+  screenshot: 10_000, clipboard: 5_000, focus: 10_000, arrange: 10_000, windows: 10_000, apps: 15_000,
+  act: 10_000, set_value: 10_000, select_text: 10_000, open: 30_000, read_ui: 30_000, observe: 30_000,
+  key_toggle: 8_000, paste: 10_000, get_window: 10_000,
+};
+
+/** The budget for one request; ops whose length is in their arguments get it added. */
+export function requestBudget(op: string, args: Record<string, unknown> = {}): number {
+  const seconds = typeof args["seconds"] === "number" && Number.isFinite(args["seconds"]) ? Math.max(0, args["seconds"]) : undefined;
+  switch (op) {
+    case "wait_window": return (Math.min(seconds ?? 10, 60) + 2) * 1000;
+    case "hold": return (Math.min(seconds ?? 0, 30) + 5) * 1000;
+    // One key event pair per character with a short pause each.
+    case "type": return 8_000 + 30 * (typeof args["text"] === "string" ? args["text"].length : 0);
+    // A pause at each waypoint, on top of the moves themselves.
+    case "drag": return 10_000 + (Array.isArray(args["path"]) ? args["path"].length : 0) * (1_000 + (typeof args["settle"] === "number" ? Math.min(args["settle"], 2_000) : 0));
+    default: return OP_MS[op] ?? REQUEST_MS;
+  }
+}
+
+/** The kinds a driver refusal may name; anything else is answered as bad input. */
+const DRIVER_CODES: ReadonlySet<string> = new Set<ComputerFailure>(["bad_input", "no_element", "refused", "control"]);
+
+/** The request id of an answer line that did not parse, when its prefix still says it. */
+function tornId(line: string): number | undefined {
+  const match = /^\{"id":(\d+),/.exec(line);
+  return match?.[1] === undefined ? undefined : Number(match[1]);
+}
 
 /** How long the driver has to say "ready" after it is spawned. */
 const READY_MS = 30 * 1000;
@@ -101,6 +138,12 @@ export function unsupportedMessage(): string {
   ].join("\n");
 }
 
+/** A driver refusal, as the kind its envelope names; a refusal without a known code is bad input. */
+export function classify(message: string, code: unknown): ComputerError {
+  const kind = typeof code === "string" && DRIVER_CODES.has(code) ? code as ComputerFailure : "bad_input";
+  return new ComputerError(kind, { message });
+}
+
 export class ComputerSession {
   #child: ChildProcessWithoutNullStreams | undefined;
   #ready: Promise<void> | undefined;
@@ -118,6 +161,20 @@ export class ComputerSession {
    */
   readonly #actorEpochs = new Map<string, number>();
   readonly #toolContext = new AsyncLocalStorage<{ epoch: number; input: InputUpdates }>();
+  #onStop: (() => void) | undefined;
+
+  /**
+   * Called as soon as an answer says the person held Escape (P1-6), before
+   * the call that carried it returns, so a batch's next step is refused.
+   */
+  onPersonStop(listener: () => void): void {
+    this.#onStop = listener;
+  }
+
+  /** Whether the person's own clicks, keys or wheel have turned up in the running call's answers so far. */
+  get humanInputInCall(): boolean {
+    return this.#toolContext.getStore()?.input.human === true;
+  }
 
   /** @param key Which conversation this driver belongs to. */
   constructor(readonly key: string) {}
@@ -169,7 +226,23 @@ export class ComputerSession {
   get busy(): boolean { return this.#pending.size > 0; }
 
   #offered: OfferedObservation | undefined;
+  #offeredFrames: FrameRecord[] = [];
   #latest: SharedObservation | undefined;
+
+  /**
+   * A frame the running call is handing its caller: a picture or a read
+   * whose id coordinates may name. The server records it under the caller
+   * once the call is done, so a frame is only ever its taker's.
+   */
+  offerFrame(frame: FrameRecord): void {
+    this.#offeredFrames.push(frame);
+  }
+
+  takeOfferedFrames(): readonly FrameRecord[] {
+    const frames = this.#offeredFrames;
+    this.#offeredFrames = [];
+    return frames;
+  }
 
   /**
    * A picture the running call took. It becomes the conversation's shared
@@ -250,6 +323,14 @@ export class ComputerSession {
         try {
           message = JSON.parse(trimmed);
         } catch {
+          // A torn answer to a request still waiting fails that request now,
+          // rather than leaving it to its deadline with the outcome unknown.
+          const torn = tornId(trimmed);
+          const waiting = torn === undefined ? undefined : this.#pending.get(torn);
+          if (torn === undefined || waiting === undefined) return;
+          this.#pending.delete(torn);
+          clearTimeout(waiting.timer);
+          waiting.reject(new ComputerError("driver", { message: "The desktop driver's answer could not be read, so this call's outcome is unknown. Observe status before any further input; do not replay it automatically." }));
           return;
         }
         if (typeof message !== "object" || message === null) return;
@@ -266,10 +347,12 @@ export class ComputerSession {
         this.#pending.delete(id);
         clearTimeout(waiting.timer);
         waiting.input?.add(record["userInput"]);
+        const reported = record["userInput"];
+        if (typeof reported === "object" && reported !== null && (reported as Record<string, unknown>)["stop"] === true) this.#onStop?.();
         if (record["ok"] === true) waiting.resolve(record["result"]);
         else {
           const said = record["error"];
-          waiting.reject(this.#classify(typeof said === "string" ? said : "The driver refused without saying why."));
+          waiting.reject(classify(typeof said === "string" ? said : "The driver refused without saying why.", record["code"]));
         }
       });
       child.on("exit", (code) => {
@@ -304,15 +387,6 @@ export class ComputerSession {
     return child;
   }
 
-  /** The driver's refusals, sorted into the kinds a caller can act on. */
-  #classify(message: string): ComputerError {
-    if (/ui_|element reference|read the window again/i.test(message)) {
-      return new ComputerError("no_element", { message });
-    }
-    if (/refused|administrator/i.test(message)) return new ComputerError("refused", { message });
-    return new ComputerError("bad_input", { message });
-  }
-
   /**
    * One operation, answered. The only door to a running driver, so also the
    * only place the idle timer is renewed.
@@ -330,15 +404,16 @@ export class ComputerSession {
     checkDesktopGuard();
     this.#touch();
     const id = this.#next++;
+    const budget = requestBudget(op, args);
     return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(id);
         reject(new ComputerError("driver", {
-          message: `The desktop driver did not answer "${op}" within ${String(REQUEST_MS / 1000)} seconds. It has been stopped; the next call starts it again.`,
+          message: `The desktop driver did not answer "${op}" within ${String(Math.ceil(budget / 1000))} seconds, so its outcome is unknown. It has been stopped; the next call starts it again. Observe before any further input; do not replay it automatically.`,
         }));
         void this.close();
-      }, REQUEST_MS);
-      this.#pending.set(id, { resolve, reject, timer, deadlineAt: Date.now() + REQUEST_MS, input: context?.input });
+      }, budget);
+      this.#pending.set(id, { resolve, reject, timer, deadlineAt: Date.now() + budget, input: context?.input });
       child.stdin.write(`${JSON.stringify({ id, op, args: { ...args, observationId: createStudioUuid() } })}\n`);
     });
   }

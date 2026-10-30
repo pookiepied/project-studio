@@ -59,7 +59,15 @@ export interface CallResource {
    * importantly, nothing above it ever is.
    */
   readonly root?: string;
+  /**
+   * The longest an answer about this resource may last. An approver asked
+   * for longer is refused, not shortened: a person who chose "always" for
+   * something that only allows "once" did not agree to "once" (P1-4).
+   */
+  readonly maxDuration?: GrantDuration;
 }
+
+const DURATION_RANK: Readonly<Record<GrantDuration, number>> = { once: 0, conversation: 1, always: 2 };
 
 /**
  * What the user answered.
@@ -390,11 +398,18 @@ export class PermissionKernel {
     });
 
     const answer = await this.#approver.request(
-      { capability, scope, resource: call.resource, scopes },
+      { capability, scope, resource: call.resource, scopes, ...(call.maxDuration === undefined ? {} : { maxDuration: call.maxDuration }) },
       decision,
       signal,
     );
     if (signal?.aborted) throw this.#cancelled(id);
+    if (answer?.verdict === "allow" && call.maxDuration !== undefined && DURATION_RANK[answer.duration] > DURATION_RANK[call.maxDuration]) {
+      throw this.#refuse("denied", id, {
+        ...decision,
+        verdict: "deny",
+        reason: `This can be approved for at most ${call.maxDuration === "once" ? "one use" : "this conversation"}, and a longer answer is refused rather than shortened. Nothing was approved.`,
+      });
+    }
     if (!answer || answer.verdict === "deny") {
       // Not `decision.reason`: that explains why the user was asked, and
       // repeating it after they answered would report a call the user just

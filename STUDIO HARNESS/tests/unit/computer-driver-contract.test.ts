@@ -22,6 +22,32 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     missing = replies.find((reply) => reply["id"] === "missing") ?? {};
   }, 35_000);
 
+  it("names a refusal's kind in a code, and leaves a plain throw uncoded (P1-7)", () => {
+    expect(checks["codes"]).toEqual({ staleRef: "no_element", plain: null });
+  });
+  it("says what input would reach from the owning process, never from window text (P1-4)", () => {
+    expect(checks["sensitivity"]).toEqual({ terminal: "terminal", terminalApp: "WindowsTerminal", carriesTitle: false, plain: null, keys: "password_manager", browser: "browser", unknownKind: true });
+  });
+  it("lets go of held input after a stop, and presses nothing (P1-6)", () => {
+    expect(checks["release"]).toEqual({ keyUp: true, keyDown: false, mouseUp: true, move: false, mixed: false });
+  });
+  it("refuses a handle Windows reused, and finds the process's windows again without picking one (T2-4, N3-1)", () => {
+    expect(checks["identity"]).toEqual({ sameOk: true, reusedRefused: true, noIdentity: true, same: true, reusedFlag: true, candidates: [51], code: "no_element" });
+  });
+  it("waits for a window by title, app, or either (T2-10)", () => {
+    expect(checks["match"]).toEqual({ title: true, titleNotApp: false, app: true, any: true });
+  });
+  it("refuses an action a control cannot take, naming the ones it can (T2-2)", () => {
+    expect(String(checks["actUnknown"])).toContain('There is no action "launch"');
+    expect(String(checks["actUnknown"])).toContain("This control supports: focus");
+    expect(String(checks["actUnsupported"])).toContain("That control cannot toggle. It supports: focus. Nothing was done.");
+  });
+  it("holds a chord across calls and lets go of it in reverse (N3-2)", () => {
+    expect(checks["keys"]).toEqual({ down: 2, up: 0, badAction: true });
+  });
+  it("tells a blank window capture from a drawn one (T2-3)", () => {
+    expect(checks["blank"]).toEqual({ plain: true, drawn: false });
+  });
   it("rejects old observations even when their numeric index exists again", () => {
     expect(checks["current"]).toBe("Old");
     expect(checks["newRead"]).toBe("New");
@@ -105,6 +131,32 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     expect(checks["fallback"]).toMatchObject({ mime: "image/jpeg", underBudget: true });
     expect(String((checks["fallback"] as Record<string, unknown>)["note"])).toMatch(/JPEG/);
     expect(checks["keptPng"]).toMatchObject({ mime: "image/png", width: 400, note: null });
+  });
+  it("never reads a password field's value into a record or the outline", () => {
+    expect(checks["passwordValueReads"]).toBe(0);
+    expect(checks["passwordRecord"]).toMatchObject({ ref: "ui_11111111-1111-4111-8111-111111111111_1", password: true, value: "[password]", patterns: ["Value"], display: 1, center: { x: 100, y: 110 } });
+    expect(String(checks["passwordLine"])).toContain('value="[password]"');
+    expect(JSON.stringify(checks["passwordRecord"]) + String(checks["passwordLine"])).not.toContain("hunter2");
+  });
+  it("records each control's identity and patterns beside the line it has always had", () => {
+    expect(checks["plainRecord"]).toMatchObject({
+      role: "edit", name: "Search", password: false, value: "cats and dogs", patterns: ["Value", "Invoke"],
+      automationId: "id-Search", className: "Edit", runtimeId: "42.7", enabled: true, focused: false,
+    });
+    expect(checks["plainLine"]).toBe('edit "Search" value="cats and dogs" display 1 @(100,110) [ui_11111111-1111-4111-8111-111111111111_2]');
+  });
+  it("refuses to set a password field unless the call says the person asked, without reading it", () => {
+    expect(checks["passwordSetRefused"]).toBe(true);
+    expect(checks["passwordSetReads"]).toBe(0);
+    expect(checks["passwordWritten"]).toEqual([]);
+    expect(checks["passwordSetAllowed"]).toBe("Set.");
+    expect(checks["plainSet"]).toBe("Set.");
+    expect(checks["written"]).toEqual(["asked", "dogs"]);
+  });
+  it("answers one look under one observation id, picturing the window read, and keeps the read when the picture fails", () => {
+    expect(checks["observe"]).toEqual({ id: "22222222-2222-4222-8222-222222222222", hasStatus: true, query: "save", pictured: 77, picture: true });
+    expect(checks["observeBlind"]).toMatchObject({ read: true, picture: false });
+    expect(String((checks["observeBlind"] as Record<string, unknown>)["error"])).toContain("minimized");
   });
   it("releases only the buttons and keys recorded as Studio-held during cleanup", () => {
     expect(checks["releasedButtons"]).toEqual(["middle/up"]);

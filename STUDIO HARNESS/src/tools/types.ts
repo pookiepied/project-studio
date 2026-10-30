@@ -3,6 +3,7 @@ import type {
   ExecutionScope,
 } from "../contracts/capabilities.js";
 import type { ResourceKind } from "../permissions/matcher.js";
+import type { GrantDuration } from "../permissions/policy.js";
 import type { LocalSandbox } from "../sandbox/local-sandbox.js";
 
 /**
@@ -20,6 +21,13 @@ export interface ToolContext {
   /** Containment. Every path a tool touches goes through this. */
   readonly sandbox: LocalSandbox;
   readonly signal: AbortSignal | undefined;
+  /**
+   * Authorizes one more resource this call reaches, known only once it is
+   * running - what a computer call's input would land on. The gate's own
+   * kernel, scope and signal, so it is the same decision a resource named
+   * up front would get: it resolves only when allowed, and a refusal throws.
+   */
+  readonly authorize?: (resource: string, limits?: { readonly maxDuration?: GrantDuration }) => Promise<void>;
 }
 
 export interface ToolDefinition<Input, Output> {

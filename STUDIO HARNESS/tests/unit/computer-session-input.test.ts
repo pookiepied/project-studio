@@ -29,7 +29,7 @@ vi.mock("node:child_process", async (load) => {
         : { said: 'Sent.', observation: { available: true }, x: 1, y: 2, display: 0 };
       console.log(JSON.stringify({ id: request.id, ok: request.op !== 'set_value', result,
         error: 'The control changed. Read the window again.',
-        userInput: request.op === 'act' || request.op === 'set_value' || request.op === 'cursor'
+        userInput: request.op === 'act' || request.op === 'set_value' || request.op === 'screenshot'
           ? { available: true, moves: 1, stateAvailable: true, cursor: { x: 42, y: 18, display: 0 }, front: { title: 'Current', handle: 30 } } : null }));
     });
     lines.on('close', () => { closing = true; if (!active) process.exit(0); });
@@ -92,7 +92,7 @@ describe.skipIf(process.platform !== "win32")("input context through the actual 
     await refused;
     vi.restoreAllMocks();
   });
-  it("keeps updates from action and follow-up cursor requests together without replaying the action", async () => {
+  it("keeps updates from action and follow-up picture requests together without replaying the action", async () => {
     const session = new ComputerSession("isolated-input-protocol"); sessions.push(session);
     const tool = toolByName("studio_computer_act");
     if (!tool) throw new Error("Missing tool");

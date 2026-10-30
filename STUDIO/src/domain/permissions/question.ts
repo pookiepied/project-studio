@@ -1,4 +1,4 @@
-import type { PendingApprovalRecord } from '@/platform/harness'
+import type { GrantDuration, PendingApprovalRecord } from '@/platform/harness'
 
 /**
  * A permission question, in the words the prompt shows.
@@ -59,6 +59,8 @@ export interface PermissionQuestion {
    * narrowest rung for every duration.
    */
   readonly lastingScopeId: string | null
+  /** The longest answer the kernel accepts; the prompt offers nothing longer. */
+  readonly maxDuration: GrantDuration
 }
 
 /**
@@ -241,5 +243,6 @@ export function questionFromRecord(
     reason: record.source === 'policy' ? record.reason : null,
     lastingScopeId:
       record.scopes.find((scope) => scope.id === 'this-folder')?.id ?? null,
+    maxDuration: record.maxDuration,
   }
 }

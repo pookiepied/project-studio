@@ -1,5 +1,97 @@
 # Studio observability implementation tracker
 
+## Computer-use capability, wave 3 (2026-10-31)
+
+One new tool, `studio_computer_get_window` (read; not in the voice list),
+which re-finds a window by its existing handle plus pid/process start and
+never picks among candidates. `focus`/`arrange` refuse a reused handle when
+told the process. `act` resolves actions through the control's patterns
+(Scroll, RangeValue, Transform added); `scroll` takes a ref. `screenshot
+capture_mode: "window"` (PrintWindow) is evidence only, never a frame, and says
+when it came back blank. `hold_key` gains down/up across calls (held keys are
+released on every refusal, pause, handoff and stop); `drag` takes a path and
+settle time; `status` reports the foreground lock; `clipboard` gains `paste`
+(text/HTML, restoring text) and a write reports what it replaced by kind and
+length; `wait_for_window` takes `match`. Batch steps add `mouse_button` and
+`arrange` and are refused before sending when their budgets exceed 100 s.
+
+No attribute, event name, route or identity kind is added. Coverage:
+`computer-surface` (each new argument, refusals before sending, window capture
+not a frame, batch set and budget), `computer-driver-contract` (reused handle
+refused and re-found, match, act refusal with supported actions, chord
+held/released, blank capture), `computer-server` (30 tools, effect rows).
+Not established on hardware: PrintWindow on real apps, ScrollPattern/
+RangeValue/Transform against real controls, HTML paste into real editors.
+
+## Computer-use trust, wave 2 (2026-10-31)
+
+The person, not the model, answers for sensitive input. The computer server
+probes what an input call would reach before the lease admits it (driver op
+`sensitivity`: owning process name, pid/start time, category, password flag;
+never window text) and refuses a browser, password-manager, terminal or
+password-field target, an `open` by path, or a clipboard read with an
+`approvalRequest` whose id is a fresh Studio UUID. The harness bridge asks
+through the same kernel under the existing `tools.authorize` stage via a new
+tool-context `authorize` hook, as a policy `ask` (`computer-sensitive-target`)
+that Auto does not resolve, and re-sends once with `_meta["studio/approval"]`.
+The kernel refuses an answer longer than the request's `maxDuration`, and the
+client card offers nothing longer. Wave 1's model-settable `password` flag is
+removed. Turns are the existing submission id in `_meta["studio/turn"]`; a new
+turn drops that actor's looks, frames and refs. A held physical Escape while
+Studio acts pauses the desktop for everyone (flag only), refusing remaining
+batch steps; the driver presses nothing more in the running op. Driver
+refusals carry a `code`; a torn answer fails at once; per-op deadlines replace
+the uniform 60 s; the driver is per-monitor-v2 DPI aware.
+
+No attribute, event name or route is added. Coverage: `computer-approval`
+(kernel limit and Auto, bridge accept/decline/no approver/changed
+target/third-party ignored, approval book, turn stamp, budgets, codes),
+`computer-lease` (turn boundary, Escape stop vs touch, ask before admission,
+actor-bound ids, password field, batch step, coded refusal, torn line),
+`computer-activity` (stop policy), `computer-driver-contract` (codes,
+sensitivity from process identity, releases after a stop), client
+`ApprovalPrompt` and contracts (duration limit). Not established: the stop
+gesture and DPI change on real mixed-DPI hardware, and the 120 s gate deadline
+covering a person's slow answer.
+
+## Computer-use correctness floor, wave 1 (2026-10-30)
+
+Coordinate input is bound to a frame. Every picture (`screenshot`, `zoom`, the
+picture after an action, `status`/`read_ui` with `screenshot: true`) and every
+`read_ui` answers a `frameId`, which is the existing product observation UUID
+(the shared picture's id, or the read's ref epoch), not a new identity kind.
+`move`, `click`, `drag`, `scroll`, a `mouse_button` press and batch coordinate
+steps must name one. The lease admits the point only when the frame is the
+caller's own, was captured at the current change count (sampled before the
+pixels) and shows the display named; otherwise it refuses `frame_required`,
+`frame_unknown`, `frame_stale` or `frame_display`, each saying no input was
+sent and none suggesting a replay. A frame is recorded under the actor after
+its call, never for a voice picture discarded when sharing ended. `status`
+without a picture remains a look for keys and refs; it is never a frame.
+
+One driver op, `observe`, answers status, a read and a picture under one
+observation id; the after-action picture now carries the pointer, removing the
+separate `cursor` request. `read_ui` answers `structuredContent.ui` with one
+bounded record per control (ref, role, name, value, patterns, display, centre,
+AutomationId, ClassName, RuntimeId), takes `query`, and states truncation and
+depth limits. A password field's value is never read by the driver, renders as
+`[password]` and is replaced again by the server; `set_value` refuses one unless
+`password: true` is passed. `mouse_button`, `hold_key` and `select_text` answer
+with a picture. Every tool publishes its effect as MCP annotations and
+`_meta["studio/effect"]`; the kernel still admits the server under its existing
+`execute`/`network` effects, so no permission is loosened.
+
+No attribute, event name, route or diagnostic field is added: frame ids,
+element records and titles are tool-result content under existing gated MCP
+capture. Coverage: `computer-lease` (accept, stale, missing, foreign, display,
+human input, batch pre-check), `computer-observation` (frame ids, display
+propagation, pictures after held input, structured read and redaction, one
+request per composite look), `computer-batch`, `computer-server` (effect row
+for all 29 tools) and `computer-driver-contract` (password value never read,
+record/line shape, set_value guard, `observe` on doubles). Not established:
+whether a given provider sets `IsPassword` (web password boxes may not), and
+the hands-on desktop scenarios.
+
 ## Desktop cursor visibility follow-up (2026-10-30)
 
 The former black overlay was too similar to a system pointer, and its two-second

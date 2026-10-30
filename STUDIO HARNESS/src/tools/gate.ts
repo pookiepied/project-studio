@@ -344,7 +344,23 @@ export class CallGate {
       // running slowly — putting approval under the deadline would cancel
       // calls for the offence of being thought about.
       return await this.#bounds.run(tool.descriptor, call.signal, (signal) =>
-        tool.execute(input, { ...context, signal }),
+        tool.execute(input, {
+          ...context,
+          signal,
+          authorize: async (more, limits) => {
+            await observeOperation("tool", "tools.authorize", () => this.#kernel.authorize(
+              tool.descriptor.id,
+              call.scope,
+              {
+                resource: more,
+                kind: "command",
+                root: this.#sandbox.policy.workspaceRoot,
+                ...(limits?.maxDuration === undefined ? {} : { maxDuration: limits.maxDuration }),
+              },
+              signal,
+            ));
+          },
+        }),
       );
     } catch (error) {
       throw this.#report(error, call.name);

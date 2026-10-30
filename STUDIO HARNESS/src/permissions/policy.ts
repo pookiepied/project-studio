@@ -66,6 +66,8 @@ export interface PermissionRequest {
    * than it displayed. See ADR 0015.
    */
   readonly scopes: readonly PermissionScope[];
+  /** The longest answer this request accepts; omitted means any. */
+  readonly maxDuration?: GrantDuration;
 }
 
 /** How long an approval lasts. */
@@ -113,6 +115,18 @@ export const BASE_POLICY: readonly PolicyRule[] = [
      */
     evaluate: ({ capability }) =>
       capability.provenance.author === "third-party" && hasElevatedEffect(capability)
+        ? "ask"
+        : undefined,
+  },
+  {
+    id: "computer-sensitive-target",
+    reason: "Studio asks before computer input reaches a browser, a password manager, a terminal or a password field, opens a file by path, or reads the clipboard.",
+    // P1-4: raised by Studio's own computer server mid-call, through the
+    // tool context's `authorize`, once it knows what the input would reach.
+    // A policy `ask`, so neither Auto nor a mode answers it; a grant the
+    // person chose still does, for as long as the request allowed.
+    evaluate: ({ capability, resource }) =>
+      capability.provenance.origin === "mcp" && capability.provenance.author === "studio" && (resource ?? "").startsWith("computer:")
         ? "ask"
         : undefined,
   },

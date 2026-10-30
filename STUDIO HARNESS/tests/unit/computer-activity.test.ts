@@ -17,7 +17,14 @@ describe.skipIf(process.platform !== "win32")("native physical input policy with
   }, 35_000);
   it("excludes injected and lower-integrity input without reading key contents", () => {
     expect(checks).toMatchObject({ key: "keyboard", keyUp: "keyboard", move: "mouse_move", button: "mouse_button", buttonUp: "mouse_button", wheel: "mouse_wheel", injectedKey: "", injectedMouse: "", lowerKey: "", lowerMouse: "" });
-    expect(checks["fields"]).toEqual(["Available", "Moves", "Buttons", "Wheels", "Keys", "AgeMs", "Truncated"]);
+    expect(checks["fields"]).toEqual(["Available", "Moves", "Buttons", "Wheels", "Keys", "AgeMs", "Truncated", "Stop"]);
+  });
+  // P1-6: a held, physical Escape while Studio acts is a stop; a tap, Studio's
+  // own injected hold, or Escape long after Studio acted is not. The policy
+  // reads a timestamp of the last physical key, never which key it was.
+  it("treats only a held physical Escape during Studio's input as a deliberate stop", () => {
+    expect(checks["stop"]).toEqual({ heldWhileActing: true, tapped: false, injectedHold: false, oldKeyOnly: false, notActing: false, notHeld: false });
+    expect(checks["stopIdle"]).toBe(false);
   });
   it("coalesces and drains counts without starting desktop hooks or an overlay", () => {
     expect(checks["summary"]).toMatchObject({ Available: false, Moves: 1, Buttons: 1, Wheels: 1, Keys: 1 });
@@ -62,7 +69,7 @@ describe("physical input product updates", () => {
     expect(control.activity()).toEqual({ conversationId: null, mode: "active" });
     await control.run(session, "studio_computer_screenshot", async () => undefined);
     expect(control.activity().conversationId).toBeNull();
-    await control.run(session, "studio_computer_click", async () => undefined);
+    await control.run(session, "studio_computer_key", async () => undefined);
     expect(control.activity()).toEqual({ conversationId: "chat", mode: "active" });
     control.pause("chat");
     expect(control.activity().mode).toBe("paused");
@@ -72,7 +79,7 @@ describe("physical input product updates", () => {
     expect(control.activity().conversationId).toBeNull();
     control.resume("chat"); session.active = true;
     await control.run(session, "studio_computer_screenshot", async () => undefined);
-    await control.run(session, "studio_computer_click", async () => undefined);
+    await control.run(session, "studio_computer_key", async () => undefined);
     control.release({ conversation: "chat", id: "chat" });
     expect(control.activity().conversationId).toBeNull();
   });
@@ -115,7 +122,7 @@ describe("shared desktop ownership", () => {
     const control = new DesktopControl();
     const first = new RunningSession("first"); const second = new RunningSession("second");
     await control.run(first, "studio_computer_screenshot", async () => "looked");
-    await control.run(first, "studio_computer_click", async () => "first");
+    await control.run(first, "studio_computer_key", async () => "first");
     let sent = false;
     await expect(control.run(second, "studio_computer_type", async () => { sent = true; })).rejects.toThrow("Another conversation");
     expect(sent).toBe(false);
@@ -137,7 +144,7 @@ describe("shared desktop ownership", () => {
     let release = () => {};
     const barrier = new Promise<void>((resolve) => { release = resolve; });
     const order: string[] = [];
-    const first = control.run(current, "studio_computer_click", async () => { order.push("input"); await barrier; order.push("observed"); });
+    const first = control.run(current, "studio_computer_key", async () => { order.push("input"); await barrier; order.push("observed"); });
     const second = control.run(new RunningSession("second"), "studio_computer_screenshot", async () => { order.push("picture"); });
     await second; expect(order).toEqual(["input", "picture"]);
     release(); await first; expect(order).toEqual(["input", "picture", "observed"]);
@@ -146,17 +153,17 @@ describe("shared desktop ownership", () => {
     const control = new DesktopControl(); const owner = new RunningSession("owner");
     const other = new RunningSession("other");
     await control.run(owner, "studio_computer_screenshot", async () => undefined);
-    await control.run(owner, "studio_computer_click", async () => {});
+    await control.run(owner, "studio_computer_key", async () => {});
     owner.active = false; owner.cleaning = true;
-    await expect(control.run(other, "studio_computer_click", async () => {})).rejects.toThrow("Another conversation");
+    await expect(control.run(other, "studio_computer_key", async () => {})).rejects.toThrow("Another conversation");
     owner.cleaning = false;
     // Its driver ended, so it lost the desktop and looks again like anyone.
     await control.run(owner, "studio_computer_screenshot", async () => undefined);
     let release = () => {};
     const barrier = new Promise<void>((resolve) => { release = resolve; });
-    const first = owner.runTool(() => control.run(owner, "studio_computer_click", async () => { await barrier; return { content: [] }; }));
+    const first = owner.runTool(() => control.run(owner, "studio_computer_key", async () => { await barrier; return { content: [] }; }));
     let sent = false;
-    const queued = owner.runTool(() => control.run(owner, "studio_computer_click", async () => { sent = true; return { content: [] }; }));
+    const queued = owner.runTool(() => control.run(owner, "studio_computer_key", async () => { sent = true; return { content: [] }; }));
     const refused = expect(queued).rejects.toThrow("queued");
     await Promise.resolve(); await Promise.resolve();
     await owner.close(); release(); await first; await refused;

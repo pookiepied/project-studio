@@ -157,6 +157,9 @@ describe("the voice prompt", () => {
     expect(STUDIO_SYSTEM_PROMPT).toContain("studio_computer_control action acquire");
     expect(STUDIO_SYSTEM_PROMPT).toContain("Use control action wait");
     expect(STUDIO_SYSTEM_PROMPT).toContain("Never replay input whose outcome you did\nnot see");
+    expect(STUDIO_SYSTEM_PROMPT).toContain("names the frameId of the\npicture or read you took it from");
+    expect(STUDIO_SYSTEM_PROMPT).toContain("Studio itself asks the\nperson before input reaches a browser");
+    expect(STUDIO_SYSTEM_PROMPT).toContain("If the person holds Escape, computer\nuse is paused");
   });
 });
 

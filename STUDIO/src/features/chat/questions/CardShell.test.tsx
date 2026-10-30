@@ -32,6 +32,7 @@ const approvalQuestion: PermissionQuestion = {
   sentence: [{ kind: 'text', text: 'Write ' }, { kind: 'code', text: 'src/app.ts' }, { kind: 'text', text: " in this conversation's workspace." }],
   reason: null,
   lastingScopeId: null,
+  maxDuration: 'always',
 }
 
 function questionRow(overrides: Partial<PendingQuestionRecord> = {}): PendingQuestionRecord {

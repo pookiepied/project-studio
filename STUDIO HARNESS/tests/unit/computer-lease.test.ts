@@ -30,16 +30,25 @@ vi.mock("node:child_process", async (load) => {
         : request.op === 'pulse' ? { pointer: { x: 150, y: 40, display: 1 }, front: { title: 'Form', app: 'app', handle: 42 }, input: { buttons: 0, keys: 0, wheels: 0, moves: 0 }, monitored: true }
         : request.op === 'displays' ? [{ index: 0, x: 0, y: 0, width: 100, height: 100 }, { index: 1, x: 100, y: 0, width: 200, height: 100 }]
         : request.op === 'status' ? { target: null, front: null, cursor: { x: 1, y: 2, display: 0 }, displays: [] }
+        // x 66 is a terminal; a ref naming pw is a password field; anything else is an ordinary app.
+        : request.op === 'sensitivity' ? (request.args.x === 66 ? { app: 'WindowsTerminal', pid: 9, processStarted: '1', category: 'terminal', password: false }
+          : request.args.kind === 'ref' && String(request.args.ref).includes('pw') ? { app: 'app', pid: 3, processStarted: '1', category: null, password: true }
+          : { app: 'app', pid: 1, processStarted: '1', category: null, password: false })
         : { said: 'Sent.', typed: 5, done: true, released: true, observation: { available: true, refsInvalidated: true } };
       // The window list stands in for any answer that carries the person's own clicks.
       const human = request.op === 'windows';
+      // A key named escape-held stands in for the person holding Escape while it ran.
+      const stop = request.op === 'key' && request.args.keys === 'escape-held';
       console.log(JSON.stringify({ id: request.id, ok: true, result,
-        userInput: human ? { available: true, moves: 0, buttons: 1, wheels: 0, keys: 0, stateAvailable: true } : null }));
+        userInput: stop ? { available: true, moves: 0, buttons: 0, wheels: 0, keys: 3, stop: true, stateAvailable: true }
+          : human ? { available: true, moves: 0, buttons: 1, wheels: 0, keys: 0, stateAvailable: true } : null }));
     };
     lines.on('line', line => {
       const request = JSON.parse(line);
       console.error('op:' + request.op);
       if (request.op === 'act') { console.log(JSON.stringify({ id: request.id, ok: false, error: 'The control changed. Read the window again.' })); return; }
+      if (request.op === 'select_text') { console.log(JSON.stringify({ id: request.id, ok: false, error: 'Gone.', code: 'no_element' })); return; }
+      if (request.op === 'apps') { console.log('{"id":' + request.id + ',"ok":tr'); return; }
       if (request.op === 'type') {
         busy++;
         setTimeout(() => { busy--; answer(request); if (closing && busy === 0) process.exit(0); }, 300);
@@ -90,10 +99,23 @@ function refusal(answer: { structuredContent?: Record<string, unknown> }): unkno
   return typeof desktop === "object" && desktop !== null && "refused" in desktop ? desktop.refused : undefined;
 }
 
-async function own(computer: ComputerService, meta: Record<string, string>): Promise<void> {
-  await computer.call("studio_computer_screenshot", {}, meta);
-  const clicked = await computer.call("studio_computer_click", { x: 5, y: 5 }, meta);
+function frameOf(answer: { structuredContent?: Record<string, unknown> }): string {
+  const frame = answer.structuredContent?.["frame"];
+  if (typeof frame !== "object" || frame === null || !("id" in frame) || typeof frame.id !== "string") throw new Error("The answer carried no frame.");
+  return frame.id;
+}
+
+/** A screenshot, answered with the frameId a point may name. */
+async function look(computer: ComputerService, meta: Record<string, unknown>, args: Record<string, unknown> = {}): Promise<string> {
+  return frameOf(await computer.call("studio_computer_screenshot", args, meta));
+}
+
+/** Takes the desktop with a framed click; answers the frame of the picture after it. */
+async function own(computer: ComputerService, meta: Record<string, string>): Promise<string> {
+  const frameId = await look(computer, meta);
+  const clicked = await computer.call("studio_computer_click", { x: 5, y: 5, frameId }, meta);
   expect(clicked.isError).toBeUndefined();
+  return frameOf(clicked);
 }
 
 describe("one hand on the desktop, per actor", () => {
@@ -161,8 +183,65 @@ describe("one hand on the desktop, per actor", () => {
     // The answer that reported the person's click was read before it was
     // known about; the next input waits for a look taken after.
     expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel))).toBe("observe_first");
-    await computer.call("studio_computer_screenshot", {}, hazel);
-    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel)).isError).toBeUndefined();
+    const frameId = await look(computer, hazel);
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1, frameId }, hazel)).isError).toBeUndefined();
+  });
+});
+
+describe("a point is bound to the picture it was read from", () => {
+  it("admits a click on the caller's current frame and nothing older, sending nothing when it refuses", async () => {
+    const computer = service();
+    const first = await look(computer, hazel);
+    const clicked = await computer.call("studio_computer_click", { x: 5, y: 5, frameId: first }, hazel);
+    expect(clicked.isError).toBeUndefined();
+    const after = frameOf(clicked);
+    expect(after).not.toBe(first);
+    const ops = spawned.ops.length;
+    // Its own click changed the screen: the picture before it no longer stands.
+    const stale = await computer.call("studio_computer_click", { x: 5, y: 5, frameId: first }, hazel);
+    expect(refusal(stale)).toBe("frame_stale");
+    expect(said(stale)).toContain("No input was sent");
+    expect(said(stale)).not.toMatch(/\breplay\b|try again/i);
+    expect(refusal(await computer.call("studio_computer_click", { x: 5, y: 5 }, hazel))).toBe("frame_required");
+    expect(refusal(await computer.call("studio_computer_click", { x: 5, y: 5, frameId: "44444444-4444-4444-8444-444444444444" }, hazel))).toBe("frame_unknown");
+    expect(spawned.ops.length).toBe(ops);
+    expect((await computer.call("studio_computer_click", { x: 5, y: 5, frameId: after }, hazel)).isError).toBeUndefined();
+  });
+
+  it("does not let one actor's picture admit another actor's point", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const voiceFrame = await look(computer, voice);
+    expect(refusal(await computer.call("studio_computer_click", { x: 5, y: 5, frameId: voiceFrame }, hazel))).toBe("frame_unknown");
+  });
+
+  it("refuses a point on another display than its frame, and uses the frame's display when none is named", async () => {
+    const computer = service();
+    const frameId = await look(computer, hazel, { display: 1 });
+    expect(refusal(await computer.call("studio_computer_click", { x: 5, y: 5, frameId, display: 0 }, hazel))).toBe("frame_display");
+    const clicked = await computer.call("studio_computer_click", { x: 5, y: 5, frameId }, hazel);
+    expect(clicked.isError).toBeUndefined();
+    expect(clicked.structuredContent).toMatchObject({ frame: { display: 1 } });
+  });
+
+  it("makes a frame stale when the person's own input arrives after it", async () => {
+    const computer = service();
+    const frameId = await own(computer, hazel);
+    await computer.call("studio_computer_windows", {}, hazel);
+    expect(refusal(await computer.call("studio_computer_click", { x: 5, y: 5, frameId }, hazel))).toBe("observe_first");
+  });
+
+  it("checks every coordinate step of a batch against its frame before the first step runs", async () => {
+    const computer = service();
+    const frameId = await own(computer, hazel);
+    const ops = spawned.ops.length;
+    const stale = await computer.call("studio_computer_batch", { steps: [{ tool: "type", text: "a" }, { tool: "click", x: 1, y: 1, frameId: "44444444-4444-4444-8444-444444444444" }] }, hazel);
+    expect(refusal(stale)).toBe("frame_unknown");
+    expect(spawned.ops.length).toBe(ops);
+    const ran = await computer.call("studio_computer_batch", { frameId, steps: [{ tool: "click", x: 1, y: 1 }, { tool: "scroll", x: 1, y: 1, direction: "down" }] }, hazel);
+    expect(ran.isError).toBeUndefined();
+    // The click step is checked for what it would reach (P1-4) just before it is sent.
+    expect(spawned.ops.slice(ops)).toEqual(["sensitivity", "click", "scroll", "screenshot"]);
   });
 });
 
@@ -264,8 +343,8 @@ describe("pause, handoff and stop", () => {
     expect(await typing).toContain("do not replay it automatically");
     expect(await queued).toMatch(/queued/);
     expect(spawned.ops).not.toContain("key");
-    await computer.call("studio_computer_screenshot", {}, elsewhere);
-    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, elsewhere)).isError).toBeUndefined();
+    const frameId = await look(computer, elsewhere);
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1, frameId }, elsewhere)).isError).toBeUndefined();
   });
 
   it("releases a settled task's desktop and what it holds", async () => {
@@ -273,8 +352,8 @@ describe("pause, handoff and stop", () => {
     await own(computer, hazel);
     const released = await computer.control({ input: { action: "release_actor", actor: "voice_hazel" }, _meta: { "studio/conversation": CHAT } });
     expect(released).toMatchObject({ released: true, heldInput: "released" });
-    await computer.call("studio_computer_screenshot", {}, juniper);
-    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, juniper)).isError).toBeUndefined();
+    const frameId = await look(computer, juniper);
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1, frameId }, juniper)).isError).toBeUndefined();
   });
 
   it("holds every automation input while the person shows something, and makes everyone look again after", async () => {
@@ -463,14 +542,182 @@ describe("a correction reaching a task at the desktop", () => {
     expect(spawned.ops).not.toContain("key");
     expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel))).toBe("observe_first");
     expect(refusal(await computer.call("studio_computer_click", { x: 1, y: 1 }, voice))).toBe("not_owner");
-    await computer.call("studio_computer_screenshot", {}, hazel);
-    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel)).isError).toBeUndefined();
+    const frameId = await look(computer, hazel);
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1, frameId }, hazel)).isError).toBeUndefined();
   });
 
   it("does nothing to a desktop the corrected task does not hold", async () => {
     const computer = service();
-    await own(computer, hazel);
+    const frameId = await own(computer, hazel);
     expect(await computer.control({ input: { action: "checkpoint", actor: "voice_juniper" }, _meta: { "studio/conversation": CHAT } })).toEqual({ held: false });
-    expect((await computer.call("studio_computer_click", { x: 1, y: 1 }, hazel)).isError).toBeUndefined();
+    expect((await computer.call("studio_computer_click", { x: 1, y: 1, frameId }, hazel)).isError).toBeUndefined();
+  });
+});
+
+describe("a turn ends what the last one could rely on (P1-5)", () => {
+  it("drops an actor's frames and looks when the harness names a new turn, and leaves other actors alone", async () => {
+    const computer = service();
+    const turn1 = { ...hazel, "studio/turn": "sub_1" };
+    const frameId = await own(computer, turn1);
+    const voiceFrame = await look(computer, voice);
+    const next = await computer.call("studio_computer_click", { x: 5, y: 5, frameId }, { ...hazel, "studio/turn": "sub_2" });
+    expect(refusal(next)).toBe("observe_first");
+    expect(said(next)).toContain("No input was sent");
+    expect(computer.desktop.frameDisplays({ conversation: CHAT, id: CHAT }, voiceFrame)).toEqual([0]);
+  });
+
+  it("changes nothing while the turn is the same or none is named", async () => {
+    const computer = service();
+    const turn1 = { ...hazel, "studio/turn": "sub_1" };
+    const frameId = await own(computer, turn1);
+    const again = await computer.call("studio_computer_click", { x: 5, y: 5, frameId }, turn1);
+    expect(again.isError).toBeUndefined();
+    expect(computer.desktop.beginTurn({ conversation: CHAT, id: "voice_hazel" }, undefined)).toBe(false);
+  });
+
+  it("lets go of the driver's element references only for the actor that read them", async () => {
+    const computer = service();
+    const turn1 = { ...hazel, "studio/turn": "sub_1" };
+    await own(computer, turn1);
+    await computer.call("studio_computer_read_ui", { window: 42 }, turn1);
+    const ops = spawned.ops.length;
+    await computer.call("studio_computer_screenshot", {}, { ...voice, "studio/turn": "sub_v" });
+    expect(spawned.ops.slice(ops)).not.toContain("reset_refs");
+    await computer.call("studio_computer_screenshot", {}, { ...hazel, "studio/turn": "sub_2" });
+    expect(spawned.ops.slice(ops)).toContain("reset_refs");
+  });
+});
+
+describe("the person's held Escape stops computer use (P1-6)", () => {
+  it("pauses the desktop the moment an answer reports it, and refuses the batch's remaining steps", async () => {
+    const computer = service();
+    const frameId = await own(computer, hazel);
+    const batch = await computer.call("studio_computer_batch", { frameId, steps: [{ tool: "key", keys: "escape-held" }, { tool: "type", text: "after" }, { tool: "key", keys: "return" }] }, hazel);
+    expect(batch.isError).toBe(true);
+    expect(said(batch)).toContain("The person held Escape");
+    expect(spawned.ops.filter((op) => op === "type")).toEqual([]);
+    expect(computer.desktop.stoppedByPerson).toBe(true);
+    const later = await computer.call("studio_computer_key", { keys: "a" }, hazel);
+    expect(refusal(later)).toBe("escape");
+    expect(said(later)).toContain("No input was sent");
+    expect(said(later)).not.toMatch(/\b(retry|replay it|try again)\b/i);
+  });
+
+  it("is a different outcome from a touch, which only makes the screen stale", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await computer.call("studio_computer_windows", {}, hazel);
+    expect(computer.desktop.stoppedByPerson).toBe(false);
+    expect(computer.desktop.state({ conversation: CHAT, id: "voice_hazel", role: "worker" }).mode).toBe("active");
+  });
+
+  it("is lifted only by the person's resume", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await computer.call("studio_computer_key", { keys: "escape-held" }, hazel);
+    expect(computer.desktop.stoppedByPerson).toBe(true);
+    await computer.control({ input: { action: "resume" }, _meta: { "studio/conversation": CHAT } });
+    expect(computer.desktop.stoppedByPerson).toBe(false);
+  });
+});
+
+describe("the person is asked before input reaches what Studio asks about (P1-4)", () => {
+  function request(answer: { structuredContent?: Record<string, unknown> }): Record<string, unknown> {
+    const asked = answer.structuredContent?.["approvalRequest"];
+    if (typeof asked !== "object" || asked === null) throw new Error("No approval request.");
+    return asked as Record<string, unknown>;
+  }
+
+  it("refuses a click into a terminal before admission, sends nothing, and keeps the frame good", async () => {
+    const computer = service();
+    const frameId = await own(computer, hazel);
+    const ops = spawned.ops.length;
+    const asked = await computer.call("studio_computer_click", { x: 66, y: 5, frameId: await look(computer, hazel) }, hazel);
+    expect(asked.isError).toBe(true);
+    expect(said(asked)).toContain("No input was sent");
+    expect(request(asked)).toMatchObject({ category: "terminal", app: "WindowsTerminal", riskLevel: "high", allowPersistentApproval: false, maxDuration: "conversation" });
+    expect(spawned.ops.slice(ops)).not.toContain("click");
+    expect(frameId).toBeTypeOf("string");
+  });
+
+  it("sends the input once the harness returns the person's yes, and only once", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const frameId = await look(computer, hazel);
+    const asked = await computer.call("studio_computer_click", { x: 66, y: 5, frameId }, hazel);
+    const approval = String(request(asked)["id"]);
+    const ops = spawned.ops.length;
+    const sent = await computer.call("studio_computer_click", { x: 66, y: 5, frameId }, { ...hazel, "studio/approval": approval });
+    expect(sent.isError).toBeUndefined();
+    expect(spawned.ops.slice(ops)).toContain("click");
+    const next = await look(computer, hazel);
+    const again = await computer.call("studio_computer_click", { x: 66, y: 5, frameId: next }, { ...hazel, "studio/approval": approval });
+    expect(request(again)["category"]).toBe("terminal");
+  });
+
+  it("does not honour an approval id asked for another actor", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const asked = await computer.call("studio_computer_click", { x: 66, y: 5, frameId: await look(computer, hazel) }, hazel);
+    await computer.call("studio_computer_control", { action: "release" }, hazel);
+    const frameId = await own(computer, juniper);
+    const stolen = await computer.call("studio_computer_click", { x: 66, y: 5, frameId }, { ...juniper, "studio/approval": String(request(asked)["id"]) });
+    expect(request(stolen)["category"]).toBe("terminal");
+  });
+
+  it("asks about opening a path and reading the clipboard from the arguments alone", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const opened = await computer.call("studio_computer_open", { path: "C:\\x.bat" }, hazel);
+    expect(request(opened)).toMatchObject({ category: "open_path", app: "", maxDuration: "conversation" });
+    const read = await computer.call("studio_computer_clipboard", { action: "read" }, hazel);
+    expect(request(read)).toMatchObject({ category: "clipboard_read", allowPersistentApproval: true });
+    expect(spawned.ops).not.toContain("open");
+    expect(spawned.ops).not.toContain("clipboard");
+  });
+
+  it("lets a password field be filled only after the person's yes, whatever the model passed", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await computer.call("studio_computer_read_ui", { window: 42 }, hazel);
+    const asked = await computer.call("studio_computer_set_value", { ref: "ui_pw_1", value: "s3cret", password: true }, hazel);
+    expect(request(asked)).toMatchObject({ category: "password_field", maxDuration: "once", allowPersistentApproval: false });
+    expect(JSON.stringify(asked)).not.toContain("s3cret");
+    const filled = await computer.call("studio_computer_set_value", { ref: "ui_pw_1", value: "s3cret" }, { ...hazel, "studio/approval": String(request(asked)["id"]) });
+    expect(filled.isError).toBeUndefined();
+  });
+
+  it("stops a batch at a step that needs asking, before that step is sent", async () => {
+    const computer = service();
+    const frameId = await own(computer, hazel);
+    const ran = await computer.call("studio_computer_batch", { frameId, steps: [{ tool: "click", x: 5, y: 5 }, { tool: "click", x: 66, y: 5 }, { tool: "key", keys: "return" }] }, hazel);
+    expect(ran.isError).toBe(true);
+    expect(said(ran)).toContain("Send that step on its own");
+    expect(spawned.ops.filter((op) => op === "click")).toHaveLength(2);
+    expect(ran.structuredContent?.["approvalRequest"]).toBeUndefined();
+  });
+
+  it("does not ask about input the lease would refuse anyway", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const ops = spawned.ops.length;
+    const refused = await computer.call("studio_computer_click", { x: 66, y: 5, frameId: await look(computer, juniper) }, juniper);
+    expect(refusal(refused)).toBe("not_owner");
+    expect(spawned.ops.slice(ops)).not.toContain("sensitivity");
+  });
+});
+
+describe("driver answers (P1-7)", () => {
+  it("sorts a refusal by the code it names, not by its words", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await expect(computer.call("studio_computer_select_text", { ref: "ui_x_1", start: 0, end: 1 }, hazel)).rejects.toMatchObject({ kind: "no_element" });
+  });
+
+  it("fails a call whose answer line is torn at once, instead of waiting out its deadline", async () => {
+    const computer = service();
+    const started = Date.now();
+    await expect(computer.call("studio_computer_apps", {}, hazel)).rejects.toThrow("could not be read");
+    expect(Date.now() - started).toBeLessThan(10_000);
   });
 });

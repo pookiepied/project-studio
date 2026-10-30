@@ -231,8 +231,10 @@ The findings that would otherwise be lost:
 3. **Needs Implementation:** bounded condition-based waits for meaningful window
    or control changes, replacing the fixed post-action sampling delay where the
    caller can state a condition. No automatic input resend.
-4. **Needs Implementation:** bind coordinate actions to the screenshot observation
-   and reject stale visual targeting; preserve crop and monitor transforms.
+4. **Implemented (2026-10-30, §9 wave 1):** coordinate actions name the `frameId`
+   of the picture or read they came from; the lease rejects a stale, foreign or
+   other-display frame before input, and a point without a display lands on its
+   frame's display.
 5. **Needs Decision:** evaluate a compiled replacement for the remaining PowerShell
    driver after measuring the current seams. The small presence helper in this
    change is not a replacement for the driver.
@@ -245,3 +247,123 @@ during that call. It does not interrupt a model stream or create an idle turn.
 Browser viewer movement is bounded/coalesced presence evidence, separately
 identified from viewer commands submitted to the page. Native hook availability
 does not prove lossless input delivery or identify who physically used a device.
+
+## 9. Correctness and trust upgrade, in waves (2026-10-30)
+
+Design properties adopted from a static study of another desktop runtime
+(observation-bound coordinates, one composite look, per-tool effects, host-side
+asks, turn scoping, a model-independent stop); its code and strings are not used.
+The lease, honest receipts and the tool surface stay as they are.
+
+**Wave 1 — correctness floor (implemented).** `frameId` on every picture and
+read, required on coordinate tools and checked by the lease (`control.ts`
+`frameUses`/`#frameRefusal`); one `observe` driver op behind `status` and
+`read_ui` with `screenshot: true`; per-tool effect labels published as MCP
+annotations; structured `read_ui` with identity, patterns, `query`, explicit
+truncation and password redaction; `set_value` refuses a password field unless
+told the person asked; `mouse_button`, `hold_key` and `select_text` answer with
+a picture.
+
+Decided in wave 1: `status` without a picture is still a look for keys and
+references but never a frame; `read_ui` is a `read` effect even though it
+chooses the working window; `clipboard` is `execute` both ways; `mark` is
+`write` because it changes what the person sees.
+
+Decided after wave 1: read-labelled computer tools are **not** admitted as
+kernel `read`. Kernel `read` from Studio is allowed without asking because it
+"reads no more than it needs" (`policy.ts` `defaultVerdict`), and a desktop
+picture can show anything on screen, the person's other work included. The
+labels stay published as MCP annotations and the server keeps its
+`execute`/`network` effects, so a picture is approved like any other computer
+call.
+
+**Wave 2 — trust (implemented).** The runtime stops depending on the model
+behaving:
+
+- *In-component ask (P1-4).* Before admission the service asks the driver
+  (`sensitivity` op) what input would reach: a browser, password manager or
+  terminal (by owning process), or a password field; `open` with `path` and
+  clipboard reads are known from the arguments. Such a call is refused with
+  `approvalRequest {id, category, app, displayName, riskLevel,
+  allowPersistentApproval, maxDuration}` before anything is sent
+  (`computer/approvals.ts`, `service.ts #gate`). The harness bridge
+  (`extend/mcp/capabilities.ts` `askThenCall`) asks the person through the
+  kernel with resource `computer:<category>:<app>` - a policy `ask`
+  (`computer-sensitive-target`) that Auto never resolves - and sends the call
+  once more with the id in `_meta["studio/approval"]`. The kernel refuses an
+  answer longer than `maxDuration` instead of shortening it, and the approval
+  card offers nothing longer. An accepted id is held for two minutes for that
+  actor and that exact process (`pid` + start time), single use. Wave 1's
+  model-settable `password` flag is gone. A batch step that needs asking stops
+  the batch before it is sent and is never bridged, since re-sending a batch
+  would replay its earlier steps.
+- *Turn boundary (P1-5).* The harness stamps the submission id as
+  `_meta["studio/turn"]`; a new turn drops the actor's looks and frames
+  (`control.ts beginTurn`) and resets the driver's element references when
+  that actor read them. No model-callable `new_turn` was added: the stamp does
+  the same without the model's word. The shared latest picture is kept, since
+  a glance taken as the person finished speaking belongs to the new turn and
+  carries its own staleness.
+- *E-stop (P1-6).* Escape held for 0.8 s with a physical key event at the
+  press, while Studio acted in the last 10 s, latches a stop
+  (`activity.cs IsDeliberateStop`). The hooks still read flags only; the key is
+  read with one `GetAsyncKeyState(VK_ESCAPE)` poll on the marker's timer. The
+  driver refuses any further press in the running op (releases always go
+  through), the answer's `userInput.stop` pauses the desktop for everyone
+  (`personStop`) as soon as it is read, remaining batch steps refuse `escape`,
+  and only the person's resume lifts it. A tap stays a touch: stale screen,
+  work continues after a look.
+- *Driver errors and budgets (P1-7, P1-8).* Refusals carry `code`
+  (`no_element`, `refused`, `control`), classified without reading words; a
+  torn answer line fails its request at once; per-op deadlines
+  (`session.ts requestBudget`) replace the uniform 60 s.
+- *Per-monitor-v2 DPI (P1-9).* `SetProcessDpiAwarenessContext(-4)` with the
+  process-wide call as fallback before Windows 10 1703.
+
+Known limits: the approval wait counts against the call's 120 s gate deadline;
+approving with a click in Studio is the person's own input, so the re-sent
+call is usually refused as stale and goes through after the next look, using
+the held approval. Clipboard snapshot/restore (T2-9) moved to wave 4 with the
+other clipboard work.
+
+**Wave 3 — capability and surface (implemented).** One new tool,
+`studio_computer_get_window` (30 in all); everything else is an argument on a
+tool that already had the job, so no voice-tier or `OWNER_TOOLS` change was
+needed (`get_window` is a read, not offered to the voice agent, whose short
+list is for a shared screen).
+
+- *`act` by pattern (T2-2).* The friendly names stay and resolve against the
+  control's own patterns through one table (`Ui-ActionTable`); added
+  `scroll`, `scroll_to`, `set_range`, `increase`, `decrease` (RangeValue),
+  `move`, `resize`, `rotate` (Transform). An action a control cannot take is
+  refused with the ones it can. `scroll` takes a `ref` (T2-7): the control's
+  ScrollPattern, else the wheel at its centre; such a scroll names no frame.
+- *Window capture (T2-3).* `screenshot capture_mode: "window"` uses
+  `PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT)` - one more P/Invoke in the
+  driver, no compiled artifact. It is evidence only: never a frame, because a
+  covered window's drawing is not what a click would hit. A blank capture
+  (GPU-drawn apps) is said, not passed off. `zoom` stays a display close-up.
+- *Window identity (T2-4, N3-1).* `windows` lists each window's pid and
+  process start; `focus` and `arrange` take them and refuse a handle Windows
+  has reused (code `no_element`); `get_window` confirms the same window or
+  lists that process's (or app's) windows now, never choosing.
+- *Keys across calls (N3-2).* `hold_key action: "down" | "up"`, tracked with
+  the held-key set, so any refusal, pause, handoff or stop lets go; a release
+  needs no look, frame or approval.
+- *Drag paths (N3-3).* `drag path` (up to 10 points) and `settle_ms`
+  (at most 2 s) pause at each point; the op's deadline grows with them.
+- *Foreground lock (N3-4).* Folded into `status`: whether Windows is likely to
+  let a window be brought to the front (lock timeout vs. the person's last
+  input), read without trying.
+- *Paste and the clipboard (N3-5, T2-9).* `clipboard action: "paste"` with
+  `format: "text" | "html"` (CF_HTML with a text fallback), asked about like
+  typing, and puts clipboard text back afterwards, saying when an image or
+  file list could not be. A `write` says what kind of thing it replaced and
+  its length, never its content.
+- *`wait_for_window match`* (T2-10): `title`, `app`, or exact `automationid` /
+  `class` of the window's root element.
+- *Batch (T2-6).* `mouse_button` and `arrange` join the steps; `clipboard`
+  stays out (cross-app data, and a read is asked about on its own). A batch
+  whose steps' budgets sum past 100 s is refused before anything is sent.
+
+Audio capture is not planned: Studio has no model allowlist to gate it with.

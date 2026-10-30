@@ -63,6 +63,7 @@ function record(conversationId: string, id = 'ask_1'): PendingApprovalRecord {
     scopes: [{ id: 'once', label: 'Just once', detail: 'This call only', pattern: null }],
     source: 'policy',
     reason: 'Writing asks first.',
+    maxDuration: 'always',
   }
 }
 

@@ -13,6 +13,8 @@ namespace Studio {
         public int Moves, Buttons, Wheels, Keys;
         public long AgeMs;
         public bool Truncated;
+        // The person held Escape while Studio was acting: a deliberate stop.
+        public bool Stop;
     }
 
     public sealed class Activity : IDisposable {
@@ -22,6 +24,8 @@ namespace Studio {
         [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(string name);
         [DllImport("user32.dll")] private static extern bool GetCursorPos(out Point point);
+        // One key's state, asked of the system; the hooks never read which key.
+        [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
         private readonly object gate = new object();
         private readonly ManualResetEvent ready = new ManualResetEvent(false);
         private readonly Hook mouse, keyboard;
@@ -29,6 +33,8 @@ namespace Studio {
         private Marker marker;
         private IntPtr mouseHook, keyboardHook;
         private long lastAt, showUntil, releasedAt;
+        private long actingUntil, escapeSince, lastKeyAt;
+        private bool stopRequested;
         private int mouseButtons;
         private int moves, buttons, wheels, keys;
         private bool available, truncated, stopped;
@@ -42,7 +48,32 @@ namespace Studio {
             }
             ready.WaitOne(2000);
         }
-        public void Pulse() { lock (gate) { showUntil = Stopwatch.GetTimestamp() + Stopwatch.Frequency * 5; } }
+        public void Pulse() {
+            lock (gate) {
+                long now = Stopwatch.GetTimestamp();
+                showUntil = now + Stopwatch.Frequency * 5; actingUntil = now + Stopwatch.Frequency * 10;
+            }
+        }
+        // Peeked by the driver between input events; cleared only by Read.
+        public bool StopRequested { get { lock (gate) { return stopRequested; } } }
+
+        // A deliberate stop is Escape held down for most of a second, while
+        // Studio acted in the last ten, with a physical (non-injected) key
+        // event at the press: Studio's own held Escape makes none, and a tap
+        // is incidental input that only makes the screen stale.
+        public static bool IsDeliberateStop(long now, long escapeSince, long lastKeyAt, long actingUntil, long frequency) {
+            if (escapeSince == 0 || now - escapeSince < frequency * 8 / 10) return false;
+            if (actingUntil < escapeSince) return false;
+            return lastKeyAt != 0 && lastKeyAt >= escapeSince - frequency / 10;
+        }
+        private void Watch(long now) {
+            bool down = (GetAsyncKeyState(0x1B) & 0x8000) != 0;
+            lock (gate) {
+                if (!down) { escapeSince = 0; return; }
+                if (escapeSince == 0) escapeSince = now;
+                if (!stopRequested && IsDeliberateStop(now, escapeSince, lastKeyAt, actingUntil, Stopwatch.Frequency)) stopRequested = true;
+            }
+        }
         public void Dismiss() { lock (gate) { showUntil = 0; mouseButtons = 0; releasedAt = 0; } }
         public void MouseButton(int flags) {
             lock (gate) {
@@ -75,7 +106,7 @@ namespace Studio {
                 if (kind == "mouse_move") Increment(ref moves);
                 else if (kind == "mouse_button") Increment(ref buttons);
                 else if (kind == "mouse_wheel") Increment(ref wheels);
-                else Increment(ref keys);
+                else { Increment(ref keys); lastKeyAt = lastAt; }
             }
         }
         private void Increment(ref int count) { if (count < 1000000) count++; else truncated = true; }
@@ -83,8 +114,9 @@ namespace Studio {
             lock (gate) {
                 InputSummary value = new InputSummary { Available = available,
                     Moves = moves, Buttons = buttons, Wheels = wheels, Keys = keys,
-                    AgeMs = lastAt == 0 ? 0 : (Stopwatch.GetTimestamp() - lastAt) * 1000 / Stopwatch.Frequency, Truncated = truncated };
-                moves = buttons = wheels = keys = 0; truncated = false;
+                    AgeMs = lastAt == 0 ? 0 : (Stopwatch.GetTimestamp() - lastAt) * 1000 / Stopwatch.Frequency, Truncated = truncated,
+                    Stop = stopRequested };
+                moves = buttons = wheels = keys = 0; truncated = false; stopRequested = false;
                 return value;
             }
         }
@@ -117,6 +149,7 @@ namespace Studio {
                             if (releaseProgress >= 1) releaseProgress = -1;
                         }
                         if (end) { Application.ExitThread(); return; }
+                        Watch(Stopwatch.GetTimestamp());
                         Point point;
                         if (show && GetCursorPos(out point)) {
                             Rectangle area = Screen.FromPoint(point).Bounds;

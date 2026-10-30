@@ -92,6 +92,12 @@ export interface PendingApprovalRecord {
   readonly source: DecisionSourceWire
   /** The kernel's short sentence for why this needs a person. */
   readonly reason: string
+  /**
+   * The longest answer the kernel will accept. A longer one is refused, not
+   * shortened, so the prompt offers nothing past it. `always` when the
+   * kernel set no limit.
+   */
+  readonly maxDuration: GrantDuration
 }
 
 export function parsePendingApproval(value: unknown): PendingApprovalRecord | null {
@@ -128,6 +134,11 @@ export function parsePendingApproval(value: unknown): PendingApprovalRecord | nu
   const scopes = listOf(parseApprovalScope, request['scopes'])
   const source = oneOf<DecisionSourceWire>(['policy', 'grant', 'default'], decision['source'])
   const reason = text(decision['reason'])
+  // Absent is no limit; anything unreadable is the narrowest, never the widest.
+  const maxDuration =
+    request['maxDuration'] === undefined
+      ? 'always'
+      : (oneOf<GrantDuration>(['once', 'conversation', 'always'], request['maxDuration']) ?? 'once')
   if (
     scopes === null ||
     source === null ||
@@ -151,6 +162,7 @@ export function parsePendingApproval(value: unknown): PendingApprovalRecord | nu
     scopes,
     source,
     reason,
+    maxDuration,
   }
 }
 

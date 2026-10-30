@@ -20,7 +20,7 @@ vi.mock('framer-motion', () => ({
   motion: new Proxy({}, { get: () => (props: Record<string, unknown>) => <div {...props} /> }),
 }))
 
-function record(agentId: string, resource: string): PendingApprovalRecord {
+function record(agentId: string, resource: string, maxDuration: PendingApprovalRecord['maxDuration'] = 'always'): PendingApprovalRecord {
   return {
     id: `approval-${agentId}-${resource}`,
     createdAt: 1_000,
@@ -36,6 +36,7 @@ function record(agentId: string, resource: string): PendingApprovalRecord {
     ],
     source: 'default',
     reason: 'native/write has not been approved yet.',
+    maxDuration,
   }
 }
 
@@ -90,5 +91,29 @@ describe('ApprovalPrompt attribution', () => {
     expect(screen.getByText('Permission')).not.toBeNull()
     expect(screen.getByText(/the general agent asks to/i)).not.toBeNull()
     expect(screen.getByText('general.html')).not.toBeNull()
+  })
+})
+
+/**
+ * P1-4: the kernel refuses an answer longer than the request allows rather
+ * than shortening it, so the card never offers one.
+ */
+describe('ApprovalPrompt duration limit', () => {
+  it('offers only "Just once" when that is all the kernel takes', () => {
+    render(<ApprovalPrompt questions={[questionFromRecord(record('studio', 'computer:password_field:app', 'once'))]} hasProject answeringId={null} onAnswer={answer} />)
+    expect(screen.queryByText('This conversation')).toBeNull()
+    expect(screen.queryByText('Always')).toBeNull()
+    expect(screen.getByText('Just once')).not.toBeNull()
+  })
+
+  it('stops at "This conversation" when that is the limit', () => {
+    render(<ApprovalPrompt questions={[questionFromRecord(record('studio', 'computer:terminal:wt', 'conversation'))]} hasProject answeringId={null} onAnswer={answer} />)
+    expect(screen.getByText('This conversation')).not.toBeNull()
+    expect(screen.queryByText('Always')).toBeNull()
+  })
+
+  it('offers every duration with no limit', () => {
+    render(<ApprovalPrompt questions={[questionFromRecord(record('studio', 'C:/home/workspace/a.txt'))]} hasProject answeringId={null} onAnswer={answer} />)
+    expect(screen.getByText('Always')).not.toBeNull()
   })
 })

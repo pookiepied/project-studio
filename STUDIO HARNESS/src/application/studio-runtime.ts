@@ -958,8 +958,12 @@ export class StudioRuntime implements AgentHost {
         this.#selection
           .resolve("mcp", serverId, this.#enablementContext(conversationId))
           .enabled,
-      actorMeta: (scope) => systemActorMeta(scope, currentExecutionContext()?.flueInstanceId,
-        (instanceId) => this.#tasks.get(instanceId)?.title, (conversationId) => this.#screenSharing.has(conversationId)),
+      actorMeta: (scope) => {
+        const execution = currentExecutionContext();
+        return systemActorMeta(scope, execution?.flueInstanceId,
+          (instanceId) => this.#tasks.get(instanceId)?.title, (conversationId) => this.#screenSharing.has(conversationId),
+          execution?.flueSubmissionId);
+      },
     });
     this.#supervisor = new McpSupervisor({
       launch: createMcpLauncher({

@@ -19,13 +19,21 @@ export class InputUpdates {
   #wheels = 0;
   #keys = 0;
   #truncated = false;
+  #stop = false;
 
   get hasUpdates(): boolean { return this.#latest !== undefined; }
+
+  /** The person clicked, typed or scrolled during this call: the screen may not be what was pictured. */
+  get human(): boolean { return this.#buttons + this.#keys + this.#wheels > 0; }
+
+  /** The person held Escape to stop computer use (P1-6). A flag, never which key. */
+  get stop(): boolean { return this.#stop; }
 
   add(value: unknown): void {
     if (!record(value) || typeof value["available"] !== "boolean") return;
     this.#moves += count(value["moves"]); this.#buttons += count(value["buttons"]);
     this.#wheels += count(value["wheels"]); this.#keys += count(value["keys"]);
+    this.#stop ||= value["stop"] === true;
     this.#truncated ||= value["truncated"] === true || Math.max(this.#moves, this.#buttons, this.#wheels, this.#keys) > 1_000_000;
     this.#moves = count(this.#moves); this.#buttons = count(this.#buttons);
     this.#wheels = count(this.#wheels); this.#keys = count(this.#keys);
@@ -40,9 +48,11 @@ export class InputUpdates {
 
   decorate(result: ToolAnswer): ToolAnswer {
     if (this.#latest === undefined) return result;
-    const activity = { ...this.#latest, moves: this.#moves, buttons: this.#buttons, wheels: this.#wheels, keys: this.#keys, truncated: this.#truncated };
+    const activity = { ...this.#latest, moves: this.#moves, buttons: this.#buttons, wheels: this.#wheels, keys: this.#keys, truncated: this.#truncated, stop: this.#stop };
     const message = this.#moves + this.#buttons + this.#wheels + this.#keys > 0
-      ? `User interaction observed (non-injected input): ${activity.moves} mouse moves, ${activity.buttons} button events, ${activity.wheels} wheel events, ${activity.keys} keyboard events. ${this.#truncated ? "Activity counts were truncated. " : ""}Key contents were not collected. Current state: ${JSON.stringify(this.#latest)}. ${this.#latest["available"] === true ? "" : "Physical input monitoring is now unavailable. "}Reobserve the intended controls before continuing; do not repeat an uncertain action. Computer use has not been stopped automatically.`
+      ? `User interaction observed (non-injected input): ${activity.moves} mouse moves, ${activity.buttons} button events, ${activity.wheels} wheel events, ${activity.keys} keyboard events. ${this.#truncated ? "Activity counts were truncated. " : ""}Key contents were not collected. Current state: ${JSON.stringify(this.#latest)}. ${this.#latest["available"] === true ? "" : "Physical input monitoring is now unavailable. "}${this.#stop
+        ? "The person held Escape to stop computer use, so it is paused until they resume it. Stop and report; do not replay anything."
+        : "Reobserve the intended controls before continuing; do not repeat an uncertain action. Computer use has not been stopped automatically."}`
       : "Physical input monitoring is unavailable. Absence of an interaction report does not prove that the person did not interact. Computer use has not been stopped automatically.";
     return { ...result, content: [...result.content, { type: "text", text: message }], structuredContent: { ...result.structuredContent, userInput: activity } };
   }

@@ -114,10 +114,16 @@ export function ApprovalPrompt({
             ariaLabel="How long this answer lasts"
             value={duration}
             onChange={setDuration}
+            // Nothing longer than the kernel accepts: it refuses a longer
+            // answer outright rather than shortening it.
             options={[
               { id: 'once' as const, label: 'Just once' },
-              { id: 'conversation' as const, label: 'This conversation' },
-              ...(hasProject ? [{ id: 'always' as const, label: 'Always' }] : []),
+              ...(question.maxDuration === 'once'
+                ? []
+                : [{ id: 'conversation' as const, label: 'This conversation' }]),
+              ...(hasProject && question.maxDuration === 'always'
+                ? [{ id: 'always' as const, label: 'Always' }]
+                : []),
             ]}
           />
           <div className="flex items-center gap-1.5">

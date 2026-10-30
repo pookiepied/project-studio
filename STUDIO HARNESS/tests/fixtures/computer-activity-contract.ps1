@@ -21,6 +21,16 @@ $activity.Record($checks.injectedKey); $activity.Record($checks.injectedMouse)
 $checks.summary = $activity.Read()
 $checks.drained = $activity.Read()
 $checks.fields = @([Studio.InputSummary].GetFields() | ForEach-Object { $_.Name })
+# The deliberate-stop policy with a 1000-tick clock: Escape held since 1000.
+$checks.stop = [ordered]@{
+  heldWhileActing = [Studio.Activity]::IsDeliberateStop(1900, 1000, 1000, 5000, 1000)
+  tapped = [Studio.Activity]::IsDeliberateStop(1500, 1000, 1000, 5000, 1000)
+  injectedHold = [Studio.Activity]::IsDeliberateStop(1900, 1000, 0, 5000, 1000)
+  oldKeyOnly = [Studio.Activity]::IsDeliberateStop(1900, 1000, 500, 5000, 1000)
+  notActing = [Studio.Activity]::IsDeliberateStop(1900, 1000, 1000, 900, 1000)
+  notHeld = [Studio.Activity]::IsDeliberateStop(1900, 0, 1000, 5000, 1000)
+}
+$checks.stopIdle = $activity.StopRequested
 $checks.overlayAbsent = -not $activity.IsOverlay(100)
 $activity.Dispose()
 # Exercise the shipped drawing without a form, hooks or desktop input.

@@ -28,6 +28,7 @@ Add-Type -Namespace Studio -Name Native -MemberDefinition @'
 [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public INPUTUNION u; }
 public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+[DllImport("user32.dll", SetLastError = true)] public static extern bool SetProcessDpiAwarenessContext(IntPtr context);
 [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
 [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
 [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint n, INPUT[] inputs, int size);
@@ -55,9 +56,20 @@ public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
 [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
+[DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
+[StructLayout(LayoutKind.Sequential)] public struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+[DllImport("user32.dll")] public static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
+[DllImport("user32.dll")] public static extern bool SystemParametersInfoW(uint action, uint param, ref uint value, uint winIni);
 '@
 
-[void][Studio.Native]::SetProcessDPIAware()
+# Per-monitor v2, so window rectangles, UI Automation bounds, the pointer and
+# captured pixels are all physical pixels on every display. Process-wide
+# awareness (the fallback, before Windows 10 1703) is scaled on mixed-DPI
+# setups, where a control's centre and the picture disagree. -4 is
+# DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2.
+$script:DpiAwareness = "per_monitor_v2"
+try { if (-not [Studio.Native]::SetProcessDpiAwarenessContext([IntPtr](-4))) { throw "unset" } }
+catch { [void][Studio.Native]::SetProcessDPIAware(); $script:DpiAwareness = "system" }
 
 $script:Activity = $null
 $script:MonitorUnavailable = $false
@@ -66,6 +78,15 @@ try {
   Add-Type -Path (Join-Path $PSScriptRoot "activity.cs") -ReferencedAssemblies System.Drawing, System.Windows.Forms
   $script:Activity = New-Object Studio.Activity
 } catch { $script:MonitorUnavailable = $true }
+
+# A refusal the server sorts by its code rather than by reading its words:
+# no_element (a stale or vanished reference), refused (Windows or a guard
+# said no) or, with no code, bad input.
+function Fail($code, $message) {
+  $e = New-Object System.Exception $message
+  $e.Data["studioCode"] = $code
+  throw $e
+}
 
 # Whether an argument was given. The Node side sends "" for "not given", and
 # a number is compared against "" by converting "" to a number: in
@@ -140,7 +161,32 @@ function Resolve-Display($index) {
 # A PNG of one display, or a region of it, scaled so the longest side is at
 # most `max` pixels. The answer names the full frame the picture stands for,
 # because the model acts in that frame and never in the picture's pixels.
-function Take-Screenshot($display, $region, $max, $format, $quality, $window, $budget) {
+# A window's own drawing, through PrintWindow with PW_RENDERFULLCONTENT (2):
+# what it paints even where another window covers it. Some apps draw with
+# the GPU (Chromium, Direct3D) and answer blank; that is reported, never
+# passed off as a picture of an empty window.
+function Capture-Window($wh, $wr) {
+  $ww = [Math]::Max(1, $wr.Right - $wr.Left); $wh2 = [Math]::Max(1, $wr.Bottom - $wr.Top)
+  $bmp = New-Object System.Drawing.Bitmap $ww, $wh2
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $printed = $false
+  try { $hdc = $g.GetHdc(); try { $printed = [Studio.Native]::PrintWindow($wh, $hdc, 2) } finally { $g.ReleaseHdc($hdc) } } finally { $g.Dispose() }
+  return @{ bitmap = $bmp; printed = $printed; blank = (Is-Blank $bmp) }
+}
+
+# Every sampled pixel the same colour: nothing was drawn.
+function Is-Blank($bitmap) {
+  $first = $bitmap.GetPixel(0, 0).ToArgb()
+  $stepX = [Math]::Max(1, [int]($bitmap.Width / 16)); $stepY = [Math]::Max(1, [int]($bitmap.Height / 16))
+  for ($sx = 0; $sx -lt $bitmap.Width; $sx += $stepX) {
+    for ($sy = 0; $sy -lt $bitmap.Height; $sy += $stepY) { if ($bitmap.GetPixel($sx, $sy).ToArgb() -ne $first) { return $false } }
+  }
+  return $true
+}
+
+function Take-Screenshot($display, $region, $max, $format, $quality, $window, $budget, $mode) {
+  $windowMode = $mode -eq "window"
+  if ($windowMode -and (-not (Given $window) -or [int64]$window -eq 0)) { throw "Window capture pictures one window: give its handle." }
   # A window handle picks the display and the region both: the rectangle the
   # window covers, clipped to the display its centre is on. The answer still
   # names that display's frame, so a point in the picture is a point to click.
@@ -163,9 +209,18 @@ function Take-Screenshot($display, $region, $max, $format, $quality, $window, $b
     $rx1 = [Math]::Max($rx0 + 1, [Math]::Min($rx1, $w)); $ry1 = [Math]::Max($ry0 + 1, [Math]::Min($ry1, $h))
     $x = $b.X + $rx0; $y = $b.Y + $ry0; $w = $rx1 - $rx0; $h = $ry1 - $ry0
   }
-  $bmp = New-Object System.Drawing.Bitmap $w, $h
-  $g = [System.Drawing.Graphics]::FromImage($bmp)
-  try { $g.CopyFromScreen($x, $y, 0, 0, (New-Object System.Drawing.Size $w, $h)) } finally { $g.Dispose() }
+  $captured = $null
+  if ($windowMode) {
+    $whole = Capture-Window $wh $wr
+    $captured = $whole
+    # The part of the window on its display, cut from the window's own drawing.
+    $bmp = $whole.bitmap.Clone((New-Object System.Drawing.Rectangle ($x - $wr.Left), ($y - $wr.Top), $w, $h), $whole.bitmap.PixelFormat)
+    $whole.bitmap.Dispose()
+  } else {
+    $bmp = New-Object System.Drawing.Bitmap $w, $h
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    try { $g.CopyFromScreen($x, $y, 0, 0, (New-Object System.Drawing.Size $w, $h)) } finally { $g.Dispose() }
+  }
   # Sampled straight after the pixels and before encoding, so "what am I
   # pointing at" pairs this picture with this pointer, never an older one.
   $pointer = Get-Cursor
@@ -196,7 +251,9 @@ function Take-Screenshot($display, $region, $max, $format, $quality, $window, $b
     imageWidth = $picture.width; imageHeight = $picture.height
     mimeType = $picture.mime; data = $picture.data
     pointer = $pointer; front = $frontRow
+    captureMode = $(if ($windowMode) { "window" } else { "display" })
   }
+  if ($windowMode) { $answer.printed = [bool]$captured.printed; $answer.blank = [bool]$captured.blank }
   if ($null -ne $picture.note) { $answer.note = $picture.note }
   return $answer
 }
@@ -312,9 +369,28 @@ function New-Input([uint32]$type, $union) {
   return $i
 }
 
+# Whether every event lets go of something: a key up, or a button up with
+# no press, move or wheel. Releases always go through, even after a stop.
+function Is-Release($inputs) {
+  foreach ($i in $inputs) {
+    if ($i.type -eq 1) { if (($i.u.ki.dwFlags -band 0x2) -eq 0) { return $false } }
+    elseif (($i.u.mi.dwFlags -band 0x54) -eq 0 -or ($i.u.mi.dwFlags -band 0x182B) -ne 0) { return $false }
+  }
+  return $true
+}
+
+# The person held Escape while Studio acted (activity.cs): nothing more is pressed.
+function Stop-Requested {
+  if ($null -ne $script:InputPending -and $script:InputPending.stop -eq $true) { return $true }
+  return $null -ne $script:Activity -and $script:Activity.StopRequested
+}
+
 function Send-Inputs([Studio.Native+INPUT[]]$inputs, $what) {
+  if ((Stop-Requested) -and -not (Is-Release $inputs)) {
+    Fail "control" "The person held Escape to stop computer use, so this $what and everything after it were not sent."
+  }
   $sent = [Studio.Native]::SendInput($inputs.Count, $inputs, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
-  if ($sent -ne $inputs.Count) { throw "Windows refused the $what. A window that runs as administrator cannot be driven from here." }
+  if ($sent -ne $inputs.Count) { Fail "refused" "Windows refused the $what. A window that runs as administrator cannot be driven from here." }
   if ($null -ne $script:Activity) { $script:Activity.Pulse() }
 }
 
@@ -411,21 +487,31 @@ function Click-At($display, $x, $y, $button, $count, $modifiers) {
 # steps with time between them, arrive at the end, settle, release. Every
 # position is an injected move (see Move-Pointer), so the window sees the
 # whole stream and not just its two ends.
-function Drag-Pointer($display, $from, $to) {
-  $fx = [int]$from[0]; $fy = [int]$from[1]; $tx = [int]$to[0]; $ty = [int]$to[1]
-  Move-Pointer $display $fx $fy
+function Drag-Pointer($display, $from, $to, $path, $settle) {
+  $points = @(,@([int]$from[0], [int]$from[1]))
+  if ($null -ne $path) { foreach ($p in $path) { $points += ,@([int]$p[0], [int]$p[1]) } }
+  $points += ,@([int]$to[0], [int]$to[1])
+  # A pause at each waypoint, for targets that react to hovering (a folder
+  # that opens, a list that scrolls, an HTML5 drop zone that lights up).
+  $pause = if (-not (Given $settle)) { 0 } else { [Math]::Max(0, [Math]::Min(2000, [int]$settle)) }
+  Move-Pointer $display $points[0][0] $points[0][1]
   Start-Sleep -Milliseconds 60
   Press-Button "left" "down"
   Start-Sleep -Milliseconds 80
-  $steps = [Math]::Max(6, [Math]::Min(24, [int]([Math]::Sqrt(($tx - $fx) * ($tx - $fx) + ($ty - $fy) * ($ty - $fy)) / 25)))
-  for ($s = 1; $s -le $steps; $s++) {
-    Move-Pointer $display ([int]($fx + ($tx - $fx) * $s / $steps)) ([int]($fy + ($ty - $fy) * $s / $steps))
-    Start-Sleep -Milliseconds 20
+  for ($leg = 1; $leg -lt $points.Count; $leg++) {
+    $fx = $points[$leg - 1][0]; $fy = $points[$leg - 1][1]; $tx = $points[$leg][0]; $ty = $points[$leg][1]
+    $steps = [Math]::Max(6, [Math]::Min(24, [int]([Math]::Sqrt(($tx - $fx) * ($tx - $fx) + ($ty - $fy) * ($ty - $fy)) / 25)))
+    for ($s = 1; $s -le $steps; $s++) {
+      Move-Pointer $display ([int]($fx + ($tx - $fx) * $s / $steps)) ([int]($fy + ($ty - $fy) * $s / $steps))
+      Start-Sleep -Milliseconds 20
+    }
+    if ($leg -lt $points.Count - 1 -and $pause -gt 0) { Start-Sleep -Milliseconds $pause }
   }
-  Move-Pointer $display $tx $ty
-  Start-Sleep -Milliseconds 60
+  Move-Pointer $display $points[-1][0] $points[-1][1]
+  Start-Sleep -Milliseconds ([Math]::Max(60, $pause))
   Press-Button "left" "up"
   Start-Sleep -Milliseconds 60
+  return $points.Count - 2
 }
 
 function Scroll-At($display, $x, $y, $direction, $amount) {
@@ -522,6 +608,21 @@ function Hold-Chord($chord, $seconds) {
   foreach ($c in $codes) { Send-Key $c $true }
   try { Start-Sleep -Milliseconds ([int]([double]$seconds * 1000)) }
   finally { for ($k = $codes.Count - 1; $k -ge 0; $k--) { Send-Key $codes[$k] $false } }
+}
+
+# A key or chord pressed in one call and let go in a later one, for a
+# modifier held across clicks (shift-click a range, ctrl-click several).
+# Held keys are tracked like a held button: any refusal, pause, handoff or
+# stop lets them go.
+function Toggle-Chord($chord, $action) {
+  $codes = @($chord.Split("+") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" } | ForEach-Object { Resolve-Key $_ })
+  if ($codes.Count -eq 0) { throw "Say which key to press or release." }
+  switch ($action) {
+    "down" { foreach ($c in $codes) { Send-Key $c $true } }
+    "up" { for ($k = $codes.Count - 1; $k -ge 0; $k--) { Send-Key $codes[$k] $false } }
+    default { throw "The action must be down or up." }
+  }
+  return @($script:HeldKeys.Keys).Count
 }
 
 # Text goes in as Unicode key events, one per character, which reaches every
@@ -743,6 +844,52 @@ function Front-Note {
   $mine = Describe-Window $script:Target
   $front = if ($fg -eq 0) { "no window" } else { Describe-Window $fg }
   return "The window in front is now $front, not $mine. Keys that went out after the change landed there; check what arrived before going on."
+}
+
+# Whether Windows is likely to let the driver bring a window to the front,
+# read without trying: SetForegroundWindow is allowed to a process that sent
+# the last input, or once the foreground lock timeout has passed since the
+# last input. Read-only; it answers why focus may honestly fail.
+function Get-ForegroundLock {
+  $timeout = [uint32]0
+  [void][Studio.Native]::SystemParametersInfoW(0x2000, 0, [ref]$timeout, 0)
+  $info = New-Object Studio.Native+LASTINPUTINFO
+  $info.cbSize = [uint32][System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+LASTINPUTINFO])
+  $idle = $null
+  if ([Studio.Native]::GetLastInputInfo([ref]$info)) { $idle = [int64](([Environment]::TickCount -band 0xFFFFFFFFL) - $info.dwTime) }
+  $fg = [int64][Studio.Native]::GetForegroundWindow()
+  $front = if ($fg -eq 0) { $null } else { Window-Row (Root-Of $fg) }
+  $likely = $fg -eq 0 -or ($null -ne $idle -and $idle -ge $timeout)
+  return [ordered]@{
+    timeoutMs = [int64]$timeout; idleMs = $idle; frontApp = $(if ($null -eq $front) { "" } else { $front.app })
+    likely = $likely
+    reason = $(if ($fg -eq 0) { "no window is in front" } elseif ($likely) { "the foreground lock has timed out" } else { "the person used the computer within the foreground lock time; focus works after Studio's own input, or after the lock times out" })
+  }
+}
+
+# A handle names a window only while the process that made it is alive: a
+# handle Windows has reused belongs to someone else. A call that says which
+# process it means is refused when the handle now belongs to another.
+function Assert-Identity($handle, $processId, $started) {
+  if (-not (Given $processId)) { return }
+  $row = Window-Row $handle
+  if ($null -eq $row -or [int]$row.pid -ne [int]$processId -or ((Given $started) -and [string]$row.processStarted -ne [string]$started)) {
+    Fail "no_element" "Window $handle no longer belongs to the process it was listed for; Windows may have reused the handle. Nothing was done. Use get_window or list windows again."
+  }
+}
+
+# A known window found again: the handle when it still belongs to the same
+# process, otherwise that process's current windows to choose from. Never
+# picks for the caller.
+function Get-Window($handle, $processId, $started, $app) {
+  $row = if ((Given $handle)) { Window-Row $handle } else { $null }
+  $same = $null -ne $row -and (-not (Given $processId) -or ([int]$row.pid -eq [int]$processId -and (-not (Given $started) -or [string]$row.processStarted -eq [string]$started)))
+  if ($same) { return [ordered]@{ found = $true; same = $true; window = $row } }
+  $all = @(Get-TopWindows $null)
+  $candidates = @()
+  if ((Given $processId)) { $candidates = @($all | Where-Object { [int]$_.pid -eq [int]$processId -and (-not (Given $started) -or [string]$_.processStarted -eq [string]$started) }) }
+  if ($candidates.Count -eq 0 -and (Given $app)) { $needle = ([string]$app).ToLowerInvariant(); $candidates = @($all | Where-Object { $_.app.ToLowerInvariant() -eq $needle }) }
+  return [ordered]@{ found = $candidates.Count -gt 0; same = $false; reused = $null -ne $row; windows = @($candidates | Select-Object -First 20) }
 }
 
 function Focus-Window($handle) {
@@ -1035,13 +1182,15 @@ function Arrange-Window($handle, $action, $display, $x, $y, $width, $height) {
 # A window that is not there yet: a dialog a click will raise, a file that
 # takes a moment to open. Waits up to `seconds` for a visible top-level
 # window whose app or title contains the text, and names it by handle.
-function Wait-ForWindow($text, $seconds) {
+function Wait-ForWindow($text, $seconds, $match) {
   if (-not (Given $text)) { throw "Say which window to wait for: part of its title or its app." }
+  $by = if (-not (Given $match)) { "any" } else { [string]$match }
+  if ($by -notin @("any", "title", "app", "automationid", "class")) { throw "match must be title, app, automationid or class." }
   $limit = if (-not (Given $seconds)) { 10 } else { [Math]::Min([double]$seconds, 60) }
   $deadline = [DateTime]::UtcNow.AddSeconds($limit)
   $needle = $text.ToLowerInvariant()
   while ($true) {
-    $found = @(Get-TopWindows $null | Where-Object { -not $_.minimized -and ($_.app.ToLowerInvariant() -like "*$needle*" -or $_.title.ToLowerInvariant() -like "*$needle*") })
+    $found = @(Get-TopWindows $null | Where-Object { -not $_.minimized -and (Window-Matches $_ $by $needle) })
     if ($found.Count -gt 0) {
       $pick = Select-UniqueWindow $found
       $adopted = Owned-ByTarget $pick
@@ -1050,6 +1199,19 @@ function Wait-ForWindow($text, $seconds) {
     }
     if ([DateTime]::UtcNow -ge $deadline) { return [ordered]@{ found = $false; waited = $limit } }
     Start-Sleep -Milliseconds 250
+  }
+}
+
+# Whether a listed window matches: by title or app (substring), or by the
+# root element's AutomationId or ClassName (exact), which survive a title
+# that changes with the document.
+function Window-Matches($row, $by, $needle) {
+  switch ($by) {
+    "title" { return $row.title.ToLowerInvariant() -like "*$needle*" }
+    "app" { return $row.app.ToLowerInvariant() -like "*$needle*" }
+    "automationid" { try { return ([System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][int64]$row.handle)).Current.AutomationId.ToLowerInvariant() -eq $needle } catch { return $false } }
+    "class" { try { return ([System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][int64]$row.handle)).Current.ClassName.ToLowerInvariant() -eq $needle } catch { return $false } }
+    default { return $row.app.ToLowerInvariant() -like "*$needle*" -or $row.title.ToLowerInvariant() -like "*$needle*" }
   }
 }
 
@@ -1094,7 +1256,62 @@ function Ui-Root($window) {
 
 $Interactive = @("button", "check box", "radio button", "combo box", "edit", "hyperlink", "list item", "menu item", "tab item", "slider", "spinner", "split button", "tree item", "document", "menu bar", "menu", "list", "tab", "tool bar", "data item", "header item")
 
-function Read-Ui($window, $depth, $limit, $all) {
+function One-Line($text, [int]$max) {
+  if ($null -eq $text) { return "" }
+  $flat = ([string]$text).Replace("`r", " ").Replace("`n", " ")
+  return $flat.Substring(0, [Math]::Min($max, $flat.Length))
+}
+
+# One control as a record: what the outline line says, plus the identity a
+# later read can match it by (AutomationId, ClassName, RuntimeId) and the
+# patterns it supports. A password field's value is never read at all, not
+# read and then hidden: a provider exposes a masked box's contents through
+# ValuePattern, and what is read here reaches the model's context and its
+# transcript. Pure over the element's own properties, so the contract test
+# runs it on doubles.
+function Element-Record($el, $type, $name, $rect, [int]$index, [int]$depth) {
+  $record = [ordered]@{ ref = "ui_$($script:RefsEpoch)_$index"; role = [string]$type; name = (One-Line $name 120); depth = $depth }
+  $password = $false
+  try { $password = [bool]$el.Current.IsPassword } catch {}
+  $record.password = $password
+  $patterns = @()
+  try { $patterns = @($el.GetSupportedPatterns() | ForEach-Object { ([string]$_.ProgrammaticName) -replace 'PatternIdentifiers\.Pattern$', '' }) } catch {}
+  $record.patterns = $patterns
+  if ($password) { $record.value = "[password]" }
+  elseif ($patterns -contains "Value") {
+    try {
+      $v = [string]$el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+      if ($v -ne "") { $record.value = One-Line $v 60 }
+    } catch {}
+  }
+  if ($patterns -contains "Toggle") {
+    try { if ($el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) { $record.checked = $true } } catch {}
+  }
+  $record.enabled = $true; $record.focused = $false
+  try { $record.enabled = [bool]$el.Current.IsEnabled; $record.focused = [bool]$el.Current.HasKeyboardFocus } catch {}
+  $record.automationId = ""; $record.className = ""; $record.runtimeId = ""
+  try { $record.automationId = One-Line $el.Current.AutomationId 120; $record.className = One-Line $el.Current.ClassName 120 } catch {}
+  try { $record.runtimeId = (@($el.GetRuntimeId()) -join ".") } catch {}
+  $point = Control-Point $rect
+  $record.display = $point.display
+  $record.center = [ordered]@{ x = $point.x; y = $point.y }
+  return $record
+}
+
+# The outline line for one record, as read_ui has always written it.
+function Element-Line($record) {
+  $parts = @(("  " * [Math]::Min($record.depth, 8)) + $record.role)
+  if ($record.name -ne "") { $parts += ('"' + $record.name + '"') }
+  if ($null -ne $record.value) { $parts += ('value="' + $record.value + '"') }
+  if ($record.checked -eq $true) { $parts += "checked" }
+  if (-not $record.enabled) { $parts += "disabled" }
+  if ($record.focused) { $parts += "focused" }
+  $parts += "display $($record.display) @($($record.center.x),$($record.center.y))"
+  $parts += "[$($record.ref)]"
+  return ($parts -join " ")
+}
+
+function Read-Ui($window, $depth, $limit, $all, $query) {
   Begin-UiRead (Ui-Handle $window) $script:ObservationId
   $root = Ui-Root $window
   # Reading a window is choosing it: the refs it hands out belong to it, and
@@ -1103,9 +1320,12 @@ function Read-Ui($window, $depth, $limit, $all) {
   $maxDepth = if (-not (Given $depth)) { 12 } else { [int]$depth }
   $maxLines = if (-not (Given $limit)) { 400 } else { [int]$limit }
   $everything = ($all -eq $true)
+  $needle = if (Given $query) { ([string]$query).ToLowerInvariant() } else { "" }
   $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
   $lines = New-Object System.Collections.Generic.List[string]
+  $elements = New-Object System.Collections.Generic.List[object]
   $counter = 0
+  $depthLimited = $false
   $stack = New-Object System.Collections.Generic.Stack[object]
   $stack.Push(@{ el = $root; d = 0 })
   while ($stack.Count -gt 0 -and $lines.Count -lt $maxLines) {
@@ -1118,28 +1338,13 @@ function Read-Ui($window, $depth, $limit, $all) {
       $rect = $el.Current.BoundingRectangle
     } catch { continue }
     $wanted = $everything -or ($Interactive -contains $type) -or ($el.Current.IsKeyboardFocusable)
-    if ($wanted -and -not $off -and $rect.Width -gt 0) {
+    $matched = $needle -eq "" -or ([string]$name).ToLowerInvariant().Contains($needle) -or ([string]$type).ToLowerInvariant().Contains($needle)
+    if ($wanted -and $matched -and -not $off -and $rect.Width -gt 0) {
       $counter += 1
       $script:Refs[$counter] = $el
-      $parts = @(("  " * [Math]::Min($d, 8)) + $type)
-      if ($name -ne "") { $parts += ('"' + $name.Replace("`n", " ").Substring(0, [Math]::Min(120, $name.Length)) + '"') }
-      try {
-        $vp = $null
-        if ($el.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) {
-          $v = $vp.Current.Value
-          if ($v -ne "") { $parts += ('value="' + $v.Substring(0, [Math]::Min(60, $v.Length)) + '"') }
-        }
-        $tp = $null
-        if ($el.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$tp)) {
-          if ($tp.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) { $parts += "checked" }
-        }
-      } catch {}
-      if (-not $el.Current.IsEnabled) { $parts += "disabled" }
-      if ($el.Current.HasKeyboardFocus) { $parts += "focused" }
-      $point = Control-Point $rect
-      $parts += "display $($point.display) @($($point.x),$($point.y))"
-      $parts += "[ui_$($script:RefsEpoch)_$counter]"
-      $lines.Add(($parts -join " "))
+      $record = Element-Record $el $type $name $rect $counter $d
+      $elements.Add($record)
+      $lines.Add((Element-Line $record))
     }
     if ($d -lt $maxDepth) {
       $children = @()
@@ -1148,52 +1353,193 @@ function Read-Ui($window, $depth, $limit, $all) {
         while ($null -ne $c) { $children += $c; $c = $walker.GetNextSibling($c) }
       } catch {}
       for ($i = $children.Count - 1; $i -ge 0; $i--) { $stack.Push(@{ el = $children[$i]; d = $d + 1 }) }
+    } elseif (-not $depthLimited) {
+      try { $depthLimited = $null -ne $walker.GetFirstChild($el) } catch {}
     }
   }
-  if ($lines.Count -ge $maxLines) { $lines.Add("... more elements than $maxLines, not listed.") }
+  # Said, not implied: a read that stopped early says where and what narrows it.
+  $truncated = $stack.Count -gt 0
+  if ($truncated) { $lines.Add("... the read stopped at $maxLines controls and the rest of the window was not walked. Give query to narrow it, or a larger limit.") }
+  if ($depthLimited) { $lines.Add("... some controls are deeper than depth $maxDepth and were not listed. Give a larger depth to reach them.") }
   $title = try { $root.Current.Name } catch { "" }
   $minimized = $false
   try { $minimized = [Studio.Native]::IsIconic([IntPtr]$root.Current.NativeWindowHandle) } catch {}
-  return [ordered]@{ window = $title; handle = $script:RefsWindow; observationId = $script:RefsEpoch; minimized = $minimized; outline = ($lines -join "`n") }
+  return [ordered]@{
+    window = $title; handle = $script:RefsWindow; observationId = $script:RefsEpoch; minimized = $minimized
+    truncated = $truncated; depthLimited = $depthLimited; outline = ($lines -join "`n"); elements = $elements.ToArray()
+  }
+}
+
+# ---- What input would land on (P1-4) ----------------------------------------
+#
+# The server asks the person before input reaches a browser, a password
+# manager or a terminal, and before text goes into a password field. This
+# says which, from the process that owns the window the input would reach.
+# It reads names and one flag, never a field's value, and sends nothing.
+
+function App-Category($app) {
+  $apps = [ordered]@{
+    password_manager = @("1password", "bitwarden", "keepass", "keepassxc", "lastpass", "dashlane", "enpass", "roboform", "nordpass", "protonpass", "keeper", "passwordsafe")
+    terminal = @("windowsterminal", "wt", "openconsole", "conhost", "cmd", "powershell", "powershell_ise", "pwsh", "wsl", "bash", "mintty", "alacritty", "wezterm-gui", "hyper", "tabby", "putty", "kitty")
+    browser = @("chrome", "msedge", "firefox", "brave", "opera", "vivaldi", "arc", "iexplore", "chromium", "librewolf", "waterfox", "floorp", "thorium")
+  }
+  $name = ([string]$app).ToLowerInvariant()
+  foreach ($category in $apps.Keys) { if ($apps[$category] -contains $name) { return $category } }
+  return $null
+}
+
+function Get-Sensitivity($a) {
+  $handle = [int64]0; $password = $false
+  switch ([string]$a.kind) {
+    "point" { $handle = Point-Window $a.display $a.x $a.y }
+    "pointer" { $c = Get-Cursor; $handle = Point-Window $c.display $c.x $c.y }
+    "ref" {
+      $handle = $script:RefsWindow
+      try { $password = [bool](Ui-Ref $a.ref).Current.IsPassword } catch {}
+    }
+    "keys" {
+      $handle = $script:Target
+      if ($a.text -eq $true) {
+        try { $focused = [System.Windows.Automation.AutomationElement]::FocusedElement; $password = $null -ne $focused -and [bool]$focused.Current.IsPassword } catch {}
+      }
+    }
+    default { throw "Say what the input would reach: point, ref or keys." }
+  }
+  $row = if ($handle -eq 0) { $null } else { Window-Row $handle }
+  $app = if ($null -eq $row) { "" } else { [string]$row.app }
+  return [ordered]@{
+    app = $app; pid = $(if ($null -eq $row) { 0 } else { $row.pid }); processStarted = $(if ($null -eq $row) { "" } else { $row.processStarted })
+    category = (App-Category $app); password = $password
+  }
 }
 
 function Ui-Ref($ref) {
   if ($null -ne $script:Activity) { Collect-UserInput }
-  if ($ref -notmatch '^ui_([0-9a-f-]{36})_(\d+)$') { throw "That element reference is invalid or stale. Read the window again and copy the complete reference." }
+  if ($ref -notmatch '^ui_([0-9a-f-]{36})_(\d+)$') { Fail "no_element" "That element reference is invalid or stale. Read the window again and copy the complete reference." }
   $epoch = $Matches[1]; $n = [int]$Matches[2]
   if ($epoch -ne $script:RefsEpoch -or $script:RefsIdentity -eq "" -or
       (Window-Identity (Window-Row $script:RefsWindow)) -ne $script:RefsIdentity) {
-    throw "That element reference belongs to an older observation or window. Read the window again."
+    Fail "no_element" "That element reference belongs to an older observation or window. Read the window again."
   }
   $el = $script:Refs[$n]
-  if ($null -eq $el) { throw "That element reference is not in the latest observation. Read the window again." }
-  try { [void]$el.Current.Name; $offscreen = $el.Current.IsOffscreen } catch { throw "That element reference is no longer on screen. Read the window again." }
-  if ($offscreen) { throw "That control is not on screen now (scrolled away, or its panel closed). Read the window again." }
+  if ($null -eq $el) { Fail "no_element" "That element reference is not in the latest observation. Read the window again." }
+  try { [void]$el.Current.Name; $offscreen = $el.Current.IsOffscreen } catch { Fail "no_element" "That element reference is no longer on screen. Read the window again." }
+  if ($offscreen) { Fail "no_element" "That control is not on screen now (scrolled away, or its panel closed). Read the window again." }
   return $el
 }
 
-function Ui-Act($ref, $action) {
-  $el = Ui-Ref $ref
-  $p = $null
-  switch ($action) {
-    "invoke" {
-      if ($el.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$p)) { $p.Invoke(); return "Invoked." }
-      if ($el.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$p)) { $p.Select(); return "Selected." }
-      if ($el.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$p)) { $p.Toggle(); return "Toggled." }
-      throw "That element cannot be invoked. Click its centre instead."
-    }
-    "toggle" { if ($el.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$p)) { $p.Toggle(); return "Toggled." }; throw "That element does not toggle." }
-    "expand" { if ($el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$p)) { $p.Expand(); return "Expanded." }; throw "That element does not expand." }
-    "collapse" { if ($el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$p)) { $p.Collapse(); return "Collapsed." }; throw "That element does not collapse." }
-    "select" { if ($el.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$p)) { $p.Select(); return "Selected." }; throw "That element cannot be selected." }
-    "focus" { $el.SetFocus(); return "Focused." }
-    "scroll_into_view" { if ($el.TryGetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$p)) { $p.ScrollIntoView(); return "Scrolled into view." }; throw "That element cannot be scrolled into view." }
-    default { throw "The action must be invoke, toggle, expand, collapse, select, focus or scroll_into_view." }
+# What each action needs of a control and does with it. The friendly names
+# stay; any of them is resolved against the control's own patterns, and an
+# action it cannot take is refused with the ones it can.
+function Ui-ActionTable {
+  return [ordered]@{
+    invoke = "Invoke"; toggle = "Toggle"; expand = "ExpandCollapse"; collapse = "ExpandCollapse"; select = "SelectionItem"
+    focus = ""; scroll_into_view = "ScrollItem"; scroll = "Scroll"; scroll_to = "Scroll"; set_range = "RangeValue"
+    increase = "RangeValue"; decrease = "RangeValue"; move = "Transform"; resize = "Transform"; rotate = "Transform"
   }
 }
 
-function Ui-SetValue($ref, $value) {
+function Pattern-Of($el, $name) {
+  $p = $null
+  $pattern = switch ($name) {
+    "Invoke" { [System.Windows.Automation.InvokePattern]::Pattern } "Toggle" { [System.Windows.Automation.TogglePattern]::Pattern }
+    "ExpandCollapse" { [System.Windows.Automation.ExpandCollapsePattern]::Pattern } "SelectionItem" { [System.Windows.Automation.SelectionItemPattern]::Pattern }
+    "ScrollItem" { [System.Windows.Automation.ScrollItemPattern]::Pattern } "Scroll" { [System.Windows.Automation.ScrollPattern]::Pattern }
+    "RangeValue" { [System.Windows.Automation.RangeValuePattern]::Pattern } "Transform" { [System.Windows.Automation.TransformPattern]::Pattern }
+  }
+  if ($null -ne $pattern -and $el.TryGetCurrentPattern($pattern, [ref]$p)) { return $p }
+  return $null
+}
+
+# The actions this control supports, from its patterns.
+function Ui-Actions($el) {
+  $can = @()
+  $table = Ui-ActionTable
+  foreach ($name in $table.Keys) {
+    $needs = $table[$name]
+    if ($needs -eq "" -or $null -ne (Pattern-Of $el $needs)) { $can += $name }
+  }
+  return $can
+}
+
+function Scroll-Element($el, $direction, $amount) {
+  $p = Pattern-Of $el "Scroll"
+  if ($null -eq $p) { return $false }
+  $n = if (-not (Given $amount)) { 3 } else { [Math]::Max(1, [Math]::Min(50, [int]$amount)) }
+  $none = [System.Windows.Automation.ScrollAmount]::NoAmount
+  $step = switch ($direction) {
+    "up" { @($none, [System.Windows.Automation.ScrollAmount]::SmallDecrement) } "down" { @($none, [System.Windows.Automation.ScrollAmount]::SmallIncrement) }
+    "left" { @([System.Windows.Automation.ScrollAmount]::SmallDecrement, $none) } "right" { @([System.Windows.Automation.ScrollAmount]::SmallIncrement, $none) }
+    default { throw "The direction must be up, down, left or right." }
+  }
+  for ($i = 0; $i -lt $n; $i++) { $p.Scroll($step[0], $step[1]) }
+  return $true
+}
+
+function Ui-Act($ref, $action, $a) {
   $el = Ui-Ref $ref
+  $name = ([string]$action).ToLowerInvariant().Trim()
+  $table = Ui-ActionTable
+  if (-not $table.Contains($name)) {
+    throw "There is no action `"$action`". This control supports: $((Ui-Actions $el) -join ', ')."
+  }
+  $needs = $table[$name]
+  $p = if ($needs -eq "") { $null } else { Pattern-Of $el $needs }
+  if ($needs -ne "" -and $null -eq $p) {
+    # invoke keeps its old fallbacks: a list item selects, a checkbox toggles.
+    if ($name -eq "invoke") {
+      $alt = Pattern-Of $el "SelectionItem"; if ($null -ne $alt) { $alt.Select(); return "Selected." }
+      $alt = Pattern-Of $el "Toggle"; if ($null -ne $alt) { $alt.Toggle(); return "Toggled." }
+    }
+    throw "That control cannot $($name -replace '_', ' '). It supports: $((Ui-Actions $el) -join ', '). Nothing was done."
+  }
+  switch ($name) {
+    "invoke" { $p.Invoke(); return "Invoked." }
+    "toggle" { $p.Toggle(); return "Toggled to $($p.Current.ToggleState)." }
+    "expand" { $p.Expand(); return "Expanded." }
+    "collapse" { $p.Collapse(); return "Collapsed." }
+    "select" { $p.Select(); return "Selected." }
+    "focus" { $el.SetFocus(); return "Focused." }
+    "scroll_into_view" { $p.ScrollIntoView(); return "Scrolled into view." }
+    "scroll" { [void](Scroll-Element $el $a.direction $a.amount); return "Scrolled $($a.direction); now at $([Math]::Round($p.Current.HorizontalScrollPercent)),$([Math]::Round($p.Current.VerticalScrollPercent)) percent." }
+    "scroll_to" {
+      $h = if ((Given $a.x)) { [double]$a.x } else { [System.Windows.Automation.ScrollPattern]::NoScroll }
+      $v = if ((Given $a.y)) { [double]$a.y } else { [System.Windows.Automation.ScrollPattern]::NoScroll }
+      $p.SetScrollPercent($h, $v); return "Scrolled to $h,$v percent."
+    }
+    "set_range" {
+      if (-not (Given $a.value)) { throw "Give value for set_range." }
+      $p.SetValue([double]$a.value); return "Set to $($p.Current.Value) (range $($p.Current.Minimum) to $($p.Current.Maximum))."
+    }
+    "increase" { $p.SetValue([Math]::Min($p.Current.Maximum, $p.Current.Value + $p.Current.SmallChange)); return "Now $($p.Current.Value)." }
+    "decrease" { $p.SetValue([Math]::Max($p.Current.Minimum, $p.Current.Value - $p.Current.SmallChange)); return "Now $($p.Current.Value)." }
+    "move" {
+      if (-not $p.Current.CanMove) { throw "That control cannot be moved." }
+      if (-not (Given $a.x) -or -not (Given $a.y)) { throw "Give x and y for a move, in the display's pixels." }
+      $at = To-Absolute $a.display $a.x $a.y; $p.Move($at.x, $at.y); return "Moved."
+    }
+    "resize" {
+      if (-not $p.Current.CanResize) { throw "That control cannot be resized." }
+      if (-not (Given $a.width) -or -not (Given $a.height)) { throw "Give width and height for a resize." }
+      $p.Resize([double]$a.width, [double]$a.height); return "Resized."
+    }
+    "rotate" {
+      if (-not $p.Current.CanRotate) { throw "That control cannot be rotated." }
+      if (-not (Given $a.value)) { throw "Give value, in degrees, for a rotation." }
+      $p.Rotate([double]$a.value); return "Rotated."
+    }
+  }
+}
+
+function Ui-SetValue($ref, $value, $allowPassword) {
+  $el = Ui-Ref $ref
+  # A password field is written only when the call says the person asked
+  # for it; a value the model chose for one on its own is refused unsent.
+  $password = $false
+  try { $password = [bool]$el.Current.IsPassword } catch {}
+  if ($password -and $allowPassword -ne $true) {
+    Fail "refused" "That is a password field, so nothing was set and no input was sent. Studio asks the person before filling one."
+  }
   $p = $null
   if ($el.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$p)) {
     if ($p.Current.IsReadOnly) { throw "That field is read-only." }
@@ -1216,21 +1562,93 @@ function Ui-SelectText($ref, $start, $end) {
   return "Selected " + ($e - $s) + " characters."
 }
 
+# ---- One look ---------------------------------------------------------------
+#
+# The bearings, a window's controls and a picture, whichever were asked for,
+# in one request under one observation id. Three requests to a driver that
+# answers one at a time were three moments, and a click read off one of them
+# could belong to none of the others. A picture asked for with a read shows
+# the window read. A picture that cannot be taken (a minimized window) does
+# not cost the read: it is left out and said so.
+function Observe-Window($a) {
+  $result = [ordered]@{ observationId = $script:ObservationId }
+  if ($a.status -eq $true) { $result.status = Get-Status }
+  if ($null -ne $a.ui) {
+    $u = $a.ui
+    $result.ui = Read-Ui $u.window $u.depth $u.limit $u.all $u.query
+  }
+  if ($null -ne $a.picture) {
+    $p = $a.picture
+    $window = $p.window
+    if (-not (Given $window) -and $null -ne $result.ui) { $window = $result.ui.handle }
+    try { $result.picture = Take-Screenshot $p.display $p.region $p.max $p.format $null $window $p.budget }
+    catch { $result.pictureError = $_.Exception.Message }
+  }
+  return $result
+}
+
 # ---- Clipboard --------------------------------------------------------------
 
-function Clipboard-Op($action, $text) {
+# What a write puts over is reported by size and kind, never by content.
+function Clipboard-Held {
+  $t = Get-Clipboard -Raw -ErrorAction SilentlyContinue
+  if ($null -ne $t) { return @{ kind = "text"; text = [string]$t } }
+  try { if ([System.Windows.Forms.Clipboard]::ContainsImage()) { return @{ kind = "image" } } } catch {}
+  try { if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) { return @{ kind = "files" } } } catch {}
+  return @{ kind = "empty" }
+}
+
+# CF_HTML: a header of byte offsets in front of the fragment, as Windows
+# expects; plain text rides along for apps that take no HTML.
+function Html-Clip($html, $plain) {
+  $pre = "<html><body><!--StartFragment-->"; $post = "<!--EndFragment--></body></html>"
+  $header = "Version:0.9`r`nStartHTML:{0:D10}`r`nEndHTML:{1:D10}`r`nStartFragment:{2:D10}`r`nEndFragment:{3:D10}`r`n"
+  $utf8 = [System.Text.Encoding]::UTF8
+  $headLength = $utf8.GetByteCount(($header -f 0, 0, 0, 0))
+  $startFragment = $headLength + $utf8.GetByteCount($pre)
+  $endFragment = $startFragment + $utf8.GetByteCount([string]$html)
+  $endHtml = $endFragment + $utf8.GetByteCount($post)
+  $data = New-Object System.Windows.Forms.DataObject
+  $data.SetData([System.Windows.Forms.DataFormats]::Html, (($header -f $headLength, $endHtml, $startFragment, $endFragment) + $pre + $html + $post))
+  $data.SetData([System.Windows.Forms.DataFormats]::UnicodeText, [string]$plain)
+  return $data
+}
+
+function Clipboard-Op($action, $text, $format) {
   switch ($action) {
     "read" { $t = Get-Clipboard -Raw -ErrorAction SilentlyContinue; return [ordered]@{ text = $(if ($null -eq $t) { "" } else { [string]$t }) } }
-    "write" { Set-Clipboard -Value ([string]$text); return [ordered]@{ written = $true } }
+    "write" {
+      $before = Clipboard-Held
+      Set-Clipboard -Value ([string]$text)
+      return [ordered]@{ written = $true; replaced = $before.kind; replacedLength = $(if ($before.kind -eq "text") { $before.text.Length } else { 0 }) }
+    }
     default { throw "The action must be read or write." }
   }
+}
+
+# Paste text or HTML into the working window through the clipboard, then put
+# back what the clipboard held. Only text can be put back; anything else is
+# said to be gone rather than silently lost.
+function Paste-Content($text, $format) {
+  Assert-Target "paste"
+  $before = Clipboard-Held
+  if ($format -eq "html") {
+    $plain = [regex]::Replace([string]$text, "<[^>]+>", "")
+    [System.Windows.Forms.Clipboard]::SetDataObject((Html-Clip ([string]$text) $plain), $true)
+  } else { Set-Clipboard -Value ([string]$text) }
+  Press-Chord "ctrl+v" 1
+  Start-Sleep -Milliseconds 200
+  $restored = $false
+  if ($before.kind -eq "text") { Set-Clipboard -Value $before.text; $restored = $true }
+  elseif ($before.kind -eq "empty") { [System.Windows.Forms.Clipboard]::Clear(); $restored = $true }
+  return [ordered]@{ pasted = ([string]$text).Length; format = $format; restored = $restored; previous = $before.kind; front = (Front-Note) }
 }
 
 # ---- The loop ---------------------------------------------------------------
 
 function Needs-ActionObservation($operation, $arguments) {
   if ($operation -eq "button" -and $arguments.action -eq "up") { return $false }
-  return $operation -in @("move", "click", "drag", "button", "scroll", "type", "key", "hold", "open", "focus", "arrange", "act", "set_value", "select_text")
+  return $operation -in @("move", "click", "drag", "button", "scroll", "type", "key", "hold", "key_toggle", "paste", "open", "focus", "arrange", "act", "set_value", "select_text")
 }
 
 function Collect-UserInput {
@@ -1241,11 +1659,11 @@ function Collect-UserInput {
     else { $script:InputPending.available = $false }
     return
   }
-  $changed = $inputState.Moves + $inputState.Buttons + $inputState.Wheels + $inputState.Keys -gt 0
+  $changed = ($inputState.Moves + $inputState.Buttons + $inputState.Wheels + $inputState.Keys -gt 0) -or $inputState.Stop
   if ($changed) { Reset-UiRefs }
   if (-not $changed -and $inputState.Available) {
     if ($null -ne $script:InputPending) {
-      if ($script:InputPending.moves + $script:InputPending.buttons + $script:InputPending.wheels + $script:InputPending.keys -eq 0) { $script:InputPending = $null }
+      if ($script:InputPending.moves + $script:InputPending.buttons + $script:InputPending.wheels + $script:InputPending.keys -eq 0 -and $script:InputPending.stop -ne $true) { $script:InputPending = $null }
       else { $script:InputPending.available = $true }
     }
     return
@@ -1253,6 +1671,7 @@ function Collect-UserInput {
   if ($null -eq $script:InputPending) {
     $script:InputPending = @{ available = $inputState.Available; moves = 0; buttons = 0; wheels = 0; keys = 0; truncated = $false; ageMs = 0 }
   }
+  if ($inputState.Stop) { $script:InputPending.stop = $true }
   $script:InputPending.available = $inputState.Available
   foreach ($field in @("moves", "buttons", "wheels", "keys")) {
     $total = $script:InputPending[$field] + $inputState.$field
@@ -1301,18 +1720,19 @@ function Answer-Pulse($id) {
   $pending = $script:InputPending
   $counts = if ($null -eq $pending) { [ordered]@{ buttons = 0; keys = 0; wheels = 0; moves = 0 } }
     else { [ordered]@{ buttons = $pending.buttons; keys = $pending.keys; wheels = $pending.wheels; moves = $pending.moves } }
-  $result = [ordered]@{ pointer = (Get-Cursor); front = $front; input = $counts; monitored = ($null -ne $script:Activity) }
+  $result = [ordered]@{ pointer = (Get-Cursor); front = $front; input = $counts; monitored = ($null -ne $script:Activity); stop = (Stop-Requested) }
   [Console]::Out.WriteLine((ConvertTo-Json ([ordered]@{ id = $id; ok = $true; result = $result }) -Compress -Depth 6))
   [Console]::Out.Flush()
 }
 
-function Refuse($id, $message) {
+function Refuse($id, $message, $code) {
   if ($null -ne $script:Activity) { $script:Activity.Dismiss() }
   Reset-UiRefs
   if ($null -ne $script:ActionBefore) {
     $message += " Observe status and read the intended window again before any further input; do not replay this action automatically."
   }
   $o = [ordered]@{ id = $id; ok = $false; error = $message }
+  if ($null -ne $code -and $code -ne "") { $o.code = [string]$code }
   if ($null -ne $script:Activity -or $null -ne $script:InputPending) { $o.userInput = Take-InputUpdate }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 4))
   [Console]::Out.Flush()
@@ -1345,10 +1765,11 @@ try { while ($true) {
     }
     switch ($req.op) {
       "displays" { Answer $id @(Get-Displays) }
-      "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality $a.window $a.budget) }
-      "status" { Answer $id (Get-Status) }
-      "arrange" { Answer $id (Arrange-Window $a.window $a.action $a.display $a.x $a.y $a.width $a.height) }
-      "wait_window" { Answer $id (Wait-ForWindow $a.text $a.seconds) }
+      "screenshot" { Answer $id (Take-Screenshot $a.display $a.region $a.max $a.format $a.quality $a.window $a.budget $a.mode) }
+      "status" { $st = Get-Status; $st.foregroundLock = Get-ForegroundLock; Answer $id $st }
+      "arrange" { Assert-Identity $a.window $a.pid $a.processStarted; Answer $id (Arrange-Window $a.window $a.action $a.display $a.x $a.y $a.width $a.height) }
+      "wait_window" { Answer $id (Wait-ForWindow $a.text $a.seconds $a.match) }
+      "get_window" { Answer $id (Get-Window $a.window $a.pid $a.processStarted $a.app) }
       "cursor" { Answer $id (Get-Cursor) }
       "pulse" { Answer-Pulse $id }
       "move" { Move-Pointer $a.display $a.x $a.y; Answer $id (Get-Cursor) }
@@ -1365,9 +1786,9 @@ try { while ($true) {
         if (Outside-Target $a.display $a.from[0] $a.from[1]) { $note = "The drag started outside the window being worked in, so that window saw none of it." }
         elseif (Outside-Target $a.display $a.to[0] $a.to[1]) { $note = "The drag ended outside the window being worked in." }
         $dragWindow = Point-Window $a.display $a.from[0] $a.from[1]
-        Drag-Pointer $a.display $a.from $a.to
+        $waypoints = Drag-Pointer $a.display $a.from $a.to $a.path $a.settle
         Set-Target $dragWindow
-        $c = Get-Cursor; if ($null -ne $note) { $c.outside = $note }
+        $c = Get-Cursor; if ($null -ne $note) { $c.outside = $note }; $c.waypoints = $waypoints
         Answer $id $c
       }
       "button" {
@@ -1377,19 +1798,48 @@ try { while ($true) {
         # window first, including when Stop is recovering a failed driver.
         Answer $id ([ordered]@{ done = $true; observation = @{ available = $false; observationId = $script:ObservationId; refsInvalidated = $true } })
       }
-      "scroll" { Scroll-At $a.display $a.x $a.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true }) }
-      "type" { Assert-Target "type"; Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length; front = (Front-Note) }) }
+      "scroll" {
+        # By reference: the control's own scrolling when it has some, else
+        # the wheel at its centre. By point: the wheel there.
+        if ((Given $a.ref)) {
+          $el = Ui-Ref $a.ref
+          if (Scroll-Element $el $a.direction $a.amount) { Answer $id ([ordered]@{ done = $true; via = "pattern" }) }
+          else { $at = Control-Point $el.Current.BoundingRectangle; Scroll-At $at.display $at.x $at.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true; via = "wheel" }) }
+        } else { Scroll-At $a.display $a.x $a.y $a.direction $a.amount; Answer $id ([ordered]@{ done = $true; via = "wheel" }) }
+      }
+      "type" {
+        Assert-Target "type"
+        if ($a.allowPassword -ne $true -and (Get-Sensitivity ([pscustomobject]@{ kind = "keys"; text = $true })).password) {
+          Fail "refused" "The control taking text is a password field, so nothing was typed. Studio asks the person before typing into one."
+        }
+        Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length; front = (Front-Note) })
+      }
       "key" { Assert-Target "press keys"; Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true; front = (Front-Note) }) }
       "hold" { Assert-Target "hold keys"; Hold-Chord ([string]$a.keys) $a.seconds; Answer $id ([ordered]@{ done = $true; front = (Front-Note) }) }
+      "key_toggle" {
+        if ($a.action -ne "up") { Assert-Target "hold keys" }
+        $held = Toggle-Chord ([string]$a.keys) ([string]$a.action)
+        Answer $id ([ordered]@{ done = $true; held = $held; front = (Front-Note) })
+      }
+      "paste" {
+        if ($a.allowPassword -ne $true -and (Get-Sensitivity ([pscustomobject]@{ kind = "keys"; text = $true })).password) {
+          Fail "refused" "The control taking text is a password field, so nothing was pasted. Studio asks the person before filling one."
+        }
+        Answer $id (Paste-Content ([string]$a.text) $(if ($a.format -eq "html") { "html" } else { "text" }))
+      }
       "apps" { Answer $id @(Get-Apps) }
       "windows" { Answer $id @(Get-TopWindows $a.app) }
       "open" { Answer $id (Open-App $a.app $a.path) }
-      "focus" { Answer $id (Focus-Window $a.window) }
-      "read_ui" { Answer $id (Read-Ui $a.window $a.depth $a.limit $a.all) }
-      "act" { Answer $id ([ordered]@{ said = (Ui-Act $a.ref $a.action) }) }
-      "set_value" { Answer $id ([ordered]@{ said = (Ui-SetValue $a.ref $a.value) }) }
+      "focus" { Assert-Identity $a.window $a.pid $a.processStarted; Answer $id (Focus-Window $a.window) }
+      "read_ui" { Answer $id (Read-Ui $a.window $a.depth $a.limit $a.all $a.query) }
+      "observe" { Answer $id (Observe-Window $a) }
+      "sensitivity" { Answer $id (Get-Sensitivity $a) }
+      # A new turn of the actor that read them: its references end with it.
+      "reset_refs" { Reset-UiRefs; Answer $id ([ordered]@{ reset = $true }) }
+      "act" { Answer $id ([ordered]@{ said = (Ui-Act $a.ref $a.action $a) }) }
+      "set_value" { Answer $id ([ordered]@{ said = (Ui-SetValue $a.ref $a.value $a.allowPassword) }) }
       "select_text" { Answer $id ([ordered]@{ said = (Ui-SelectText $a.ref $a.start $a.end) }) }
-      "clipboard" { Answer $id (Clipboard-Op $a.action $a.text) }
+      "clipboard" { Answer $id (Clipboard-Op $a.action $a.text $a.format) }
       "ping" { Answer $id ([ordered]@{ pong = $true }) }
       # A pause or handoff lets go of whatever Studio still holds - a button
       # pressed by mouse_button, a modifier - without closing the driver, so
@@ -1403,9 +1853,13 @@ try { while ($true) {
     }
   } catch {
     $m = $_.Exception.Message
-    if ($null -ne $_.Exception.InnerException) { $m = $_.Exception.InnerException.Message }
+    $code = $_.Exception.Data["studioCode"]
+    if ($null -ne $_.Exception.InnerException) {
+      $m = $_.Exception.InnerException.Message
+      if ($null -eq $code) { $code = $_.Exception.InnerException.Data["studioCode"] }
+    }
     Release-HeldInput
-    Refuse $id $m
+    Refuse $id $m $code
   }
 } } finally {
   Release-HeldInput

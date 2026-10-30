@@ -823,6 +823,17 @@ describe('parsePendingApprovals', () => {
     expect(delegateAsk?.[0]?.agentId).toBe('general')
   })
 
+  // P1-4: the longest answer the kernel takes. Absent is no limit; an
+  // unreadable one is the narrowest, never the widest.
+  it('reads the longest answer the kernel takes', () => {
+    expect(parsePendingApprovals([APPROVAL])?.[0]?.maxDuration).toBe('always')
+    const limited = (maxDuration: unknown) =>
+      parsePendingApprovals([{ ...APPROVAL, request: { ...APPROVAL.request, maxDuration } }])?.[0]?.maxDuration
+    expect(limited('once')).toBe('once')
+    expect(limited('conversation')).toBe('conversation')
+    expect(limited('forever')).toBe('once')
+  })
+
   it('carries a resource that is absent, not empty', () => {
     // A harness request built with `resource: undefined` serializes with no
     // resource key at all; null on the wire reads as null here.

@@ -4,7 +4,8 @@ import { staleReasons } from "./observations.js";
 import { VOICE_BATCH_STEPS, VOICE_COMPUTER_TOOLS } from "../contracts/voice-computer.js";
 import { ComputerError } from "./errors.js";
 import { ComputerSession } from "./session.js";
-import { toolByName, type ToolAnswer } from "./tools.js";
+import { reachOf, toolByName, type ToolAnswer } from "./tools.js";
+import { ApprovalBook, approvalIdFrom, targetFrom, type ApprovalRequest, type ApprovalTarget } from "./approvals.js";
 import { sampleFrom, ScreenWatch, type DrawnShape } from "./screen-watch.js";
 import { displaysFrom } from "./marks.js";
 
@@ -68,6 +69,31 @@ function actorKey(actor: Actor): string {
   return actor.id;
 }
 
+/**
+ * The turn a call belongs to: the harness's submission id, stamped from its
+ * own execution context. A model never spells it, so a turn boundary does
+ * not depend on the model saying one happened (P1-5).
+ */
+function turnFrom(meta: unknown): string | undefined {
+  if (!isRecord(meta)) return undefined;
+  const turn = meta["studio/turn"];
+  return typeof turn === "string" && turn !== "" ? turn : undefined;
+}
+
+/** Who an approval is for: one actor of one conversation. */
+function approvalActor(actor: Actor): string {
+  return `${actor.conversation}\u0000${actor.id}`;
+}
+
+/** What a model reads while the person is asked, or if nobody can ask them. */
+function askedSentence(request: ApprovalRequest): string {
+  return `No input was sent: this would reach ${request.displayName}, and Studio asks the person before that. ` +
+    "It goes ahead only if they agree; do not try to reach it another way.";
+}
+
+/** Tools whose answer hands out element references from the driver's memory. */
+const READS_REFS = new Set(["read_ui", "status"]);
+
 /** Whether the person's own clicks, keys or wheel turned up in an answer. */
 function sawHumanInput(answer: ToolAnswer): boolean {
   const input = answer.structuredContent?.["userInput"];
@@ -91,6 +117,9 @@ export class ComputerService {
   /** Conversations whose watch gave up, so the turn's context can say live updates are unavailable. */
   readonly #unwatchable = new Set<string>();
   readonly desktop = new DesktopControl();
+  readonly #approvals = new ApprovalBook();
+  /** Who last read the element references each conversation's driver holds. */
+  readonly #refsReader = new Map<string, string>();
   readonly #create: (key: string) => ComputerSession;
   readonly #pulseMs: number;
 
@@ -104,6 +133,7 @@ export class ComputerService {
     const existing = this.#sessions.get(conversation);
     if (existing !== undefined) return existing;
     const created = this.#create(conversation);
+    created.onPersonStop(() => this.#personStop());
     this.#sessions.set(conversation, created);
     return created;
   }
@@ -137,16 +167,37 @@ export class ComputerService {
     const sharedAt = this.#sharingEpoch(actor.conversation);
     if (name === "studio_computer_control") return this.#withinSharing(actor, sharedAt, await tool.run(session, args, context));
     const ticket = this.desktop.ticket(actor);
+    const newTurn = this.desktop.beginTurn(actor, turnFrom(meta));
+    this.#approvals.accept(approvalIdFrom(meta), approvalActor(actor));
     try {
-      const answer = await session.runTool(
-        () => this.desktop.run(session, name, () => tool.run(session, args, context), actor, args, ticket),
-        actorKey(actor),
-      );
-      this.#commit(session, actor, sharedAt);
+      const answer = await session.runTool(async () => {
+        // A new turn ends the references its actor read in the last one.
+        if (newTurn && session.running && this.#refsReader.get(actor.conversation) === actor.id) {
+          await session.request("reset_refs");
+          this.#refsReader.delete(actor.conversation);
+        }
+        const gated = await this.#gate(session, actor, name, args, ticket);
+        if (gated.request !== undefined) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: askedSentence(gated.request) }],
+            structuredContent: { approvalRequest: gated.request, desktop: this.desktop.state(actor) },
+          };
+        }
+        const gate = async (step: string, stepArgs: Record<string, unknown>): Promise<{ refusal?: string; allowPassword?: boolean }> => {
+          const checked = await this.#gate(session, actor, step, stepArgs, undefined);
+          return checked.request === undefined
+            ? { allowPassword: checked.allowPassword === true }
+            : { refusal: `This step would reach ${checked.request.displayName}, and Studio asks the person before that, so it and the steps after it were not sent. Send that step on its own so the person can be asked.` };
+        };
+        const granted = { ...context, allowPassword: gated.allowPassword === true, gate };
+        return this.desktop.run(session, name, () => tool.run(session, args, granted), actor, args, ticket);
+      }, actorKey(actor));
+      this.#commit(session, actor, sharedAt, name);
       if (sawHumanInput(answer)) this.desktop.noteHumanInput();
       return this.#withinSharing(actor, sharedAt, { ...answer, structuredContent: { ...answer.structuredContent, desktop: this.desktop.state(actor) } });
     } catch (error) {
-      this.#commit(session, actor, sharedAt);
+      this.#commit(session, actor, sharedAt, name);
       if (error instanceof ComputerError && error.desktop !== undefined) {
         return { isError: true, content: [{ type: "text", text: error.message }], structuredContent: { desktop: error.desktop } };
       }
@@ -188,11 +239,53 @@ export class ComputerService {
     };
   }
 
+  /**
+   * Whether the person must be asked before this call's input is sent
+   * (P1-4), decided before the lease admits it: a refused call has sent
+   * nothing and counted as no input, so the frame it named still holds once
+   * the person has answered. Input the lease would refuse anyway is not put
+   * to the person. A batch step is checked with no ticket, inside its batch.
+   */
+  async #gate(
+    session: ComputerSession,
+    actor: Actor,
+    name: string,
+    args: Record<string, unknown>,
+    ticket: ReturnType<DesktopControl["ticket"]> | undefined,
+  ): Promise<{ readonly request?: ApprovalRequest; readonly allowPassword?: boolean }> {
+    const reach = reachOf(name, args, { actor, desktop: this.desktop });
+    if (reach === undefined) return {};
+    if (ticket !== undefined && this.desktop.wouldRefuse(actor, name, args, ticket) !== undefined) return {};
+    let target: ApprovalTarget | undefined;
+    if ("category" in reach) target = { category: reach.category, app: "", pid: 0, processStarted: "" };
+    else {
+      target = targetFrom(await session.request("sensitivity", reach.probe));
+      // The person's own input since the last answer - a click on Studio's
+      // own approval prompt among it - leaves the pictured screen behind, so
+      // the lease hears of it before it admits anything.
+      if (session.humanInputInCall) this.desktop.noteHumanInput();
+    }
+    if (target === undefined) return {};
+    const key = approvalActor(actor);
+    if (this.#approvals.take(key, target)) return { allowPassword: target.category === "password_field" };
+    return { request: this.#approvals.ask(key, target) };
+  }
+
+  /** The person held Escape while Studio acted: pause everything, and let go of anything held. */
+  #personStop(): void {
+    const owner = this.desktop.ownerSession;
+    if (this.desktop.personStop() === "paused") void this.#releaseHeld(owner);
+  }
+
   /** The call's picture becomes the conversation's shared observation, with who took it. */
-  #commit(session: ComputerSession, actor: Actor, sharedAt: number): void {
+  #commit(session: ComputerSession, actor: Actor, sharedAt: number, name: string): void {
+    if (READS_REFS.has(bareTool(name))) this.#refsReader.set(actor.conversation, actor.id);
     const offered = session.takeOffered();
-    if (offered === undefined) return;
+    const frames = session.takeOfferedFrames();
+    // A picture discarded because sharing ended was never seen, so its frame admits nothing.
     if (actor.role === "voice" && this.#sharingEpoch(actor.conversation) !== sharedAt) return;
+    for (const frame of frames) this.desktop.recordFrame(actor, frame);
+    if (offered === undefined) return;
     session.commitObservation({
       ...offered,
       by: { role: actor.role, id: actor.id, ...(actor.name === undefined ? {} : { name: actor.name }) },
@@ -246,6 +339,7 @@ export class ComputerService {
           const sample = sampleFrom(value, Date.now());
           if (sample === undefined) throw new ComputerError("internal", { message: "The driver answered a pulse without a pointer." });
           watching.failures = 0;
+          if (isRecord(value) && value["stop"] === true) this.#personStop();
           if (this.#watches.get(conversation) !== watching) return;
           if (watching.watch.sample(sample)) this.desktop.noteHumanInput();
         }).catch(() => {

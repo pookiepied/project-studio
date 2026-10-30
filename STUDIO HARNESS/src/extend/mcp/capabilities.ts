@@ -1,6 +1,7 @@
 import type { CapabilityDescriptor, ExecutionScope } from "../../contracts/capabilities.js";
+import { PermissionError } from "../../permissions/errors.js";
 import { ToolError } from "../../tools/errors.js";
-import { defineStudioTool, type ToolDefinition } from "../../tools/types.js";
+import { defineStudioTool, type ToolContext, type ToolDefinition } from "../../tools/types.js";
 import { ExtendError } from "../errors.js";
 import { McpServerRegistry, type McpServerRecord } from "./registry.js";
 
@@ -46,17 +47,22 @@ export function systemActorMeta(
   instanceId: string | undefined,
   taskName: (instanceId: string) => string | undefined,
   sharing: (conversationId: string) => boolean = () => false,
+  submissionId?: string,
 ): Readonly<Record<string, string>> {
   const actor = instanceId === undefined || instanceId === "" ? scope.conversationId : instanceId;
+  // The submission the call runs in is the actor's turn: the computer server
+  // ends a turn's looks and frames when the next one starts (P1-5). An
+  // existing opaque id, passed through, never minted here.
+  const turn = submissionId === undefined || submissionId === "" ? {} : { "studio/turn": submissionId };
   if (actor === scope.conversationId) {
     // The voice role also says whether the person is sharing the screen:
     // the switch is theirs, and the computer server enforces it per call.
     return scope.agentId === "voice"
-      ? { "studio/actor": actor, "studio/role": "voice", "studio/sharing": sharing(scope.conversationId) ? "on" : "off" }
-      : { "studio/actor": actor, "studio/role": "conversation" };
+      ? { "studio/actor": actor, "studio/role": "voice", "studio/sharing": sharing(scope.conversationId) ? "on" : "off", ...turn }
+      : { "studio/actor": actor, "studio/role": "conversation", ...turn };
   }
   const name = taskName(actor);
-  return { "studio/actor": actor, "studio/role": "worker", ...(name === undefined ? {} : { "studio/actor-name": name }) };
+  return { "studio/actor": actor, "studio/role": "worker", ...(name === undefined ? {} : { "studio/actor-name": name }), ...turn };
 }
 
 interface McpToolEntry {
@@ -257,8 +263,8 @@ function createTool(
           tool: entry.name,
         });
       }
-      return normalizeCallResult(
-        await connection.request(
+      const call = (approval?: string): Promise<unknown> =>
+        connection.request(
           "tools/call",
           {
             name: entry.name,
@@ -276,15 +282,76 @@ function createTool(
             // any use for it, and one that started keying behaviour on it
             // would be tracking a person across their work.
             ...(record.provenance === "system"
-              ? { _meta: { ...actorMeta(context.scope), "studio/conversation": context.scope.conversationId } }
+              ? { _meta: {
+                ...actorMeta(context.scope),
+                "studio/conversation": context.scope.conversationId,
+                ...(approval === undefined ? {} : { "studio/approval": approval }),
+              } }
               : {}),
           },
           context.signal,
-        ),
+        );
+      const answered = await call();
+      // Only Studio's own servers can ask the person through the kernel.
+      const asked = record.provenance === "system" ? approvalRequestOf(answered) : undefined;
+      return normalizeCallResult(
+        asked === undefined ? answered : await askThenCall(asked, context, call),
         record.provenance === "system",
       );
     },
   });
+}
+
+/**
+ * The person-answered half of a Studio server's in-component ask (P1-4).
+ * The server refused before sending anything and said what it would reach;
+ * the kernel asks the person under this call's own scope, and the call goes
+ * again with the request's id in `_meta` - a channel no model reads or
+ * writes - only if they agreed. One retry: a second request means what the
+ * input would reach changed while they were asked, and that is said, never
+ * asked again behind their back.
+ */
+interface AskedApproval {
+  readonly id: string;
+  readonly category: string;
+  readonly app: string;
+  readonly maxDuration: "once" | "conversation" | "always";
+}
+
+function approvalRequestOf(value: unknown): AskedApproval | undefined {
+  if (!isRecord(value) || value["isError"] !== true || !isRecord(value["structuredContent"])) return undefined;
+  const request = value["structuredContent"]["approvalRequest"];
+  if (!isRecord(request)) return undefined;
+  const { id, category, app, maxDuration } = request;
+  if (typeof id !== "string" || typeof category !== "string" || !/^[a-z_]{1,32}$/.test(category)) return undefined;
+  const limit = maxDuration === "always" || maxDuration === "conversation" ? maxDuration : "once";
+  // Process names only; anything else is not something to key a grant on.
+  return { id, category, app: typeof app === "string" && /^[\w .-]{0,64}$/.test(app) ? app : "", maxDuration: limit };
+}
+
+function refused(text: string): Record<string, unknown> {
+  return { isError: true, content: [{ type: "text", text }] };
+}
+
+async function askThenCall(
+  asked: AskedApproval,
+  context: ToolContext,
+  call: (approval?: string) => Promise<unknown>,
+): Promise<unknown> {
+  if (context.authorize === undefined) {
+    return refused("No input was sent: this needs the person's approval and nobody here can be asked. Do not try to reach it another way.");
+  }
+  try {
+    await context.authorize(`computer:${asked.category}${asked.app === "" ? "" : `:${asked.app.toLowerCase()}`}`, { maxDuration: asked.maxDuration });
+  } catch (error) {
+    if (!(error instanceof PermissionError)) throw error;
+    return refused(`No input was sent: ${error.kind === "denied" ? "the person did not approve it" : "the person could not be asked"} (${error.message}) Do not try to reach it another way.`);
+  }
+  const again = await call(asked.id);
+  if (approvalRequestOf(again) !== undefined) {
+    return refused("No input was sent: the person approved it, but what the input would reach changed while they were asked. Look at the screen again before deciding anything.");
+  }
+  return again;
 }
 
 export class McpCapabilityCatalog {

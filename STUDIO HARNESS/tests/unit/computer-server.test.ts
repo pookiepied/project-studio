@@ -37,8 +37,10 @@ describe("the tool surface", () => {
     expect(new Set(TOOLS.map((tool) => tool.name)).size).toBe(TOOLS.length);
     // 27 until desktop control (ADR 0059) added `control`: the lease is a
     // capability a model must be able to read and hand back; 29 with `mark`,
-    // pointing on the person's screen without touching it.
-    expect(TOOLS).toHaveLength(29);
+    // pointing on the person's screen without touching it; 30 with
+    // `get_window`, finding a window again after Windows reused its handle.
+    // The rest of the upgrade's surface is arguments on these, not tools.
+    expect(TOOLS).toHaveLength(30);
   });
 
   it("covers the jobs the capability exists for", () => {
@@ -89,10 +91,45 @@ describe("the tool surface", () => {
     }
   });
 
-  it("answers tools/list with definitions and nothing else", () => {
+  it("answers tools/list with definitions and their effect, and nothing else", () => {
     for (const definition of definitions()) {
-      expect(Object.keys(definition).sort()).toEqual(["description", "inputSchema", "name"]);
+      expect(Object.keys(definition).sort()).toEqual(["_meta", "annotations", "description", "inputSchema", "name"]);
     }
+  });
+
+  // Every tool says what it does to the desktop, decided here rather than
+  // defaulted: a tool added without a row fails this test.
+  const EFFECTS: Record<string, "read" | "write" | "execute"> = {
+    displays: "read", screenshot: "read", zoom: "read", cursor: "read", apps: "read", windows: "read",
+    status: "read", read_ui: "read", wait_for_window: "read", wait: "read", get_window: "read",
+    move: "write", click: "write", drag: "write", mouse_button: "write", scroll: "write",
+    type: "write", key: "write", hold_key: "write", focus: "write", arrange: "write",
+    act: "write", set_value: "write", select_text: "write", batch: "write", mark: "write",
+    control: "write", stop: "write",
+    open: "execute", clipboard: "execute",
+  };
+
+  it.each(Object.entries(EFFECTS))("labels %s as %s, and publishes it as MCP annotations", (name, effect) => {
+    const tool = toolByName(`studio_computer_${name}`);
+    expect(tool?.effect).toBe(effect);
+    const definition = definitions().find((each) => each["name"] === `studio_computer_${name}`);
+    expect(definition?.["_meta"]).toEqual({ "studio/effect": effect });
+    expect(definition?.["annotations"]).toMatchObject({ readOnlyHint: effect === "read", destructiveHint: effect !== "read" });
+  });
+
+  it("has an effect row for every tool", () => {
+    expect(Object.keys(EFFECTS).map((name) => `studio_computer_${name}`).sort()).toEqual(TOOLS.map((tool) => tool.name).sort());
+  });
+
+  it("requires a frameId on every coordinate tool", () => {
+    for (const name of ["move", "click", "drag"]) {
+      expect(toolByName(`studio_computer_${name}`)?.inputSchema["required"]).toContain("frameId");
+    }
+    // A scroll names a frame with its point, or a ui_ reference instead; the lease
+    // refuses a point without a frame at run time.
+    expect(toolByName("studio_computer_scroll")?.inputSchema["required"]).toEqual(["direction"]);
+    // A press names its frame at run time; a release is cleanup and never waits on one.
+    expect(toolByName("studio_computer_mouse_button")?.inputSchema["required"]).toEqual(["action"]);
   });
 });
 
@@ -138,7 +175,7 @@ describe("bearings: the tools that keep a model from getting lost", () => {
     const session = withPictures({ windows: [{ ...row(4, "Notes", 1), foreground: true, target: true }] });
     const answer = await toolByName("studio_computer_windows")!.run(session, {});
     expect(said(answer)).toBe(
-      'window 4: "Notes" (Notepad) on display 1 at (10,20) 800x600, in front, the window being worked in',
+      'window 4: "Notes" (Notepad, process 1) on display 1 at (10,20) 800x600, in front, the window being worked in',
     );
   });
 

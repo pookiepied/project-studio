@@ -343,6 +343,32 @@ operation nor authority to send input. Accessibility refs include the read's
 observation UUID and expire at input/refusal, another read or driver replacement.
 Target stamps retain native handles plus PID/process-start metadata. Coordinate
 centres from accessibility are display-relative, matching the input contract.
+A picture's or read's `frameId` is that same product observation UUID, never a
+new identity: the lease records it per actor with the change count sampled
+before capture, and admits a coordinate only on the caller's current frame of
+the named display. Frame refusals are lease results that send nothing. Element
+records (AutomationId, ClassName, RuntimeId, patterns) and frame ids are result
+content under gated capture, never attributes; a password field's value is
+never read by the driver. Per-tool effect labels are MCP annotations only and
+change no kernel admission.
+
+An in-component ask's request id is a new Studio UUID from `contracts/uuid.ts`,
+held only in the computer server's memory; it names one refused call, is not an
+execution or approval-store id, and reaches the server back only in
+`_meta["studio/approval"]`, which the harness writes after the kernel's answer.
+The ask itself is an ordinary kernel decision under the existing
+`tools.authorize` stage with resource `computer:<category>:<process name>`
+(no window text); its grant, refusal and pending-approval row are the kernel's
+own records. The turn stamp `_meta["studio/turn"]` passes the existing Flue
+submission id through unchanged. A deliberate stop is one flag in the driver's
+input report beside the counts; no key value or history crosses the boundary,
+and the hooks still read flags only.
+
+Window identity reuses the existing native handle plus PID/process-start
+metadata; `get_window` mints nothing. A window capture is result content like
+any picture and is never recorded as a frame. A clipboard write reports the
+replaced content's kind and length only; paste restores text without reading
+it into any result.
 
 Input replies carry bounded post-action product evidence: eight read-only samples
 over 800ms, current target/foreground, at most 20 opened/closed windows and 20

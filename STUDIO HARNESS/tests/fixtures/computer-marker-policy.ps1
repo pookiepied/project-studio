@@ -13,7 +13,7 @@ public static bool SetCursorPos(int x, int y) { return true; }
 $tokens = $null; $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($Driver, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw $parseErrors[0].Message }
-foreach ($name in @("Send-Inputs", "Send-Mouse", "New-Input", "Move-Pointer")) {
+foreach ($name in @("Send-Inputs", "Send-Mouse", "New-Input", "Move-Pointer", "Stop-Requested", "Is-Release")) {
     $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if ($null -eq $function) { throw "Missing production function $name" }
     . ([scriptblock]::Create($function.Extent.Text))

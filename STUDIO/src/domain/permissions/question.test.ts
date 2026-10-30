@@ -31,6 +31,7 @@ function record(overrides: Partial<PendingApprovalRecord> = {}): PendingApproval
     ],
     source: 'default',
     reason: 'native/write has not been approved yet.',
+    maxDuration: 'always',
     ...overrides,
   }
 }

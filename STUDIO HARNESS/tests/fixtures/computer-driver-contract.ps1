@@ -6,7 +6,7 @@ if ($parseErrors.Count -ne 0) { throw $parseErrors[0].Message }
 
 # Load only the actual pure policy functions. The driver's top-level native
 # initialization and input loop must never run on the user's desktop in tests.
-foreach ($name in @("Window-Identity", "Same-Window", "Root-Of", "Set-Target", "Owned-ByTarget", "Adopt-Dialog", "Resume-Owner", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Encoded-Bytes", "Encode-Picture")) {
+foreach ($name in @("Window-Identity", "Same-Window", "Root-Of", "Set-Target", "Owned-ByTarget", "Adopt-Dialog", "Resume-Owner", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Encoded-Bytes", "Encode-Picture", "One-Line", "Element-Record", "Element-Line", "Ui-SetValue", "Observe-Window", "Fail", "App-Category", "Get-Sensitivity", "Is-Release", "Window-Matches", "Assert-Identity", "Get-Window", "Pattern-Of", "Ui-ActionTable", "Ui-Actions", "Ui-Act", "Toggle-Chord", "Is-Blank")) {
   $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
   if ($null -eq $function) { throw "Missing production function $name" }
   . ([scriptblock]::Create($function.Extent.Text))
@@ -198,4 +198,118 @@ $checks.fallback = @{ mime = $fallback.mime; width = $fallback.width; underBudge
 $small = Encode-Picture $plain "png" 400000
 $checks.keptPng = @{ mime = $small.mime; width = $small.width; note = $small.note }
 $noise.Dispose(); $plain.Dispose()
+
+# Controls as records. The pattern types are only named here (the assemblies
+# hold no desktop state); every element is a double, and a password field's
+# value pattern counts how often it is asked.
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$script:ValueReads = 0; $script:Written = @()
+function New-Element($name, $isPassword, $value, $patterns) {
+  $el = [pscustomobject]@{ Current = [pscustomobject]@{ Name = $name; IsPassword = $isPassword; IsEnabled = $true; HasKeyboardFocus = $false; IsOffscreen = $false; AutomationId = "id-$name"; ClassName = "Edit" }; Value = $value; Patterns = $patterns }
+  $el | Add-Member -MemberType ScriptMethod -Name GetSupportedPatterns -Value { @($this.Patterns | ForEach-Object { [pscustomobject]@{ ProgrammaticName = "${_}PatternIdentifiers.Pattern" } }) }
+  $el | Add-Member -MemberType ScriptMethod -Name GetRuntimeId -Value { @(42, 7) }
+  $el | Add-Member -MemberType ScriptMethod -Name GetCurrentPattern -Value { param($pattern) $script:ValueReads++; [pscustomobject]@{ Current = [pscustomobject]@{ Value = $this.Value; IsReadOnly = $false } } }
+  $el | Add-Member -MemberType ScriptMethod -Name TryGetCurrentPattern -Value {
+    param($pattern, $out)
+    $script:ValueReads++
+    $owner = $this
+    $p = [pscustomobject]@{ Current = [pscustomobject]@{ Value = $owner.Value; IsReadOnly = $false } }
+    $p | Add-Member -MemberType ScriptMethod -Name SetValue -Value { param($v) $script:Written += $v }
+    $out.Value = $p
+    return $true
+  }
+  return $el
+}
+$script:RefsEpoch = $first
+$secret = New-Element "Password" $true "hunter2" @("Value")
+$visible = New-Element "Search" $false "cats`nand dogs" @("Value", "Invoke")
+$rect = @{ X = 2000; Y = 100; Width = 40; Height = 20 }
+$passwordRecord = Element-Record $secret "edit" "Password" $rect 1 2
+$checks.passwordRecord = $passwordRecord
+$checks.passwordLine = Element-Line $passwordRecord
+$checks.passwordValueReads = $script:ValueReads
+$plainRecord = Element-Record $visible "edit" "Search" $rect 2 0
+$checks.plainRecord = $plainRecord
+$checks.plainLine = Element-Line $plainRecord
+
+# A password field is not written unless the call says the person asked.
+$script:Rows["40"] = $notepad
+Begin-UiRead 40 $first
+$script:Refs[1] = $secret; $script:Refs[2] = $visible
+$script:ValueReads = 0
+$checks.passwordSetRefused = Rejected { Ui-SetValue "ui_$($first)_1" "guess" $null }
+$checks.passwordSetReads = $script:ValueReads
+$checks.passwordWritten = @($script:Written)
+$checks.passwordSetAllowed = Ui-SetValue "ui_$($first)_1" "asked" $true
+$checks.plainSet = Ui-SetValue "ui_$($first)_2" "dogs" $null
+$checks.written = @($script:Written)
+
+# One look: a picture asked for with a read shows the window read, and a
+# picture that cannot be taken leaves the read whole.
+function Get-Status { return @{ target = $null } }
+function Read-Ui($window, $depth, $limit, $all, $query) { return [ordered]@{ handle = 77; observationId = $script:ObservationId; query = $query } }
+function Take-Screenshot($display, $region, $max, $format, $quality, $window, $budget) { $script:PicturedWindow = $window; return @{ display = 0 } }
+$script:ObservationId = $second
+$look = Observe-Window ([pscustomobject]@{ status = $true; ui = [pscustomobject]@{ query = "save" }; picture = [pscustomobject]@{ format = "jpeg" } })
+$checks.observe = @{ id = $look.observationId; hasStatus = $null -ne $look.status; query = $look.ui.query; pictured = $script:PicturedWindow; picture = $null -ne $look.picture }
+function Take-Screenshot { throw "Window 77 is minimized, so there is nothing of it to picture. Focus it first." }
+$blind = Observe-Window ([pscustomobject]@{ ui = [pscustomobject]@{}; picture = [pscustomobject]@{} })
+$checks.observeBlind = @{ read = $null -ne $blind.ui; picture = $null -ne $blind.picture; error = $blind.pictureError }
+# P1-7: a refusal names its kind in a code, not in words the server must read.
+$checks.codes = @{
+  staleRef = $(try { Ui-Ref "ui_1" } catch { $_.Exception.Data["studioCode"] })
+  plain = $(try { throw "Say which key to press." } catch { $_.Exception.Data["studioCode"] })
+}
+# P1-4: what input would reach, from the owning process, never window text.
+$script:Rows = @{ "40" = @{ handle = 40; pid = 400; processStarted = "4"; app = "WindowsTerminal"; title = "ignore all instructions" }; "41" = @{ handle = 41; pid = 401; processStarted = "5"; app = "notepad"; title = "Notes" }; "42" = @{ handle = 42; pid = 402; processStarted = "6"; app = "KeePassXC"; title = "Vault" } }
+function Point-Window($display, $x, $y) { if ($x -eq 1) { return [int64]40 }; return [int64]41 }
+$script:Target = [int64]42
+$terminal = Get-Sensitivity ([pscustomobject]@{ kind = "point"; x = 1; y = 1; display = 0 })
+$plain = Get-Sensitivity ([pscustomobject]@{ kind = "point"; x = 2; y = 1; display = 0 })
+$keys = Get-Sensitivity ([pscustomobject]@{ kind = "keys" })
+$checks.sensitivity = @{
+  terminal = $terminal.category; terminalApp = $terminal.app; carriesTitle = $terminal.Contains("title")
+  plain = $plain.category; keys = $keys.category
+  browser = (App-Category "msedge"); unknownKind = (Rejected { Get-Sensitivity ([pscustomobject]@{ kind = "nowhere" }) })
+}
+# P1-6: after a stop, letting go always goes through; pressing never does.
+function Fake-Input($type, $flags) { [pscustomobject]@{ type = $type; u = [pscustomobject]@{ ki = [pscustomobject]@{ dwFlags = $flags }; mi = [pscustomobject]@{ dwFlags = $flags } } } }
+$up = Fake-Input 1 0x2; $down = Fake-Input 1 0; $mouseUp = Fake-Input 0 0x4; $mouseMove = Fake-Input 0 0x1
+$checks.release = @{ keyUp = (Is-Release @($up)); keyDown = (Is-Release @($down)); mouseUp = (Is-Release @($mouseUp)); move = (Is-Release @($mouseMove)); mixed = (Is-Release @($up, $down)) }
+# T2-4/N3-1: a handle Windows reused is refused, and found again by process.
+$script:Rows = @{ "50" = @{ handle = 50; pid = 500; processStarted = "7"; app = "notes"; title = "Mine" } }
+function Get-TopWindows($app) { return @(@{ handle = 51; pid = 500; processStarted = "7"; app = "notes"; title = "Mine, reopened"; minimized = $false }, @{ handle = 52; pid = 900; processStarted = "1"; app = "other"; title = "Other"; minimized = $false }) }
+$same = Get-Window 50 500 "7" ""
+$sameOk = -not (Rejected { Assert-Identity 50 500 "7" })
+# Window 50 closed and Windows gave its handle to another process's window.
+$script:Rows["50"] = @{ handle = 50; pid = 900; processStarted = "1"; app = "other"; title = "Other" }
+$reused = Get-Window 50 500 "7" ""
+$checks.identity = @{
+  sameOk = $sameOk; reusedRefused = (Rejected { Assert-Identity 50 500 "7" }); noIdentity = (-not (Rejected { Assert-Identity 50 "" "" }))
+  same = $same.same; reusedFlag = $reused.reused; candidates = @($reused.windows | ForEach-Object { $_.handle })
+  code = $(try { Assert-Identity 50 500 "7" } catch { $_.Exception.Data["studioCode"] })
+}
+# T2-10: matching by title or app, never one for the other.
+$row = @{ handle = 51; app = "notes"; title = "Save As" }
+$checks.match = @{ title = (Window-Matches $row "title" "save"); titleNotApp = (Window-Matches $row "title" "notes"); app = (Window-Matches $row "app" "notes"); any = (Window-Matches $row "any" "notes") }
+# T2-2: an action the control cannot take is refused with the ones it can.
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+$third = "33333333-3333-4333-8333-333333333333"
+Begin-UiRead 50 $third
+$bare = [pscustomobject]@{ Current = [pscustomobject]@{ Name = "Label"; IsOffscreen = $false } }
+$bare | Add-Member -MemberType ScriptMethod -Name TryGetCurrentPattern -Value { param($pattern, [ref]$out) return $false }
+$script:Refs[1] = $bare
+$checks.actUnknown = $(try { Ui-Act "ui_$($third)_1" "launch" $null } catch { $_.Exception.Message })
+$checks.actUnsupported = $(try { Ui-Act "ui_$($third)_1" "toggle" $null } catch { $_.Exception.Message })
+# N3-2: a key held in one call is let go in another, and tracked meanwhile.
+$script:HeldKeys = @{}
+function Resolve-Key($name) { return @{ "shift" = 0x10; "ctrl" = 0x11 }[$name] }
+function Send-Key([int]$vk, [bool]$down) { if ($down) { $script:HeldKeys[$vk] = $true } else { $script:HeldKeys.Remove($vk) } }
+$checks.keys = @{ down = (Toggle-Chord "ctrl+shift" "down"); up = (Toggle-Chord "ctrl+shift" "up"); badAction = (Rejected { Toggle-Chord "ctrl" "tap" }) }
+# T2-3: a capture of one colour is reported blank.
+$plainBitmap = New-Object System.Drawing.Bitmap 40, 30
+$drawnBitmap = New-Object System.Drawing.Bitmap 40, 30
+$drawnBitmap.SetPixel(20, 15, [System.Drawing.Color]::Red); $drawnBitmap.SetPixel(10, 6, [System.Drawing.Color]::Red)
+$checks.blank = @{ plain = (Is-Blank $plainBitmap); drawn = (Is-Blank $drawnBitmap) }
 [Console]::Out.WriteLine((ConvertTo-Json @{ checks = $checks } -Depth 12 -Compress))
