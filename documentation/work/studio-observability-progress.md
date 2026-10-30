@@ -1,5 +1,42 @@
 # Studio observability implementation tracker
 
+## Desktop cursor visibility follow-up (2026-10-30)
+
+The former black overlay was too similar to a system pointer, and its two-second
+pre-action pulse could expire during input or be cleared by pointer correction.
+The marker now has a compact white face and thin charcoal edge, shared by the
+browser viewer. Successful native input and pointer correction renew its visual
+pulse for five seconds. Manual non-injected input still hides it; refusal,
+held-input release and disposal clear it. No input delivery, permission, product
+result, diagnostic field or retry is added or changed by these visual updates.
+
+`computer-marker-policy.ps1` executes the production dispatch functions with
+managed native doubles and no hooks. The corresponding `computer-activity` tests
+cover renewal, correction, refusal, manual takeover and cleanup, including
+negative controls that remove each renewal. The former all-neutral raster
+assertion checks the white face, charcoal edge and absence of coloured fringes.
+The opt-in `computer-marker-live.ps1` fixture verified actual layered-window pixels
+and foreground preservation over an owned white backdrop. The end-to-end agent
+path and physical-input attribution are not established by this component check.
+
+The follow-up also adds actual-dispatch mouse-button feedback: a compact pressed
+pose, held-button ring and 260 ms expanding release fade. Multiple buttons remain
+visually held until the last release; wheels and refused input do not animate as
+clicks. The mask and timestamp stay inside the native helper and add no result or
+diagnostic fields. A bounded browser `pressSequence` counter survives complete
+clicks between viewer polls. It is product visual telemetry, never an execution
+ID or input authority; the existing private RPC/content exclusions remain intact.
+Client feedback does not replay initial/repeated snapshots and is hidden for an
+ended session or another human controller. Coverage includes the native renderer
+and dispatch fixtures, controlled browser integration, parser and `StudioCursor`
+tests, plus the existing browser-window end-to-end fixture.
+
+The pill now reserves its Stop/Stopping slot, uses one text line box, reduces the
+shadow and spacing, and stays compact within its native window. The original Stop
+label change widened the button by about 23 px in the real browser fixture. The
+new isolated `computer-indicator-layout` suite checks aligned text, stable button
+width and unclipped status labels across 96 font/theme/status/DPI combinations.
+
 ## Desktop presence and cursor refinement (2026-10-30)
 
 `GET /api/computer/activity` and `computer.activity` expose only the live lease's

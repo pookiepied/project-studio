@@ -35,9 +35,12 @@ describe.skipIf(engineReport().seen === undefined)("live control of an installed
     await session.live.interact({ action: "view", viewerId });
     await tab.page.mouse.move(40, 30);
     await tab.page.mouse.down();
-    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { kind: "text", pressed: true } });
+    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { kind: "text", pressed: true, pressSequence: 1 } });
     await tab.page.mouse.up();
-    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { kind: "text", pressed: false } });
+    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { kind: "text", pressed: false, pressSequence: 1 } });
+    // A complete click between viewer reads must still leave bounded visual evidence.
+    await tab.page.mouse.click(40, 30);
+    await expect.poll(() => session.live.interact({ action: "view", viewerId })).toMatchObject({ cursor: { pressed: false, pressSequence: 2 } });
     expect(session.live.hasActivity).toBe(false);
     await session.live.interact({ action: "claim", viewerId });
     await session.live.interact({ action: "text", viewerId, tabId: tab.id, text: "private-text" });

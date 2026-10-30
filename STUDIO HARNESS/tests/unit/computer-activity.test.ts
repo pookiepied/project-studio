@@ -27,8 +27,31 @@ describe.skipIf(process.platform !== "win32")("native physical input policy with
   it("draws the browser-style arrow and custom rounded badge, including at screen edges", () => {
     expect(checks).toMatchObject({ arrowPainted: true, badgePainted: true, badgeRounded: true, edgeBadgeVisible: true });
   });
-  it("renders neutral antialiased edges on transparent pixels without a colour key", () => {
-    expect(checks).toMatchObject({ transparentBackground: true, neutralEdges: true });
+  it("renders the white pointer and charcoal edge without coloured transparency fringes", () => {
+    expect(checks).toMatchObject({ arrowPainted: true, transparentBackground: true, neutralEdges: true });
+  });
+  it("draws a press ring and an expanding release pulse that fades away", () => {
+    expect(checks).toMatchObject({ pressRing: true, releaseRing: true, releaseFades: true });
+  });
+});
+
+describe.skipIf(process.platform !== "win32")("desktop marker visibility after dispatch", () => {
+  let checks: Record<string, unknown>;
+  beforeAll(async () => {
+    const fixture = fileURLToPath(new URL("../fixtures/computer-marker-policy.ps1", import.meta.url));
+    const source = fileURLToPath(new URL("../../src/computer/activity.cs", import.meta.url));
+    const driver = fileURLToPath(new URL("../../src/computer/driver.ps1", import.meta.url));
+    const { stdout } = await promisify(execFile)(windowsPowerShell(), ["-NoProfile", "-NonInteractive", "-File", fixture, "-Source", source, "-Driver", driver], { windowsHide: true, timeout: 30_000 });
+    checks = JSON.parse(stdout.trim());
+  }, 35_000);
+  it("restores the marker after pointer correction and renews it after successful input", () => {
+    expect(checks).toMatchObject({ moveVisible: true, inputVisible: true, visibleForFiveSeconds: true });
+  });
+  it("keeps manual takeover, cleanup and refused input distinct from active input", () => {
+    expect(checks).toMatchObject({ manualMoveHides: true, manualButtonClearsPress: true, releaseHides: true, refused: true, refusedInputHidden: true, refusedInputNotPressed: true, monitorNotStarted: true });
+  });
+  it("tracks overlapping button presses until the last release and does not animate wheel input as a click", () => {
+    expect(checks).toMatchObject({ pressSurvivesMove: true, multiButtonPress: true, partialReleaseStaysPressed: true, finalReleaseAnimates: true, wheelNotClick: true });
   });
 });
 

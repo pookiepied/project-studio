@@ -24,7 +24,7 @@ export interface LiveBrowserState {
   readonly tabs: readonly { id: string; url: string; title: string }[]
   readonly control: 'human' | 'agent' | 'other'
   readonly busy: boolean
-  readonly cursor: { x: number; y: number; tabId: string; kind?: 'default' | 'pointer' | 'text'; pressed?: boolean } | null
+  readonly cursor: { x: number; y: number; tabId: string; kind?: 'default' | 'pointer' | 'text'; pressed?: boolean; pressSequence?: number } | null
   readonly frame: LiveFrame | null
   readonly omittedTabs?: number
   readonly frameUnavailable?: boolean
@@ -60,10 +60,12 @@ export function parseLiveBrowserState(value: unknown): LiveBrowserState | null {
     const item = value.cursor
     if (!record(item) || !finite(item.x) || !finite(item.y) || item.x < 0 || item.x > 1 || item.y < 0 || item.y > 1 || typeof item.tabId !== 'string'
       || (item.kind !== undefined && item.kind !== 'default' && item.kind !== 'pointer' && item.kind !== 'text')
-      || (item.pressed !== undefined && typeof item.pressed !== 'boolean')) return null
+      || (item.pressed !== undefined && typeof item.pressed !== 'boolean')
+      || (item.pressSequence !== undefined && (!finite(item.pressSequence) || !Number.isSafeInteger(item.pressSequence) || item.pressSequence < 0))) return null
     cursor = { x: item.x, y: item.y, tabId: item.tabId,
       ...(item.kind === 'default' || item.kind === 'pointer' || item.kind === 'text' ? { kind: item.kind } : {}),
-      ...(typeof item.pressed === 'boolean' ? { pressed: item.pressed } : {}) }
+      ...(typeof item.pressed === 'boolean' ? { pressed: item.pressed } : {}),
+      ...(typeof item.pressSequence === 'number' ? { pressSequence: item.pressSequence } : {}) }
   }
   return { running: value.running, busy: value.busy, activeTabId: value.activeTabId, tabs,
     control: value.control === 'human' ? 'human' : value.control === 'other' ? 'other' : 'agent', frame, cursor,

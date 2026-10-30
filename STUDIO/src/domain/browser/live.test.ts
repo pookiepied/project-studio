@@ -18,4 +18,11 @@ describe('live browser response boundary', () => {
     expect(parseLiveBrowserState({ ...state, cursor: { ...cursor, kind: {} } })).toBeNull()
     expect(parseLiveBrowserState({ ...state, cursor: { ...cursor, pressed: 'yes' } })).toBeNull()
   })
+  it('accepts bounded press counters and refuses malformed counters', () => {
+    const cursor = { x: 0.5, y: 0.3, tabId: 'tab_1', pressed: false, pressSequence: 2 }
+    expect(parseLiveBrowserState({ ...state, cursor })?.cursor).toEqual(cursor)
+    for (const pressSequence of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '2']) {
+      expect(parseLiveBrowserState({ ...state, cursor: { ...cursor, pressSequence } })).toBeNull()
+    }
+  })
 })

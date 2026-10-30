@@ -11,9 +11,23 @@ let state: LiveBrowserState = { running: true, activeTabId: 'tab_1', control: 'a
 vi.mock('./useLiveBrowser', () => ({ useLiveBrowser: () => ({ state, error: null, send, reconnect }) }))
 vi.mock('@/platform/tauri', async (original) => ({ ...await original<object>(), isTauri: () => false, startWindowDrag: vi.fn() }))
 
-afterEach(() => { cleanup(); send.mockClear(); state = { ...state, control: 'agent', frame: null, cursor: null } })
+afterEach(() => { cleanup(); send.mockClear(); state = { ...state, running: true, control: 'agent', frame: null, cursor: null } })
 
 describe('detached browser window', () => {
+  it('hides Studio input feedback for another human controller or an ended session', () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    state = { ...state, control: 'other', cursor: { x: 0.5, y: 0.5, tabId: 'tab_1', pressed: true },
+      frame: { data: '/9j/', tabId: 'tab_1', sequence: 1, width: 640, height: 400 } }
+    const view = render(<BrowserWindow conversationId="cnv_1" />)
+    expect(screen.queryByLabelText('Studio cursor')).toBeNull()
+    state = { ...state, control: 'agent' }
+    view.rerender(<BrowserWindow conversationId="cnv_1" />)
+    expect(screen.getByLabelText('Studio cursor')).toBeTruthy()
+    state = { ...state, running: false }
+    view.rerender(<BrowserWindow conversationId="cnv_1" />)
+    expect(screen.queryByLabelText('Studio cursor')).toBeNull()
+    vi.unstubAllGlobals()
+  })
   it('fits a small viewport without magnifying its page', () => {
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
     state = { ...state, frame: { data: '/9j/', tabId: 'tab_1', sequence: 1, width: 640, height: 400 } }

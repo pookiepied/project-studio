@@ -518,6 +518,31 @@ The desktop marker paints the browser's arrow geometry and a rounded custom
 Studio badge. Screen-edge placement keeps the badge visible and arrow hotspot
 aligned. It does not replace the OS-wide cursor. Offscreen drawing tests exercise
 the shipped renderer; these are not evidence of live desktop focus or hook delivery.
+The compact white pointer face and thin charcoal edge use Studio's neutral palette.
+Its five-second visual pulse renews after successful input dispatch and exact
+pointer correction; manual non-injected input, refusal and held-input release
+dismiss it. These paint-only pulses add no input, retry, collected field or new
+execution identity. Existing action results and exceptions are unchanged.
+The opt-in `computer-marker-live.ps1` fixture composes the shipped layered window
+over an owned test backdrop without hooks or injected input, checking its pixels
+and foreground preservation. This verifies that component's live composition,
+not physical-input attribution or the running agent's end-to-end delivery.
+Successful native mouse-button dispatch updates only a bounded visual button mask
+and release timestamp. The cursor compresses on press, retains held-button feedback
+until the last button is released, then draws a 260 ms expanding, fading neutral
+ring. Wheels and refused input never start click feedback. No button identities or
+timestamps are added to results or diagnostic attributes.
+
+Browser cursor snapshots retain a bounded `pressSequence` counter so a complete
+page press/release between viewer polls can still produce feedback. This is visual
+page telemetry, not an execution/event ID, input authority or proof of application
+success. It travels only through the existing private viewer projection; raw cursor
+bindings and viewer RPC frames remain excluded from diagnostic content capture.
+Initial/repeated snapshots do not replay animation, and another human controller
+or an ended session does not show Studio's cursor. The pill's fixed Stop slot and
+shared text line box are presentation only. `computer-indicator-layout.test.ts`
+checks the actual fonts, geometry and clipping in isolated headless browsers across
+supported font sizes, light/dark themes and 100/125/150 percent display scales.
 
 Desktop presence uses admitted `GET /api/computer/activity`, the child operation
 `computer.activity`, and the existing private `studio/computer` RPC. The desktop

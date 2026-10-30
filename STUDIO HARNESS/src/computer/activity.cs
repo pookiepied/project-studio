@@ -28,7 +28,8 @@ namespace Studio {
         private Thread thread;
         private Marker marker;
         private IntPtr mouseHook, keyboardHook;
-        private long lastAt, showUntil;
+        private long lastAt, showUntil, releasedAt;
+        private int mouseButtons;
         private int moves, buttons, wheels, keys;
         private bool available, truncated, stopped;
         public Activity() { mouse = Mouse; keyboard = Keyboard; }
@@ -41,7 +42,21 @@ namespace Studio {
             }
             ready.WaitOne(2000);
         }
-        public void Pulse() { lock (gate) { showUntil = Stopwatch.GetTimestamp() + Stopwatch.Frequency * 2; } }
+        public void Pulse() { lock (gate) { showUntil = Stopwatch.GetTimestamp() + Stopwatch.Frequency * 5; } }
+        public void Dismiss() { lock (gate) { showUntil = 0; mouseButtons = 0; releasedAt = 0; } }
+        public void MouseButton(int flags) {
+            lock (gate) {
+                int before = mouseButtons;
+                if ((flags & 0x02) != 0) mouseButtons |= 1;
+                if ((flags & 0x04) != 0) mouseButtons &= ~1;
+                if ((flags & 0x08) != 0) mouseButtons |= 2;
+                if ((flags & 0x10) != 0) mouseButtons &= ~2;
+                if ((flags & 0x20) != 0) mouseButtons |= 4;
+                if ((flags & 0x40) != 0) mouseButtons &= ~4;
+                if (mouseButtons != 0) releasedAt = 0;
+                else if (before != 0) releasedAt = Stopwatch.GetTimestamp();
+            }
+        }
         public bool IsOverlay(long handle) { lock (gate) { return marker != null && marker.NativeHandle == new IntPtr(handle); } }
 
         // These pure policies are also exercised without installing any hooks.
@@ -55,7 +70,8 @@ namespace Studio {
         public void Record(string kind) {
             if (kind != "mouse_move" && kind != "mouse_button" && kind != "mouse_wheel" && kind != "keyboard") return;
             lock (gate) {
-                lastAt = Stopwatch.GetTimestamp(); showUntil = 0;
+                lastAt = Stopwatch.GetTimestamp(); showUntil = 0; releasedAt = 0;
+                if (kind == "mouse_button") mouseButtons = 0;
                 if (kind == "mouse_move") Increment(ref moves);
                 else if (kind == "mouse_button") Increment(ref buttons);
                 else if (kind == "mouse_wheel") Increment(ref wheels);
@@ -92,12 +108,19 @@ namespace Studio {
                     lock (gate) { available = mouseHook != IntPtr.Zero && keyboardHook != IntPtr.Zero; }
                     timer.Interval = 16;
                     timer.Tick += delegate {
-                        bool end, show;
-                        lock (gate) { end = stopped; show = showUntil > Stopwatch.GetTimestamp(); }
+                        bool end, show, pressed;
+                        float releaseProgress;
+                        lock (gate) {
+                            long now = Stopwatch.GetTimestamp();
+                            end = stopped; show = showUntil > now; pressed = mouseButtons != 0;
+                            releaseProgress = releasedAt == 0 ? -1 : (float)((now - releasedAt) / (Stopwatch.Frequency * 0.26));
+                            if (releaseProgress >= 1) releaseProgress = -1;
+                        }
                         if (end) { Application.ExitThread(); return; }
                         Point point;
                         if (show && GetCursorPos(out point)) {
                             Rectangle area = Screen.FromPoint(point).Bounds;
+                            view.SetFeedback(pressed, releaseProgress);
                             view.Follow(point, area);
                             if (!view.Visible) view.Show();
                         } else if (view.Visible) view.Hide();
@@ -114,29 +137,49 @@ namespace Studio {
         }
         public void Dispose() { lock (gate) { stopped = true; showUntil = 0; } if (thread != null) thread.Join(1000); }
 
-        // Same arrow geometry and rounded Studio badge as BrowserWindow.tsx.
+        // Same compact pointer and neutral Studio badge as BrowserWindow.tsx.
         // Paint our own badge, never a native tooltip or a global cursor change.
         public static void PaintCursor(Graphics graphics, Point hotspot, Size size) {
+            PaintCursor(graphics, hotspot, size, false, -1);
+        }
+        public static void PaintCursor(Graphics graphics, Point hotspot, Size size, bool pressed, float releaseProgress) {
             GraphicsState state = graphics.Save();
             try {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 using (Brush fill = new SolidBrush(Color.FromArgb(30, 30, 30)))
                 using (Brush ink = new SolidBrush(Color.White))
-                using (Pen outline = new Pen(Color.White, 1.5f))
-                using (Font font = new Font("Segoe UI", 8, FontStyle.Regular, GraphicsUnit.Point))
+                using (Pen outline = new Pen(Color.FromArgb(30, 30, 30), 1.1f))
+                using (Font font = new Font("Segoe UI", 7.5f, FontStyle.Regular, GraphicsUnit.Point))
                 using (GraphicsPath arrow = new GraphicsPath())
                 using (GraphicsPath badge = new GraphicsPath()) {
-                    arrow.AddPolygon(new Point[] { new Point(hotspot.X, hotspot.Y), new Point(hotspot.X + 8, hotspot.Y + 22),
-                        new Point(hotspot.X + 11, hotspot.Y + 13), new Point(hotspot.X + 20, hotspot.Y + 10) });
+                    if (pressed || releaseProgress >= 0) {
+                        float progress = Math.Max(0, Math.Min(1, releaseProgress));
+                        float radius = pressed ? 7 : 7 + progress * 10;
+                        int alpha = pressed ? 90 : (int)(90 * (1 - progress));
+                        using (Pen ring = new Pen(Color.FromArgb(alpha, 30, 30, 30), 2.5f))
+                        using (Pen highlight = new Pen(Color.FromArgb(Math.Min(255, alpha * 2), 255, 255, 255), 1)) {
+                            graphics.DrawEllipse(ring, hotspot.X - radius, hotspot.Y - radius, radius * 2, radius * 2);
+                            graphics.DrawEllipse(highlight, hotspot.X - radius, hotspot.Y - radius, radius * 2, radius * 2);
+                        }
+                    }
+                    arrow.AddPolygon(new Point[] { new Point(hotspot.X, hotspot.Y), new Point(hotspot.X + 5, hotspot.Y + 20),
+                        new Point(hotspot.X + 9, hotspot.Y + 12), new Point(hotspot.X + 18, hotspot.Y + 8) });
                     outline.LineJoin = LineJoin.Round;
-                    graphics.FillPath(fill, arrow); graphics.DrawPath(outline, arrow);
-                    int x = Math.Max(0, Math.Min(size.Width - 56, hotspot.X + 12));
-                    int y = hotspot.Y + 26 + 20 <= size.Height ? hotspot.Y + 26 : Math.Max(0, hotspot.Y - 24);
-                    badge.AddArc(x, y, 20, 20, 90, 180);
-                    badge.AddArc(x + 36, y, 20, 20, 270, 180); badge.CloseFigure();
+                    GraphicsState pointerState = graphics.Save();
+                    if (pressed) {
+                        graphics.TranslateTransform(hotspot.X, hotspot.Y);
+                        graphics.ScaleTransform(0.9f, 0.9f);
+                        graphics.TranslateTransform(-hotspot.X, -hotspot.Y);
+                    }
+                    graphics.FillPath(ink, arrow); graphics.DrawPath(outline, arrow);
+                    graphics.Restore(pointerState);
+                    int x = Math.Max(0, Math.Min(size.Width - 50, hotspot.X + 10));
+                    int y = hotspot.Y + 24 + 18 <= size.Height ? hotspot.Y + 24 : Math.Max(0, hotspot.Y - 22);
+                    badge.AddArc(x, y, 18, 18, 90, 180);
+                    badge.AddArc(x + 32, y, 18, 18, 270, 180); badge.CloseFigure();
                     graphics.FillPath(fill, badge);
-                    graphics.DrawString("Studio", font, ink, x + 9, y + 2);
+                    graphics.DrawString("Studio", font, ink, x + 8, y + 1);
                 }
             } finally { graphics.Restore(state); }
         }
@@ -154,17 +197,21 @@ namespace Studio {
             [DllImport("user32.dll")] private static extern bool UpdateLayeredWindow(IntPtr window, IntPtr screen, ref Point position,
                 ref Size size, IntPtr source, ref Point origin, int key, ref Blend blend, int flags);
             public readonly IntPtr NativeHandle;
-            private Point hotspot = new Point(2, 2);
+            private Point hotspot = new Point(20, 20);
+            private bool pressed, paintedPressed;
+            private float releaseProgress = -1, paintedProgress = -1;
             public Marker() {
                 FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
-                ClientSize = new Size(92, 56); DoubleBuffered = true; NativeHandle = Handle;
+                ClientSize = new Size(112, 80); DoubleBuffered = true; NativeHandle = Handle;
             }
+            public void SetFeedback(bool down, float progress) { pressed = down; releaseProgress = progress; }
             public void Follow(Point point, Rectangle area) {
-                Point location = new Point(Math.Max(area.Left, Math.Min(area.Right - Width, point.X - 2)),
-                    Math.Max(area.Top, Math.Min(area.Bottom - Height, point.Y - 2)));
+                Point location = new Point(Math.Max(area.Left, Math.Min(area.Right - Width, point.X - 20)),
+                    Math.Max(area.Top, Math.Min(area.Bottom - Height, point.Y - 20)));
                 Point next = new Point(point.X - location.X, point.Y - location.Y);
-                bool redraw = hotspot != next || !Visible;
+                bool redraw = hotspot != next || !Visible || pressed != paintedPressed || releaseProgress != paintedProgress;
                 hotspot = next;
+                paintedPressed = pressed; paintedProgress = releaseProgress;
                 Location = location;
                 if (redraw) PaintLayer();
             }
@@ -173,7 +220,7 @@ namespace Studio {
                 using (Bitmap bitmap = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb)) {
                     using (Graphics graphics = Graphics.FromImage(bitmap)) {
                         graphics.Clear(Color.Transparent);
-                        PaintCursor(graphics, hotspot, ClientSize);
+                        PaintCursor(graphics, hotspot, ClientSize, pressed, releaseProgress);
                     }
                     IntPtr screen = GetDC(IntPtr.Zero), source = CreateCompatibleDC(screen);
                     IntPtr pixels = bitmap.GetHbitmap(Color.FromArgb(0)), previous = SelectObject(source, pixels);

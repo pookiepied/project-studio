@@ -19,7 +19,8 @@ export class LiveBrowser {
   #frame: { data: string; sequence: number; tabId: string; width: number; height: number } | null = null;
   #sequence = 0;
   #frameUnavailable = false;
-  #cursor: { x: number; y: number; tabId: string; kind?: "default" | "pointer" | "text"; pressed?: boolean } | null = null;
+  #cursor: { x: number; y: number; tabId: string; kind?: "default" | "pointer" | "text"; pressed?: boolean; pressSequence?: number } | null = null;
+  #pressSequence = 0;
   #activity: { moves: number; buttons: number; wheels: number; keys: number; edits: number; pageInputs: number; viewerOnly: number; tabId: string; x: number | null; y: number | null } | undefined;
   #timer: NodeJS.Timeout | undefined;
   readonly #held = new Map<Page, Set<string>>();
@@ -52,7 +53,7 @@ export class LiveBrowser {
     if (box !== null && viewport) {
       const x = (box.x + box.width / 2) / viewport.width;
       const y = (box.y + box.height / 2) / viewport.height;
-      this.#cursor = x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y, tabId } : null;
+      this.#cursor = x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y, tabId, pressSequence: this.#pressSequence } : null;
     }
   }
 
@@ -260,7 +261,7 @@ export class LiveBrowser {
         if (!event.isTrusted) return;
         const cursor = event.target instanceof Element ? getComputedStyle(event.target).cursor : 'default';
         const kind = cursor === 'pointer' ? 'pointer' : cursor === 'text' ? 'text' : 'default';
-        pending = { x: event.clientX, y: event.clientY, kind, pressed: event.buttons !== 0 };
+        pending = { x: event.clientX, y: event.clientY, kind, pressed: event.buttons !== 0, press: event.type === 'mousedown' };
         if (event.type !== 'mousemove' || performance.now() - last >= 33) {
           clearTimeout(timer); timer = undefined; publish();
         } else if (timer === undefined) timer = setTimeout(() => { timer = undefined; publish(); }, 33);
@@ -278,9 +279,11 @@ export class LiveBrowser {
         if (viewport && typeof value === "object" && value !== null && "x" in value && "y" in value
           && typeof value.x === "number" && Number.isFinite(value.x) && value.x >= 0 && value.x <= viewport.width
           && typeof value.y === "number" && Number.isFinite(value.y) && value.y >= 0 && value.y <= viewport.height) {
+          const pressed = "pressed" in value && value.pressed === true;
+          if ("press" in value && value.press === true && this.#pressSequence < Number.MAX_SAFE_INTEGER) this.#pressSequence++;
           this.#cursor = { tabId, x: value.x / viewport.width, y: value.y / viewport.height,
             kind: "kind" in value && value.kind === "pointer" ? "pointer" : "kind" in value && value.kind === "text" ? "text" : "default",
-            pressed: "pressed" in value && value.pressed === true };
+            pressed, pressSequence: this.#pressSequence };
         }
       } catch { /* A page cannot break the browser by sending malformed cursor telemetry. */ }
     });

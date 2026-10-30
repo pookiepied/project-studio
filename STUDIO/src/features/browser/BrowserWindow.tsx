@@ -9,6 +9,7 @@ import { startWindowDrag } from '@/platform/tauri'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { useLiveBrowser } from './useLiveBrowser'
+import { StudioCursor } from './StudioCursor'
 
 export function BrowserWindow({ conversationId }: { conversationId: string }) {
   const { state, error, inputError, reconnecting, send, reconnect } = useLiveBrowser(conversationId)
@@ -143,7 +144,7 @@ function BrowserSurface({ state, manual, send }: {
 
   if (!picture || !tabId) return null
   const scale = Math.min(1, size.width / picture.width, size.height / picture.height)
-  const cursor = state.cursor?.tabId === tabId && !manual ? state.cursor : null
+  const cursor = state.cursor?.tabId === tabId && state.running && state.control === 'agent' ? state.cursor : null
 
   const pointer = (event: PointerEvent<HTMLDivElement>, kind: 'move' | 'down' | 'up') => {
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -224,13 +225,7 @@ function BrowserSurface({ state, manual, send }: {
         {cursor ? <motion.div aria-label="Studio cursor" data-cursor-kind={cursor.kind ?? 'default'} data-pressed={cursor.pressed === true} className="pointer-events-none absolute left-0 top-0 z-10"
           animate={{ x: cursor.x * picture.width * scale, y: cursor.y * picture.height * scale }}
           transition={{ duration: DURATION.fast, ease: EASE_OUT }}>
-          {cursor.pressed ? <span className="absolute -left-3 -top-3 size-7 rounded-full border-2 border-foreground/60 bg-foreground/10 outline outline-1 outline-background" /> : null}
-          <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true" className={cn('overflow-visible', cursor.kind === 'text' && '-translate-x-1/2 -translate-y-1/2')}>
-            {cursor.kind === 'text'
-              ? <><path d="M8 2H18M13 2V24M8 24H18" className="stroke-background" strokeWidth="4" /><path d="M8 2H18M13 2V24M8 24H18" className="stroke-foreground" strokeWidth="2" /></>
-              : <path d="M0 0L8 22L11 13L20 10Z" fill="#1e1e1e" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />}
-          </svg>
-          <span className="ml-3 inline-flex h-5 items-center rounded-full bg-[#1e1e1e] px-2.5 text-[10px] font-medium tracking-wide text-white shadow-sm">Studio</span>
+          <StudioCursor key={cursor.tabId} cursor={cursor} />
         </motion.div> : null}
       </div>
     </div>

@@ -88,11 +88,11 @@ export function ComputerIndicatorWindow() {
       <div
         role="status"
         aria-live="polite"
-        className="flex h-10 items-center gap-3 rounded-full border border-hairline bg-surface pl-3 pr-1.5 text-foreground shadow-panel"
+        className="flex h-10 w-max min-w-[300px] max-w-full items-center gap-2 rounded-full border border-hairline bg-surface pl-3 pr-1.5 text-caption font-medium text-foreground shadow-sm [&_button]:text-foreground"
       >
-        <Icons.computerUse className="size-4 text-muted-foreground" />
-        <span className="text-caption whitespace-nowrap font-medium">{stopFailed ? 'Could not stop. Try again.' : mode === 'paused' ? 'Computer work is paused' : mode === 'demonstrating' ? 'You have computer control' : mode === 'stopping' ? 'Studio is releasing your computer' : 'Studio is using your computer'}</span>
-        <Button size="xs" variant="ghost" busy={stopping || mode === 'stopping'} onClick={stop}>
+        <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground"><Icons.computerUse /></span>
+        <span className="min-w-0 flex-1 truncate leading-4">{stopFailed ? 'Could not stop. Try again.' : mode === 'paused' ? 'Computer work is paused' : mode === 'demonstrating' ? 'You have computer control' : mode === 'stopping' ? 'Releasing computer control' : 'Studio is using your computer'}</span>
+        <Button size="xs" variant="ghost" className="h-7 w-[5.5em] px-0 leading-4" busy={stopping || mode === 'stopping'} onClick={stop}>
           {stopping || mode === 'stopping' ? 'Stopping' : 'Stop'}
         </Button>
       </div>

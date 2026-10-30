@@ -315,6 +315,7 @@ function New-Input([uint32]$type, $union) {
 function Send-Inputs([Studio.Native+INPUT[]]$inputs, $what) {
   $sent = [Studio.Native]::SendInput($inputs.Count, $inputs, [System.Runtime.InteropServices.Marshal]::SizeOf([type][Studio.Native+INPUT]))
   if ($sent -ne $inputs.Count) { throw "Windows refused the $what. A window that runs as administrator cannot be driven from here." }
+  if ($null -ne $script:Activity) { $script:Activity.Pulse() }
 }
 
 function Send-Mouse([uint32]$flags, [int]$data) {
@@ -328,6 +329,7 @@ function Send-Mouse([uint32]$flags, [int]$data) {
   $u = New-Object Studio.Native+INPUTUNION
   $u.mi = $mi
   Send-Inputs ([Studio.Native+INPUT[]]@((New-Input 0 $u))) "mouse input"
+  if ($null -ne $script:Activity) { $script:Activity.MouseButton([int]$flags) }
 }
 
 # A move is an input event, not a teleport. SetCursorPos puts the pointer
@@ -355,6 +357,8 @@ function Move-Pointer($display, $x, $y) {
   Send-MouseTo $a.x $a.y 0
   [void][Studio.Native]::SetCursorPos($a.x, $a.y)
   Start-Sleep -Milliseconds 20
+  # The exact-position correction can arrive as a non-injected move and hide the marker.
+  if ($null -ne $script:Activity) { $script:Activity.Pulse() }
 }
 
 # Whether a point of a display lies inside the window being worked in. A
@@ -1303,6 +1307,7 @@ function Answer-Pulse($id) {
 }
 
 function Refuse($id, $message) {
+  if ($null -ne $script:Activity) { $script:Activity.Dismiss() }
   Reset-UiRefs
   if ($null -ne $script:ActionBefore) {
     $message += " Observe status and read the intended window again before any further input; do not replay this action automatically."
@@ -1389,7 +1394,11 @@ try { while ($true) {
       # A pause or handoff lets go of whatever Studio still holds - a button
       # pressed by mouse_button, a modifier - without closing the driver, so
       # the task keeps its place while the person or another actor works.
-      "release_held" { Release-HeldInput; Answer $id ([ordered]@{ released = $true }) }
+      "release_held" {
+        Release-HeldInput
+        if ($null -ne $script:Activity) { $script:Activity.Dismiss() }
+        Answer $id ([ordered]@{ released = $true })
+      }
       default { Refuse $id ("Unknown operation `"" + $req.op + "`".") }
     }
   } catch {
