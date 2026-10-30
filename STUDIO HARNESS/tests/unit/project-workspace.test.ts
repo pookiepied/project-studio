@@ -3,11 +3,17 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
+import { modelToolName } from "../../src/application/tool-name.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { ConversationStore } from "../../src/conversations/store.js";
+import { McpCapabilityCatalog } from "../../src/extend/mcp/capabilities.js";
+import { McpConnection } from "../../src/extend/mcp/connection.js";
+import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
+import { McpSupervisor } from "../../src/extend/mcp/supervisor.js";
+import { conversationScope, ExtensionSelectionStore } from "../../src/extend/selection.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
@@ -109,6 +115,59 @@ async function makeDirectory(path: string): Promise<string> {
 }
 
 describe("a project conversation stands in the project's folders", () => {
+  it("offers shared-screen tools to a fresh voice sandbox without adopting them for typed chat", async () => {
+    const state = await harness();
+    const connection = new McpConnection({
+      send: () => undefined, onData: () => undefined, onStderr: () => undefined,
+      onClose: () => undefined, close: () => undefined,
+    });
+    try {
+      vi.spyOn(state.runtime, "start").mockResolvedValue(undefined);
+      vi.spyOn(state.runtime, "reconcile").mockResolvedValue(undefined);
+      vi.spyOn(McpSupervisor.prototype, "ensure").mockResolvedValue(connection);
+      vi.spyOn(connection, "request").mockResolvedValue({});
+      const record = new McpServerRegistry(state.database).save({
+        id: "studio-computer", title: "Computer", description: "", provenance: "system",
+        transport: "stdio", command: process.execPath, args: [], env: {}, auth: "none",
+      });
+      const selection = new ExtensionSelectionStore(state.database);
+      const key = { kind: "mcp", extensionId: record.id, scope: conversationScope("voice") } as const;
+      selection.set(key, true);
+      const catalog = new McpCapabilityCatalog();
+      const computerTools = await catalog.refresh(record, { request: async () => ({ tools:
+        ["control", "screenshot", "click", "drag", "stop"].map((name) => ({
+          name: `studio_computer_${name}`, description: "", inputSchema: { type: "object" },
+        })),
+      }) });
+      vi.spyOn(McpCapabilityCatalog.prototype, "tools").mockImplementation((ids) =>
+        ids === undefined || ids.includes(record.id) ? [...computerTools] : []);
+      const factory = state.runtime.createAgentSandbox({ agentId: "voice", conversationId: "voice", voiceOnly: true });
+      const environment = await factory.createSandbox({ id: "voice" });
+      const names = () => factory.tools?.(environment, { subagents: {} }).map((tool) => tool.name);
+      expect(names()).toEqual(["read"]);
+      await state.runtime.setScreenSharing("voice", true);
+      expect(names()).toEqual(["read", ...["control", "screenshot", "click"].map((name) =>
+        modelToolName("mcp:studio-computer", `studio_computer_${name}`))]);
+      const typed = state.runtime.createAgentSandbox({ agentId: "studio", conversationId: "voice" });
+      expect(typed.tools?.(environment, { subagents: {} }).some((tool) => tool.name.includes("studio_computer_"))).toBe(false);
+      const other = state.runtime.createAgentSandbox({ agentId: "voice", conversationId: "other", voiceOnly: true });
+      expect(other.tools?.(environment, { subagents: {} }).map((tool) => tool.name)).toEqual(["read"]);
+      new McpServerRegistry(state.database).save({ ...record, provenance: "user" });
+      const replaced = state.runtime.createAgentSandbox({ agentId: "voice", conversationId: "voice", voiceOnly: true });
+      expect(replaced.tools?.(environment, { subagents: {} }).map((tool) => tool.name)).toEqual(["read"]);
+      new McpServerRegistry(state.database).save(record);
+      selection.set(key, false);
+      const disabled = state.runtime.createAgentSandbox({ agentId: "voice", conversationId: "voice", voiceOnly: true });
+      expect(disabled.tools?.(environment, { subagents: {} }).map((tool) => tool.name)).toEqual(["read"]);
+      await state.runtime.setScreenSharing("voice", false);
+      expect(names()).toEqual(["read"]);
+    } finally {
+      connection.close();
+      vi.restoreAllMocks();
+      await stop(state);
+    }
+  });
+
   it("refuses coordination of another conversation's worker before dispatch", async () => {
     const state = await harness();
     try {

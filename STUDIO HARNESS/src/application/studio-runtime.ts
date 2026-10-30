@@ -2515,20 +2515,30 @@ export class StudioRuntime implements AgentHost {
       const active = this.#enabledMcpServers(enablement);
       const enabledIds = new Set(active.map((record) => record.id));
 
-      // The withhold, and it is now total for MCP. ADR 0048 §3 first said
+      // Voice has no discover tool. Offer its bounded computer surface while
+      // sharing without adopting schemas into the typed conversation's set.
+      // Calls still pass through the same gate and server-side sharing check.
+      if (options.voiceOnly && this.#screenSharing.has(options.conversationId)) {
+        for (const record of active) {
+          if (record.id !== COMPUTER_SERVER_ID || record.provenance !== "system") continue;
+          for (const tool of this.#catalog.tools([record.id])) {
+            if (voiceToolOffered(tool.descriptor.id.namespace, tool.descriptor.id.name, true)) registerMcpTool(tool);
+          }
+        }
+      }
+
+      // Outside the shared voice surface, MCP stays withheld. ADR 0048 §3 first said
       // system-provenance servers load eagerly; ADR 0049 §5 corrected that,
       // because it conflated **who owns a capability** with **how expensive it
       // is to load**. A Studio-owned browser is still twenty-four schemas, and
       // ownership does not make a schema cheap. The rule that replaced it:
       // eager loading is for capabilities small enough and general enough that
       // most turns might use them - which means the natives, registered above.
-      // Everything reached over MCP is discovered, whoever wrote it.
+      // Outside voice's shared-screen tools, everything reached over MCP is
+      // discovered, whoever wrote it.
       //
-      // Kept as a loop over nothing rather than deleted, because what it
-      // leaves behind is the important part: this function's *only* eager
-      // contribution is the natives, and every MCP tool below is here because
-      // this conversation asked for it. Nothing removes anything either - a
-      // tool already registered keeps its place, since withholding applies at
+      // Every MCP tool below is here because this conversation asked for it.
+      // A tool already registered keeps its place, since withholding applies at
       // registration and this function only ever declines to add. That is ADR
       // 0029's rule, kept.
 
