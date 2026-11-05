@@ -25,6 +25,10 @@ const KINDS: Readonly<Record<string, ActivityKind>> = {
   image: { label: 'generated images', running: 'Generating images', mark: Icons.image },
   video: { label: 'generated videos', running: 'Generating videos', mark: Icons.video },
   web: { label: 'researched the web', running: 'Researching the web', mark: Icons.browserUse },
+  activate_skill: { label: 'activated skills', running: 'Activating skills', mark: Icons.skill },
+  read_skill_resource: { label: 'read skill resources', running: 'Reading skill resources', mark: Icons.fileRead },
+  voice_work: { label: 'managed voice work', running: 'Managing voice work', mark: Icons.voice },
+  task_activity: { label: 'checked task activity', running: 'Checking task activity', mark: Icons.backgroundJobs },
 }
 
 const OTHER: ActivityKind = { label: 'used tools', running: 'Using tools', mark: Icons.mcp }

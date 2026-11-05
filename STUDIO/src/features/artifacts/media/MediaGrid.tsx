@@ -38,6 +38,7 @@ export function MediaGrid({
   title,
   working,
   onOpen,
+  onKeep,
 }: {
   outputs: readonly MediaOutput[]
   /** How many frames there will be; the ones past `outputs` are reserved. */
@@ -49,6 +50,7 @@ export function MediaGrid({
   working: boolean
   /** Open the output at this index larger. */
   onOpen?: (index: number) => void
+  onKeep?: (output: MediaOutput, index: number) => void
 }) {
   const [measured, setMeasured] = useState<Readonly<Record<number, number>>>({})
 
@@ -93,6 +95,10 @@ export function MediaGrid({
                   }
                   {...(onOpen !== undefined && frame.output !== null
                     ? { onOpen: () => onOpen(frame.index) }
+                    : {})}
+                  {...(onKeep !== undefined && frame.output !== null
+                    ? { onKeep: () => { if (frame.output !== null) onKeep(frame.output, frame.index) },
+                        keepLabel: count > 1 ? `Keep ${String(frame.index + 1)} in the library` : 'Keep in the library' }
                     : {})}
                 />
               </AnimatedItem>

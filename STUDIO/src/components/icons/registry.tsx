@@ -28,7 +28,7 @@
 import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, ArrowUpRight, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, CornerDownRight, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
-  GalleryVerticalEnd, GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
+  GalleryVerticalEnd, GitBranch, GitFork, Globe, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
   MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
   RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Split,
   SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
@@ -40,6 +40,7 @@ import {
 import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
 import { McpMark } from '@/components/icons/McpMark'
+import { PhotoMark } from '@/components/icons/PhotoMark'
 import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave } from '@/components/icons/drawn'
 import { DoneMark, EraserMark, HighlighterMark, PenMark, ShareScreenMark, ShowMeMark, UndoMark } from '@/components/icons/screen'
 
@@ -308,7 +309,7 @@ const REGISTRY = {
   themeSystem: { mark: Monitor },
   themeLight: { mark: Sun },
   themeDark: { mark: Moon },
-  image: { mark: Image },
+  image: { mark: PhotoMark },
 
   // — Artifacts -----------------------------------------------------------
   // Marks for things the model produced. `image` already exists above and is

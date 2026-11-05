@@ -106,6 +106,8 @@ describe('the activity disclosure', () => {
       ['web_search', Icons.browserUse], ['fetch', Icons.browserUse],
       ['edit', Icons.edit], ['plan', Icons.plan], ['task', Icons.branch],
       ['studio_image', Icons.image], ['studio_video', Icons.video],
+      ['activate_skill', Icons.skill],
+      ['read_skill_resource', Icons.fileRead], ['voice_work', Icons.voice], ['task_activity', Icons.backgroundJobs],
       ['unknown_extension', Icons.mcp],
     ] as const) {
       expect(activityState([call('one', tool)], false).mark).toBe(mark)

@@ -151,6 +151,17 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   // OCR reads a page through a provider; the row's subject is the file,
   // and the verb is the reading it is, not the network trip it takes.
   ocr: { mark: Icons.fileRead, running: 'Reading pages of', done: 'Read pages of' },
+  activate_skill: { mark: Icons.skill, running: 'Activating', done: 'Activated' },
+  read_skill_resource: { mark: Icons.fileRead, running: 'Reading skill resource', done: 'Read skill resource' },
+  voice_work: { mark: Icons.voice, running: 'Managing voice work', done: 'Managed voice work' },
+  task_activity: { mark: Icons.backgroundJobs, running: 'Checking task activity', done: 'Checked task activity' },
+}
+
+function actionOf(toolName: string): ToolAction {
+  return ACTIONS[toolName.replace(/^native_/, '')] ?? {
+    mark: toolName.startsWith('mcp__') ? Icons.mcp : Icons.tools,
+    running: readableName(toolName), done: readableName(toolName),
+  }
 }
 
 /** The tools whose subject is a file path, and so earns the file's own mark. */
@@ -161,7 +172,7 @@ function answeredOf(call: ToolCallView): boolean {
 }
 
 export function activityLabel(call: ToolCallView): string {
-  const verb = ACTIONS[call.toolName]?.running ?? readableName(call.toolName)
+  const verb = actionOf(call.toolName).running
   const subject = subjectOf(call)
   return subject === null ? verb : `${verb} ${subject}`
 }
@@ -172,7 +183,7 @@ export function activityLabel(call: ToolCallView): string {
 
 function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const [open, setOpen] = useState(false)
-  const action = ACTIONS[call.toolName]
+  const action = actionOf(call.toolName)
   const subject = subjectOf(call)
   const file = FILE_TOOLS.has(call.toolName) ? subject : null
   const outcome = outcomeOf(call)
@@ -196,7 +207,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const verb =
     operation !== null && failed
       ? call.toolName === 'move' ? 'Could not move' : 'Could not delete'
-      : action === undefined ? readableName(call.toolName) : running ? action.running : action.done
+      : running ? action.running : action.done
 
   // A text read is a statement, not a disclosure. Its answer is the page the
   // model read -- the model's business, and a slab a reader was never meant
@@ -208,7 +219,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
   if (call.toolName === 'read' && call.errorText === null) {
     return (
       <DisclosureRow
-        leading={action === undefined ? undefined : <action.mark />}
+        leading={<action.mark />}
         entering={live}
         label={
           <span className="flex min-w-0 items-center gap-1.5">
@@ -236,7 +247,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
 
   return (
     <DisclosureRow
-      leading={action === undefined ? undefined : <action.mark />}
+      leading={<action.mark />}
       entering={live}
       label={
         <span className="flex min-w-0 items-center gap-1.5">
@@ -587,6 +598,7 @@ function subjectOf(call: ToolCallView): string | null {
   const input: unknown = call.input.value
   if (!isRecord(input)) return typeof input === 'string' && input.length > 0 ? input : null
   if (call.toolName === 'ask_user_question') return askSubject(input)
+  if (call.toolName.replace(/^native_/, '') === 'activate_skill') return firstString(input, ['name'])
   // `from` first for a move: the row's object is the file that exists, and
   // the destination it gained is the call's working-out, not its subject.
   // `agent` for a task call: the delegate's name is the row's subject.

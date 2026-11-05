@@ -40,7 +40,7 @@ export function MediaArtifact({
   artifact: Artifact
   video: boolean
   /**
-   * "Keep in the library", offered under a finished picture when the
+   * "Keep in the library", offered over a finished picture when the
    * caller can file it: the transcript's card can, a gallery cannot.
    */
   onKeep?: (output: MediaOutput, index: number) => void
@@ -89,6 +89,7 @@ export function MediaArtifact({
           title={artifact.title}
           working={working}
           onOpen={(index) => setOpen(index)}
+          {...(!video && !working && onKeep !== undefined ? { onKeep } : {})}
         />
       )}
 
@@ -100,22 +101,6 @@ export function MediaArtifact({
         caption={media.prompt}
         video={video}
       />
-
-      {onKeep !== undefined && !video && !working && media.outputs.length > 0 ? (
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {media.outputs.map((output, index) => (
-            <button
-              key={output.path ?? output.url ?? String(index)}
-              type="button"
-              onClick={() => onKeep(output, index)}
-              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-caption text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-            >
-              <Icons.keep size="sm" />
-              {media.outputs.length > 1 ? `Keep ${String(index + 1)} in the library` : 'Keep in the library'}
-            </button>
-          ))}
-        </div>
-      ) : null}
 
       {media.prompt ? <Prompt text={media.prompt} /> : null}
 

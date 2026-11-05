@@ -66,6 +66,22 @@ function runOf(file: string, ...calls: readonly ToolCallView[]): ToolGroupView {
 }
 
 describe('the chip is the default', () => {
+  it('gives skill activation its own mark and names the activated skill', () => {
+    const { container } = render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'activate_skill', calls: [call({
+      toolName: 'activate_skill', input: present({ name: 'image-workflow' }), output: present('Skill instructions'),
+    })] })} />)
+    expect(screen.getByText('Activated')).toBeTruthy()
+    expect(screen.getByText('image-workflow')).toBeTruthy()
+    expect(container.querySelector('button')?.firstElementChild?.classList.contains('studio-icon')).toBe(true)
+  })
+
+  it.each(['unfamiliar_tool', 'mcp__vendor__unfamiliar_tool', 'native_shell'])(
+    'always gives %s a leading mark', (toolName) => {
+      const { container } = render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName, calls: [call({ toolName })] })} />)
+      expect(container.querySelector('button')?.firstElementChild?.classList.contains('studio-icon')).toBe(true)
+    },
+  )
+
   it('does not claim that an unanswered historical web call completed', () => {
     render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'web_search', calls: [call({
       toolName: 'web_search', input: present({ query: 'react docs' }),
@@ -810,18 +826,12 @@ describe('the late native tools', () => {
 })
 
 /**
- * Every tool in the harness's native registry, against the rendering. The
- * list is copied by hand from `STUDIO HARNESS/src/tools` -- the UI cannot
- * import the harness, so this file is the pin: when a native tool ships,
- * it goes here AND into the action map (or a family of its own), or it
- * falls through to its bare wire name with no mark. That fall-through is
- * right for an extension's tool, whose name we cannot know, and a leak for
- * ours, whose names we chose -- discover and jobs leaked exactly this way,
- * silently, because the row still renders. One test per tool, so the
- * failure names the tool that leaked.
+ * The native registry, Studio's coordination tools, and the framework's
+ * task and skill tools all need leading marks. Keep the mounted inventory
+ * pinned here; unfamiliar extensions are covered by the fallback tests.
  */
-describe('every native tool', () => {
-  const NATIVE_TOOLS = [
+describe('every Studio and framework tool', () => {
+  const STUDIO_TOOLS = [
     'read',
     'write',
     'edit',
@@ -843,14 +853,17 @@ describe('every native tool', () => {
     'studio_video',
     'web_search',
     'fetch',
+    'activate_skill',
+    'read_skill_resource',
+    'voice_work',
+    'task_activity',
   ]
 
-  for (const toolName of NATIVE_TOOLS) {
+  for (const toolName of STUDIO_TOOLS) {
     it(`never renders ${toolName} under its raw wire name`, () => {
-      // The media and web tools draw their artifact cards, and those cards
-      // reach for the workspace and rail stores; every row here renders
-      // inside the same providers a real transcript sits in.
-      render(
+      // Research details use the transcript's providers. Generated media has
+      // a standalone slot, covered by MediaCallArtifact's interaction tests.
+      const { container } = render(
         <NavigationProvider>
           <WorkspaceProvider>
             <RailProvider>
@@ -865,6 +878,9 @@ describe('every native tool', () => {
         </NavigationProvider>,
       )
       expect(screen.queryByText(toolName)).toBeNull()
+      if (toolName !== 'studio_image' && toolName !== 'studio_video') {
+        expect(container.querySelector('button')?.firstElementChild?.classList.contains('studio-icon')).toBe(true)
+      }
     })
   }
 })

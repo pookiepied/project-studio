@@ -2,6 +2,7 @@ import type { SyntheticEvent } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT, MEDIA_FRAME } from '@/design/tokens'
 import { Icons } from '@/components/icons'
+import { IconButton } from '@/components/primitives'
 import { BobbingDots, Deferred, lazyNamed } from '@/components/state'
 import { useMediaSource } from '@/features/artifacts/media/source'
 import type { MediaOutput } from '@/domain/artifacts/media'
@@ -45,6 +46,8 @@ export function MediaFrame({
   ratio,
   onRatio,
   onOpen,
+  onKeep,
+  keepLabel = 'Keep in the library',
 }: {
   /** The output, or null for a frame reserved for one still coming. */
   output: MediaOutput | null
@@ -58,6 +61,8 @@ export function MediaFrame({
   onRatio: (ratio: number) => void
   /** Open this output larger. Absent while there is nothing to open. */
   onOpen?: () => void
+  onKeep?: () => void
+  keepLabel?: string
 }) {
   const src = useMediaSource(output, video)
   const poster = output?.poster
@@ -176,6 +181,14 @@ export function MediaFrame({
             </span>
           </button>
         )
+      ) : null}
+      {onKeep !== undefined && !video && shown !== null ? (
+        <div className="absolute top-2.5 right-2.5 z-10">
+          <IconButton label={keepLabel} onClick={onKeep} tooltipSide="bottom"
+            className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/60 [&_.studio-icon]:text-white">
+            <Icons.keep />
+          </IconButton>
+        </div>
       ) : null}
     </div>
   )
