@@ -1,4 +1,6 @@
 import { cn } from '@/lib/cn'
+import { useState } from 'react'
+import { MediaLightbox } from '@/features/artifacts/media/MediaLightbox'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserCallView } from './browserCall'
 import { BROWSER_FAMILY, type ReportFamily } from './reportFamily'
@@ -20,15 +22,18 @@ export function BrowserCard({
   call,
   conversationId,
   family = BROWSER_FAMILY,
+  preview = 'full',
 }: {
   call: BrowserCallView
   /** The conversation the call ran in, which keys its attachments. */
   conversationId: string
   /** Which capability the call belongs to; it words the picture. */
   family?: ReportFamily
+  preview?: 'full' | 'thumbnail'
 }) {
   const { frame, url, title, said } = call
   const frameUrl = useAttachmentFrame(conversationId, frame)
+  const [open, setOpen] = useState(false)
 
   return (
     <div className="flex flex-col gap-2">
@@ -52,7 +57,16 @@ export function BrowserCard({
           fetched and one the harness cannot produce both read as a card
           without its picture, because a broken-image glyph claims the bytes
           were here and failed to draw, which is never the truth. */}
-      {frameUrl === null ? null : (
+      {frameUrl === null ? null : preview === 'thumbnail' ? (
+        <>
+          <button type="button" aria-label={`Preview screenshot: ${title ?? family.label}`}
+            onClick={() => setOpen(true)} className="w-32 overflow-hidden rounded-md border border-border bg-background">
+            <img src={frameUrl} alt={title ?? family.pictureOf} className="h-20 w-32 object-contain" draggable={false} />
+          </button>
+          <MediaLightbox open={open} onClose={() => setOpen(false)} title={title ?? family.label}
+            video={false} output={{ url: frameUrl, ratio: null }} />
+        </>
+      ) : (
         <div
           className={cn(
             'overflow-hidden rounded-md border border-border bg-background',

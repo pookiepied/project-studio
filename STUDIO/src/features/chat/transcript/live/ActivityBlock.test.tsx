@@ -29,6 +29,15 @@ function message(id: string, segments: readonly AssistantSegment[], submissionId
 }
 
 describe('activity boundaries and order', () => {
+  it('places pending, failed and completed media outside activity without losing call order', () => {
+    for (const media of [call('image', 'studio_image', false),
+      { ...call('image', 'studio_image'), errorText: 'Provider failed' }, call('image', 'studio_image')]) {
+      const sections = activitySections([tools('mixed', call('before'), media, call('after'))])
+      expect(sections.map((section) => section.kind)).toEqual(['activity', 'artifact', 'activity'])
+      expect(sections[1]?.id).toBe('image')
+    }
+  })
+
   it('ends a block at visible words, keeping repeated edits on either side', () => {
     const sections = activitySections([tools('before', call('first', 'edit')),
       { kind: 'text', id: 'words', text: 'Now check the other case.' }, tools('after', call('second', 'edit'))])

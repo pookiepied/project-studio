@@ -4,8 +4,7 @@ import { FileTypeMark } from '@/components/icons/fileTypes'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 import { recordedChanges, type RecordedChange } from '@/features/changes/recordedChanges'
 import { useRail } from '@/stores/rail'
-import { readMediaCall } from './mediaCall'
-import { MediaCallArtifact } from './MediaCallArtifact'
+import { toolPresentation } from './toolPresentation'
 import { answerText } from './callText'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserFrame } from '@/domain/browser/steps'
@@ -16,23 +15,20 @@ import { WebPreviewResult } from './WebPreviewResult'
 export function WorkResults({ calls, conversationId, resultId }: {
   calls: readonly ToolCallView[]; conversationId: string; resultId: string
 }) {
-  const changes = useMemo(() => recordedChanges(calls), [calls])
-  const pages = browserResults(calls)
+  const changes = useMemo(() => recordedChanges(calls.filter((call) => toolPresentation(call.toolName).result === 'changes')), [calls])
+  const pages = browserResults(calls.filter((call) => toolPresentation(call.toolName).result === 'browser'))
   const screens: { frame: BrowserFrame; title: string }[] = []
-  const media = calls.flatMap((call) => {
-    if (call.output?.present && call.errorText === null) {
+  for (const call of calls) {
+    if (toolPresentation(call.toolName).result === 'computer' && call.output?.present && call.errorText === null) {
       const screen = readComputerCall(call.toolName, call.output.value, call.errorText)
       if (screen?.frame !== null && screen?.frame !== undefined) screens.push({ frame: screen.frame, title: screen.title ?? 'Computer screenshot' })
     }
-    const view = readMediaCall(call)
-    return view === null ? [] : [{ call, view }]
-  })
+  }
   const computer = screens[screens.length - 1] ?? null
-  const background = calls.some((call) => call.toolName === 'shell' && call.output?.present &&
+  const background = calls.some((call) => toolPresentation(call.toolName).result === 'background' && call.output?.present &&
     /^Started \S+ in the background:/.test(answerText(call.output.value)))
-  if (changes.length === 0 && pages.length === 0 && media.length === 0 && !background && computer === null) return null
+  if (changes.length === 0 && pages.length === 0 && !background && computer === null) return null
   return <div className="mt-4 flex min-w-0 flex-col gap-3">
-    {media.map(({ call, view }) => <MediaCallArtifact key={call.toolCallId} call={call} view={view} conversationId={conversationId} />)}
     {pages.map((page) => <WebPreviewResult key={page.url} preview={page} conversationId={conversationId} resultId={resultId} />)}
     {computer !== null ? <ScreenshotResult {...computer} conversationId={conversationId} /> : null}
     {changes.length > 0 ? <ChangedFiles changes={changes} conversationId={conversationId} resultId={resultId} /> : null}

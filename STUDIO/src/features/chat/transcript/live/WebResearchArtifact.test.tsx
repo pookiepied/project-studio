@@ -7,7 +7,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { present } from '@/platform/harness/contracts/chunks'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 
+import { WebResearchArtifact } from '@/features/artifacts/kinds/WebResearchArtifact'
+import { researchArtifact } from './webCall'
 import { ToolGroups } from './ToolGroups'
+
+// Pin the full research renderer independently of its activity disclosure.
+function ResearchArtifacts({ groups }: {
+  groups: readonly { calls: readonly ToolCallView[] }[]; conversationId: string; live?: boolean
+}) {
+  return <>{groups.flatMap((group) => group.calls).map((call) =>
+    <WebResearchArtifact key={call.toolCallId} artifact={researchArtifact([call])} />)}</>
+}
 
 /**
  * Research in the transcript: a segment's searches and page reads lifted
@@ -51,7 +61,7 @@ function groups(...calls: ToolCallView[]) {
 
 describe('one search', () => {
   it('is its query as the title, the count as the status, and a row per source', () => {
-    render(<ToolGroups conversationId="conv" live={false} groups={groups(call({ output: present(searchAnswer(3)) }))} />)
+    render(<ResearchArtifacts conversationId="conv" live={false} groups={groups(call({ output: present(searchAnswer(3)) }))} />)
     expect(screen.getByText('tauri rounded corners')).toBeTruthy()
     expect(screen.getByText('3 sources for “tauri rounded corners”')).toBeTruthy()
     const links = screen.getAllByRole('link')
@@ -64,13 +74,13 @@ describe('one search', () => {
   })
 
   it('says it is searching, with no rows, before the answer', () => {
-    render(<ToolGroups conversationId="conv" live groups={groups(call({}))} />)
+    render(<ResearchArtifacts conversationId="conv" live groups={groups(call({}))} />)
     expect(screen.getByText('Searching')).toBeTruthy()
     expect(screen.queryByRole('link')).toBeNull()
   })
 
   it('shows five sources and folds the rest behind one line', () => {
-    render(<ToolGroups conversationId="conv" live={false} groups={groups(call({ output: present(searchAnswer(12)) }))} />)
+    render(<ResearchArtifacts conversationId="conv" live={false} groups={groups(call({ output: present(searchAnswer(12)) }))} />)
     expect(screen.getAllByRole('link')).toHaveLength(5)
     fireEvent.click(screen.getByText('Show 7 more'))
     expect(screen.getAllByRole('link')).toHaveLength(12)
@@ -80,7 +90,7 @@ describe('one search', () => {
 
   it("shows the refusal in the harness's words", () => {
     render(
-      <ToolGroups conversationId="conv" live={false} groups={groups(call({ errorText: 'No search provider is set.' }))} />,
+      <ResearchArtifacts conversationId="conv" live={false} groups={groups(call({ errorText: 'No search provider is set.' }))} />,
     )
     expect(screen.getByText('No search provider is set.')).toBeTruthy()
   })
@@ -100,7 +110,7 @@ describe('a burst of research', () => {
 
   it('keeps each research call in its own position and state', () => {
     render(
-      <ToolGroups
+      <ResearchArtifacts
         conversationId="conv"
         live
         groups={groups(
@@ -134,7 +144,7 @@ describe('a burst of research', () => {
 
   it('retains each search result count rather than merging separate calls', () => {
     render(
-      <ToolGroups
+      <ResearchArtifacts
         conversationId="conv"
         live={false}
         groups={groups(
@@ -166,6 +176,7 @@ describe('a burst of research', () => {
       />,
     )
     expect(screen.getByText('Read')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /tauri rounded corners/ }))
     expect(screen.getByText('1 source for “tauri rounded corners”')).toBeTruthy()
   })
 })

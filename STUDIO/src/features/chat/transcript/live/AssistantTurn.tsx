@@ -14,6 +14,7 @@ import { ActivityBlock, activitySections } from './ActivityBlock'
 import { finalTextStart, workSummary } from './workSummary'
 import { WorkHistory } from './WorkHistory'
 import { WorkResults } from './WorkResults'
+import { ToolArtifact } from './ToolArtifact'
 import { callsIn } from './taskEvidence'
 import type {
   AssistantSegment,
@@ -98,7 +99,9 @@ export const AssistantTurn = memo(function AssistantTurn({
   const written = writtenRuns(summary === null ? item : { ...item, segments: summary.final })
   const sections = activitySections(summary?.final ?? item.segments)
   const history = activitySections(summary?.activity ?? [])
-  const lastIndex = sections.length - 1
+  const visible = [...history.filter((section) => section.kind === 'artifact'), ...sections]
+  const workHistory = history.filter((section) => section.kind !== 'artifact')
+  const lastIndex = visible.length - 1
   return (
     <div
       onPointerEnter={() => setHovered(true)}
@@ -109,15 +112,18 @@ export const AssistantTurn = memo(function AssistantTurn({
           artifact inside the words - arrives on the one entrance, and only
           while the turn is live; a replayed turn was already here. */}
       <Arriving live={live}>
-        {summary !== null ? <WorkHistory title={summary.title}>
-          {history.map((segment, index) => segment.kind === 'activity'
+        {summary !== null && workHistory.length > 0 ? <WorkHistory title={summary.title}>
+          {workHistory.map((segment, index) => segment.kind === 'activity'
             ? <ActivityBlock key={segment.id} segments={segment.segments} active={false} conversationId={conversationId}
-                textBefore={history[index - 1]?.kind === 'text'} textAfter={history[index + 1]?.kind === 'text'} />
+                textBefore={workHistory[index - 1]?.kind === 'text'} textAfter={workHistory[index + 1]?.kind === 'text'} />
             : <TextSegment key={segment.id} segment={segment} growing={false} observeDelivery={false} identity={{ conversationId, messageId: item.id, ...(item.submissionId === null ? {} : { submissionId: item.submissionId }) }} />)}
         </WorkHistory> : null}
-        {sections.map((segment, index) => segment.kind === 'activity' ? (
-          <ActivityBlock key={segment.id} segments={segment.segments} active={activityLive && index === lastIndex} conversationId={conversationId}
-            textBefore={sections[index - 1]?.kind === 'text'} textAfter={sections[index + 1]?.kind === 'text'} />
+        {visible.map((segment, index) => segment.kind === 'artifact' ? (
+          <ToolArtifact key={segment.id} call={segment.call} conversationId={conversationId} />
+        ) : segment.kind === 'activity' ? (
+          <ActivityBlock key={segment.id} segments={segment.segments}
+            active={activityLive && (index === lastIndex || callsIn(segment.segments).some((call) => call.errorText === null && !call.output?.present))} conversationId={conversationId}
+            textBefore={visible[index - 1]?.kind === 'text'} textAfter={visible[index + 1]?.kind === 'text'} />
         ) : (
           <TextSegment
             key={segment.id}

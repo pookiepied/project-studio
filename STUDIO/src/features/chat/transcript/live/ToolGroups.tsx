@@ -21,17 +21,16 @@ import { ExtensionToolDetails } from './tools/ExtensionToolDetails'
 import { RollingCount } from './RollingCount'
 import { ImageReads, readImages, type ReadImage } from './ImageReads'
 import { BrowserReport } from './BrowserReport'
-import { MediaCallArtifact } from './MediaCallArtifact'
-import { readMediaCall } from './mediaCall'
-import { researchArtifact, webKind } from './webCall'
+import { researchArtifact, readWebCall } from './webCall'
 import { WebResearchArtifact } from '@/features/artifacts/kinds/WebResearchArtifact'
+import { toolPresentation } from './toolPresentation'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { isRecord } from '@/lib/guards'
 
 /**
  * The flat call list inside an activity block. Even calls from one family
- * stay at their original positions; individual result views are unchanged.
+ * stay at their original positions; artifacts use a separate transcript slot.
  */
 export function ToolGroups({
   groups,
@@ -50,6 +49,7 @@ export function ToolGroups({
   const rows: ({ readonly kind: 'images'; readonly id: string; readonly images: ReadImage[] } |
     { readonly kind: 'call'; readonly id: string; readonly call: ToolCallView })[] = []
   for (const call of calls) {
+    if (toolPresentation(call.toolName).activity === 'none') continue
     const images = readImages(call)
     const previous = rows[rows.length - 1]
     if (images.length === 0) rows.push({ kind: 'call', id: call.toolCallId, call })
@@ -66,17 +66,31 @@ export function ToolGroups({
 }
 
 /**
- * One call standing alone: a generation is the artifact it made, drawn by
- * the same component the gallery uses; every other call is a row with its
- * working-out behind a disclosure.
+ * Activity opens onto compact rows. Full artifacts have their own placement
+ * in the transcript, independent of whether this disclosure is open.
  */
 function CallRow({ call, live, conversationId }: { call: ToolCallView; live: boolean; conversationId: string }) {
   const family = familyOf(call.toolName)
-  if (family !== null) return <BrowserReport calls={[call]} live={live} conversationId={conversationId} family={family} />
-  if (webKind(call.toolName) !== null) return <WebResearchArtifact artifact={researchArtifact([call])} />
-  const media = readMediaCall(call)
-  if (media === null) return <ToolCallRow call={call} live={live} />
-  return <MediaCallArtifact call={call} view={media} conversationId={conversationId} />
+  const presentation = toolPresentation(call.toolName)
+  if (presentation.activity === 'steps' && family !== null) return <BrowserReport calls={[call]} live={live} conversationId={conversationId} family={family} presentation="activity" />
+  if (presentation.activity === 'research') return <ResearchRow call={call} live={live} />
+  return <ToolCallRow call={call} live={live} />
+}
+
+function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
+  const [open, setOpen] = useState(false)
+  const step = readWebCall(call)
+  const failed = resultState(call, live) === 'failed'
+  const pending = call.errorText === null && !call.output?.present
+  const running = live && pending
+  const verb = failed ? 'Could not research' : step?.kind === 'search'
+    ? pending ? 'Searching' : 'Searched' : pending ? 'Reading' : 'Read'
+  const subject = step?.kind === 'search' ? step.query : step?.url
+  return <DisclosureRow leading={<Icons.browserUse />} entering={live} open={open}
+    onToggle={() => setOpen((value) => !value)} flush
+    label={<span className={cn('min-w-0 truncate', failed && 'text-danger', running && 'studio-shimmer')}>{verb} {subject} {pending && !live ? 'pending' : null}</span>}>
+    <WebResearchArtifact artifact={researchArtifact([call])} />
+  </DisclosureRow>
 }
 
 /* -------------------------------------------------------------------------- */

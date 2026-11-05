@@ -1,15 +1,28 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { present } from '@/platform/harness/contracts/chunks'
 import { setAttachmentBytesTransport } from '@/platform/harness/attachments'
 import type { MediaArtifactFile, MediaJob } from '@/platform/harness'
-import type { ToolCallView } from '@/features/chat/transcript/projection'
+import type { ToolCallView, TranscriptItem } from '@/features/chat/transcript/projection'
 
+import { ToolArtifact } from './ToolArtifact'
+import { AssistantTurn } from './AssistantTurn'
 import { ToolGroups } from './ToolGroups'
+import { WorkResults } from './WorkResults'
+
+vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }))
+
+// Media uses its standalone slot; the activity list no longer owns it.
+function ArtifactCalls({ groups, conversationId }: {
+  groups: readonly { calls: readonly ToolCallView[] }[]; conversationId: string; live: boolean
+}) {
+  return <>{groups.flatMap((group) => group.calls).map((call) =>
+    <ToolArtifact key={call.toolCallId} call={call} conversationId={conversationId} />)}</>
+}
 
 /**
  * A generation in the transcript, drawn as the artifact the gallery draws:
@@ -64,6 +77,59 @@ function groups(...calls: ToolCallView[]) {
 }
 
 describe('an image call', () => {
+  it('keeps an earlier parallel tool active when a media artifact arrives', () => {
+    const pending = call({ toolName: 'shell', toolCallId: 'prepare', input: present({ command: 'prepare' }) })
+    const second = call({ toolName: 'shell', toolCallId: 'second', input: present({ command: 'second' }), output: present('done') })
+    const item: Extract<TranscriptItem, { kind: 'assistant' }> = {
+      kind: 'assistant', id: 'parallel', submissionId: 'turn', model: null, usage: null, end: { state: 'stopped' },
+      segments: [{ kind: 'tools', id: 'tools', groups: groups(pending, second) }],
+    }
+    const view = render(<AssistantTurn item={item} conversationId="conv" live turnInFlight />)
+    const activity = screen.getByRole('button', { name: 'Running prepare' })
+    fireEvent.click(activity)
+    const details = within(screen.getByRole('region', { name: 'Tool activity' })).getByRole('button', { name: /second/ })
+    fireEvent.click(details)
+    view.rerender(<AssistantTurn item={{ ...item, segments: [
+      { kind: 'tools', id: 'tools', groups: groups(pending, second, call({})) },
+    ] }} conversationId="conv" live turnInFlight />)
+    expect(screen.getByRole('button', { name: 'Running prepare' })).toBe(activity)
+    expect(activity.getAttribute('aria-expanded')).toBe('true')
+    expect(within(screen.getByRole('region', { name: 'Tool activity' })).getByRole('button', { name: /second/ })).toBe(details)
+    expect(details.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('a red bicycle')).toBeTruthy()
+  })
+
+  it('has one standalone location while live, completed, expanded and replayed', () => {
+    const generated = call({ output: present('Artifact: /api/media/artifacts/conv/media_ab12-0.png (image/png)') })
+    const item: Extract<TranscriptItem, { kind: 'assistant' }> = {
+      kind: 'assistant', id: 'message', submissionId: 'turn', model: null, usage: null, end: { state: 'complete' },
+      segments: [
+        { kind: 'tools', id: 'tools', groups: groups(call({ toolName: 'shell', toolCallId: 'before', input: present({ command: 'prepare' }), output: present('done') }), generated) },
+        { kind: 'text', id: 'answer', text: 'The image is ready.' },
+      ],
+    }
+    const view = render(<AssistantTurn item={item} conversationId="conv" live turnInFlight />)
+    const title = screen.getByText('a red bicycle')
+    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Ran commands' }))
+    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+    expect(view.container.querySelector('[aria-label="Tool activity"]')?.contains(title)).toBe(false)
+    view.rerender(<AssistantTurn item={item} conversationId="conv" live={false} />)
+    expect(screen.getByText('a red bicycle')).toBe(title)
+    fireEvent.click(screen.getByRole('button', { name: 'Generated an image' }))
+    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+    view.unmount()
+    render(<AssistantTurn item={item} conversationId="conv" live={false} />)
+    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+  })
+
+  it('does not render media a second time in grouped activity or completion results', () => {
+    const image = call({})
+    const view = render(<><ToolGroups conversationId="conv" groups={groups(image)} />
+      <WorkResults conversationId="conv" resultId="turn" calls={[image]} /></>)
+    expect(view.container.textContent).toBe('')
+  })
+
   it('draws the picture from the harness bytes under the prompt as its title', async () => {
     const transport = vi.fn(async (path: string) => {
       expect(path).toBe('/api/media/artifacts/conv/media_abc1-1.png')
@@ -72,7 +138,7 @@ describe('an image call', () => {
     setAttachmentBytesTransport(transport)
 
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live={false}
         groups={groups(
@@ -99,7 +165,7 @@ describe('an image call', () => {
 
   it('reserves a frame per picture asked for while the call has not answered, and never a broken image', () => {
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live
         groups={groups(call({ input: present({ prompt: 'a red bicycle', count: 3, aspect_ratio: '16:9' }) }))}
@@ -118,7 +184,7 @@ describe('an image call', () => {
   it('lays two pictures in one row, each as wide as its ratio', async () => {
     setAttachmentBytesTransport(async () => bytesOf('png-bytes'))
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live={false}
         groups={groups(
@@ -159,7 +225,7 @@ describe('an image call', () => {
 
   it("shows the refusal in the harness's words and no frame", () => {
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live={false}
         groups={groups(call({ errorText: 'No image model is connected. Choose one in Settings - Providers.' }))}
@@ -187,7 +253,7 @@ describe('a video call', () => {
     })
 
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live={false}
         groups={groups(
@@ -239,7 +305,7 @@ describe('a video call', () => {
 
   it('says the result was not kept when the harness no longer holds the job', async () => {
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live={false}
         groups={groups(
@@ -268,7 +334,7 @@ describe('a video call', () => {
     listedArtifacts.push({ fileName: 'media_gone-1.mp4', mimeType: 'video/mp4' })
 
     render(
-      <ToolGroups
+      <ArtifactCalls
         conversationId="conv"
         live={false}
         groups={groups(

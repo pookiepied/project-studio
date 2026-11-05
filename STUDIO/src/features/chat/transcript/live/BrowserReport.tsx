@@ -36,6 +36,7 @@ export function BrowserReport({
   live,
   conversationId,
   family = BROWSER_FAMILY,
+  presentation = 'report',
 }: {
   calls: readonly ToolCallView[]
   /** This turn is being written now: a call without its answer shimmers. */
@@ -44,6 +45,7 @@ export function BrowserReport({
   conversationId: string
   /** Which capability this is a report of. The browser unless said. */
   family?: ReportFamily
+  presentation?: 'report' | 'activity'
 }) {
   // Paired, not parallel: a step and the call it came from travel together,
   // so the expanding row never has to trust that two filtered arrays still
@@ -62,10 +64,15 @@ export function BrowserReport({
   const latestFrame = newestFirst.find((entry) => entry.step.frame !== null)?.step.frame ?? null
   const latestUrl = newestFirst.find((entry) => entry.step.url !== null)?.step.url ?? null
   const latestTitle = newestFirst.find((entry) => entry.step.title !== null)?.step.title ?? null
-  const frameUrl = useAttachmentFrame(conversationId, latestFrame)
+  const frameUrl = useAttachmentFrame(conversationId, presentation === 'report' ? latestFrame : null)
 
   const running =
     live && calls.some((call) => call.errorText === null && !(call.output !== null && call.output.present))
+
+  if (presentation === 'activity') return <ol className="flex min-w-0 flex-col gap-0.5">
+    {steps.map((entry) => <BrowserStepRow key={entry.step.id} entry={entry} live={live}
+      conversationId={conversationId} family={family} compact />)}
+  </ol>
 
   return (
     <div className="my-1 flex flex-col gap-2 rounded-lg bg-muted/60 p-2.5">
@@ -139,11 +146,13 @@ function BrowserStepRow({
   live,
   conversationId,
   family,
+  compact = false,
 }: {
   entry: { readonly call: ToolCallView; readonly step: BrowserStep }
   live: boolean
   conversationId: string
   family: ReportFamily
+  compact?: boolean
 }) {
   const { call, step } = entry
   const [open, setOpen] = useState(false)
@@ -155,6 +164,7 @@ function BrowserStepRow({
   return (
     <li>
       <DisclosureRow
+        leading={compact ? <family.Mark /> : undefined}
         entering={false}
         label={
           <span className="flex min-w-0 items-center gap-1.5">
@@ -171,7 +181,7 @@ function BrowserStepRow({
         flush
       >
         <ToolResultPanel title={family.label} call={call} live={live}>
-          {view === null ? null : <BrowserCard call={view} conversationId={conversationId} family={family} />}
+          {view === null ? null : <BrowserCard call={view} conversationId={conversationId} family={family} preview={compact ? 'thumbnail' : 'full'} />}
         </ToolResultPanel>
       </DisclosureRow>
     </li>

@@ -3,20 +3,22 @@ import { useArriving } from '@/components/motion/Arrive'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
-import type { AssistantSegment } from '@/features/chat/transcript/projection'
+import type { AssistantSegment, ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { ToolGroups, activityLabel } from './ToolGroups'
 import { activityState } from './activitySummary'
 import { familyOf } from './reportFamily'
 import { webKind } from './webCall'
 import { mediaKind } from './mediaCall'
+import { toolPresentation } from './toolPresentation'
 
 type WorkSegment = Exclude<AssistantSegment, { kind: 'text' }>
 
 export type ActivitySection =
   | Extract<AssistantSegment, { kind: 'text' }>
+  | { readonly kind: 'artifact'; readonly id: string; readonly call: ToolCallView }
   | { readonly kind: 'activity'; readonly id: string; readonly segments: readonly WorkSegment[] }
 
-/** Visible words separate activity; reasoning stays at its original place inside it. */
+/** Visible words and standalone artifacts separate activity in execution order. */
 export function activitySections(segments: readonly AssistantSegment[]): ActivitySection[] {
   const sections: ActivitySection[] = []
   for (const segment of segments) {
@@ -24,12 +26,46 @@ export function activitySections(segments: readonly AssistantSegment[]): Activit
       if (segment.text.trim() !== '') sections.push(segment)
       continue
     }
-    const last = sections[sections.length - 1]
-    if (last?.kind === 'activity') {
-      sections[sections.length - 1] = { ...last, segments: [...last.segments, segment] }
-    } else {
-      sections.push({ kind: 'activity', id: segment.id, segments: [segment] })
+    const append = (work: WorkSegment) => {
+      const last = sections[sections.length - 1]
+      if (last?.kind === 'activity') {
+        sections[sections.length - 1] = { ...last, segments: [...last.segments, work] }
+      } else {
+        sections.push({ kind: 'activity', id: work.id, segments: [work] })
+      }
     }
+    if (segment.kind !== 'tools' || !segment.groups.some((group) =>
+      group.calls.some((call) => {
+        const presentation = toolPresentation(call.toolName)
+        return presentation.artifact !== null || presentation.activity === 'none'
+      }))) {
+      append(segment)
+      continue
+    }
+    let buffered: ToolGroupView[] = []
+    let id = segment.id
+    let afterArtifact = false
+    const flush = () => {
+      if (buffered.length > 0) append({ ...segment, id, groups: buffered })
+      buffered = []
+    }
+    for (const group of segment.groups) {
+      for (const call of group.calls) {
+        const presentation = toolPresentation(call.toolName)
+        if (presentation.activity !== 'none') {
+          if (buffered.length === 0 && afterArtifact) id = call.toolCallId
+          const last = buffered[buffered.length - 1]
+          if (last?.id === group.id) buffered[buffered.length - 1] = { ...last, calls: [...last.calls, call] }
+          else buffered.push({ ...group, calls: [call] })
+        }
+        if (presentation.artifact !== null) {
+          flush()
+          sections.push({ kind: 'artifact', id: call.toolCallId, call })
+          afterArtifact = true
+        }
+      }
+    }
+    flush()
   }
   return sections
 }

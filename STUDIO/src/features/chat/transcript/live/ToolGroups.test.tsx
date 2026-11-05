@@ -66,6 +66,39 @@ function runOf(file: string, ...calls: readonly ToolCallView[]): ToolGroupView {
 }
 
 describe('the chip is the default', () => {
+  it('does not claim that an unanswered historical web call completed', () => {
+    render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'web_search', calls: [call({
+      toolName: 'web_search', input: present({ query: 'react docs' }),
+    })] })} />)
+    expect(screen.getByRole('button', { name: /Searching.*react docs.*pending/ })).toBeTruthy()
+  })
+
+  it('keeps browser and computer screenshots behind compact action details', () => {
+    for (const toolName of ['mcp__studio_browser_open', 'mcp__15_studio-computer__26_studio_computer_screenshot']) {
+      const view = render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName, calls: [call({ toolName,
+        output: present({ content: [{ type: 'text', text: 'Screenshot taken.\nTab: tab-1\nURL: https://example.com/\nTitle: Example' },
+          { type: 'image', data: 'AAAA', mimeType: 'image/png' }] }),
+      })] })} />)
+      expect(view.container.querySelector('img')).toBeNull()
+      fireEvent.click(screen.getByRole('button'))
+      const preview = screen.getByRole('button', { name: /Preview screenshot/ })
+      expect(preview.querySelector('img')).toBeTruthy()
+      fireEvent.click(preview)
+      expect(screen.getByRole('dialog')).toBeTruthy()
+      cleanup()
+    }
+  })
+
+  it('keeps web sources behind a compact research row', () => {
+    render(<NavigationProvider><WorkspaceProvider><RailProvider><ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'web_search', calls: [call({
+      toolName: 'web_search', input: present({ query: 'react docs' }),
+      output: present('Searched with Brave.\n\n1. React\nhttps://react.dev/\nReact documentation'),
+    })] })} /></RailProvider></WorkspaceProvider></NavigationProvider>)
+    expect(screen.queryByRole('link')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /react docs/ }))
+    expect(screen.getByRole('link', { name: /React/ })).toBeTruthy()
+  })
+
   it('renders every call as its own row, with no count line in front', () => {
     const { container } = render(
       <ToolGroups conversationId="conv"
