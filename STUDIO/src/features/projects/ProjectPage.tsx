@@ -37,10 +37,8 @@ export function ProjectPage({ project }: { project: Project }) {
   return (
     <div data-attachment-drop-zone className="h-full overflow-y-auto studio-scroll-inset">
       <div
-        className="mx-auto w-full"
+        className="studio-content-column"
         style={{
-          maxWidth: SHELL.measure,
-          paddingInline: SHELL.gutter,
           paddingTop: SHELL.topStrip.height + 28,
           paddingBottom: 32,
         }}

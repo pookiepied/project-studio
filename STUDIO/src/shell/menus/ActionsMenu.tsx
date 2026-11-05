@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fieldAt } from '@/lib/field'
-import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
+import { FloatingMenu, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
  * The right-click menu.
@@ -28,9 +28,6 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * edge that is off screen.
  */
 
-/** The tallest list - the page's four rows and a rule - so the clamp keeps every list on screen. */
-const MENU_MAX_HEIGHT = 144
-
 export function ActionsMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<FloatingPlacement | null>(null)
@@ -49,8 +46,8 @@ export function ActionsMenu() {
       const kind = fieldAt(event.target) ? 'field' : selection ? 'selection' : 'page'
       setPosition({
         kind,
-        x: Math.min(event.clientX, window.innerWidth - MENU_WIDTH - EDGE_PADDING),
-        y: Math.min(event.clientY, window.innerHeight - MENU_MAX_HEIGHT - EDGE_PADDING),
+        x: event.clientX,
+        y: event.clientY,
         origin: 'top left',
         selection,
         target: event.target as HTMLElement | null,

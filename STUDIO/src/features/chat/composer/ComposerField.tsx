@@ -200,6 +200,14 @@ export function ComposerField({
   // which has already re-rendered with the new text by the time this runs.
   useLayoutEffect(remeasure, [value, remeasure])
 
+  // Appearance changes can alter line height without changing the field's
+  // width. The width observer below cannot see that in a fixed-height field.
+  useLayoutEffect(() => {
+    const observer = new MutationObserver(remeasure)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    return () => observer.disconnect()
+  }, [remeasure])
+
   // Wrapping depends on the field's width, which typing cannot change but the
   // window being resized can. Without this, a resize left the height at what
   // it was until the next keystroke corrected it. Width only — the observer

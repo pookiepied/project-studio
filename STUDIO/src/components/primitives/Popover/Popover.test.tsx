@@ -3,7 +3,7 @@
  */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Popover } from './Popover'
 
@@ -22,7 +22,11 @@ import { Popover } from './Popover'
  * must still be substantially there, on its way out rather than already gone.
  */
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 /** Framer drives on rAF; this lets real frames elapse rather than faking a clock. */
 function frames(count: number) {
@@ -35,12 +39,13 @@ function frames(count: number) {
   })
 }
 
-function Harness() {
+function Harness({ maxHeight }: { maxHeight?: string }) {
   const [open, setOpen] = useState(true)
   return (
     <Popover
       open={open}
       onOpenChange={setOpen}
+      maxHeight={maxHeight}
       trigger={
         <button type="button" onClick={() => setOpen(false)}>
           Close
@@ -71,5 +76,29 @@ describe('a popover being dismissed', () => {
     const opacity = Number((leaving as HTMLElement).style.opacity)
     expect(opacity).toBeGreaterThan(0.8)
     expect(opacity).toBeLessThan(1)
+  })
+})
+
+describe('a popover in a constrained viewport', () => {
+  it('preserves a caller cap as well as the viewport bound', () => {
+    vi.stubGlobal('innerHeight', 1000)
+    render(<Harness maxHeight="28rem" />)
+    expect(screen.getByRole('menu').style.maxHeight).toBe('min(28rem, 984px)')
+  })
+
+  it('limits the scrollable panel and updates its bounds while it remains open', () => {
+    vi.stubGlobal('innerWidth', 420)
+    vi.stubGlobal('innerHeight', 320)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
+    render(<Harness />)
+    const menu = screen.getByRole('menu')
+    expect(menu.style.maxWidth).toBe('404px')
+    expect(menu.style.maxHeight).toBe('304px')
+    expect(menu.classList.contains('studio-floating-surface')).toBe(true)
+    vi.stubGlobal('innerHeight', 240)
+    fireEvent(window, new Event('resize'))
+    expect(menu.style.maxHeight).toBe('224px')
+    expect(menu.style.top).toBe('8px')
   })
 })

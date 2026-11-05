@@ -279,14 +279,14 @@ export function AddModelDialog({
 
         <fieldset className="flex flex-col gap-1.5">
           <legend className="text-caption text-muted-foreground">Capabilities</legend>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          <div className="studio-form-grid gap-x-4 gap-y-1.5">
             {CAPABILITY_CHOICES.map((choice) => (
               <label key={choice.key} className="flex items-center gap-2 text-ui text-foreground">
                 <input
                   type="checkbox"
                   checked={capabilities[choice.key] === 'supported'}
                   onChange={() => toggleCapability(choice.key)}
-                  className="size-3.5 accent-current"
+                  className="size-[var(--icon-sm)] shrink-0 accent-current"
                 />
                 <span title={choice.hint}>{choice.label}</span>
               </label>
@@ -332,7 +332,7 @@ export function AddModelDialog({
         ) : null}
 
         <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="studio-form-grid gap-3">
             <label className="flex flex-col gap-1.5">
               <span className="text-caption text-muted-foreground">Context window</span>
               <TextField

@@ -187,13 +187,13 @@
      responds well to about a half-percent either side.
      ---------------------------------------------------------------------- */
 
-  /* Section headers, badges, counts. Small enough that weight has to do the
-     work of being noticed, wide enough that it does not turn into a smudge. */
+  /* Section headers, badges, counts. A little tracking separates the letters
+     without turning every small label into an uppercase-style tag. */
   .text-micro {
     font-size: var(--text-micro);
     line-height: var(--leading-micro);
     font-weight: 500;
-    letter-spacing: 0.045em;
+    letter-spacing: 0.018em;
   }
 
   /* Secondary: hints, notes, timestamps. The one role that leans on colour --

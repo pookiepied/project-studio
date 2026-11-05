@@ -236,10 +236,9 @@ export async function openConversationWindow(
  * person a quiet nothing on cancel, because changing your mind after opening
  * a dialog is the most common outcome it has, not a failure.
  *
- * One dialog, one caller: the new-project dialog's `Add folder`. The
- * capability behind it grants only `dialog:allow-open` (see
- * `capabilities/default.json`), so a second caller is a decision about the
- * grant, not just an import.
+ * Project creation and an unresolved relative file reference both ask the
+ * person to choose a folder. The existing `dialog:allow-open` grant permits
+ * only the picker; selecting a base folder never reveals a file automatically.
  */
 export async function pickDirectory(): Promise<string | null> {
   if (!isTauri()) return null

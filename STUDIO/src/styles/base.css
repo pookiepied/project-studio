@@ -124,9 +124,22 @@
    with its classes, so the 16px line box is measured, not fought.
    --------------------------------------------------------------------------- */
 @media (pointer: coarse) {
+  :root {
+    /* WebKit's focus-zoom floor applies to the whole scale so field text,
+       neighbouring labels and icons retain their proportions. */
+    --input-size-floor: 16px;
+    --control-xs: 44px;
+    --control-sm: 44px;
+    --control-md: 44px;
+    --control-lg: 44px;
+    --control-xl: max(44px, calc(var(--ui-size) * 11 / 3));
+  }
+
+  /* Specialized fields may request caption/code roles below the UI size.
+     Keep those editable fields above WebKit's focus-zoom threshold too. */
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: max(16px, var(--text-ui));
   }
 }

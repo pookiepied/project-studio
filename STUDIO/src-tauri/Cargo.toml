@@ -156,7 +156,12 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # `readText` is refused by WebView2 whatever the permission handler answers.
 # `Win32_System_SystemInformation` resolves the browser opener from the OS
 # system directory rather than trusting the workspace or PATH.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation"] }
+# `Win32_UI_Shell` + `Win32_UI_Shell_Common` and `Win32_System_Com` are the
+# reveal seam (`reveal.rs`): `ILCreateFromPathW` + `SHOpenFolderAndSelectItems`
+# open a folder view and select an item in it - navigation, never execution -
+# on a COM-initialized thread. Feature sets of the crate already in this tree;
+# no new crate.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_System_Com"] }
 
 # The permission grant (`permissions.rs`): WebView2's PermissionRequested,
 # answered by Studio instead of by a stall or by Edge's own prompt. The

@@ -340,7 +340,7 @@ function MarkLabel({ text, at, bounds }: { text: string; at: InkPoint; bounds: {
       transition={{ duration: DURATION.base, ease: EASE_OUT, delay: DURATION.fast }}
     >
       <div
-        className="inline-flex h-7 max-w-full items-center truncate rounded-full px-3 text-[12px] font-medium text-white"
+        className="studio-control inline-flex max-w-full items-center truncate rounded-full px-3 text-ui font-medium text-white"
         style={{ background: 'rgba(28, 28, 30, 0.82)', backdropFilter: 'blur(20px) saturate(1.6)', boxShadow: '0 0 0 0.5px rgba(255,255,255,0.12), 0 6px 18px rgba(0,0,0,0.22)' }}
       >
         {text}
@@ -385,7 +385,7 @@ function DrawingToolbar({
       exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
       transition={{ duration: DURATION.base, ease: EASE_OUT }}
     >
-      <span className="mr-1.5 flex items-center gap-2 whitespace-nowrap text-[12px] text-white/70">
+      <span className="mr-1.5 flex items-center gap-2 whitespace-nowrap text-ui text-white/70">
         <span aria-hidden className="size-1.5 rounded-full" style={{ background: tool === 'pen' ? PERSON : HIGHLIGHT }} />
         Draw to show Studio
       </span>
@@ -397,7 +397,7 @@ function DrawingToolbar({
       <button
         type="button"
         onClick={onDone}
-        className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3.5 text-[12px] font-medium text-[#1c1c1e] transition-colors duration-[120ms] hover:bg-white/90"
+        className="studio-control ml-1 inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 text-ui font-medium text-[#1c1c1e] transition-colors duration-fast hover:bg-white/90"
       >
         <Icons.inkDone size="sm" className="!text-[#1c1c1e]" />
         Done

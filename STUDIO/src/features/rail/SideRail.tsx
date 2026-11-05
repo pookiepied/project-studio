@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { FADE, SPRING_PANEL } from '@/design/tokens'
+import { FADE, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
@@ -22,7 +22,7 @@ import { AgentInspector } from './AgentInspector'
  * controls start colliding. It is a floor for the page, expressed as the rail's
  * ceiling.
  */
-const MIN_PAGE_WIDTH = 520
+const MIN_PAGE_WIDTH = SHELL.minPageWidth
 
 /** What the header calls the active entry, per kind. */
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/primitives'
-import { SHELL } from '@/design/tokens'
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
 import { StreamedMarkdown } from '@/features/chat/streaming'
 import { Section } from './Section'
@@ -18,7 +17,7 @@ export function ConversationSection() {
     return () => window.clearInterval(timer)
   }, [streaming])
   return <Section title="Conversation" note="Real user and answer renderers. Check hierarchy, wrapping, nested lists, and streaming in both themes.">
-    <div className="flex min-w-0 flex-col gap-8 self-center w-full" style={{ maxWidth: SHELL.measure }}>
+    <div className="studio-content-column flex flex-col gap-8">
       <LiveUserMessage item={{ kind: 'user', id: 'specimen-user', submissionId: null, text: ASK, attachments: [], documents: [], timestamp: null }} />
       <div className="studio-prose"><StreamedMarkdown text={ANSWER.slice(0, characters) + (streaming ? '' : CITATIONS)} streaming={streaming} /></div>
       <Button variant="secondary" onClick={() => setCharacters(0)}>Replay streamed answer</Button>

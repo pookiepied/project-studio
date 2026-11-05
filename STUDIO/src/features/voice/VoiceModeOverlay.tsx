@@ -209,8 +209,8 @@ export function VoiceModeOverlay({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12, scale: 0.96, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
           transition={{ duration: DURATION.base, ease: EASE_OUT }}
-          className="absolute bottom-4 z-50 flex w-[22rem] max-w-[calc(100%-2rem)] flex-col gap-2.5 rounded-2xl border border-border bg-surface-raised p-3 shadow-lg"
-          style={{ right: insetRight + 16 }}
+          className="absolute bottom-4 z-50 flex w-[22rem] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] flex-col gap-2.5 overflow-y-auto rounded-2xl border border-border bg-surface-raised p-3 shadow-lg"
+          style={{ right: `min(${insetRight + 16}px, max(16px, calc(100% - 22rem - 16px)))` }}
         >
           <div className="flex items-center gap-2.5">
             <span className="relative">
@@ -393,7 +393,7 @@ export function VoiceModeOverlay({
 
           <footer className="flex shrink-0 flex-col items-center gap-3 pb-7">
             {asking ? (
-              <div className="w-full px-6" style={{ maxWidth: SHELL.measure }}>
+              <div className="studio-content-column">
                 <ApprovalPrompt
                   // Keyed by the active question for the chat page's reason: a
                   // scope chosen for one question must not stay preselected.

@@ -41,9 +41,9 @@ export function HomePage() {
     <div
       data-attachment-drop-zone
       className="flex h-full flex-col items-center justify-center"
-      style={{ paddingInline: SHELL.gutter, paddingBottom: SHELL.topStrip.height }}
+      style={{ paddingBottom: SHELL.topStrip.height }}
     >
-      <div className="w-full" style={{ maxWidth: SHELL.measure }}>
+      <div className="studio-content-column">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

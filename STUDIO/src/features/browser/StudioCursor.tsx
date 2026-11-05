@@ -29,6 +29,6 @@ export function StudioCursor({ cursor }: { cursor: NonNullable<LiveBrowserState[
         : <motion.path d="M0 0L5 20L9 12L18 8Z" fill="white" stroke="#1e1e1e" strokeWidth="1.1" strokeLinejoin="round"
           animate={{ scale: cursor.pressed ? 0.9 : 1 }} style={{ originX: 0, originY: 0 }} transition={{ duration: 0.09 }} />}
     </svg>
-    <span className="ml-2.5 inline-flex h-[18px] items-center rounded-full bg-[#1e1e1e] px-2 text-[10px] text-white">Studio</span>
+    <span className="ml-2.5 inline-flex min-h-[var(--control-xs)] items-center rounded-full bg-[#1e1e1e] px-2 text-micro text-white">Studio</span>
   </>
 }

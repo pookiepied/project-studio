@@ -234,7 +234,8 @@ export function TurnMenu() {
         onOpenChange={setOpen}
         side="bottom"
         align="end"
-        className="studio-scroll-bounded max-h-[28rem] w-80 overflow-y-auto"
+        maxHeight="28rem"
+        className="studio-scroll-bounded w-80"
         trigger={
           <Tooltip
             label={[

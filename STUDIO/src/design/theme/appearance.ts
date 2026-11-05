@@ -260,7 +260,7 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
   const root = document.documentElement
 
   root.classList.toggle('dark', resolved === 'dark')
-  root.style.setProperty('--ui-size', `${appearance.uiSize}px`)
+  root.style.setProperty('--ui-size', `max(${appearance.uiSize}px, var(--input-size-floor, 0px))`)
   // The offset, not the size: `--code-size` is a `calc()` in styles/type.css that
   // derives from this and `--ui-size` together, so the step survives a change
   // to either one.

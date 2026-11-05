@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fieldAt } from '@/lib/field'
-import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
+import { EDGE_PADDING, FloatingMenu, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
  * The selection menu.
@@ -34,10 +34,6 @@ import { EDGE_PADDING, FloatingMenu, MENU_WIDTH, type FloatingPlacement } from '
  * selection collapsing. "Select all" deliberately does not dismiss it: that
  * verb is usually the first half of Copy.
  */
-
-/** Three rows and the panel's padding: the selection list is short on purpose. */
-const MENU_HEIGHT = 104
-const SELECTION_GAP = 8
 
 /** Reads the current selection into menu state, or null if there is nothing to act on. */
 function readSelection(): { rect: DOMRect; selection: string; target: HTMLElement | null } | null {
@@ -91,28 +87,11 @@ export function SelectionMenu() {
       return
     }
 
-    const centred = read.rect.left + read.rect.width / 2 - MENU_WIDTH / 2
-    const x = Math.min(Math.max(centred, EDGE_PADDING), window.innerWidth - MENU_WIDTH - EDGE_PADDING)
-
-    const above = read.rect.top - MENU_HEIGHT - SELECTION_GAP
-    if (above >= EDGE_PADDING) {
-      setPlacement({ x, y: above, origin: 'bottom left', kind: 'selection', selection: read.selection, target: read.target })
-    } else {
-      setPlacement({
-        x,
-        // Floored as well as clamped: on a window shorter than the menu the
-        // clamp alone goes negative, which is how a menu once landed at a
-        // negative coordinate and became unclickable.
-        y: Math.min(
-          Math.max(read.rect.bottom + SELECTION_GAP, EDGE_PADDING),
-          Math.max(EDGE_PADDING, window.innerHeight - MENU_HEIGHT - EDGE_PADDING),
-        ),
-        origin: 'top left',
-        kind: 'selection',
-        selection: read.selection,
-        target: read.target,
-      })
-    }
+    setPlacement({
+      x: read.rect.left, y: read.rect.top, anchor: read.rect,
+      origin: 'bottom left', kind: 'selection',
+      selection: read.selection, target: read.target,
+    })
   }
 
   useEffect(() => {

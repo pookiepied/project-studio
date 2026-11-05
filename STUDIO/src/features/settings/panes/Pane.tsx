@@ -4,9 +4,8 @@ import type { ReactNode } from 'react'
  * The shape every settings pane takes.
  *
  * One layout, used by all of them, so a section added later cannot invent its
- * own spacing. The label column is fixed and the control column is fluid, which
- * is what keeps every control in the app aligned on the same x however long its
- * label runs.
+ * own spacing. The pane's available width decides whether labels and controls
+ * sit together or stack, including when this pane lives inside another surface.
  */
 export function Pane({
   title,
@@ -18,7 +17,7 @@ export function Pane({
   children: ReactNode
 }) {
   return (
-    <div className="mx-auto w-full max-w-[36rem]">
+    <div className="studio-settings-pane">
       <header className="mb-5">
         {/* The editorial serif, because this is a page title and that is the
             serif's one job (ADR 0043). It was set in `text-title` — Inter,
@@ -44,12 +43,12 @@ export function Row({
   children?: ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 py-3.5">
-      <div className="min-w-0 flex-1">
+    <div className="studio-settings-row">
+      <div className="studio-settings-label">
         <p className="text-ui text-foreground">{label}</p>
         {hint ? <p className="mt-0.5 text-caption text-muted-foreground">{hint}</p> : null}
       </div>
-      {children ? <div className="shrink-0">{children}</div> : null}
+      {children ? <div className="studio-settings-control">{children}</div> : null}
     </div>
   )
 }

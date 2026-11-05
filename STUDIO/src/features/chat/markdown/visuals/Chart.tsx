@@ -21,8 +21,6 @@ import { VisualFrame, seriesColor } from './VisualFrame'
 const PLOT_HEIGHT = 200
 const TOP = 10
 const BOTTOM = 26
-/** The micro type the axes are set in, measured once by eye: ~6px a glyph. */
-const GLYPH = 6.2
 
 export function Chart({ chart }: { chart: ChartVisual }) {
   const [table, setTable] = useState(false)
@@ -129,17 +127,36 @@ function Bars({ chart }: { chart: ChartVisual }) {
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(560)
+  const [font, setFont] = useState('11px sans-serif')
+  const [, refreshFont] = useState(0)
   useLayoutEffect(() => {
     const element = ref.current
     if (element === null) return
-    const measure = () => { if (element.clientWidth > 0) setWidth(element.clientWidth) }
+    const measure = () => {
+      if (element.clientWidth > 0) setWidth(element.clientWidth)
+      const label = element.querySelector('text')
+      if (label) {
+        const style = getComputedStyle(label)
+        setFont(`${style.fontSize} ${style.fontFamily}`)
+      }
+    }
     measure()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(element)
+    const appearance = new MutationObserver(measure)
+    appearance.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    const fontsLoaded = () => { measure(); refreshFont((version) => version + 1) }
+    document.fonts?.addEventListener('loadingdone', fontsLoaded)
+    return () => {
+      observer?.disconnect()
+      appearance.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fontsLoaded)
+    }
   }, [])
-  return { ref, width }
+  const context = typeof CanvasRenderingContext2D === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+  if (context) context.font = font
+  const textWidth = (label: string) => context?.measureText(label).width ?? label.length * (parseFloat(font) || 11) * 0.6
+  return { ref, width, textWidth }
 }
 
 /** Round ticks covering [min, max]: 1, 2, 2.5 or 5 times a power of ten apart. */
@@ -171,7 +188,7 @@ function columnPath(x: number, top: number, width: number, bottom: number, up: b
 }
 
 function Plot({ chart }: { chart: ChartVisual }) {
-  const { ref, width } = useWidth()
+  const { ref, width, textWidth } = useWidth()
   const [hover, setHover] = useState<number | null>(null)
   const columns = chart.type === 'column' || chart.type === 'bar'
   const values = chart.series.flatMap((series) => series.values.filter((value): value is number => value !== null))
@@ -190,10 +207,10 @@ function Plot({ chart }: { chart: ChartVisual }) {
   const count = chart.x.length
 
   const tickLabels = ticks.map((tick) => formatValue(tick, chart.unit, true))
-  const left = Math.max(...tickLabels.map((label) => label.length)) * GLYPH + 10
+  const left = Math.min(width * 0.35, Math.max(...tickLabels.map(textWidth)) + 10)
   const last = single ? lastValue(chart.series[0].values) : null
   const endLabel = !columns && last !== null ? formatValue(last.value, chart.unit, true) : null
-  const right = endLabel === null ? 12 : endLabel.length * GLYPH + 16
+  const right = endLabel === null ? 12 : Math.min(width * 0.35, textWidth(endLabel) + 16)
   const plotWidth = Math.max(40, width - left - right)
   const height = TOP + PLOT_HEIGHT + BOTTOM
   const y = (value: number) => TOP + PLOT_HEIGHT - ((value - low) / (high - low || 1)) * PLOT_HEIGHT
@@ -203,7 +220,7 @@ function Plot({ chart }: { chart: ChartVisual }) {
     : left + (count === 1 ? plotWidth / 2 : (index * plotWidth) / (count - 1))
 
   // Labels along x: as many as fit without touching.
-  const labelWidth = Math.max(...chart.x.map((label) => label.length)) * GLYPH + 10
+  const labelWidth = Math.max(...chart.x.map(textWidth)) + 10
   const per = columns ? band : plotWidth / Math.max(1, count - 1)
   const every = Math.max(1, Math.ceil(labelWidth / per))
 

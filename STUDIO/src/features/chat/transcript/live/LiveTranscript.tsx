@@ -146,6 +146,7 @@ export function LiveTranscript({
               item.submissionId !== null &&
               item.submissionId === inFlightSubmission
             }
+            latest={(item.tailMessageId ?? item.id) === lastAssistantId}
             {...(onBranch === undefined ? {} : { onBranch })}
           />
         ),

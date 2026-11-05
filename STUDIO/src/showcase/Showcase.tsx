@@ -32,6 +32,7 @@ import { ArtifactsSection } from './ArtifactsSection'
 import { Section } from './Section'
 import { WorkspaceSection } from './WorkspaceSection'
 import { ConversationSection } from './ConversationSection'
+import { LayoutSection } from './LayoutSection'
 
 /**
  * The parts, on one page.
@@ -68,7 +69,7 @@ function ShowcasePage() {
               /showcase.html, never built into the app.
             </p>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-2">
               <span className="text-micro text-muted-foreground">Theme</span>
               <Segmented<Theme>
@@ -98,6 +99,7 @@ function ShowcasePage() {
         </header>
 
         <ConversationSection />
+        <LayoutSection />
         <ButtonsSection />
         <IconButtonsSection />
         <FieldsSection />

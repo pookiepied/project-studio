@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_IN, SPRING_SNAPPY } from '@/design/tokens'
 import { cn } from '@/lib/cn'
+import { floatingViewport, observeFloating, placeFloating, type FloatingAlign, type FloatingSide } from '@/design/layout/floating'
 
 /**
  * A popover anchored to its trigger.
@@ -55,12 +56,11 @@ import { cn } from '@/lib/cn'
  * first position beats one that fails to open at all.
  */
 
-type Side = 'top' | 'bottom'
-type Align = 'start' | 'end' | 'center'
+type Side = Exclude<FloatingSide, 'right'>
+type Align = FloatingAlign
 
 /** Breathing room between the panel and the trigger, and from the window edge. */
 const OFFSET = 6
-const MARGIN = 8
 
 export function Popover({
   open,
@@ -69,6 +69,7 @@ export function Popover({
   side = 'bottom',
   align = 'start',
   offset = OFFSET,
+  maxHeight,
   children,
   className,
   inline = false,
@@ -85,6 +86,8 @@ export function Popover({
    * the button's, where it would sit on the surface's border.
    */
   offset?: number
+  /** Optional content cap; the visible viewport remains the upper bound. */
+  maxHeight?: string
   children: ReactNode
   className?: string
   inline?: boolean
@@ -92,7 +95,7 @@ export function Popover({
   const anchor = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement>(null)
   const focusedInline = useRef(false)
-  const [position, setPosition] = useState<{ top: number; left: number; side: Side } | null>(null)
+  const [position, setPosition] = useState<ReturnType<typeof placeFloating> | null>(null)
 
   /**
    * Places the panel against the viewport.
@@ -109,43 +112,11 @@ export function Popover({
     // Layout sizes, not the bounding rect: the rect is multiplied by the
     // entry animation's scale transform, and placing a menu against a box
     // that will not exist a frame later is the shift described above.
-    const width = panelElement.offsetWidth
-    const height = panelElement.offsetHeight
-
-    // Flip rather than overflow: if the preferred side has no room but the
-    // opposite side does, use the opposite side. If neither does, keep the
-    // preference and let the clamp below deal with it.
-    const below = window.innerHeight - trigger.bottom - offset - MARGIN
-    const above = trigger.top - offset - MARGIN
-    let resolved = side
-    if (side === 'bottom' && height > below && above > below) resolved = 'top'
-    if (side === 'top' && height > above && below > above) resolved = 'bottom'
-
-    const top =
-      resolved === 'bottom' ? trigger.bottom + offset : trigger.top - height - offset
-
-    const preferred =
-      align === 'end'
-        ? trigger.right - width
-        : align === 'center'
-          ? trigger.left + trigger.width / 2 - width / 2
-          : trigger.left
-
-    // Pulled back inside the window on both axes. A menu that hangs off the
-    // edge is not merely ugly — the rows past the edge cannot be clicked. The
-    // bounds are floored at MARGIN so a panel wider than the window clamps to
-    // the left edge instead of the min/max pair collapsing and letting it
-    // through to the right.
-    const left = Math.min(
-      Math.max(preferred, MARGIN),
-      Math.max(MARGIN, window.innerWidth - width - MARGIN),
-    )
-    const clampedTop = Math.min(
-      Math.max(top, MARGIN),
-      Math.max(MARGIN, window.innerHeight - height - MARGIN),
-    )
-
-    setPosition({ top: clampedTop, left, side: resolved })
+    setPosition(placeFloating({
+      anchor: trigger,
+      panel: { width: panelElement.offsetWidth, height: panelElement.offsetHeight },
+      viewport: floatingViewport(), side, align, gap: offset,
+    }))
   }, [align, offset, side])
 
   useLayoutEffect(() => {
@@ -155,28 +126,7 @@ export function Popover({
     }
     place()
 
-    // The window can be resized and the page scrolled while a menu is open, and
-    // a fixed panel does not follow its trigger on its own. `capture` catches
-    // scrolls on any ancestor, not just the document — including the menu's
-    // own scrolling list, which is why a re-place must be stable rather than
-    // slightly different every time.
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-
-    // Content that resizes in place — a view swapped inside the same open
-    // menu, a list shortened by a filter — needs a fresh placement, and no
-    // scroll or resize event will announce it.
-    const observer =
-      typeof ResizeObserver === 'undefined'
-        ? undefined
-        : new ResizeObserver(() => place())
-    if (panel.current !== null && observer !== undefined) observer.observe(panel.current)
-
-    return () => {
-      window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
-      observer?.disconnect()
-    }
+    return observeFloating(anchor.current, panel.current, place)
   }, [open, place])
 
   useEffect(() => {
@@ -262,6 +212,9 @@ export function Popover({
               style={{
                 top: position?.top ?? 0,
                 left: position?.left ?? 0,
+                maxWidth: position?.maxWidth,
+                maxHeight: position && maxHeight ? `min(${maxHeight}, ${position.maxHeight}px)` : position?.maxHeight,
+                minWidth: position && position.maxWidth < 192 ? 0 : undefined,
                 transformOrigin: (position?.side ?? side) === 'top' ? 'bottom center' : 'top center',
                 // Hidden until measured. The panel has to be in the DOM to have
                 // a height worth measuring, so it renders first and is placed
@@ -274,7 +227,7 @@ export function Popover({
                 // panel's. The max-width is the same hard clamp the placement
                 // math applies, said in CSS as well, so a panel can never be
                 // the thing that gives the page a horizontal scrollbar.
-                'studio-blur fixed z-50 min-w-48 max-w-[calc(100vw-1rem)] rounded-lg border p-1',
+                'studio-floating-surface studio-blur fixed z-50 min-w-48 rounded-lg border p-1',
                 'shadow-overlay',
                 className,
               )}

@@ -56,7 +56,7 @@ export function SettingsPage({ sectionId }: { sectionId: string }) {
 
   return (
     <div
-      className="studio-scroll-inset flex h-full min-h-0 justify-center overflow-y-auto px-8"
+      className="studio-scroll-inset h-full min-h-0 overflow-y-auto"
       style={{ paddingTop: SHELL.topStrip.height + 16 }}
     >
       <motion.div
@@ -64,8 +64,7 @@ export function SettingsPage({ sectionId }: { sectionId: string }) {
         initial={mounted.current ? { opacity: 0 } : false}
         animate={{ opacity: 1 }}
         transition={{ duration: DURATION.base, ease: EASE_OUT }}
-        className="w-full pb-24"
-        style={{ maxWidth: '36rem' }}
+        className="studio-content-column studio-settings-column pb-24"
       >
         {paneFor(active)}
       </motion.div>

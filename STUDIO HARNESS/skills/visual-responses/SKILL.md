@@ -12,11 +12,22 @@ object inside it. Studio draws it. You do not choose colors, fonts, or sizes.
 Rules for every visual:
 
 - The JSON must be valid: double quotes, no comments, no trailing commas.
-- Use only real data from the conversation, your tools, or your sources.
-  Never invent numbers. If numbers are estimates, say so in the subtitle.
-- Write one or two sentences of text before the visual that say what it shows.
-  Put any conclusion in your text, not only in the visual.
-- Use at most one visual for each point you make. Most replies need none.
+- Use data from the conversation, your tools, or your sources. Never invent
+  numbers, dates, ratings, or sources. Label supplied estimates as estimates
+  in the subtitle or accompanying text. User-proposed plans can use their
+  intended dates or stages; do not present them as completed events.
+- Introduce the visual briefly and explain the conclusion in your text.
+  Keep evidence, tradeoffs, and limitations that matter to the user's decision.
+  Do not repeat every visual item in prose.
+- Use the matching visual for the cases in the system prompt's Visuals section.
+  Do not wait for the user to request it. Use at most one visual for each
+  distinct point, and respect requests for plain text or a specific format.
+- Use only the five fence names below, with one JSON object per fence. Do not
+  wrap a visual fence inside another code block. Maps and arbitrary HTML are
+  not supported by these formats.
+- Before sending, check the JSON, required fields, units, and source data.
+  The sample values and addresses below demonstrate the format; they are not
+  verified facts to reuse in an answer.
 
 ## Which visual to use
 
@@ -27,7 +38,7 @@ Rules for every visual:
 | A ranking, or categories with long names | `chart` with type `bar` |
 | Two to four key figures | `stats` |
 | How complete several parts of a task are | `progress` |
-| Events or stages in order, with dates | `timeline` |
+| A schedule, history, or plan with several dates or stages | `timeline` |
 | Products, places, or options to choose from | `cards` |
 
 ## chart
@@ -105,6 +116,8 @@ For one series, you can use `data` instead of `x` and `series`:
 ```
 
 - `max` is optional and defaults to 100. Without it, `value` is a percentage.
+- Use measured counts or percentages. If you only know task states such as
+  started or blocked, report them in text rather than guessing a percentage.
 
 ## timeline
 
@@ -146,7 +159,13 @@ For one series, you can use `data` instead of `x` and `series`:
 - `image` is a web address you found, or the path of a picture saved in this
   conversation's files, such as `workspace/photo.png`. If you do not have a
   real address, leave `image` out.
+- Include a relevant picture when one is available from the user's files or
+  retrieved sources. A product page address is not an image address. Do not
+  guess an image address or use a generated picture as a real product photo.
 - `url` is the page the card links to. It opens in the user's browser.
+- Include the source page when available. Keep the recommendation and key
+  tradeoffs in the surrounding text. Use a table instead when the user mainly
+  needs to compare many exact attributes across the options.
 - `rating` is a number from 0 to 5.
 - `tags` holds at most four short labels.
 
@@ -159,5 +178,7 @@ light and dark mode, and the user can view it as a table.
 
 ## If a visual does not appear
 
-If the JSON is invalid, Studio shows it as code with the reason. Fix the JSON
-in your next reply only if the user asks about it.
+If the JSON is invalid, Studio shows it as code with the reason. If the user
+or a tool reports that a visual failed, correct the format rather than repeat
+the invalid block. You cannot assume a visual rendered successfully merely
+because you wrote its fence.

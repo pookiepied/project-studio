@@ -1,5 +1,5 @@
-import { createContext, memo, useContext, type ReactNode } from 'react'
-import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
+import { createContext, memo, useContext, type ComponentProps, type ReactNode } from 'react'
+import ReactMarkdown, { defaultUrlTransform, type Components, type ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -7,10 +7,12 @@ import { ArtifactBlock } from '@/features/artifacts'
 import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/blocks'
 import { useMath } from '@/features/chat/markdown/useMath'
 import { MarkdownLink } from './MarkdownLink'
+import { FileReference } from './FileReference'
+import { parsePathReference } from './pathReference'
 import { prepareMath } from './prepareMath'
 import { rehypeReply, type Sources } from './rehypeReply'
 import { VISUAL_FENCES, VisualBlock } from './visuals'
-import { LOCAL_IMAGE, remarkReplyImages, ReplyImage } from './ReplyImage'
+import { LOCAL_IMAGE, remarkReplyFiles, ReplyImage } from './ReplyImage'
 
 /**
  * Model output, rendered.
@@ -100,11 +102,13 @@ const SCHEMA = {
     ...Object.fromEntries(
       SVG_TAGS.map((tag) => [tag, [...SVG_ATTRIBUTES, ['className', 'math-inline', 'math-display']]]),
     ),
-  },  // A local picture arrives as `studio-file:` (see `remarkReplyImages`); the
-  // image component, not the webview, decides what that may load.
+  },  // A local file address arrives as `studio-file:` (see `remarkReplyFiles`);
+  // the image and file-reference components, not the webview, decide what
+  // those may load or offer.
   protocols: {
     ...defaultSchema.protocols,
     src: [...(defaultSchema.protocols?.src ?? []), LOCAL_IMAGE.slice(0, -1)],
+    href: [...(defaultSchema.protocols?.href ?? []), LOCAL_IMAGE.slice(0, -1)],
   },
 }
 
@@ -157,6 +161,34 @@ function textOf(node: FenceNode): string {
 
 const StreamingContext = createContext(false)
 const UserContext = createContext(false)
+const InsideLink = createContext(false)
+
+/**
+ * Inline code, and nothing else -- every fence was routed at `pre`.
+ *
+ * A clear filesystem reference becomes a file-reference chip; everything else
+ * stays inline code, whatever it contains. The reading is
+ * `parsePathReference`'s, not this component's. The surrounding link owns
+ * interaction when the reference is part of a link's label.
+ */
+function InlineCode({ className, children, ...rest }: ComponentProps<'code'> & ExtraProps) {
+  const reference = typeof children === 'string' ? parsePathReference(children) : null
+  const streaming = useContext(StreamingContext)
+  const insideLink = useContext(InsideLink)
+  if (reference !== null) {
+    // While the reply is still being written the reference stays the plain
+    // chip: a path mid-arrival is not yet a fact, and an interactive control
+    // bound to it would offer an action on text that may still be growing.
+    // Nothing here probes a filesystem either way - the verbs wait for a
+    // click.
+    return <FileReference reference={reference} streaming={streaming || insideLink} />
+  }
+  return (
+    <code className={className} {...rest}>
+      {children}
+    </code>
+  )
+}
 
 function Fence({ node }: { node: FenceNode | undefined }) {
   const streaming = useContext(StreamingContext)
@@ -169,6 +201,22 @@ function Fence({ node }: { node: FenceNode | undefined }) {
   }
   if (fence === undefined || fence in TEXT_FENCES) return <TextBlock text={text} fence={fence ?? 'text'} />
   return <CodeBlock code={text} fence={fence} streaming={streaming} />
+}
+
+function ReplyLink({ href, title, children }: ComponentProps<'a'>) {
+  const streaming = useContext(StreamingContext)
+  if (typeof href === 'string' && href.startsWith(LOCAL_IMAGE)) {
+    let reference = null
+    try {
+      reference = parsePathReference(decodeURIComponent(href.slice(LOCAL_IMAGE.length)))
+    } catch {
+      // Malformed destinations stay readable without gaining an action.
+    }
+    if (reference !== null) return <FileReference reference={reference} streaming={streaming} />
+    return <InsideLink.Provider value><span>{children}</span></InsideLink.Provider>
+  }
+  // Descendant inline code stays readable, while the outer link owns interaction.
+  return <InsideLink.Provider value><MarkdownLink href={href} title={title} children={children} /></InsideLink.Provider>
 }
 
 const COMPONENTS: Components = {
@@ -204,17 +252,8 @@ const COMPONENTS: Components = {
     return <Fence node={node} />
   },
 
-  /** Inline code, and nothing else -- every fence was routed at `pre`. */
-  code({ className, children, ...rest }) {
-    const fileReference = typeof children === 'string'
-      && (!/\s/.test(children) || /^(?:[A-Za-z]:[\\/]|\/|\.{1,2}[\\/])/.test(children))
-      && /(?:^|[\\/])[^\\/\n]+\.(?:png|jpe?g|webp|gif|svg|avif|pdf|docx?|pptx?|xlsx?|csv|tsv|txt|md|py|[cm]?[jt]sx?|json|html?|css|rs|go|java|toml|ya?ml|sh|sql|mp4|webm|mp3|wav|ogg)(?::\d+(?::\d+)?)?$/i.test(children)
-    return (
-      <code className={fileReference ? 'studio-file-reference' : className} {...rest}>
-        {children}
-      </code>
-    )
-  },
+  /** Inline code is its own component, so the streaming context reads cleanly. */
+  code: InlineCode,
 
   /**
    * A table is embedded content, not a produced object.
@@ -246,9 +285,7 @@ const COMPONENTS: Components = {
     return <ReplyImage src={typeof src === 'string' ? src : undefined} alt={alt} />
   },
 
-  a({ href, title, children }) {
-    return <MarkdownLink href={href} title={title} children={children} />
-  },
+  a: ReplyLink,
 }
 
 export const Markdown = memo(function Markdown({ text, streaming = false, user = false, sources }: { text: string; streaming?: boolean; user?: boolean; sources?: Sources }): ReactNode {
@@ -261,7 +298,7 @@ export const Markdown = memo(function Markdown({ text, streaming = false, user =
   return (
     <UserContext.Provider value={user}><StreamingContext.Provider value={streaming}><ReactMarkdown
       skipHtml={user}
-      remarkPlugins={math === null ? [remarkGfm, remarkReplyImages] : [remarkGfm, remarkReplyImages, math.remark]}
+      remarkPlugins={math === null ? [remarkGfm, remarkReplyFiles] : [remarkGfm, remarkReplyFiles, math.remark]}
       urlTransform={urlTransform}
       rehypePlugins={
         user ? (math === null ? [reply] : [reply, math.rehype]) : math === null

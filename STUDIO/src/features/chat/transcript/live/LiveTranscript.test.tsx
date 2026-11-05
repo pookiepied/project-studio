@@ -43,7 +43,7 @@ function user(id: string, text: string): TranscriptItem {
   return { kind: 'user', id, submissionId: 'sub_1', text, attachments: [], documents: [], timestamp: null }
 }
 
-function assistant(id: string, text: string): TranscriptItem {
+function assistant(id: string, text: string): Extract<TranscriptItem, { kind: 'assistant' }> {
   return {
     kind: 'assistant',
     id,
@@ -159,6 +159,27 @@ describe('activity across provider messages', () => {
     expect(screen.queryByText('Stopped before finishing')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Branch from here', hidden: true }))
     expect(branch).toHaveBeenCalledWith('two')
+  })
+})
+
+describe('settled response actions', () => {
+  it('shows them on the newest answer while older answers stay hover-led', () => {
+    const older: TranscriptItem = {
+      ...assistant('one', 'an earlier answer'),
+      submissionId: 'sub_1',
+      end: { state: 'complete' },
+    }
+    const newest: TranscriptItem = {
+      ...assistant('two', 'the newest answer'),
+      submissionId: 'sub_2',
+      end: { state: 'complete' },
+    }
+    show([older, newest], { status: 'idle' })
+
+    const rows = screen.getAllByRole('button', { name: 'Copy' })
+      .map((button) => button.closest('[class*="mb-4"]'))
+    expect(rows[0]?.className).toContain('pointer-events-none')
+    expect(rows[1]?.className).not.toContain('pointer-events-none')
   })
 })
 

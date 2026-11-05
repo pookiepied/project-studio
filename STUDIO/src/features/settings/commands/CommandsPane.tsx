@@ -155,7 +155,7 @@ function CommandRow({
   const own = command.provenance === 'user'
   const tag = PROVENANCE_LABEL[command.provenance]
   return (
-    <div className="flex items-start justify-between gap-6 py-3.5">
+    <div className="studio-settings-row">
       <div className="flex min-w-0 flex-1 items-start gap-2.5">
         <span className="mt-0.5 shrink-0">
           <Icons.command />

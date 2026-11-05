@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AssistantSegment, ToolCallView, TranscriptItem } from '@/features/chat/transcript/projection'
 import { ActivityBlock, activitySections } from './ActivityBlock'
 import { activityItems } from './activityItems'
+import { activityState } from './activitySummary'
+import { Icons } from '@/components/icons'
+import { Arriving } from '@/components/motion/Arrive'
 
 vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }))
 afterEach(cleanup)
@@ -69,6 +72,54 @@ describe('activity boundaries and order', () => {
 })
 
 describe('the activity disclosure', () => {
+  it('keeps space around activity while words and tool results arrive', () => {
+    const view = render(<Arriving live><ActivityBlock conversationId="conv" active textBefore textAfter segments={[
+      tools('a', call('search', 'web_search', false)),
+    ]} /></Arriving>)
+    const row = screen.getByRole('button', { name: 'Researching the web' }).parentElement
+    expect(row?.classList.contains('mt-4')).toBe(true)
+    expect(row?.classList.contains('mb-4')).toBe(true)
+    expect(row?.querySelector('svg')?.classList.contains('lucide-globe')).toBe(true)
+    view.rerender(<Arriving live><ActivityBlock conversationId="conv" active textBefore textAfter segments={[
+      tools('a', call('search', 'web_search')),
+    ]} /></Arriving>)
+    expect(screen.getByRole('button', { name: 'Researched the web' }).parentElement).toBe(row)
+    expect(row?.classList.contains('mt-4')).toBe(true)
+    expect(row?.classList.contains('mb-4')).toBe(true)
+    view.rerender(<Arriving live={false}><ActivityBlock conversationId="conv" active={false} textBefore textAfter segments={[
+      tools('a', call('search', 'web_search')),
+    ]} /></Arriving>)
+    expect(screen.getByRole('button', { name: 'Researched the web' }).parentElement).toBe(row)
+  })
+
+  it('uses the group family mark rather than a command mark', () => {
+    for (const [tool, mark] of [
+      ['web_search', Icons.browserUse], ['fetch', Icons.browserUse],
+      ['edit', Icons.edit], ['plan', Icons.plan], ['task', Icons.branch],
+      ['studio_image', Icons.image], ['studio_video', Icons.video],
+      ['unknown_extension', Icons.mcp],
+    ] as const) {
+      expect(activityState([call('one', tool)], false).mark).toBe(mark)
+    }
+  })
+
+  it('keeps all group categories and a stable mark across parallel results and replay', () => {
+    const first = call('search', 'web_search', false)
+    const second = call('edit', 'edit', false)
+    const initial = activityState([first, second], true)
+    expect(initial.mark).toBe(Icons.browserUse)
+    expect(initial.current).toBe(second)
+    const updated = activityState([call('search', 'web_search'), second, call('command')], true)
+    expect(updated.mark).toBe(initial.mark)
+    expect(updated.summary).toBe('Researched the web, changed files, ran commands')
+    expect(updated.current).toBe(second)
+    const replay = activityState([first, { ...second, errorText: 'denied' }], false)
+    expect(replay.mark).toBe(initial.mark)
+    expect(replay.current).toBeUndefined()
+    expect(replay.failed).toBe(1)
+    expect(replay.unfinished).toBe(true)
+  })
+
   it('starts collapsed and opens a flat chronological list, including repeated tools', () => {
     const { container } = render(<ActivityBlock conversationId="conv" active={false} segments={[
       tools('a', call('first'), call('second', 'edit'), call('third')),

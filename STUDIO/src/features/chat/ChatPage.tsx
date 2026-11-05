@@ -435,10 +435,8 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         className="studio-scroll-inset studio-no-anchor min-h-0 flex-1 overflow-y-auto"
       >
         <div
-          className="mx-auto w-full"
+          className="studio-content-column"
           style={{
-            maxWidth: SHELL.measure,
-            paddingInline: SHELL.gutter,
             paddingTop: SHELL.topStrip.height + 20,
             paddingBottom: 20,
           }}
@@ -571,7 +569,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                 transition={{ duration: DURATION.fast, ease: EASE_OUT }}
                 onClick={scrollToBottom}
                 aria-label="Jump to latest"
-                className="studio-blur pointer-events-auto flex size-8 items-center justify-center rounded-full border shadow-lifted"
+                className="studio-blur pointer-events-auto flex size-[var(--control-lg)] items-center justify-center rounded-full border shadow-lifted"
               >
                 <Icons.jumpToLatest />
               </motion.button>
@@ -609,8 +607,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
         {gallery ? null : (
           <div
-            className="relative z-10 mx-auto w-full bg-surface pb-4"
-            style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
+            className="studio-content-column relative z-10 bg-surface pb-4"
           >
             <ConnectionNotice
               phase={live.phase}

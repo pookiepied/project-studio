@@ -161,7 +161,11 @@ describe('VoiceModeOverlay', () => {
     expect(screen.getByText('approval card')).toBeTruthy()
     rerender(<VoiceModeOverlay open minimized conversationId="cnv_1" onClose={() => {}} onRestore={onRestore} insetRight={420} />)
     const player = screen.getByRole('region', { name: 'Voice call' })
-    expect(player.style.right).toBe('436px')
+    // Preserve the rail reservation while allowing a narrow parent to clamp it.
+    const bounds = document.createElement('div')
+    bounds.style.right = 'min(436px, max(16px, calc(100% - 22rem - 16px)))'
+    expect(player.style.right).toBe(bounds.style.right)
+    expect(player.className).toContain('max-h-[calc(100%-2rem)]')
     // The full stage plays its exit, then leaves: the page is usable underneath.
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
     fireEvent.click(screen.getByText(/agent is waiting for your approval/))

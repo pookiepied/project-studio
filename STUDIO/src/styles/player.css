@@ -33,10 +33,10 @@
      player at this size. */
   --media-control-background: transparent;
   --media-control-hover-background: oklch(1 0 0 / 18%);
-  --media-control-height: 26px;
+  --media-control-height: var(--control-sm);
   --media-control-padding: 6px;
-  --media-button-icon-width: 15px;
-  --media-button-icon-height: 15px;
+  --media-button-icon-width: var(--icon-sm);
+  --media-button-icon-height: var(--icon-sm);
 
   --media-range-track-height: 3px;
   --media-range-track-background: oklch(1 0 0 / 24%);
@@ -64,7 +64,7 @@
   position: absolute;
   inset-inline: 10px;
   bottom: 10px;
-  height: 36px;
+  min-height: calc(var(--control-sm) + 10px);
   padding-inline: 4px;
   display: flex;
   align-items: center;
@@ -84,7 +84,7 @@
 .studio-player media-time-range {
   flex: 1 1 auto;
   min-width: 0;
-  height: 26px;
+  height: var(--control-sm);
 }
 
 .studio-player media-time-display {
@@ -102,16 +102,16 @@
    pointer keeps passing through to the controller underneath while hidden.
    --------------------------------------------------------------------------- */
 .studio-player .studio-player-centre {
-  width: 52px;
-  height: 52px;
+  width: var(--control-xl);
+  height: var(--control-xl);
   padding: 0;
   border-radius: 999px;
   background: oklch(0.16 0 0 / 55%);
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   box-shadow: 0 4px 16px -4px oklch(0 0 0 / 45%);
-  --media-button-icon-width: 22px;
-  --media-button-icon-height: 22px;
+  --media-button-icon-width: var(--icon-lg);
+  --media-button-icon-height: var(--icon-lg);
   --media-control-hover-background: oklch(0.16 0 0 / 70%);
   transition:
     opacity var(--duration-base) var(--ease-out-quint),

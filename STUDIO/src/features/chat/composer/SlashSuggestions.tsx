@@ -5,10 +5,10 @@ import { DURATION, EASE_IN, SPRING_SNAPPY } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import type { CommandRecord } from '@/platform/harness'
 import { cn } from '@/lib/cn'
+import { floatingViewport, observeFloating, placeFloating } from '@/design/layout/floating'
 
 /** Breathing room between the panel and the composer's top edge, and from the window's. */
 const GAP = 6
-const MARGIN = 8
 
 /**
  * The commands a slash offers, floating above the composer.
@@ -66,7 +66,7 @@ export function SlashSuggestions({
 }) {
   const panel = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLUListElement>(null)
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+  const [position, setPosition] = useState<ReturnType<typeof placeFloating> | null>(null)
   const open = commands !== null
 
   // The picked row stays in view as the arrows move it past the edge.
@@ -89,21 +89,12 @@ export function SlashSuggestions({
     const element = panel.current
     if (!frame || !element) return
 
-    const width = Math.min(frame.width, window.innerWidth - MARGIN * 2)
+    const viewport = floatingViewport()
+    const width = Math.min(frame.width, Math.max(0, viewport.width - viewport.edge * 2))
     element.style.width = `${width}px`
-    const height = element.offsetHeight
-
-    const top = Math.min(
-      Math.max(frame.top - height - GAP, MARGIN),
-      Math.max(MARGIN, window.innerHeight - height - MARGIN),
-    )
-    const left = Math.min(
-      Math.max(frame.left, MARGIN),
-      Math.max(MARGIN, window.innerWidth - width - MARGIN),
-    )
-    setPosition((current) =>
-      current !== null && current.top === top && current.left === left ? current : { top, left },
-    )
+    setPosition(placeFloating({ anchor: frame, panel: { width, height: element.offsetHeight },
+      viewport, side: 'top', gap: GAP,
+    }))
   }, [anchor])
 
   useLayoutEffect(() => {
@@ -113,22 +104,8 @@ export function SlashSuggestions({
     }
     place()
 
-    // The transcript scrolls under the open panel, and the window can be
-    // resized; a fixed panel follows neither on its own. `capture` catches
-    // scrolls on any ancestor, including the panel's own list — the same
-    // wiring `Popover` runs, and for the same reasons.
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-    const observer =
-      typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => place())
-    if (panel.current !== null && observer !== undefined) observer.observe(panel.current)
-
-    return () => {
-      window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
-      observer?.disconnect()
-    }
-  }, [open, place])
+    return observeFloating(anchor.current, panel.current, place)
+  }, [open, place, anchor])
 
   // Always mounted, so the panel's leaving is an exit the AnimatePresence
   // below can play rather than an unmount nobody sees.
@@ -149,7 +126,9 @@ export function SlashSuggestions({
           style={{
             top: position?.top ?? 0,
             left: position?.left ?? 0,
-            transformOrigin: 'bottom center',
+            maxWidth: position?.maxWidth,
+            maxHeight: position?.maxHeight,
+            transformOrigin: position?.side === 'bottom' ? 'top center' : 'bottom center',
             // Hidden until measured — the panel has to be in the DOM to have
             // a height worth placing against, and that first frame must not
             // be seen at (0, 0).
@@ -159,7 +138,7 @@ export function SlashSuggestions({
             // The popover recipe: translucent, blurred, one hairline, the
             // overlay step of the shadow scale. `p-1` puts rows on `sm`,
             // the concentric rule.
-            'studio-blur fixed z-50 rounded-lg border p-1 shadow-overlay',
+            'studio-floating-surface studio-blur fixed z-50 rounded-lg border p-1 shadow-overlay',
           )}
         >
           {commands.length === 0 ? (

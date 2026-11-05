@@ -6,6 +6,7 @@ mod clipboard;
 mod external;
 mod permissions;
 mod remote;
+mod reveal;
 mod screen_overlay;
 mod services;
 mod tray;
@@ -972,7 +973,8 @@ pub fn run() {
       remote_device_revoke,
       remote_device_revoke_all,
       remote_addresses,
-      external::open_external_url
+      external::open_external_url,
+      reveal::reveal_path
       ];
       move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
         diagnostics::command_received(invoke.message.command());

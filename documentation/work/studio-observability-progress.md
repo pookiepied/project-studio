@@ -974,6 +974,19 @@ truth for implementation progress, not evidence that the whole goal is complete.
 
 ## Latest boundary verification
 
+- Inline file reveal uses the existing arrival-only `reveal_path` IPC boundary.
+  Paths and chosen folders never enter diagnostic attributes; outcomes and
+  generic IPC parent joins remain unsupported. Client regressions cover passive
+  streaming across inline code, links and captions, nested-link composition,
+  encoded/reference destinations and explicit base-folder selection. Native tests
+  cover validation, metadata classification and folder-versus-item PIDL selection.
+  The folder-selection negative control failed when its empty-child selection
+  was removed, then passed after restoration. Explicit live fixtures opened a
+  directory to its contents and selected a spaced/punctuated `.exe` fixture in
+  its parent; Explorer automation confirmed the folder and selected item. No
+  model-produced path is launched. Browser/POSIX/UNC reveal remains unavailable;
+  the UI retains details/copy and explains that boundary.
+
 - Full harness run 5889 ended: 2,427 passed, 28 skipped, three failures across
   184 files. The failures are new assertions against modules already transformed
   before their fixes (media dispatch/job target metadata and HTTP metadata guard).

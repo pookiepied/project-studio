@@ -60,7 +60,14 @@ describe('CodeBlock', () => {
 
   it('names the file, counts the lines, and carries the language mark', () => {
     const { container } = render(<CodeBlock code={'const a = 1\nconst b = 2\nconst c = 3'} fence="ts:src/x.ts" />)
-    expect(screen.getByText('src/x.ts')).toBeTruthy()
+    expect(screen.getByText('x.ts')).toBeTruthy()
+    expect(screen.getByText('src')).toBeTruthy()
+    // The caption is a file reference now: its details live in the panel the
+    // label opens, not in a hover tooltip, so the title attribute that used
+    // to carry the path is deliberately gone.
+    const label = container.querySelector('button[aria-haspopup="menu"]')
+    expect(label?.textContent).toBe('x.tssrc')
+    expect(label?.getAttribute('title')).toBeNull()
     expect(screen.getByText('3 lines')).toBeTruthy()
     // The language glyph is a filled mark -- the same family the tool chips draw.
     expect(container.querySelector('svg[fill="currentColor"]')).not.toBeNull()

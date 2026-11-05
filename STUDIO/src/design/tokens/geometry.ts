@@ -1,5 +1,3 @@
-import { DEFAULT_UI_SIZE } from './typography'
-
 /**
  * Radius, spacing, and shell geometry.
  *
@@ -35,46 +33,7 @@ export const RADIUS = {
   pill: 9999,
 } as const
 
-/**
- * Control heights, as multiples of the interface text size.
- *
- * The ratios are `--control-*` in `styles/type.css`, and this is the numeric mirror
- * of them: Framer cannot spring a `calc()`, so the handful of controls that
- * animate a height or a radius need real numbers. Derived rather than restated,
- * so the two cannot drift the way the type scale and the geometry did — which
- * is the whole reason this block exists.
- *
- * The multiplication comes before the division on both sides, so the steps are
- * exact integers at the default rather than a rounded decimal here and an
- * unrounded `calc()` there.
- *
- * `Math.round` matches the `round()` the CSS side now applies, and at the 12px
- * default it changes nothing — every step there is already whole. It is here so
- * the two sides stay the same function of `--ui-size` rather than agreeing by
- * coincidence at one setting, which is the failure this block was written to
- * prevent and which the missing rounding reintroduced: the CSS was rounding and
- * this was not, so at 13px they would have disagreed by two thirds of a pixel.
- *
- * That drift is worth naming, because it is what "changing the font size did
- * nothing" actually was. Text was driven by `--ui-size`; these numbers were
- * fixed px from when the interface text was 14. Nothing recomputed them at 12,
- * so every box kept the proportions of a larger scale and a size preference
- * moved the text while the sidebar, the chrome and the composer stood still.
- */
-export const CONTROL = {
-  /** Small actions inside cards, paired with caption text. */
-  xs: Math.round((DEFAULT_UI_SIZE * 5) / 3),
-  /** Compact: row overflow buttons, menu affordances. */
-  sm: (DEFAULT_UI_SIZE * 2) / 1,
-  /** Default text actions, fields, icon buttons and composer controls. */
-  md: Math.round((DEFAULT_UI_SIZE * 7) / 3),
-  /** The largest round control in the chrome. */
-  lg: Math.round((DEFAULT_UI_SIZE * 8) / 3),
-  /** The stage control: voice mode's transport, and nothing else. */
-  xl: Math.round((DEFAULT_UI_SIZE * 11) / 3),
-} as const
-
-/** The 4px spacing grid. Nothing in the app uses a value that is not here. */
+/** Spacing used by native and animated shell geometry. CSS layout roles live in styles/layout.css. */
 const SPACE = {
   none: 0,
   hair: 2,
@@ -88,6 +47,11 @@ const SPACE = {
 } as const
 
 export const SHELL = {
+  /** Available shell width before the sidebar floats over the page. */
+  compactWidth: 900,
+  /** Page budget before the workspace becomes an overlay. */
+  minPageWidth: 520,
+  railGutter: SPACE.xl,
   /** Corner radius of the window, matched by the DWM preference in Rust. */
   windowRadius: RADIUS.window,
 
@@ -109,20 +73,6 @@ export const SHELL = {
     /** Expanded, showing conversation titles. */
     expandedWidth: 236,
   },
-
-  /**
-   * Reading measure for the transcript and the composer.
-   *
-   * 46 em of body text, which is about 76 characters — the upper end of
-   * comfortable prose. Stated against `--text-body` because the measure has to
-   * track the text it is measuring; the root font-size is the layout grid now,
-   * not the text size. The composer shares it so a reply lands exactly as wide
-   * as the field that produced it.
-   */
-  measure: 'calc(var(--text-body) * 46)',
-
-  /** Shared content gutter, so nothing sits at a different x between views. */
-  gutter: SPACE['2xl'],
 
   /**
    * How far the scroll thumb is held back from each end of its track.
@@ -148,70 +98,26 @@ export const SHELL = {
   scrollbarInset: { top: 40 + 20, bottom: 40 },
 } as const
 
-/*
- * The composer's height, and why it is no longer a number of its own.
- *
- * It used to be 52, and 52 was never chosen for the text — it was 32px round
- * controls plus 10px of padding, twice. The field was sized by its buttons, and
- * the text inside it had no say at all: setting the composer to 8px or 16px
- * left the capsule exactly 52 tall either way. That is why every attempt to fix
- * "the field is huge and the text is tiny" by changing a font size failed. The
- * font was never in the equation.
- *
- * Measured, the field held 11px text in a 52px box — 4.7x. Every other control
- * in the app sat between 2.2x and 2.4x. It was not that the composer looked
- * wrong next to the text; it was the one control in the interface not drawn to
- * the same proportion as the rest of it.
- *
- * Both inputs are tokens now, so the height is an outcome rather than a
- * constant: the control row is `CONTROL.md`, the same step every other icon
- * button uses, and the padding is one step of the spacing grid. At the default
- * that lands on 40 — which is also `SHELL.topStrip.height`, so the field and
- * the window's chrome finally agree without either being told to.
- */
+/** The live control height comes from CSS so stored text preferences remain authoritative. */
 const COMPOSER_PADDING_BLOCK = SPACE.sm
-const COMPOSER_RESTING_HEIGHT = CONTROL.md + COMPOSER_PADDING_BLOCK * 2
 
 /** The composer, which is a capsule when single-line and a rounded box when not. */
 export const COMPOSER = {
   /** Above and below the control row. The resting height derives from it. */
   paddingBlock: COMPOSER_PADDING_BLOCK,
-  /** Height of the resting single-line field. Radius is half of this. */
-  restingHeight: COMPOSER_RESTING_HEIGHT,
   /**
    * The single-line radius: half the field's own height, so it is a capsule.
    *
-   * A real number rather than `RADIUS.pill`, and this is the fix for the
-   * reshape-on-paste that survived three other attempts.
-   *
-   * `pill` is 9999. Animating 9999 -> 18 is a linear interpolation through
-   * absurd values, and border-radius is clamped to half the box at paint time,
-   * so nothing visible happens for most of the transition — the field sits as
-   * a capsule through ~99% of the duration and then collapses to a box in the
-   * last few frames. That late collapse, arriving after the height had already
-   * changed, is exactly the "it changes shape and then reverts" the user kept
-   * seeing. The measurement was never late; the interpolation was.
-   *
-   * From 26 to 18 the transition is short, monotonic and visible the whole way,
-   * which is what makes it read as one object relaxing rather than two shapes
-   * swapping. (Half of 52 exactly — it only adds up now that the rem grid
-   * paints at nominal; for as long as the root carried the text size, the
-   * field's real height was ~42px and this number described a box it never
-   * sat on.)
-   *
-   * Half of the height rather than a hand-written copy of half the height —
-   * the capsule stays a capsule when the height moves, instead of the two
-   * needing to be remembered together.
+   * Resolving against the live control avoids a default-size mirror. A finite
+   * radius also avoids the delayed visual collapse of animating 9999px to 18px.
    */
-  restingRadius: COMPOSER_RESTING_HEIGHT / 2,
+  restingRadius: `calc((var(--control-md) + ${COMPOSER_PADDING_BLOCK * 2}px) / 2)`,
 
   /** Past this the field is a box, not a capsule. */
   multilineRadius: RADIUS.xl,
   /** Grow to about eight lines, then scroll inside. */
   maxHeight: 184,
   paddingInline: SPACE.sm,
-  /** Every round control inside the field — the same step as the chrome's. */
-  controlSize: CONTROL.md,
 } as const
 
 /**

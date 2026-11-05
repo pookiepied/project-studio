@@ -1,5 +1,20 @@
 # Identity and observations: developer contract
 
+Inline file references use the existing native `reveal_path` command and shared
+IPC arrival observation. The native host owns the existing command-arrival UUID;
+no new execution parent, retry or automatic resend is introduced. Only the fixed
+command name enters diagnostics. Paths, filenames, chosen base folders, clipboard
+contents and OS errors remain excluded. The command validates an absolute local
+Windows path, classifies metadata and navigates through Shell PIDLs; files and
+links are selected, and directories open to their contents. Success or refusal is
+returned to the caller but command completion and Explorer selection are not
+diagnostic outcomes. The optional base-folder picker reuses `dialog:allow-open`;
+plugin-managed picker calls remain outside custom IPC capture. Rendering and
+streaming cause no filesystem probes or native actions. Parser, streaming, link
+composition, folder-choice isolation and native classification/selection tests
+cover the boundary. Explicit live fixtures verified Explorer's actual folder and
+selection through its automation interface; they remain opt-in desktop tests.
+
 Voice conversations reuse the Studio conversation and canonical submission
 stream. `voice_input` is a user transcription carried as a typed signal, not a
 second chat store. Voice settings changes use `voice.settings`; worker admission

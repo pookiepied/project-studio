@@ -152,6 +152,7 @@ pub(crate) fn command_received(command: &str) {
         "remote_device_revoke_all" => "remote_device_revoke_all",
         "remote_addresses" => "remote_addresses",
         "open_external_url" => "open_external_url",
+        "reveal_path" => "reveal_path",
         _ => "unrecognized",
     };
     if let Some(mut span) = NativeSpan::new("native.command", None, None) {

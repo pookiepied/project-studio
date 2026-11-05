@@ -1,7 +1,8 @@
-import { forwardRef } from 'react'
+import { forwardRef, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
 import { ActionItems, type ActionKind } from '@/shell/menus/ActionItems'
+import { floatingViewport, observeFloating, placeFloating } from '@/design/layout/floating'
 
 /** The menu's width, which its placement has to know before it renders. */
 export const MENU_WIDTH = 208
@@ -17,6 +18,7 @@ export interface FloatingPlacement {
   readonly kind: ActionKind
   readonly selection: string
   readonly target: HTMLElement | null
+  readonly anchor?: DOMRect
 }
 
 /**
@@ -36,11 +38,32 @@ export const FloatingMenu = forwardRef<
   HTMLDivElement,
   { placement: FloatingPlacement | null; label: string; close: () => void }
 >(function FloatingMenu({ placement, label, close }, ref) {
+  const panel = useRef<HTMLDivElement | null>(null)
+  const [position, setPosition] = useState<ReturnType<typeof placeFloating> | null>(null)
+  useLayoutEffect(() => {
+    if (!placement) return
+    const place = () => {
+      const element = panel.current
+      if (!element) return
+      setPosition(placeFloating({
+        anchor: placement.anchor ?? { left: placement.x, top: placement.y, width: 0, height: 0 },
+        panel: { width: element.offsetWidth, height: element.scrollHeight },
+        viewport: floatingViewport(), side: placement.anchor ? 'top' : 'bottom',
+        align: placement.anchor ? 'center' : 'start', gap: placement.anchor ? 8 : 0,
+      }))
+    }
+    place()
+    return observeFloating(null, panel.current, place)
+  }, [placement])
   return (
     <AnimatePresence>
       {placement ? (
         <motion.div
-          ref={ref}
+          ref={(element) => {
+            panel.current = element
+            if (typeof ref === 'function') ref(element)
+            else if (ref) ref.current = element
+          }}
           role="menu"
           aria-label={label}
           initial={{ opacity: 0, scale: 0.96 }}
@@ -48,12 +71,14 @@ export const FloatingMenu = forwardRef<
           exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
           transition={SPRING_SNAPPY}
           style={{
-            left: placement.x,
-            top: placement.y,
+            left: position?.left ?? placement.x,
+            top: position?.top ?? placement.y,
+            maxWidth: position?.maxWidth,
+            maxHeight: position?.maxHeight,
             width: MENU_WIDTH,
-            transformOrigin: placement.origin,
+            transformOrigin: position?.side === 'top' ? 'bottom left' : placement.origin,
           }}
-          className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-overlay"
+          className="studio-blur studio-floating-surface fixed z-[60] rounded-lg border p-1 shadow-overlay"
         >
           <ActionItems kind={placement.kind} selection={placement.selection} target={placement.target} close={close} />
         </motion.div>

@@ -5,7 +5,7 @@ import { memo, useEffect, useCallback } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { MessageEnd, TranscriptItem } from '@/features/chat/transcript/projection'
+import type { AssistantSegment, MessageEnd, TranscriptItem } from '@/features/chat/transcript/projection'
 
 import { AssistantTurn } from './AssistantTurn'
 
@@ -41,6 +41,34 @@ vi.stubGlobal('matchMedia', () => ({
 
 afterEach(() => {
   cleanup()
+})
+
+describe('spacing at activity boundaries', () => {
+  it.each([
+    [false, false], [false, true], [true, false], [true, true],
+  ])('spaces only adjacent prose (before=%s, after=%s)', (before, after) => {
+    const segments: AssistantSegment[] = []
+    if (before) segments.push({ kind: 'text', id: 'before', text: 'Before the work.' })
+    segments.push({ kind: 'tools', id: 'tools', groups: [{ id: 'group', file: null, calls: [{
+      toolCallId: 'call', toolName: 'plan', input: null,
+      output: { present: true, value: 'ok' }, errorText: null,
+    }] }] })
+    // Empty streamed text does not create a visible boundary.
+    segments.push({ kind: 'text', id: 'empty', text: '  ' })
+    const item = { ...assistant({ state: 'stopped' }), segments }
+    const view = render(<AssistantTurn conversationId="conv" item={item} live />)
+    const row = screen.getByRole('button', { name: 'Updated the plan' }).parentElement
+    expect(row?.classList.contains('mt-4')).toBe(before)
+    expect(row?.classList.contains('mb-4')).toBe(false)
+    if (after) segments.push({ kind: 'text', id: 'after', text: 'The result is ready.' })
+    view.rerender(<AssistantTurn conversationId="conv" item={{ ...item, segments: [...segments] }} live />)
+    expect(screen.getByRole('button', { name: 'Updated the plan' }).parentElement).toBe(row)
+    expect(row?.classList.contains('mt-4')).toBe(before)
+    expect(row?.classList.contains('mb-4')).toBe(after)
+    view.rerender(<AssistantTurn conversationId="conv" item={{ ...item, segments: [...segments], end: { state: 'complete' } }} live={false} />)
+    expect(row?.classList.contains('mt-4')).toBe(before)
+    expect(row?.classList.contains('mb-4')).toBe(after)
+  })
 })
 
 describe('what a message being written says about how it ended', () => {
@@ -137,6 +165,12 @@ describe('the action row under a finished answer', () => {
     const row = screen.getByRole('button', { name: 'Copy' }).closest('[class*="mb-4"]')
     expect(row?.className).toContain('pointer-events-none')
     fireEvent.pointerEnter(container.firstElementChild ?? container)
+    expect(row?.className).not.toContain('pointer-events-none')
+  })
+
+  it('keeps the latest settled answer actions visible without hover', () => {
+    render(<AssistantTurn conversationId="conv" item={finished()} live={false} latest />)
+    const row = screen.getByRole('button', { name: 'Copy' }).closest('[class*="mb-4"]')
     expect(row?.className).not.toContain('pointer-events-none')
   })
 })

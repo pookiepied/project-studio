@@ -13,19 +13,18 @@
  * The offset is about +1px at UI sizes and +2px once text is large enough for
  * its counters to open up.
  *
- * ---- Why 12 ----------------------------------------------------------------
+ * ---- Why 13 ----------------------------------------------------------------
  *
- * The window is small — 1040x720, 620 at its narrowest — and 14px Inter in
- * a frame that size reads as a web page shrunk to fit rather than as something
- * drawn for the space. Inter's tall x-height makes it render larger than its
- * nominal size besides, so 12px Inter sits where 13px of a system UI face
- * sits.
+ * Twelve kept the chrome compact, but it also made the transcript, composer and
+ * secondary labels do their work at 12, 12 and 10px. The reading column was the
+ * densest text in the window and the smallest labels read as tags. Thirteen
+ * gives prose and captions enough room without changing the type system's
+ * relationships: caption and micro remain derived steps, code remains one step
+ * under, and every paired icon and control derives from the same value.
  *
- * The number was not chosen in the abstract: the marks are the anchor. They
- * were drawn and tuned first, on their own grid, and they read as correct at
- * the sizes they paint. 12 is the text size at which a glyph beside a label
- * stops competing with it — smaller and the marks begin to look oversized,
- * larger and they drown. The icons decided; this file agrees with them.
+ * The measure and leading carry the calm, not a smaller font. This is a desktop
+ * reading size, not a universal absolute: the appearance choices still move the
+ * whole scale together.
  *
  * `body` sits level with `ui`. It spent a while one step under, on the theory
  * that the transcript is the one full-foreground column on screen and identical
@@ -89,7 +88,7 @@ export type CodeOffset = (typeof CODE_OFFSET_CHOICES)[number]
  * `assertScaleDefaults` below fails loudly in development if the two ever
  * disagree — the CSS is a safety net, these are the authority.
  */
-export const DEFAULT_UI_SIZE: UiSize = 12
+export const DEFAULT_UI_SIZE: UiSize = 13
 export const DEFAULT_CODE_OFFSET: CodeOffset = -1
 
 /** What the code text actually resolves to, for labelling a settings row. */

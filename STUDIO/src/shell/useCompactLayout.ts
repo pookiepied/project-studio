@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SHELL } from '@/design/tokens'
 
 /**
  * Whether the window is too narrow for the sidebar to take space from the page.
@@ -26,7 +27,7 @@ import { useEffect, useState } from 'react'
  * number of times anything here actually needs to change.
  */
 /** The width below which the sidebar stops being worth its space. */
-const COMPACT_WIDTH = 900
+const COMPACT_WIDTH = SHELL.compactWidth
 
 /**
  * ---- Why the rail is part of this question -------------------------------
@@ -57,7 +58,7 @@ const COMPACT_WIDTH = 900
 export function useCompactLayout(railWidth: number): boolean {
   // The rail's own margins count: it is inset, so it costs its width plus the
   // gap either side of it.
-  const reserved = railWidth > 0 ? railWidth + 16 : 0
+  const reserved = railWidth > 0 ? railWidth + SHELL.railGutter : 0
   const query = `(max-width: ${COMPACT_WIDTH + reserved}px)`
 
   const [compact, setCompact] = useState(

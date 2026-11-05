@@ -94,3 +94,16 @@ export function useWorkspace(): WorkspaceValue {
   if (!context) throw new Error('useWorkspace must be used within WorkspaceProvider')
   return context
 }
+
+/**
+ * The workspace value when there is one, null when there is not.
+ *
+ * The transcript renders in surfaces that carry no workspace - tests, the
+ * showcase, a story page - and a deep feature that needs a fact the store
+ * holds (a conversation's project folder, say) must degrade to "unknown"
+ * there rather than crash the render. Readers that cannot mean anything
+ * without the store keep using `useWorkspace`, which says so loudly.
+ */
+export function useOptionalWorkspace(): WorkspaceValue | null {
+  return useContext(WorkspaceContext)
+}

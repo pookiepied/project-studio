@@ -5,6 +5,8 @@ import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 import { Deferred, lazyNamed } from '@/components/state'
 import { PlainCode } from '@/features/chat/markdown/blocks/PlainCode'
 import { displayName, resolveLanguage } from '@/features/chat/markdown/languages'
+import { FileReference, FilePathLabel } from '@/features/chat/markdown/FileReference'
+import { parsePathReference } from '@/features/chat/markdown/pathReference'
 
 const HighlightedCode = lazyNamed(
   () => import('@/features/chat/markdown/blocks/HighlightedCode'),
@@ -63,9 +65,13 @@ export function CodeBlock({ code, fence, streaming = false }: { code: string; fe
   // ```ts:src/utils/get-diff.ts — the language, then optionally where this came
   // from. A path makes a far better caption than a language name: "TypeScript"
   // is already obvious from the syntax colouring, while *which file* is the one
-  // thing the block cannot tell you itself.
+  // thing the block cannot tell you itself. A caption that reads as a clear
+  // filesystem reference gains the reference's verbs - details, copy, reveal -
+  // while a caption that reads as anything else (a tag, a made-up word after
+  // the colon) stays plain text, for the same reason inline code does.
   const [language, ...rest] = fence.split(':')
   const path = rest.join(':') || undefined
+  const caption = path === undefined ? null : parsePathReference(path)
 
   // A trailing newline closes the last line; it does not open an empty one.
   // Counting the split's parts called a four-line block five lines whenever
@@ -75,7 +81,9 @@ export function CodeBlock({ code, fence, streaming = false }: { code: string; fe
   return (
     <BlockFrame
       glyph={<Glyph fence={language} />}
-      label={path ?? displayName(language)}
+      label={caption === null
+        ? (path === undefined ? displayName(language) : <FilePathLabel path={path} />)
+        : <FileReference reference={caption} variant="caption" streaming={streaming} />}
       meta={lines === 1 ? '1 line' : `${lines} lines`}
       actions={
         <CopyButton text={code} label="Copy code" />

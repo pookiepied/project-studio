@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { harnessBytesDataUrl } from '@/platform/harness'
+import { parsePathReference } from './pathReference'
 
 /**
  * A picture a reply embeds: `![alt](address)`.
@@ -40,18 +41,45 @@ export function isLocalImage(url: string): boolean {
 interface MdastNode { type: string; url?: string; children?: MdastNode[] }
 
 /**
- * Carries local image paths through as `studio-file:` addresses.
+ * Whether a Markdown link's destination names a file rather than a web
+ * resource, and is therefore worth carrying to the file-reference component.
+ *
+ * Deliberately stricter than `isLocalImage`: a picture address may be any
+ * scheme-less string (the harness route resolves it against the places the
+ * conversation works in), while a *link* is a deliberate reference whose
+ * target must pass the same clear-reference reading inline code uses - a
+ * rooted path, a `file:` address, or a relative path with a file-shaped last
+ * segment. `[notes](/api/report)` stays an ordinary link, because a leading
+ * slash in a link conventionally means the site, not the drive root.
+ */
+function localFileLink(url: string): string | null {
+  if (url.startsWith('/')) return null
+  try {
+    const path = /^file:/i.test(url) ? url : decodeURIComponent(url)
+    return parsePathReference(path) === null ? null : path
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Carries local file addresses through as `studio-file:` destinations.
  *
  * Both URL filters downstream -- the sanitiser's protocol list and
  * react-markdown's own transform -- drop a Windows path (`C:` reads as a
  * scheme) or keep a relative one only to have the webview resolve it against
- * its own origin. Marked here, before either runs, the path reaches the
- * image component intact and the component decides what it may load.
+ * its own origin. Marked here, before either runs, the address reaches the
+ * component that owns it intact - a picture to `ReplyImage`, a link to the
+ * file reference - and the component decides what it may load or offer.
  */
-export function remarkReplyImages() {
+export function remarkReplyFiles() {
   const walk = (node: MdastNode) => {
-    if (node.type === 'image' && typeof node.url === 'string' && isLocalImage(node.url)) {
-      node.url = LOCAL_IMAGE + encodeURIComponent(node.url)
+    if (typeof node.url === 'string') {
+      if (node.type === 'image' && isLocalImage(node.url)) node.url = LOCAL_IMAGE + encodeURIComponent(node.url)
+      if (node.type === 'link' || node.type === 'definition') {
+        const path = localFileLink(node.url)
+        if (path !== null) node.url = LOCAL_IMAGE + encodeURIComponent(path)
+      }
     }
     node.children?.forEach(walk)
   }

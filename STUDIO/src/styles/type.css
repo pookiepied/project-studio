@@ -11,7 +11,7 @@
    The offsets below mirror that file. If you change one, change both.
    --------------------------------------------------------------------------- */
 :root {
-  --ui-size: 12px;
+  --ui-size: 13px;
   /* Code text is an *offset* from the interface text, never an absolute size.
 
      A mono face at the same nominal size as its sans surroundings paints
@@ -48,7 +48,7 @@
      The optics argument for the step was real -- a full-foreground column does
      carry more mass than muted chrome -- but the answer to that is leading and
      measure, which this role already has (`--leading-body` is the loosest in
-     the scale, and `SHELL.measure` caps the column). Size was the wrong lever:
+     the scale, and the shared content column caps the measure). Size was the wrong lever:
      it bought a little optical calm and paid for it by making reading text the
      least legible thing in the window.
 
@@ -155,9 +155,8 @@
      controls inside it and the text had no say. Stated as multiples of
      `--ui-size`, the agreement holds at every setting instead of only at 12.
 
-     `round-trip` note: these are also mirrored in `geometry.ts` for the few
-     places that must animate a number (Framer cannot spring a `calc()`), and
-     that file derives them from the same ratios rather than restating pixels.
+     These CSS variables are the runtime authority. Numeric animation geometry
+     must be measured from the element rather than copied from the default size.
 
      Written as exact fractions rather than rounded decimals. `2.33` is not
      seven thirds, and the difference showed up immediately: the TS mirror

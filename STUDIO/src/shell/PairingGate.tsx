@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { StudioMark } from '@/components/brand'
 import { Button, TextField } from '@/components/primitives'
-import { SHELL } from '@/design/tokens'
 import { readPairingState } from '@/platform/harness'
 import { isTauri } from '@/platform/tauri'
 
@@ -70,7 +69,9 @@ function BrowserGate({ children }: { children: ReactNode }) {
   }, [])
 
   const admitted = answer.kind === 'listener' && answer.paired
-  useEffect(() => {
+  // Attach before the admitted screen is presented; focus can arrive as soon
+  // as its content is visible, before a passive effect has run.
+  useLayoutEffect(() => {
     if (!admitted) return
     let live = true
     const check = () => {
@@ -187,10 +188,10 @@ function PairingScreen({ onPaired, initialRefusal }: { onPaired: () => void; ini
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-surface px-6 text-center">
+    <div className="studio-content-column flex h-full flex-col items-center justify-center gap-5 bg-surface text-center">
       <StudioMark entrance size={44} className="text-foreground" />
 
-      <div className="flex flex-col items-center" style={{ maxWidth: SHELL.measure }}>
+      <div className="flex flex-col items-center">
         <h1 className="studio-display text-foreground">Pair this device</h1>
         <p className="mt-3 text-ui text-muted-foreground">
           Open Studio on the PC to see the pairing code, then type it here.

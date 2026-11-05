@@ -311,6 +311,22 @@ it is holding.
 
 ## 8. Shell
 
+**A reading column owns its gutters.** Use `studio-content-column` for a
+conversation, composer, project or centered reading surface. Its measure is the
+inner content width; the shared class adds the viewport gutter once. Do not
+restate a maximum width or add another gutter around it. Settings adds
+`studio-settings-column`; its `Pane` owns the container query and `Row` stacks
+labels and controls when that pane becomes narrow. These roles live in
+`styles/layout.css` so they also apply to detached windows and the showcase.
+
+**Floating geometry has one authority.** Anchored popovers, tooltips and slash
+suggestions use `design/layout/floating.ts` for viewport bounds, placement and
+resize observation. Their shared surface role bounds scrolling to the visible
+viewport. A content-specific height cap goes through the popover's `maxHeight`
+prop, where it combines with that viewport bound. Focus, dismissal and keyboard
+selection stay with each widget. Measure layout dimensions, not an animated
+transform's bounding box.
+
 The window is frameless and transparent; a rounded panel inside paints the
 visible surface. The 20px corner is a **DWM attribute set in Rust**, not CSS —
 CSS cannot round the OS window, and looking at the DOM will not tell you
@@ -421,6 +437,18 @@ an empty state is not `StateNote`, on purpose.
 ---
 
 ## 11. How to add something
+
+The client check parses JSX class expressions and rejects literal arbitrary
+font sizes. Typography roles must also survive colour merging through `cn`.
+Settings list rows use `studio-settings-row`; form and library grids use their
+shared available-width roles. Media controls adapt the same control and icon
+tokens into media-chrome instead of maintaining another pixel scale.
+
+On coarse pointers the effective scale has a 16px floor to prevent WebKit focus
+zoom, with 44px control targets. The saved desktop text choice remains the
+appearance input. Apply the floor to the entire scale, never just a field.
+Chart labels measure their actual font and refresh when appearance or loaded
+fonts change; image and plot coordinates retain their content units.
 
 1. Use a role, a token, a scale step. If none fits, the missing step is the
    change — add it here first.

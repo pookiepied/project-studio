@@ -112,8 +112,7 @@ export function HarnessDownPage() {
       </header>
 
       <div
-        className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center"
-        style={{ paddingInline: SHELL.gutter }}
+        className="studio-content-column flex flex-1 flex-col items-center justify-center gap-5 text-center"
       >
         {/* The mark does not breathe here. `busy` is the ripple that means work
             is in flight, and nothing is in flight on this page — the harness is
@@ -122,7 +121,7 @@ export function HarnessDownPage() {
             page must not imply. `entrance` instead: assembles once, then holds. */}
         <StudioMark entrance size={44} className="text-foreground" />
 
-        <div className="flex flex-col items-center" style={{ maxWidth: SHELL.measure }}>
+        <div className="flex flex-col items-center">
           <h1 className="studio-display text-foreground">{failure.headline}</h1>
           {failure.remedy !== null ? (
             <p className="mt-3 text-ui text-muted-foreground">{failure.remedy}</p>

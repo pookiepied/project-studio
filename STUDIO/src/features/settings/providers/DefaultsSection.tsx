@@ -171,7 +171,7 @@ function SlotRow({
   const placeholder = PLACEHOLDER_BY_SLOT[slot]
 
   return (
-    <div className="flex items-start justify-between gap-6 py-3.5">
+    <div className="studio-settings-row">
       <div className="min-w-0 flex-1">
         <p className="text-ui text-foreground">{title}</p>
 

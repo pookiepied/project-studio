@@ -349,7 +349,7 @@ function Body({
             scale: 0.98,
             transition: { duration: DURATION.base, ease: EASE_IN },
           }}
-          className="grid origin-center grid-cols-2 gap-3 py-3.5 sm:grid-cols-3"
+          className="studio-library-grid origin-center gap-3 py-3.5"
         >
           <AnimatePresence initial={true} mode="popLayout">
             {items.map((item, index) => (

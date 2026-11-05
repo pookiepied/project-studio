@@ -51,6 +51,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   live,
   conversationId,
   turnInFlight = false,
+  latest = false,
   activityLive = live,
   branchMessageId = item.id,
   finalTextStartId = finalTextStart(item.segments),
@@ -77,6 +78,8 @@ export const AssistantTurn = memo(function AssistantTurn({
    * its verbs.
    */
   turnInFlight?: boolean
+  /** The newest reply keeps its settled actions visible; older rows stay hover-led. */
+  latest?: boolean
   /** Tools may still run after the provider closes its assistant message. */
   activityLive?: boolean
   /** The last underlying message when several provider messages share a view. */
@@ -94,6 +97,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   const summary = settled ? workSummary(item.segments, finalTextStartId) : null
   const written = writtenRuns(summary === null ? item : { ...item, segments: summary.final })
   const sections = activitySections(summary?.final ?? item.segments)
+  const history = activitySections(summary?.activity ?? [])
   const lastIndex = sections.length - 1
   return (
     <div
@@ -106,12 +110,14 @@ export const AssistantTurn = memo(function AssistantTurn({
           while the turn is live; a replayed turn was already here. */}
       <Arriving live={live}>
         {summary !== null ? <WorkHistory title={summary.title}>
-          {activitySections(summary.activity).map((segment) => segment.kind === 'activity'
-            ? <ActivityBlock key={segment.id} segments={segment.segments} active={false} conversationId={conversationId} />
+          {history.map((segment, index) => segment.kind === 'activity'
+            ? <ActivityBlock key={segment.id} segments={segment.segments} active={false} conversationId={conversationId}
+                textBefore={history[index - 1]?.kind === 'text'} textAfter={history[index + 1]?.kind === 'text'} />
             : <TextSegment key={segment.id} segment={segment} growing={false} observeDelivery={false} identity={{ conversationId, messageId: item.id, ...(item.submissionId === null ? {} : { submissionId: item.submissionId }) }} />)}
         </WorkHistory> : null}
         {sections.map((segment, index) => segment.kind === 'activity' ? (
-          <ActivityBlock key={segment.id} segments={segment.segments} active={activityLive && index === lastIndex} conversationId={conversationId} />
+          <ActivityBlock key={segment.id} segments={segment.segments} active={activityLive && index === lastIndex} conversationId={conversationId}
+            textBefore={sections[index - 1]?.kind === 'text'} textAfter={sections[index + 1]?.kind === 'text'} />
         ) : (
           <TextSegment
             key={segment.id}
@@ -136,7 +142,7 @@ export const AssistantTurn = memo(function AssistantTurn({
           the log carried, and no reading of "live" may swallow one. */}
       {live && item.end.state === 'stopped' ? null : <EndLine end={item.end} />}
       <MessageActions
-        visible={hovered && !live && !turnInFlight}
+        visible={(hovered || latest) && !live && !turnInFlight}
         copyPayload={written}
         actions={
           onBranch === undefined

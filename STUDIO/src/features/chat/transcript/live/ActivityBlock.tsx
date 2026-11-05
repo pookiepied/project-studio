@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Icons } from '@/components/icons'
+import { useArriving } from '@/components/motion/Arrive'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import type { AssistantSegment } from '@/features/chat/transcript/projection'
 import { ToolGroups, activityLabel } from './ToolGroups'
-import { resultState } from './toolResult'
-import { activitySummary } from './activitySummary'
+import { activityState } from './activitySummary'
+import { familyOf } from './reportFamily'
+import { webKind } from './webCall'
+import { mediaKind } from './mediaCall'
 
 type WorkSegment = Exclude<AssistantSegment, { kind: 'text' }>
 
@@ -36,20 +38,25 @@ export function ActivityBlock({
   segments,
   active,
   conversationId,
+  textBefore = false,
+  textAfter = false,
 }: {
   segments: readonly WorkSegment[]
   active: boolean
   conversationId: string
+  /** Only boundaries with visible prose need separation. */
+  textBefore?: boolean
+  textAfter?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const arriving = useArriving()
   const calls = segments.flatMap((segment) => segment.kind === 'tools'
     ? segment.groups.flatMap((group) => group.calls) : [])
-  const unanswered = calls.filter((call) => call.errorText === null && !call.output?.present)
-  const failed = calls.filter((call) => resultState(call) === 'failed').length
-  const current = unanswered[unanswered.length - 1]
-  const label = active
-    ? current === undefined ? 'Working' : activityLabel(current)
-    : activitySummary(calls)
+  const state = activityState(calls, active)
+  const current = state.current
+  const label = current === undefined ? state.summary
+    : familyOf(current.toolName) !== null || webKind(current.toolName) !== null || mediaKind(current.toolName) !== null
+      ? state.running : activityLabel(current)
 
   // Pure reasoning still uses its existing disclosure, without an empty tools wrapper.
   if (calls.length === 0) return <>{segments.map((segment) => segment.kind === 'thinking'
@@ -58,8 +65,9 @@ export function ActivityBlock({
 
   return (
     <DisclosureRow
-      className="my-1 min-w-0"
-      leading={<Icons.run />}
+      className={cn('min-w-0', textBefore && 'mt-4', textAfter && 'mb-4')}
+      entering={arriving}
+      leading={<state.mark />}
       open={open}
       onToggle={() => setOpen((value) => !value)}
       flush
@@ -67,8 +75,8 @@ export function ActivityBlock({
       label={
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className={cn('min-w-0 [overflow-wrap:anywhere]', active && 'studio-shimmer')}>{label}</span>
-          {failed > 0 ? <>{' '}<span className="shrink-0 text-danger">Some tools failed</span></> : null}
-          {!active && unanswered.length > 0 ? <>{' '}<span className="shrink-0">Unfinished</span></> : null}
+          {state.failed > 0 ? <>{' '}<span className="shrink-0 text-danger">Some tools failed</span></> : null}
+          {state.unfinished ? <>{' '}<span className="shrink-0">Unfinished</span></> : null}
         </span>
       }
     >
