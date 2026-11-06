@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { IconCache } from "../cache.js";
 import {
   ICON_MAX_BYTES,
+  ICON_RECHECK_AFTER_FAILURE_MS,
   ICON_TIMEOUT_MS,
   VALID_ID,
   type Fetcher,
@@ -35,7 +36,6 @@ import {
 const MANIFEST_URL = "https://models.dev/api.json";
 const LOGO_BASE = "https://models.dev/logos/";
 const PLACEHOLDER_PROBE_ID = "studio-placeholder-probe";
-const FAILED_MANIFEST_RETRY_MS = 60 * 1000;
 const MANIFEST_MAX_BYTES = 20 * 1024 * 1024;
 const MANIFEST_FILE = "manifest.json";
 
@@ -101,64 +101,61 @@ export interface ModelsDevOptions {
 
 export function createModelsDevSource(options: ModelsDevOptions): IconSource {
   const { cache, fetcher, now, ttlMs } = options;
-  let manifest: Manifest | undefined;
-  let readAt = 0;
-  let failedAt = 0;
-
-  function fromDisk(): Manifest | undefined {
-    if (manifest !== undefined) return manifest;
-    const stored = cache.readJson(MANIFEST_FILE, isManifest);
-    if (stored === undefined) return undefined;
-    manifest = stored;
-    readAt = now();
-    return stored;
-  }
+  let manifest: Manifest | null | undefined;
+  let manifestRequest: Promise<Manifest | undefined> | undefined;
+  let retryManifestAt: number | undefined;
 
   async function ensureManifest(): Promise<Manifest | undefined> {
+    if (manifest === undefined) manifest = cache.readJson(MANIFEST_FILE, isManifest) ?? null;
     const at = now();
-    if (manifest !== undefined && at - readAt < ttlMs) return manifest;
-    // A recent failure is not retried on every render; the disk copy answers
-    // in the meantime so an offline session still draws what it already has.
-    if (at - failedAt < FAILED_MANIFEST_RETRY_MS) return fromDisk();
+    if (manifest !== null && at < manifest.fetchedAt + ttlMs) return manifest;
+    if (manifestRequest !== undefined) return manifestRequest;
+    if (retryManifestAt !== undefined && at < retryManifestAt) return undefined;
 
-    try {
-      const placeholder = await fetcher({
-        url: `${LOGO_BASE}${PLACEHOLDER_PROBE_ID}.svg`,
-        author: "user",
-        headers: { accept: "image/svg+xml" },
-        timeoutMs: ICON_TIMEOUT_MS,
-        maxBytes: ICON_MAX_BYTES,
-      });
-      const index = await fetcher({
-        url: MANIFEST_URL,
-        author: "user",
-        headers: { accept: "application/json" },
-        timeoutMs: ICON_TIMEOUT_MS,
-        maxBytes: MANIFEST_MAX_BYTES,
-      });
-      if (placeholder.status !== 200 || index.status !== 200) {
-        failedAt = at;
-        return fromDisk();
+    manifestRequest = refreshManifest().then((fresh) => {
+      manifestRequest = undefined;
+      if (fresh === undefined) {
+        retryManifestAt = now() + ICON_RECHECK_AFTER_FAILURE_MS;
+      } else {
+        manifest = fresh;
+        retryManifestAt = undefined;
+        cache.writeJson(MANIFEST_FILE, fresh);
       }
+      return fresh;
+    });
+    return manifestRequest;
+  }
+
+  async function refreshManifest(): Promise<Manifest | undefined> {
+    try {
+      const [placeholder, index] = await Promise.all([
+        fetcher({
+          url: `${LOGO_BASE}${PLACEHOLDER_PROBE_ID}.svg`,
+          author: "user",
+          headers: { accept: "image/svg+xml" },
+          timeoutMs: ICON_TIMEOUT_MS,
+          maxBytes: ICON_MAX_BYTES,
+        }),
+        fetcher({
+          url: MANIFEST_URL,
+          author: "user",
+          headers: { accept: "application/json" },
+          timeoutMs: ICON_TIMEOUT_MS,
+          maxBytes: MANIFEST_MAX_BYTES,
+        }),
+      ]);
+      if (placeholder.status !== 200 || index.status !== 200) return undefined;
       const parsed: unknown = JSON.parse(index.body);
       // api.json is one map: provider id -> provider record. The ids are the
       // whole of what this source needs from it.
-      const providers =
-        typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-          ? Object.keys(parsed).filter((id) => VALID_ID.test(id))
-          : [];
-      const fresh: Manifest = {
-        fetchedAt: at,
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
+      return {
+        fetchedAt: now(),
         placeholderHash: sha256(placeholder.body),
-        providers,
+        providers: Object.keys(parsed).filter((id) => VALID_ID.test(id)),
       };
-      cache.writeJson(MANIFEST_FILE, fresh);
-      manifest = fresh;
-      readAt = at;
-      return fresh;
     } catch {
-      failedAt = at;
-      return fromDisk();
+      return undefined;
     }
   }
 
@@ -166,18 +163,23 @@ export function createModelsDevSource(options: ModelsDevOptions): IconSource {
     name: "models-dev",
     async get(id: string): Promise<IconAnswer> {
       const remoteId = ALIASES[id] ?? id;
-      if (!VALID_ID.test(remoteId)) return { kind: "absent" };
+      if (!VALID_ID.test(remoteId)) return { kind: "absent", recheckAt: now() + ttlMs };
 
-      const cached = cache.readText(`${remoteId}.svg`);
-      if (cached !== undefined) return { kind: "found", svg: cached };
+      const filename = `${remoteId}.svg`;
+      const cached = cache.readIcon(filename);
+      if (cached !== undefined && now() < cached.fetchedAt + ttlMs) {
+        return { kind: "found", svg: cached.svg, recheckAt: cached.fetchedAt + ttlMs };
+      }
 
-      // No manifest means we could not reach models.dev and have no disk copy
-      // to fall back on -- unavailable, not absent, so nothing is remembered.
+      const unavailable = { kind: "unavailable", staleSvg: cached?.svg } as const;
       const index = await ensureManifest();
-      if (index === undefined) return { kind: "unavailable" };
-      if (!index.providers.includes(remoteId)) return { kind: "absent" };
+      if (index === undefined) return unavailable;
+      const absent = { kind: "absent", recheckAt: index.fetchedAt + ttlMs } as const;
+      if (!index.providers.includes(remoteId)) {
+        if (cached !== undefined) cache.removeIcon(filename);
+        return absent;
+      }
 
-      let body: string;
       try {
         const response = await fetcher({
           url: `${LOGO_BASE}${remoteId}.svg`,
@@ -186,20 +188,20 @@ export function createModelsDevSource(options: ModelsDevOptions): IconSource {
           timeoutMs: ICON_TIMEOUT_MS,
           maxBytes: ICON_MAX_BYTES,
         });
-        if (response.status !== 200) return { kind: "unavailable" };
+        if (response.status !== 200) return unavailable;
         if (!(response.headers["content-type"] ?? "").includes("svg")) {
-          return { kind: "absent" };
+          return unavailable;
         }
-        body = response.body;
+        // A listed provider can still serve the generic placeholder.
+        if (sha256(response.body) === index.placeholderHash) {
+          if (cached !== undefined) cache.removeIcon(filename);
+          return absent;
+        }
+        cache.writeText(filename, response.body);
+        return { kind: "found", svg: response.body, recheckAt: now() + ttlMs };
       } catch {
-        return { kind: "unavailable" };
+        return unavailable;
       }
-
-      // The manifest named it, but the body is the generic placeholder: this
-      // vendor is listed without artwork, which is a real absence.
-      if (sha256(body) === index.placeholderHash) return { kind: "absent" };
-      cache.writeText(`${remoteId}.svg`, body);
-      return { kind: "found", svg: body };
     },
   };
 }

@@ -128,6 +128,8 @@ export function providerClient({ json, empty }: Requester): ProviderClient {
         `${PROVIDERS_PATH}/icons/${encodeURIComponent(id)}`,
         undefined,
         parseProviderIcon,
+        // An expired icon can need a manifest, a logo lookup, and a second source.
+        20_000,
       )
     },
 

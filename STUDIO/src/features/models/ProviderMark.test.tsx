@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, waitFor } from '@testing-library/react'
-import { resetProviderIconCacheForTests } from '@/domain/providers/icons'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { resetProviderIconRequestsForTests } from '@/domain/providers/icons'
 import { ProviderMark } from './ProviderMark'
 
 /**
@@ -28,7 +28,7 @@ afterEach(() => {
 })
 
 beforeEach(() => {
-  resetProviderIconCacheForTests()
+  resetProviderIconRequestsForTests()
 })
 
 describe('the mark before a logo arrives', () => {
@@ -213,7 +213,10 @@ describe('the real logo', () => {
   it('keeps the monogram when the harness answers that no icon is known', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(JSON.stringify({ error: 'No provider icon is known for that id.' }), { status: 404 })),
+      vi.fn(async () => Response.json({
+        code: 'providers.icons.unknown',
+        error: 'No provider icon is known for that id.',
+      }, { status: 404 })),
     )
     vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
     vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
@@ -230,5 +233,53 @@ describe('the real logo', () => {
     // The mask path never ran. Asserted on `data-mark` rather than on the
     // element name, which no longer separates them: a monogram is a span too.
     expect(container.querySelector('[data-mark="logo"]')).toBeNull()
+  })
+
+  it('refreshes a mounted mark on focus and keeps the old mark during a transport failure', async () => {
+    let response: Response | null = Response.json({ svg: '<svg id="first"/>' })
+    const fetcher = vi.fn(async () => {
+      if (response === null) throw new Error('Harness unavailable')
+      return response.clone()
+    })
+    vi.stubGlobal('fetch', fetcher)
+    vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
+    vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
+    const { container } = render(<ProviderMark provider="a-remote-vendor" />)
+    const mask = () => container.querySelector<HTMLElement>('[data-mark="logo"]')?.style.maskImage
+
+    await waitFor(() => expect(mask()).toContain('first'))
+    response = null
+    await act(async () => { fireEvent.focus(window) })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(mask()).toContain('first')
+
+    response = Response.json({ svg: '<svg id="updated"/>' })
+    fireEvent.focus(window)
+    await waitFor(() => expect(mask()).toContain('updated'))
+
+    response = Response.json({ code: 'providers.icons.unknown', error: 'No icon' }, { status: 404 })
+    fireEvent.focus(window)
+    await waitFor(() => expect(container.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('monogram'))
+  })
+
+  it('can find a logo after the harness becomes available', async () => {
+    const fetcher = vi.fn(async (input: URL | string) => String(input).includes('/api/providers/icons/')
+      ? Response.json({ svg: '<svg id="recovered"/>' })
+      : new Response(null, { status: 404 }))
+    vi.stubGlobal('fetch', fetcher)
+    vi.stubEnv('VITE_HARNESS_BASE_URL', '')
+    vi.stubEnv('VITE_HARNESS_TOKEN', '')
+    const { container } = render(<ProviderMark provider="a-remote-vendor" />)
+
+    await act(async () => {})
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('[data-mark="monogram"]')).not.toBeNull()
+
+    vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
+    vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
+    fireEvent.focus(window)
+    await waitFor(() => {
+      expect(container.querySelector<HTMLElement>('[data-mark="logo"]')?.style.maskImage).toContain('recovered')
+    })
   })
 })

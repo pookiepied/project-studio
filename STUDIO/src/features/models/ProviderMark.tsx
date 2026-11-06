@@ -78,10 +78,17 @@ function useProviderIconDataUri(provider: string | null): string | null {
   useEffect(() => {
     if (provider === null || provider === '') return
     let live = true
-    void resolveProviderIcon(provider).then((uri) => {
-      if (live && uri !== null) setResult({ provider, uri })
-    })
-    return () => { live = false }
+    const refresh = () => {
+      void resolveProviderIcon(provider).then((uri) => {
+        if (live && uri !== undefined) setResult(uri === null ? null : { provider, uri })
+      })
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => {
+      live = false
+      window.removeEventListener('focus', refresh)
+    }
   }, [provider])
 
   return result?.provider === provider ? result.uri : null

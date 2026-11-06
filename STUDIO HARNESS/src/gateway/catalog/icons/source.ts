@@ -3,19 +3,13 @@ import type { HttpRequestOptions } from "../../../net/http.js";
 /**
  * What a source found, and the distinction the whole cache depends on.
  *
- * `absent` and `unavailable` both mean "no SVG for you right now", and
- * collapsing them into one answer is a bug that hides for a long time: the
- * catalog remembers `absent` forever, so one lookup made while the network
- * was down would leave that vendor drawn as a letter until the process
- * restarted. Only the source knows which of the two happened, so only the
- * source can say.
+ * A confirmed miss can wait for normal expiry. An unavailable source gets
+ * another chance sooner and can supply previously downloaded artwork.
  */
 export type IconAnswer =
-  | { readonly kind: "found"; readonly svg: string }
-  /** This source genuinely has no mark for that id, and never will. */
-  | { readonly kind: "absent" }
-  /** The source could not be reached. Ask again later; remember nothing. */
-  | { readonly kind: "unavailable" };
+  | { readonly kind: "found"; readonly svg: string; readonly recheckAt: number }
+  | { readonly kind: "absent"; readonly recheckAt: number }
+  | { readonly kind: "unavailable"; readonly staleSvg: string | undefined };
 
 /**
  * What every icon source has to be, and nothing more.
@@ -58,6 +52,7 @@ export const VALID_ID = /^[a-z0-9][a-z0-9._-]*$/;
 /** Shared limits. A logo is small; anything large is not one. */
 export const ICON_MAX_BYTES = 64 * 1024;
 export const ICON_TIMEOUT_MS = 6_000;
+export const ICON_RECHECK_AFTER_FAILURE_MS = 60_000;
 
 /**
  * The vendor name inside an id that carries something else as well.

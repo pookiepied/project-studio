@@ -1,51 +1,25 @@
 import { isRetiredProvider } from "../../retired-providers.js";
 import type { IconCache } from "./cache.js";
-import { VALID_ID, normalizeId, type IconSource } from "./source.js";
+import { ICON_RECHECK_AFTER_FAILURE_MS, VALID_ID, normalizeId, type IconSource } from "./source.js";
 
 /**
- * One catalog over every icon source, and the only thing the app talks to.
- *
- * The shape this replaces had the webview reaching one source directly, which
- * worked for exactly as long as there was one. Adding a second would have
- * meant the frontend knowing which vendors live where, a second round trip on
- * every miss, and two caches with two expiry rules -- the duplication this
- * file exists to prevent.
- *
- * What happens instead: sources are asked in order and the first real answer
- * wins. The order is a quality decision, not a fallback chain. models.dev is
- * first because its marks are drawn on one uniform grid and it covers 190 of
- * the endpoints a connection can name; lobehub is second because it covers
- * the model authors models.dev has never heard of. Where both have a vendor,
- * first place keeps the column visually consistent.
- *
- * ---- What is remembered, and for how long ---------------------------------
- *
- * Three layers, and they answer different questions:
- *
- *   `#resolved`  this process, one map, so a picker drawing two hundred rows
- *                asks once rather than once per render
- *   the disk     per source, survives a restart, refetched after the TTL
- *   `#absent`    "no source has this", the answer for a third of the catalog
- *
- * The negative answer is the one that has to be cached as firmly as a success.
- * Most of OpenRouter's authors are individuals publishing fine-tunes and no
- * logo for them exists anywhere; without `#absent` every one of those rows
- * would re-ask both sources forever.
- *
- * A network failure is deliberately *not* remembered as absent. Sources return
- * undefined for both "I do not have it" and "I could not reach you", and only
- * this layer can tell the difference -- so it does not, and instead treats a
- * miss as absent only once every source has answered. An offline session
- * therefore heals when it comes back rather than needing a restart.
+ * The earliest expiry wins so an answer from a lower-priority source cannot
+ * hide a new mark from a higher-priority source. On an outage, a known mark
+ * can still be drawn while the catalog waits briefly to try that source again.
  */
 export class ProviderIconCatalog {
   readonly #sources: readonly IconSource[];
-  readonly #resolved = new Map<string, string>();
-  readonly #absent = new Set<string>();
+  readonly #now: () => number;
+  readonly #resolved = new Map<string, {
+    readonly svg?: string;
+    readonly source?: string;
+    readonly recheckAt: number;
+  }>();
   readonly #inflight = new Map<string, Promise<string | undefined>>();
 
-  constructor(sources: readonly IconSource[]) {
+  constructor(sources: readonly IconSource[], now: () => number) {
     this.#sources = sources;
+    this.#now = now;
   }
 
   /**
@@ -58,8 +32,7 @@ export class ProviderIconCatalog {
     if (key.length === 0 || !VALID_ID.test(key) || isRetiredProvider(key)) return undefined;
 
     const hit = this.#resolved.get(key);
-    if (hit !== undefined) return hit;
-    if (this.#absent.has(key)) return undefined;
+    if (hit !== undefined && this.#now() < hit.recheckAt) return hit.svg;
 
     const inflight = this.#inflight.get(key);
     if (inflight !== undefined) return inflight;
@@ -73,25 +46,28 @@ export class ProviderIconCatalog {
 
   /** Which source answered for an id, for diagnostics. Never a fetch. */
   whichSource(id: string): string | undefined {
-    return this.#origin.get(normalizeId(id));
+    return this.#resolved.get(normalizeId(id))?.source;
   }
 
-  readonly #origin = new Map<string, string>();
-
   async #resolve(key: string): Promise<string | undefined> {
-    let everyoneAnswered = true;
+    const previous = this.#resolved.get(key);
+    let recheckAt = Infinity;
     for (const source of this.#sources) {
+      let svg: string | undefined;
       const answer = await source.get(key);
-      if (answer.kind === "found") {
-        this.#resolved.set(key, answer.svg);
-        this.#origin.set(key, source.name);
-        return answer.svg;
+      if (answer.kind === "unavailable") {
+        recheckAt = Math.min(recheckAt, this.#now() + ICON_RECHECK_AFTER_FAILURE_MS);
+        svg = answer.staleSvg ?? (previous?.source === source.name ? previous.svg : undefined);
+      } else {
+        recheckAt = Math.min(recheckAt, answer.recheckAt);
+        if (answer.kind === "found") svg = answer.svg;
       }
-      // One unreachable source is enough to make "nobody has this" a guess
-      // rather than a fact, so the whole lookup stays forgettable.
-      if (answer.kind === "unavailable") everyoneAnswered = false;
+      if (svg !== undefined) {
+        this.#resolved.set(key, { svg, source: source.name, recheckAt });
+        return svg;
+      }
     }
-    if (everyoneAnswered) this.#absent.add(key);
+    this.#resolved.set(key, { recheckAt });
     return undefined;
   }
 }

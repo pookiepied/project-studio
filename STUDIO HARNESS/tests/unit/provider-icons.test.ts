@@ -1,15 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { IconCache } from "../../src/gateway/catalog/icons/cache.js";
-import { ProviderIconCatalog, cacheFor } from "../../src/gateway/catalog/icons/catalog.js";
+import { createProviderIcons } from "../../src/gateway/catalog/icons/index.js";
 import type { Fetcher } from "../../src/gateway/catalog/icons/source.js";
-import { createModelsDevSource } from "../../src/gateway/catalog/icons/sources/models-dev.js";
-import { createLobehubSource } from "../../src/gateway/catalog/icons/sources/lobehub.js";
 
 /**
  * The icon catalog and its two sources, against a stubbed network.
@@ -28,6 +25,7 @@ const ANTHROPIC_MD = '<svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z"/></svg>';
 const CLAUDE_LOBE = '<svg viewBox="0 0 24 24"><path d="M12 2 2 22h20Z"/></svg>';
 const QWEN_LOBE = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>';
 const PROBE = "studio-placeholder-probe";
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface StubOptions {
   /** Provider ids models.dev names in its manifest. */
@@ -70,20 +68,16 @@ function createStub(options: StubOptions = {}) {
     const body = options.modelsDevBodies?.[name] ?? PLACEHOLDER;
     return { status: 200, headers: { "content-type": "image/svg+xml" }, body };
   };
-  return { calls, fetcher, goOnline: () => (offline = false) };
+  return {
+    calls,
+    fetcher,
+    goOffline: () => { offline = true; },
+    goOnline: () => { offline = false; },
+  };
 }
 
 function build(stub: { fetcher: Fetcher }, cacheDir: string, now: () => number = Date.now) {
-  const root = new IconCache(cacheDir);
-  return new ProviderIconCatalog([
-    createModelsDevSource({
-      cache: cacheFor(root, "models-dev"),
-      fetcher: stub.fetcher,
-      now,
-      ttlMs: 24 * 60 * 60 * 1000,
-    }),
-    createLobehubSource({ cache: cacheFor(root, "lobehub"), fetcher: stub.fetcher }),
-  ]);
+  return createProviderIcons({ cacheDir, fetcher: stub.fetcher, now, ttlMs: DAY_MS });
 }
 
 const temp = () => mkdtempSync(join(tmpdir(), "icons-"));
@@ -180,6 +174,17 @@ describe("the provider icon catalog", () => {
     expect(stub.calls.filter((url) => url.endsWith("/anthropic.svg")).length).toBe(1);
   });
 
+  it("shares one manifest refresh across different provider lookups", async () => {
+    const stub = createStub({ modelsDev: ["anthropic", "tavily"], modelsDevBodies: {
+      anthropic: ANTHROPIC_MD, tavily: QWEN_LOBE,
+    } });
+    const catalog = build(stub, temp());
+
+    expect(await Promise.all([catalog.get("anthropic"), catalog.get("tavily")]))
+      .toEqual([ANTHROPIC_MD, QWEN_LOBE]);
+    expect(stub.calls.filter((url) => url.endsWith("/api.json"))).toHaveLength(1);
+  });
+
   it("serves a second process from disk without going back to the network", async () => {
     const dir = temp();
     const stub = createStub({ modelsDev: ["anthropic"], modelsDevBodies: { anthropic: ANTHROPIC_MD } });
@@ -213,6 +218,105 @@ describe("the provider icon catalog", () => {
     clock += 61_000;
     stub.goOnline();
     expect(await catalog.get("anthropic")).toBe(ANTHROPIC_MD);
+  });
+
+  it.each(["models-dev", "lobehub"])("refreshes changed %s artwork after expiry", async (source) => {
+    const dir = temp();
+    let clock = Date.now();
+    const bodies = { "test-vendor": ANTHROPIC_MD };
+    const stub = createStub(source === "models-dev"
+      ? { modelsDev: ["test-vendor"], modelsDevBodies: bodies }
+      : { lobehub: bodies });
+    const catalog = build(stub, dir, () => clock);
+
+    expect(await catalog.get("test-vendor")).toBe(ANTHROPIC_MD);
+    bodies["test-vendor"] = CLAUDE_LOBE;
+    expect(await catalog.get("test-vendor")).toBe(ANTHROPIC_MD);
+    clock += DAY_MS + 1_000;
+
+    expect(await catalog.get("test-vendor")).toBe(CLAUDE_LOBE);
+    expect(readFileSync(join(dir, source, "test-vendor.svg"), "utf8")).toBe(CLAUDE_LOBE);
+    expect(stub.calls.filter((url) => url.endsWith("/test-vendor.svg"))).toHaveLength(2);
+  });
+
+  it("rechecks a miss and a fallback when the preferred source adds them", async () => {
+    const dir = temp();
+    let clock = Date.now();
+    const ids: string[] = [];
+    const stub = createStub({
+      modelsDev: ids,
+      modelsDevBodies: { alibaba: ANTHROPIC_MD, "new-provider": CLAUDE_LOBE },
+      lobehub: { qwen: QWEN_LOBE },
+    });
+    const catalog = build(stub, dir, () => clock);
+
+    expect(await catalog.get("new-provider")).toBeUndefined();
+    clock += DAY_MS / 2;
+    expect(await catalog.get("qwen")).toBe(QWEN_LOBE);
+    ids.push("alibaba", "new-provider");
+    // models.dev resolves Qwen through its Alibaba provider id.
+    clock += DAY_MS / 2 + 1_000;
+
+    expect(await catalog.get("new-provider")).toBe(CLAUDE_LOBE);
+    expect(await catalog.get("qwen")).toBe(ANTHROPIC_MD);
+  });
+
+  it("retains an expired disk logo offline and refreshes it after recovery", async () => {
+    const dir = temp();
+    let clock = Date.now();
+    const bodies = { anthropic: ANTHROPIC_MD };
+    const stub = createStub({ modelsDev: ["anthropic"], modelsDevBodies: bodies });
+    expect(await build(stub, dir, () => clock).get("anthropic")).toBe(ANTHROPIC_MD);
+
+    clock += DAY_MS + 1_000;
+    stub.goOffline();
+    const restarted = build(stub, dir, () => clock);
+    expect(await restarted.get("anthropic")).toBe(ANTHROPIC_MD);
+
+    bodies.anthropic = CLAUDE_LOBE;
+    stub.goOnline();
+    clock += 61_000;
+    expect(await restarted.get("anthropic")).toBe(CLAUDE_LOBE);
+  });
+
+  it("checks the saved manifest's original age when the harness restarts", async () => {
+    const dir = temp();
+    let clock = Date.now();
+    const ids: string[] = [];
+    const stub = createStub({ modelsDev: ids, modelsDevBodies: { "new-provider": CLAUDE_LOBE } });
+    expect(await build(stub, dir, () => clock).get("new-provider")).toBeUndefined();
+
+    clock += DAY_MS + 1_000;
+    ids.push("new-provider");
+    expect(await build(stub, dir, () => clock).get("new-provider")).toBe(CLAUDE_LOBE);
+    expect(stub.calls.filter((url) => url.endsWith("/api.json"))).toHaveLength(2);
+  });
+
+  it("keeps the downloaded mark in memory when the disk cache cannot be written", async () => {
+    const cacheFile = join(temp(), "blocked");
+    writeFileSync(cacheFile, "");
+    let clock = Date.now();
+    const stub = createStub({ modelsDev: ["anthropic"], modelsDevBodies: { anthropic: ANTHROPIC_MD } });
+    const catalog = build(stub, cacheFile, () => clock);
+    expect(await catalog.get("anthropic")).toBe(ANTHROPIC_MD);
+
+    clock += DAY_MS + 1_000;
+    stub.goOffline();
+    expect(await catalog.get("anthropic")).toBe(ANTHROPIC_MD);
+  });
+
+  it("removes a cached logo when the source replaces it with the placeholder", async () => {
+    const dir = temp();
+    let clock = Date.now();
+    const bodies = { anthropic: ANTHROPIC_MD };
+    const stub = createStub({ modelsDev: ["anthropic"], modelsDevBodies: bodies });
+    const catalog = build(stub, dir, () => clock);
+    expect(await catalog.get("anthropic")).toBe(ANTHROPIC_MD);
+
+    clock += DAY_MS + 1_000;
+    bodies.anthropic = PLACEHOLDER;
+    expect(await catalog.get("anthropic")).toBeUndefined();
+    expect(existsSync(join(dir, "models-dev", "anthropic.svg"))).toBe(false);
   });
 
   it("refuses an id that could escape its own cache directory", async () => {

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -27,27 +27,36 @@ export class IconCache {
     return new IconCache(join(this.#dir, name));
   }
 
-  readText(name: string): string | undefined {
-    const file = join(this.#dir, name);
-    if (!existsSync(file)) return undefined;
+  readIcon(name: string): { readonly svg: string; readonly fetchedAt: number } | undefined {
     try {
-      return readFileSync(file, "utf8");
+      const file = join(this.#dir, name);
+      const fetchedAt = statSync(file).mtimeMs;
+      return { svg: readFileSync(file, "utf8"), fetchedAt };
     } catch {
-      // A cache read that throws is a cache miss. There is no state worth
-      // repairing here: the next fetch overwrites it.
       return undefined;
     }
   }
 
   writeText(name: string, text: string): void {
-    this.#ensure();
-    writeFileSync(join(this.#dir, name), text, "utf8");
+    try {
+      this.#ensure();
+      writeFileSync(join(this.#dir, name), text, "utf8");
+    } catch {
+      // A read-only cache must not hide an icon the source just supplied.
+    }
+  }
+
+  removeIcon(name: string): void {
+    try {
+      rmSync(join(this.#dir, name), { force: true });
+    } catch {
+      // The cache is disposable and may be read-only.
+    }
   }
 
   readJson<T>(name: string, isValid: (value: unknown) => value is T): T | undefined {
-    const text = this.readText(name);
-    if (text === undefined) return undefined;
     try {
+      const text = readFileSync(join(this.#dir, name), "utf8");
       const parsed: unknown = JSON.parse(text);
       return isValid(parsed) ? parsed : undefined;
     } catch {

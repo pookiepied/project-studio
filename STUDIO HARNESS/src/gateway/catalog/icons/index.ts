@@ -18,13 +18,8 @@ export { ProviderIconCatalog } from "./catalog.js";
  * `get`; everything below it is one source minding its own business. Adding a
  * third source is a file in `sources/` and a line in the array here.
  *
- * ---- Why 24 hours ---------------------------------------------------------
- *
- * The TTL is on the *index* a source keeps, not on the icons. A logo that has
- * been fetched is kept until the cache directory is deleted, because a brand
- * mark does not change and re-downloading it daily would buy nothing. What
- * expires is the list of which ids exist, so a vendor added to models.dev
- * today is drawable tomorrow without a restart.
+ * Daily revalidation covers both artwork and the index that names providers.
+ * Refresh happens on demand so idle Studio sessions make no icon requests.
  */
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -46,6 +41,6 @@ export function createProviderIcons(options: ProviderIconsOptions = {}): Provide
     // First: uniform artwork, and 190 of the endpoints a connection can name.
     createModelsDevSource({ cache: cacheFor(root, "models-dev"), fetcher, now, ttlMs }),
     // Second: the model authors the first source has never heard of.
-    createLobehubSource({ cache: cacheFor(root, "lobehub"), fetcher }),
-  ]);
+    createLobehubSource({ cache: cacheFor(root, "lobehub"), fetcher, now, ttlMs }),
+  ], now);
 }

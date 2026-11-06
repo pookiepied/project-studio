@@ -80,20 +80,26 @@ const ALIASES: Readonly<Record<string, string>> = {
 export interface LobehubOptions {
   readonly cache: IconCache;
   readonly fetcher: Fetcher;
+  readonly now: () => number;
+  readonly ttlMs: number;
 }
 
 export function createLobehubSource(options: LobehubOptions): IconSource {
-  const { cache, fetcher } = options;
+  const { cache, fetcher, now, ttlMs } = options;
 
   return {
     name: "lobehub",
     async get(id: string): Promise<IconAnswer> {
       const remoteId = ALIASES[id] ?? id;
-      if (!VALID_ID.test(remoteId)) return { kind: "absent" };
+      if (!VALID_ID.test(remoteId)) return { kind: "absent", recheckAt: now() + ttlMs };
 
-      const cached = cache.readText(`${remoteId}.svg`);
-      if (cached !== undefined) return { kind: "found", svg: cached };
+      const filename = `${remoteId}.svg`;
+      const cached = cache.readIcon(filename);
+      if (cached !== undefined && now() < cached.fetchedAt + ttlMs) {
+        return { kind: "found", svg: cached.svg, recheckAt: cached.fetchedAt + ttlMs };
+      }
 
+      const unavailable = { kind: "unavailable", staleSvg: cached?.svg } as const;
       try {
         const response = await fetcher({
           url: `${BASE}${remoteId}.svg`,
@@ -105,15 +111,18 @@ export function createLobehubSource(options: LobehubOptions): IconSource {
         // 404 is the membership test, and it is a real answer rather than a
         // body we have to recognise. Anything else that is not a 200 is the
         // CDN having a bad day, which must not be remembered as an absence.
-        if (response.status === 404) return { kind: "absent" };
-        if (response.status !== 200) return { kind: "unavailable" };
-        if (!(response.headers["content-type"] ?? "").includes("svg")) {
-          return { kind: "absent" };
+        if (response.status === 404) {
+          if (cached !== undefined) cache.removeIcon(filename);
+          return { kind: "absent", recheckAt: now() + ttlMs };
         }
-        cache.writeText(`${remoteId}.svg`, response.body);
-        return { kind: "found", svg: response.body };
+        if (response.status !== 200) return unavailable;
+        if (!(response.headers["content-type"] ?? "").includes("svg")) {
+          return unavailable;
+        }
+        cache.writeText(filename, response.body);
+        return { kind: "found", svg: response.body, recheckAt: now() + ttlMs };
       } catch {
-        return { kind: "unavailable" };
+        return unavailable;
       }
     },
   };
