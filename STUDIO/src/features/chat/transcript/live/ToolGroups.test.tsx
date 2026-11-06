@@ -132,8 +132,12 @@ describe('the chip is the default', () => {
       { toolName: fetch.toolName, calls: [fetch] },
     )} />)
     fireEvent.click(screen.getByRole('button', { name: /framework docs.*4 sources/ }))
+    const searchDetails = screen.getByRole('region', { name: 'Web search details' })
+    expect(searchDetails.classList.contains('overflow-auto')).toBe(false)
+    expect(screen.getByRole('columnheader', { name: 'Source' })).toBeTruthy()
     expect(screen.getAllByRole('link')).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: /Read Fetched article/ }))
+    expect(screen.getByRole('columnheader', { name: 'Page' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Fetched article/ }).getAttribute('href')).toBe('https://example.com/article')
     expect(screen.queryByText('Long page text')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show 1 more' }))

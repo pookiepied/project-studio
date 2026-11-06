@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Icons } from '@/components/icons'
+import { cn } from '@/lib/cn'
 import { isRecord } from '@/lib/guards'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 import { readableName, resultState, type ResultState } from './toolResult'
@@ -9,16 +10,17 @@ const STATUS: Record<ResultState, string> = {
 }
 
 /** One quiet surface, without nested frames or a rule hanging from its row. */
-export function ToolResultPanel({ title, call, live, children, statusLabel }: {
-  title: string; call: ToolCallView; live: boolean; children: ReactNode; statusLabel?: string
+export function ToolResultPanel({ title, call, live, children, statusLabel, scroll = true }: {
+  title: string; call: ToolCallView; live: boolean; children: ReactNode; statusLabel?: string; scroll?: boolean
 }) {
   const state = resultState(call, live)
   const Mark = state === 'success' ? Icons.check : state === 'failed' ? Icons.failed : Icons.run
   return (
     <section aria-label={title} className="my-1 min-w-0 rounded-lg bg-muted/60 px-3 py-2.5 text-foreground">
       <div className="mb-3 text-caption font-medium text-muted-foreground">{title}</div>
-      <div role="region" aria-label={`${title} details`} tabIndex={0}
-        className="studio-selectable studio-scroll-bounded flex max-h-80 min-w-0 flex-col gap-3 overflow-auto overscroll-contain text-caption [overflow-wrap:anywhere]">
+      <div role="region" aria-label={`${title} details`} tabIndex={scroll ? 0 : undefined}
+        className={cn('studio-selectable flex min-w-0 flex-col gap-3 text-caption [overflow-wrap:anywhere]',
+          scroll && 'studio-scroll-bounded max-h-80 overflow-auto overscroll-contain')}>
         {children}
         {call.errorText !== null ? <p className="whitespace-pre-wrap text-danger">{call.errorText}</p> : null}
       </div>

@@ -11,7 +11,7 @@ import { SearchQueryLine, SearchResults } from './SearchResults'
 import { diffLines, wholeFileDiff, type LineDiff } from './diffLines'
 import { FileDiff } from './FileDiff'
 import { FileOperation, fileOperationOf } from './FileOperation'
-import { GenericToolDetails, StructuredValue } from './ToolResultPanel'
+import { GenericToolDetails, StructuredValue, ToolResultPanel } from './ToolResultPanel'
 import { DiscoveryDetails, PlanDetails, ShellDetails } from './NativeToolDetails'
 import { readableName, resultState } from './toolResult'
 import { AgentTaskDetails } from './tools/AgentTaskDetails'
@@ -95,37 +95,44 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
     ? [{ title: step.title ?? hostOf(step.url), url: step.url }]
     : []
   const extra = sources.length - RESEARCH_PREVIEW_LIMIT
-  const status = failed ? step.error || 'The tool reported an error.'
-    : pending ? live ? 'Working…' : 'No result recorded yet.'
-    : sources.length === 0 ? searching ? 'No results.' : 'No page link recorded.' : null
-
   return <DisclosureRow leading={searching ? <Icons.search /> : <Icons.browserUse />} entering={live} open={open}
-    onToggle={() => setOpen((value) => !value)}
+    onToggle={() => setOpen((value) => !value)} chevron="hover" flush
     label={<>
       <span className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{verb} {subject} {state === 'pending' ? 'pending' : null}</span>
       {searching && state === 'success' && sources.length > 0
         ? <span className="shrink-0">· {sources.length} {sources.length === 1 ? 'source' : 'sources'}</span>
         : null}
     </>}>
-    {status !== null ? <p className="break-words text-caption text-muted-foreground">{status}</p> : (
-      <>
-        <ul className="min-w-0">
-          {(showAll ? sources : sources.slice(0, RESEARCH_PREVIEW_LIMIT)).map((source, index) => (
-            <li key={`${source.url}:${String(index)}`}>
-              <a href={source.url} target="_blank" rel="noreferrer noopener"
-                className="flex min-w-0 items-baseline gap-2 rounded-md py-0.5 text-caption hover:text-foreground hover:underline">
-                <span className="min-w-0 truncate">{source.title}</span>
-                <span className="max-w-[40%] shrink-0 truncate text-muted-foreground">{hostOf(source.url)}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+    <ToolResultPanel title={searching ? 'Web search' : 'Web fetch'} call={call} live={live} scroll={false}>
+      {state === 'success' && sources.length === 0 ? (
+        <p className="text-muted-foreground">{searching ? 'No results.' : 'No page link recorded.'}</p>
+      ) : null}
+      {state === 'success' && sources.length > 0 ? <div>
+        <table className="w-full table-fixed text-left">
+          <thead className="text-muted-foreground">
+            <tr className="border-b border-border">
+              <th scope="col" className="pb-1 font-medium">{searching ? 'Source' : 'Page'}</th>
+              <th scope="col" className="w-1/3 pb-1 pl-3 font-medium">Site</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {(showAll ? sources : sources.slice(0, RESEARCH_PREVIEW_LIMIT)).map((source, index) => (
+              <tr key={`${source.url}:${String(index)}`}>
+                <td className="py-1.5">
+                  <a href={source.url} target="_blank" rel="noreferrer noopener"
+                    className="block truncate hover:underline" title={source.title}>{source.title}</a>
+                </td>
+                <td className="truncate py-1.5 pl-3 text-muted-foreground" title={hostOf(source.url)}>{hostOf(source.url)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         {extra > 0 ? <button type="button" onClick={() => setShowAll((value) => !value)}
           className="rounded-md py-0.5 text-caption text-muted-foreground hover:text-foreground hover:underline">
           {showAll ? 'Show fewer' : `Show ${String(extra)} more`}
         </button> : null}
-      </>
-    )}
+      </div> : null}
+    </ToolResultPanel>
   </DisclosureRow>
 }
 
