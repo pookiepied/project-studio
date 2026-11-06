@@ -151,6 +151,14 @@ describe('a read step', () => {
     expect(step).toMatchObject({ kind: 'read', status: 'running', url: 'https://example.org/a' })
     expect(step?.kind === 'read' ? step.excerpt : 'x').toBeUndefined()
   })
+
+  it('does not use a heading in the page body as its title', () => {
+    const step = readWebCall(call({
+      toolName: 'fetch',
+      output: present('Source: https://example.org/a\nRead by: Jina\n\n# Section heading'),
+    }))
+    expect(step?.kind === 'read' ? step.title : 'unexpected step').toBeUndefined()
+  })
 })
 
 describe('the artifact a segment becomes', () => {

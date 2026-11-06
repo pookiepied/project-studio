@@ -92,15 +92,18 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const searching = step.kind === 'search'
   const verb = failed ? searching ? 'Search failed' : 'Could not read' : searching
     ? pending ? 'Searching' : 'Searched' : pending ? 'Reading' : 'Read'
-  const subject = searching ? step.query : step.title ?? step.url
+  const subject = searching ? step.query : hostOf(step.url)
+  const label = !searching && state === 'success' && step.title
+    ? step.title
+    : `${verb} ${subject}`.trimEnd()
   const sources = searching ? step.hits : /^https?:\/\//i.test(step.url)
-    ? [{ title: step.title ?? hostOf(step.url), url: step.url }]
+    ? [{ title: step.url, url: step.url }]
     : []
   const extra = sources.length - RESEARCH_PREVIEW_LIMIT
   return <DisclosureRow leading={searching ? <Icons.search /> : <Icons.browserUse />} entering={live} open={open}
     onToggle={() => setOpen((value) => !value)} chevron="hover" flush
     label={<>
-      <span className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{verb} {subject} {state === 'pending' ? 'pending' : null}</span>
+      <span title={label} className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{label}{state === 'pending' ? ' pending' : null}</span>
       {searching && state === 'success' && sources.length > 0
         ? <span className="shrink-0">· {sources.length} {sources.length === 1 ? 'source' : 'sources'}</span>
         : null}
@@ -113,7 +116,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
         <table className="w-full table-fixed text-left">
           <thead className="text-muted-foreground">
             <tr className="border-b border-border">
-              <th scope="col" className="pb-1 font-medium">{searching ? 'Source' : 'Page'}</th>
+              <th scope="col" className="pb-1 font-medium">{searching ? 'Source' : 'Link'}</th>
               <th scope="col" className="w-1/3 pb-1 pl-3 font-medium">Site</th>
             </tr>
           </thead>

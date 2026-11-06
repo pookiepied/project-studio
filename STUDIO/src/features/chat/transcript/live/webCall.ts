@@ -34,7 +34,7 @@ const PROVIDER_SUMMARY = /^Provider summary: (.+)$/m
 const HIT_HEAD = /^(\d+)\. (.+)$/
 const READ_BY = /^Read by: (.+)$/m
 const SOURCE = /^Source: (.+)$/m
-const HEADING = /^# (.+)$/m
+const HEADING = /^# (.+)/
 
 /** How much of a read page the artifact shows. */
 const EXCERPT_LENGTH = 280
@@ -114,7 +114,7 @@ function excerptOf(answered: string): string | undefined {
 function readStep(call: ToolCallView): ReadStep {
   const answered = call.output?.present ? answerText(call.output.value) : ''
   const url = inputString(call.input?.present ? call.input.value : null, 'url') ?? SOURCE.exec(answered)?.[1] ?? ''
-  const title = HEADING.exec(answered)?.[1]
+  const title = HEADING.exec(answered)?.[1]?.trim()
   const provider = READ_BY.exec(answered)?.[1]
   const fellBack = FELL_BACK.exec(answered)?.[1]
   const excerpt = call.output?.present ? excerptOf(answered) : undefined
@@ -123,7 +123,7 @@ function readStep(call: ToolCallView): ReadStep {
     id: call.toolCallId,
     status: stepStatus(call),
     url,
-    ...(title === undefined ? {} : { title }),
+    ...(title ? { title } : {}),
     ...(provider === undefined ? {} : { provider }),
     ...(fellBack === undefined ? {} : { fellBack }),
     ...(excerpt === undefined ? {} : { excerpt }),
