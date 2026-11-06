@@ -1,6 +1,6 @@
 import { cn } from '@/lib/cn'
 import { useState } from 'react'
-import { ShowMoreButton } from '@/components/primitives'
+import { ShowMoreButton, ShowMoreContent } from '@/components/primitives'
 import { MediaLightbox } from '@/features/artifacts/media/MediaLightbox'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserCallView } from './browserCall'
@@ -90,9 +90,9 @@ export function BrowserCard({
       )}
 
       {said === null ? null : <>
-        <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-muted-foreground">
+        <ShowMoreContent><pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-muted-foreground">
           {hasMore && !showOutput ? `${outputPreview}…` : said}
-        </pre>
+        </pre></ShowMoreContent>
         {hasMore ? <ShowMoreButton expanded={showOutput} onToggle={() => setShowOutput((value) => !value)}
           moreLabel="Show full output" lessLabel="Show less" className="self-start" /> : null}
       </>}

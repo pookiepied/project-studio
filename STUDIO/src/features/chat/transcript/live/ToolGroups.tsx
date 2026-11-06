@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
-import { ShowMoreButton } from '@/components/primitives'
+import { ShowMoreButton, ShowMoreContent } from '@/components/primitives'
 import { SiteMark } from '@/features/artifacts/kinds/SiteMark'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
@@ -115,7 +115,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
         <p className="text-muted-foreground">{searching ? 'No results.' : 'No page link recorded.'}</p>
       ) : null}
       {state === 'success' && sources.length > 0 ? <div>
-        <table className="w-full table-fixed text-left">
+        <ShowMoreContent><table className="w-full table-fixed text-left">
           <thead className="text-muted-foreground">
             <tr className="border-b border-border">
               <th scope="col" className="pb-1 font-medium">{searching ? 'Source' : 'Link'}</th>
@@ -146,7 +146,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></ShowMoreContent>
         {linkError ? <p role="alert" className="mt-1 text-danger">Could not open the link.</p> : null}
         {extra > 0 ? <ShowMoreButton expanded={showAll} onToggle={() => setShowAll((value) => !value)}
           moreLabel={`Show ${String(extra)} more`} className="mt-2" /> : null}

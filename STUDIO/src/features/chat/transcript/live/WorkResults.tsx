@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { ShowMoreButton } from '@/components/primitives'
+import { ShowMoreButton, ShowMoreContent } from '@/components/primitives'
 import { FileTypeMark } from '@/components/icons/fileTypes'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 import { recordedChanges, type RecordedChange } from '@/features/changes/recordedChanges'
@@ -58,7 +58,7 @@ function ChangedFiles({ changes, conversationId, resultId }: {
       <button type="button" className="rounded-md px-2 py-1 text-muted-foreground hover:bg-tint hover:text-foreground" onClick={() => review()}>View changes</button>
     </div>
     <p className="mb-2 text-muted-foreground">Recorded file tool changes</p>
-    <ul className="flex flex-col gap-1">
+    <ShowMoreContent><ul className="flex flex-col gap-1">
       {(all ? changes : changes.slice(0, 3)).map((change) => <li key={change.path}>
         <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md py-1.5 text-left hover:bg-tint" onClick={() => review([change])}>
           <FileTypeMark path={change.path} />
@@ -67,7 +67,7 @@ function ChangedFiles({ changes, conversationId, resultId }: {
             : <span className="shrink-0 text-muted-foreground">{change.action}</span>}
         </button>
       </li>)}
-    </ul>
+    </ul></ShowMoreContent>
     {changes.length > 3 ? <ShowMoreButton expanded={all} onToggle={() => setAll((value) => !value)}
       moreLabel={`Show ${changes.length - 3} more ${changes.length === 4 ? 'file' : 'files'}`}
       lessLabel="Show fewer files" className="mt-2" /> : null}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { ShowMoreButton } from '@/components/primitives'
+import { ShowMoreButton, ShowMoreContent } from '@/components/primitives'
 import { WorkingDots } from '@/components/state'
 import { AnimatedItem, AnimatedList } from '@/features/artifacts/ArtifactMotion'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
@@ -186,13 +186,13 @@ function SearchBody({ step, className }: { step: SearchStep; className?: string 
       {done && step.hits.length === 0 && className === undefined ? (
         <p className="px-1.5 text-caption text-muted-foreground">No results.</p>
       ) : null}
-      <AnimatedList className="gap-0.5">
+      <ShowMoreContent><AnimatedList className="gap-0.5">
         {shown.map((hit, index) => (
           <AnimatedItem key={hit.url} index={index}>
             <Result hit={hit} />
           </AnimatedItem>
         ))}
-      </AnimatedList>
+      </AnimatedList></ShowMoreContent>
       {hidden > 0 ? (
         <ShowMoreButton expanded={open} onToggle={() => setOpen((value) => !value)}
           moreLabel={`Show ${String(hidden)} more`} className="mt-2 self-start" />
