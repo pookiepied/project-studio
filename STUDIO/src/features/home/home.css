@@ -1,9 +1,33 @@
+.studio-home-clover {
+  color: color-mix(in oklab, var(--muted-foreground) 65%, var(--primary));
+}
+
+.dark .studio-home-clover {
+  color: var(--foreground);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .studio-home-intro {
-    transition: transform var(--duration-slow) ease-out;
+    transition: opacity var(--duration-fast) ease-out, transform var(--duration-fast) ease-out;
   }
 
-  .studio-home:focus-within .studio-home-intro {
-    transform: translateY(-6px);
+  .studio-home-intro[data-leaving] {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  .studio-home-clover {
+    transform-origin: 50% 80%;
+    transition: transform var(--duration-base) ease-out;
+  }
+
+  @media (hover: hover) {
+    .studio-home-intro:not([data-leaving]) .studio-home-clover-hitbox:hover .studio-home-clover {
+      transform: rotate(-8deg) scale(1.07);
+    }
+  }
+
+  .studio-home-intro:not([data-leaving]) .studio-home-clover-hitbox:active .studio-home-clover {
+    transform: rotate(4deg) scale(0.93);
   }
 }

@@ -1,10 +1,10 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <rect width="1024" height="1024" rx="224" fill="#121212"/>
-  <g transform="translate(236 144) scale(5.7)" fill="#F9FAFB">
-    <rect x="25" y="8" width="25" height="25" rx="5.5"/>
-    <rect x="47" y="30" width="25" height="25" rx="5.5"/>
-    <rect x="25" y="52" width="25" height="25" rx="5.5"/>
-    <rect x="47" y="74" width="25" height="25" rx="5.5"/>
-    <rect x="25" y="96" width="25" height="25" rx="5.5"/>
+  <g transform="translate(176 174) scale(10.5)" fill="#F9FAFB">
+    <path d="M32 30c1.6 11.5-1.2 21.7-8.2 27.1" fill="none" stroke="#F9FAFB" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M31 29C22 28 10 26 9 18c-.8-5 3.4-8.7 8-7.8.9-4.4 4.8-6.6 8.6-4.8C31 8 31.9 19 31 29Z"/>
+    <path d="M33 29c-.7-10.4.6-21.4 6.3-23.9 4.3-1.9 8.2.8 8.7 5.2 4.9-.6 8.8 3.4 7.3 8.3C53 26.1 42 28.5 33 29Z"/>
+    <path d="M31 31c-.5 9-3.3 18.8-9.5 19.4-4.3.5-7.2-2.3-7.2-6.3-4.2-.3-6.5-3.9-5.2-7.3C11.3 31 22.5 30.5 31 31Z"/>
+    <path d="M33 31c9.2-.5 20.5.3 22 6.6 1 4-1.6 7.1-5.6 7.4-.4 4.3-4 6.7-7.6 5.3C36.2 48.2 33.6 39.5 33 31Z"/>
   </g>
 </svg>

@@ -227,12 +227,10 @@ describe('the thinking mark', () => {
   })
 
   it('is not the brand mark', () => {
-    // The StudioMark draws on a 96x128 canvas; nothing else in the app does,
-    // so its viewBox is the fingerprint of the mark this row had to leave.
     const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
-    expect(container.querySelector('svg[viewBox="0 0 96 128"]')).toBeNull()
+    expect(container.querySelector('[data-studio-mark]')).toBeNull()
   })
 })
 

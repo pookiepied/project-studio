@@ -1,64 +1,12 @@
-import { motion, type Transition } from 'framer-motion'
-import { EASE_OUT, LOOP } from '@/design/tokens'
+import { motion, useReducedMotion } from 'framer-motion'
+import { DURATION, EASE_OUT, LOOP } from '@/design/tokens'
 
-/**
- * The Studio mark: five rounded tiles descending in a staircase.
- *
- * Draws in `currentColor`, so it inherits text colour and works in both themes
- * without a second asset. This is the brand rather than system chrome, so the
- * monochrome rule does not constrain it — it simply happens not to need a hue.
- *
- * `busy` ripples the tiles to signal work in flight. It reads as active without
- * spinning, and it is the same glyph at rest, so nothing jumps when a turn
- * starts or ends.
- *
- * `entrance` is the one-shot assembly for the splash screen: the tiles stagger
- * in top to bottom, in the order the staircase is read, so the mark arrives
- * already descending.
- */
-
-const TILE = { size: 25, radius: 5.5 } as const
-
-/** Tile origins on the 96x128 canvas, top to bottom. */
-const TILES = [
-  { x: 25, y: 8 },
-  { x: 47, y: 30 },
-  { x: 25, y: 52 },
-  { x: 47, y: 74 },
-  { x: 25, y: 96 },
+const LEAVES = [
+  'M31 29C22 28 10 26 9 18c-.8-5 3.4-8.7 8-7.8.9-4.4 4.8-6.6 8.6-4.8C31 8 31.9 19 31 29Z',
+  'M33 29c-.7-10.4.6-21.4 6.3-23.9 4.3-1.9 8.2.8 8.7 5.2 4.9-.6 8.8 3.4 7.3 8.3C53 26.1 42 28.5 33 29Z',
+  'M31 31c-.5 9-3.3 18.8-9.5 19.4-4.3.5-7.2-2.3-7.2-6.3-4.2-.3-6.5-3.9-5.2-7.3C11.3 31 22.5 30.5 31 31Z',
+  'M33 31c9.2-.5 20.5.3 22 6.6 1 4-1.6 7.1-5.6 7.4-.4 4.3-4 6.7-7.6 5.3C36.2 48.2 33.6 39.5 33 31Z',
 ] as const
-
-interface TileMotion {
-  initial: false | { opacity: number; scale: number }
-  animate: { opacity: number | number[]; scale: number | number[] }
-  transition: Transition
-}
-
-function tileMotion(index: number, busy: boolean, entrance: boolean): TileMotion {
-  if (!busy && !entrance) {
-    return {
-      initial: false,
-      animate: { opacity: 1, scale: 1 },
-      transition: { duration: 0.48, ease: EASE_OUT },
-    }
-  }
-
-  if (entrance) {
-    return {
-      initial: { opacity: 0, scale: 0.82 },
-      animate: { opacity: 1, scale: 1 },
-      transition: { duration: 0.48, delay: 0.12 + index * 0.14, ease: EASE_OUT },
-    }
-  }
-
-  // The trough stays well above invisible: this is a shimmer travelling down
-  // the mark, not tiles disappearing and returning.
-  return {
-    initial: { opacity: 1, scale: 1 },
-    animate: { opacity: [0.62, 1, 0.62], scale: [0.94, 1, 0.94] },
-    transition: { ...LOOP.pulse, delay: index * (LOOP.pulse.duration / 10) },
-  }
-}
 
 export function StudioMark({
   busy = false,
@@ -67,41 +15,40 @@ export function StudioMark({
   className,
 }: {
   busy?: boolean
-  /** One-shot staggered assembly — the splash entrance. */
   entrance?: boolean
-  /** Rendered height in px; the mark keeps its 3:4 ratio. */
   size?: number
   className?: string
 }) {
+  const reducedMotion = useReducedMotion()
+  const opens = entrance && !reducedMotion
+  const pulses = busy && !entrance && !reducedMotion
+
   return (
     <svg
       height={size}
-      width={(size * 96) / 128}
-      viewBox="0 0 96 128"
-      fill="none"
+      width={size}
+      viewBox="0 0 64 64"
+      fill="currentColor"
+      data-studio-mark
       aria-hidden
-      shapeRendering="geometricPrecision"
-      preserveAspectRatio="xMidYMid meet"
       className={className}
     >
-      {TILES.map((tile, index) => {
-        const props = tileMotion(index, busy, entrance)
-        return (
-          <motion.rect
-            key={tile.y}
-            x={tile.x}
-            y={tile.y}
-            width={TILE.size}
-            height={TILE.size}
-            rx={TILE.radius}
-            fill="currentColor"
-            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-            initial={props.initial}
-            animate={props.animate}
-            transition={props.transition}
+      <path d="M32 30c1.6 11.5-1.2 21.7-8.2 27.1" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+      <motion.g
+        style={{ transformOrigin: '32px 30px' }}
+        initial={opens ? { opacity: 0, scale: 0.68 } : false}
+        animate={{ opacity: 1, scale: opens ? [0.68, 1.05, 1] : 1 }}
+        transition={{ duration: DURATION.slow, ease: EASE_OUT }}
+      >
+        {LEAVES.map((leaf, index) => (
+          <motion.path
+            key={leaf}
+            d={leaf}
+            animate={{ opacity: pulses ? [0.62, 1, 0.62] : 1 }}
+            transition={pulses ? { ...LOOP.pulse, delay: index * 0.1 } : { duration: DURATION.base }}
           />
-        )
-      })}
+        ))}
+      </motion.g>
     </svg>
   )
 }
