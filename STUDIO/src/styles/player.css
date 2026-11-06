@@ -33,7 +33,7 @@
      player at this size. */
   --media-control-background: transparent;
   --media-control-hover-background: oklch(1 0 0 / 18%);
-  --media-control-height: var(--control-sm);
+  --media-control-height: var(--button-sm);
   --media-control-padding: 6px;
   --media-button-icon-width: var(--icon-sm);
   --media-button-icon-height: var(--icon-sm);
@@ -64,7 +64,7 @@
   position: absolute;
   inset-inline: 10px;
   bottom: 10px;
-  min-height: calc(var(--control-sm) + 10px);
+  min-height: calc(var(--button-sm) + 10px);
   padding-inline: 4px;
   display: flex;
   align-items: center;
@@ -84,7 +84,7 @@
 .studio-player media-time-range {
   flex: 1 1 auto;
   min-width: 0;
-  height: var(--control-sm);
+  height: var(--button-sm);
 }
 
 .studio-player media-time-display {

@@ -4,21 +4,8 @@ import { cn } from '@/lib/cn'
 /**
  * The field treatment used everywhere except the composer.
  *
- * Focus is the border, deepened — nothing else. The treatment this replaces
- * was a border shift plus a 2px bloom of grey, first at 26% and then at 14%,
- * and the person using the forms described both the same way: a thick,
- * old-fashioned, light-grey outline that reads like an error state. The
- * lesson was not a smaller alpha. A monochrome halo cannot do this job at
- * any weight — a blue ring says "focus, not warning" with hue, and grey has
- * nothing but spread to say it with, so the answer read as smudge whatever
- * its opacity. The edge says it instead: the same one-pixel border the field
- * always had, deepened to 45%, the weight `--ring` already established as
- * assertive-but-polite in this app.
- *
- * The keyboard outline is a separate register and stays `--ring`: Tab-only,
- * drawn outside the control where it cannot crowd anything. The fields never
- * consume it directly — see the token note in `styles/type.css` for the history of
- * the regression that proved why.
+ * The one-pixel border takes the theme's foreground on focus. A second
+ * outline made the edge read as an error and could clip in tight forms.
  */
 
 const BASE = [
@@ -31,7 +18,7 @@ const BASE = [
   'studio-control w-full min-w-0 rounded-md border bg-surface px-2.5 text-ui text-foreground',
   'placeholder:text-muted-foreground/70',
   'transition-[border-color] duration-fast outline-none',
-  'focus:border-foreground/45',
+  'focus:border-foreground',
   // The app's global `:focus-visible` outline would stack on top of this
   // field's own border — two answers, and the outer one floats 4px off the
   // field, where its ends bulge past the field's own shape on a short control

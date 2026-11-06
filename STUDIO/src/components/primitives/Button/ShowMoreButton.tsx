@@ -1,4 +1,5 @@
-import { cn } from '@/lib/cn'
+import { Icons } from '@/components/icons'
+import { Button } from './Button'
 
 export function ShowMoreButton({
   expanded, onToggle, moreLabel = 'Show more', lessLabel = 'Show fewer', className,
@@ -9,10 +10,8 @@ export function ShowMoreButton({
   lessLabel?: string
   className?: string
 }) {
-  return <button type="button" aria-expanded={expanded} onClick={onToggle}
-    className={cn('inline-flex rounded-md border border-border px-2 py-0.5 text-caption font-medium text-muted-foreground',
-      'transition-colors duration-fast hover:bg-tint hover:text-foreground active:bg-selected focus-visible:ring-2 focus-visible:ring-ring',
-      className)}>
+  return <Button size="xs" expanded={expanded} onClick={onToggle} className={className}>
     {expanded ? lessLabel : moreLabel}
-  </button>
+    <Icons.dropdown size="sm" className={expanded ? 'rotate-180' : undefined} />
+  </Button>
 }

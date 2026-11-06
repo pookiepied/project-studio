@@ -71,7 +71,7 @@ export function DeleteConversationDialog({
           <Button variant="ghost" size="sm" onClick={close}>
             Cancel
           </Button>
-          <Button variant="danger" size="sm" busy={busy} onClick={() => void confirm()}>
+          <Button variant="danger-confirm" size="sm" busy={busy} onClick={() => void confirm()}>
             Delete
           </Button>
         </>

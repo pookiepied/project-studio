@@ -244,11 +244,11 @@ export function AddConnectionDialog({
       width="28rem"
       footer={
         mode.kind === 'pick' ? (
-          <Button variant="ghost" onClick={close}>
+          <Button variant="secondary" onClick={close}>
             Close
           </Button>
         ) : createdId !== null ? (
-          <Button variant="ghost" onClick={close}>
+          <Button variant="secondary" onClick={close}>
             Done
           </Button>
         ) : (

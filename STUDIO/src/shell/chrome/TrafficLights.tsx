@@ -54,7 +54,7 @@ export function TrafficLights() {
           <svg
             viewBox="0 0 6 6"
             aria-hidden
-            className="size-full p-[2.5px] opacity-0 transition-opacity duration-base group-hover/lights:opacity-100"
+            className="size-full p-[2.5px] opacity-0 transition-opacity duration-base group-hover/lights:opacity-100 group-focus-within/lights:opacity-100"
           >
             <path
               d={glyph}

@@ -1,16 +1,4 @@
-/* The palette, light and dark. Monochrome, with no exception. */
-
-/* ---------------------------------------------------------------------------
-   Palette -- monochrome, with no exception.
-
-   Every colour here is oklch with chroma 0. Nothing in the system UI carries a
-   hue, and that includes the window controls: the macOS red, amber and green
-   would be the only saturated pixels in the app and therefore the first thing
-   the eye lands on every time it opens. Position and order carried their
-   meaning; the colour was decoration.
-
-   The brand mark is not bound by this. It happens not to need a hue either.
-   --------------------------------------------------------------------------- */
+/* Neutral surfaces and primary actions, with colour reserved for state. */
 :root {
   --surface: oklch(1 0 0);
   --surface-sunken: oklch(0.979 0 0);
@@ -41,6 +29,9 @@
   --ring: oklch(0.145 0 0 / 45%);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
+  --button-edge: oklch(0.145 0 0 / 22%);
+  --button-secondary: var(--surface);
+  --danger-confirm: #b72740;
 
   /* -- The one hue -------------------------------------------------------
      Everything else in this file is greyscale on purpose, and this is the
@@ -174,6 +165,8 @@
   --ring: oklch(1 0 0 / 45%);
   --primary: oklch(0.94 0 0);
   --primary-foreground: oklch(0.205 0 0);
+  --button-edge: oklch(1 0 0 / 22%);
+  --button-secondary: var(--surface-sunken);
 
   /* Lifted, like every other colour here: the same lightness that reads as
      calm on white disappears into a 0.205 surface. */

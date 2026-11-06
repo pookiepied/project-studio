@@ -143,7 +143,7 @@ export function ServerDialog({
       width="30rem"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button

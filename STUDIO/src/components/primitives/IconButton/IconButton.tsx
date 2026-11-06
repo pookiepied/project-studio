@@ -34,8 +34,8 @@ import { cn } from '@/lib/cn'
  * gesture cannot leave the glyph stuck mid-press.
  */
 
-type Size = 'sm' | 'md' | 'lg' | 'xl'
-type Tone = 'quiet' | 'solid'
+type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+type Tone = 'quiet' | 'solid' | 'secondary'
 
 /**
  * The three control steps, read from the scale rather than written as rem.
@@ -47,13 +47,14 @@ type Tone = 'quiet' | 'solid'
  * was, and the gap between them read as "the text is too small for its
  * buttons". It was, and no amount of changing the text could have fixed it.
  *
- * `--control-*` derives from `--ui-size`, so a size preference now moves the
- * button and the label inside it by the same proportion.
+ * The button and stage steps derive from `--ui-size`, so a size preference
+ * moves the button and its glyph together.
  */
 const SIZE_CLASS: Record<Size, string> = {
-  sm: 'size-[var(--control-sm)]',
-  md: 'size-[var(--control-md)]',
-  lg: 'size-[var(--control-lg)]',
+  xs: 'size-[var(--button-xs)]',
+  sm: 'size-[var(--button-sm)]',
+  md: 'size-[var(--button-md)]',
+  lg: 'size-[var(--button-lg)]',
   xl: 'size-[var(--control-xl)]',
 }
 
@@ -83,12 +84,13 @@ const SIZE_CLASS: Record<Size, string> = {
  * darker, and it says it without becoming the loudest thing in the window.
  */
 const TONE_CLASS: Record<Tone, string> = {
-  quiet: 'text-muted-foreground hover:bg-tint',
+  quiet: 'text-muted-foreground hover:bg-tint active:bg-foreground/15',
   // Opting out of the global muted icon colour on purpose: this mark sits on
   // a filled chip, where muted grey on near-black is unreadable rather than
   // quiet. The arbitrary variant lands in the utilities layer, which is what
   // lets it beat the `.studio-icon` default in `styles/components.css`.
-  solid: 'bg-primary text-primary-foreground hover:opacity-85 [&_.studio-icon]:text-primary-foreground',
+  solid: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary [&_.studio-icon]:text-primary-foreground',
+  secondary: 'border border-button-edge bg-button-secondary text-foreground hover:bg-muted active:bg-selected',
 }
 
 interface IconButtonProps {
@@ -150,7 +152,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           'rounded-full',
           SIZE_CLASS[size],
           TONE_CLASS[tone],
-          active && tone === 'quiet' && 'bg-selected',
+          active && tone === 'quiet' && 'bg-selected hover:bg-selected',
           className,
         )}
       >

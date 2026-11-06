@@ -146,6 +146,10 @@ input[type='search']::-webkit-search-cancel-button {
     --control-md: 44px;
     --control-lg: 44px;
     --control-xl: max(44px, calc(var(--ui-size) * 11 / 3));
+    --button-xs: max(44px, calc(var(--ui-size) * 28 / 13));
+    --button-sm: max(44px, calc(var(--ui-size) * 32 / 13));
+    --button-md: max(44px, calc(var(--ui-size) * 36 / 13));
+    --button-lg: max(44px, calc(var(--ui-size) * 42 / 13));
   }
 
   /* Specialized fields may request caption/code roles below the UI size.

@@ -244,7 +244,7 @@ export function AddModelDialog({
       width="28rem"
       footer={
         <>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="secondary" onClick={close}>
             Cancel
           </Button>
           <Button variant="primary" disabled={!valid} busy={busy} onClick={() => void submit()}>
@@ -314,9 +314,9 @@ export function AddModelDialog({
                         selected ? current.filter((entry) => entry !== level) : [...current, level],
                       )
                     }}
-                    className={`rounded-full border px-2.5 py-0.5 text-caption transition-colors duration-fast ${
+                    className={`studio-control rounded-full border px-2.5 text-caption transition-colors duration-fast [--control-size:var(--button-xs)] ${
                       selected
-                        ? 'border-foreground/40 bg-selected text-foreground'
+                        ? 'border-transparent bg-selected text-foreground'
                         : 'text-muted-foreground hover:bg-tint'
                     }`}
                   >

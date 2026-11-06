@@ -139,14 +139,14 @@ function Specimen({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-const BUTTON_VARIANTS = ['primary', 'secondary', 'ghost', 'danger'] as const
+const BUTTON_VARIANTS = ['primary', 'secondary', 'ghost', 'danger', 'danger-confirm'] as const
 const BUTTON_SIZES = ['xs', 'sm', 'md', 'lg'] as const
 
 function ButtonsSection() {
   return (
     <Section
       title="Buttons"
-      note="Three ranks and danger. The rank states what the page wants; one surface carries one primary."
+      note="Neutral capsules for ordinary actions. Solid red is reserved for destructive confirmation."
     >
       <Card>
         {BUTTON_VARIANTS.map((variant) => (
@@ -190,9 +190,9 @@ function IconButtonsSection() {
     >
       <Card>
         <Specimen label="sizes">
-          {(['sm', 'md', 'lg'] as const).map((size) => (
+          {(['xs', 'sm', 'md', 'lg'] as const).map((size) => (
             <IconButton key={size} label={`Search, ${size}`} size={size}>
-              <Icons.search size={size} />
+              <Icons.search size={size === 'xs' ? 'sm' : size} />
             </IconButton>
           ))}
         </Specimen>
@@ -205,6 +205,9 @@ function IconButtonsSection() {
           </IconButton>
           <IconButton label="Settings, disabled" disabled>
             <Icons.settings size="md" />
+          </IconButton>
+          <IconButton label="Voice mode" tone="secondary">
+            <Icons.voice size="md" />
           </IconButton>
         </Specimen>
       </Card>
@@ -359,7 +362,7 @@ function OverlaysSection() {
             width="30rem"
             footer={
               <>
-                <Button variant="ghost" onClick={() => setSheetOpen(false)}>
+                <Button variant="secondary" onClick={() => setSheetOpen(false)}>
                   Cancel
                 </Button>
                 <Button variant="primary" onClick={() => setSheetOpen(false)}>

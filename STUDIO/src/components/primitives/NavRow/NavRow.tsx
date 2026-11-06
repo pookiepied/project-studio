@@ -30,7 +30,7 @@ export function NavRow({
     <button
       type="button"
       className={cn(
-        'studio-control-flat flex items-center gap-1.5 rounded-md px-1.5 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground',
+        'studio-control-flat flex items-center gap-1.5 rounded-sm px-2 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground active:bg-selected',
         className,
       )}
       {...rest}

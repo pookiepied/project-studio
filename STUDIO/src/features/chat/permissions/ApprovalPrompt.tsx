@@ -128,7 +128,7 @@ export function ApprovalPrompt({
           />
           <div className="flex items-center gap-1.5">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="xs"
               disabled={answering}
               busy={answering && verdictInFlight === 'deny'}

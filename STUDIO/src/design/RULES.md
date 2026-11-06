@@ -196,11 +196,10 @@ condition on it and silently disabled the composer's focus lift in dark mode.
 
 ## 5. Colour
 
-Monochrome, with no exception. Every value is oklch with chroma 0 — including
-the window controls, where the macOS red/amber/green would be the only
-saturated pixels in the app and therefore the first thing the eye lands on
-every time it opens. Position and order carry that meaning; the colour was
-decoration.
+The chrome is monochrome, including the window controls. Primary buttons
+invert with the theme, and secondary buttons use a neutral surface and edge.
+Red identifies destructive actions, with a solid fill reserved for the final
+confirmation.
 
 Hover and selection are **translucent tints of the foreground**, not opaque
 swatches. A tint composites, so the same two values work on the sidebar, inside
@@ -226,11 +225,11 @@ it locally. Markdown structure supplies the hierarchy, while caption and micro
 roles remain reserved for supporting labels. Text-paired icons inherit their
 role's size; standalone icons use the existing icon steps.
 
-Default text buttons, fields, menu actions and segmented options use the shared
-`--control-md` height. Compact text actions use `--control-xs` or `--control-sm`,
-and larger actions use `--control-lg`. Their minimum height and vertical padding
-follow the role's actual line box, so multi-line content can grow. A font-size
-preference must move labels, glyphs and control geometry together. Inline file
+Text actions use the `--button-xs` through `--button-lg` scale. Icon buttons
+share the small, medium and large steps, while fields and dense rows keep the
+`--control-md` step. Minimum height and vertical padding follow the role's
+actual line box, so multi-line content can grow. A font-size preference moves
+labels, glyphs and control geometry together. Inline file
 references keep sentence size and family at medium weight; ordinary inline code
 keeps the code-size preference with enough weight to remain readable.
 
@@ -243,9 +242,8 @@ disagreeing by 23%, and every size preference rescaled the layout without
 moving the marks. Text sizes are px variables applied by the roles; the default
 size sits on `body` so un-roled text inherits it exactly as before.
 
-**Control geometry derives from `--ui-size` too.** `--control-sm/md/lg` are
-multiples of the interface text (2, 2.33, 2.67), and `IconButton` reads them
-instead of `size-6/7/8`. This is the other half of the rule above, and for a
+**Control geometry derives from `--ui-size` too.** Both the control and button
+steps scale with the interface text. This is the other half of the rule above, and for a
 long time it was missing: text scaled from one number and every box was a fixed
 px or rem constant calibrated when the text was 14. At 12 the boxes kept the
 proportions of the larger scale, and a size preference moved the text while the

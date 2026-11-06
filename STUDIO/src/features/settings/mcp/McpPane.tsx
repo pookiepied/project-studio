@@ -213,7 +213,7 @@ function ServerRow({
             <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
               Keep
             </Button>
-            <Button variant="danger" size="sm" onClick={onRemove}>
+            <Button variant="danger-confirm" size="sm" onClick={onRemove}>
               Remove
             </Button>
           </>

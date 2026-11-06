@@ -59,17 +59,13 @@ export function MenuItem({
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        'studio-menu-row studio-control-flat flex w-full items-start gap-2 rounded-sm px-2 text-left text-ui',
+        'studio-menu-row studio-control-flat flex w-full items-start gap-2 rounded-sm px-2 text-left text-ui [--control-size:calc((var(--button-sm)+var(--button-md))/2)]',
         'transition-colors duration-fast',
         selected ? 'bg-selected text-foreground' : 'text-muted-foreground',
         expanded && 'text-foreground ring-1 ring-inset ring-foreground/15',
         !selected && !expanded && 'enabled:hover:bg-tint enabled:hover:text-foreground',
         'enabled:active:bg-foreground/15',
         'disabled:cursor-default disabled:opacity-45',
-        // Delete and its kin say so with the mark, since the label alone reads
-        // like every other row until you have finished reading it. This is the
-        // one place a glyph carries meaning by colour, so it opts out of the
-        // muted default rather than the rule being softened for everyone.
         destructive && '[&_.studio-icon]:text-danger/80 hover:[&_.studio-icon]:text-danger',
       )}
     >

@@ -183,7 +183,7 @@ export function QuestionPrompt({
             <Button variant="ghost" size="xs" disabled={answering} onClick={defer}>
               You decide
             </Button>
-            <Button variant="danger" size="xs" disabled={answering} onClick={onStop}>
+            <Button variant="secondary" size="xs" disabled={answering} onClick={onStop}>
               Stop
             </Button>
           </div>

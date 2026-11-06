@@ -1,4 +1,5 @@
 import { Icons } from '@/components/icons'
+import { IconButton } from '@/components/primitives'
 import type { TurnImageWire } from '@/platform/harness'
 
 /**
@@ -24,7 +25,7 @@ export function PendingImages({
   onRemove: (index: number) => void
   /**
    * "Keep in the library": the offer the brief asks for on every upload -
-   * a control on the thumbnail, not a question in the way of sending. The
+   * a control beside the thumbnail, not a question in the way of sending. The
    * picture rides on the message whether or not it is kept.
    */
   onKeep?: (index: number) => void
@@ -35,7 +36,7 @@ export function PendingImages({
       {images.map((image, index) => (
         <figure
           key={`${image.filename ?? ''}-${index}`}
-          className="group relative size-16 shrink-0"
+          className="flex shrink-0 flex-col items-center gap-0.5"
         >
           <img
             src={`data:${image.mimeType};base64,${image.data}`}
@@ -43,25 +44,24 @@ export function PendingImages({
             className="size-16 rounded-md object-cover ring-1 ring-border"
             draggable={false}
           />
-          {onKeep !== undefined ? (
-            <button
-              type="button"
-              aria-label={`Keep ${image.filename ?? 'image'} in the library`}
-              title="Keep in the library"
-              onClick={() => onKeep(index)}
-              className="absolute -left-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border bg-surface-raised text-muted-foreground shadow-raised transition-colors duration-fast hover:bg-tint hover:text-foreground"
+          <div className="flex gap-0.5">
+            {onKeep !== undefined ? (
+              <IconButton
+                label={`Keep ${image.filename ?? 'image'} in the library`}
+                size="xs"
+                onClick={() => onKeep(index)}
+              >
+                <Icons.keep size="sm" />
+              </IconButton>
+            ) : null}
+            <IconButton
+              label={`Remove ${image.filename ?? 'image'}`}
+              size="xs"
+              onClick={() => onRemove(index)}
             >
-              <Icons.keep size="sm" />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            aria-label={`Remove ${image.filename ?? 'image'}`}
-            onClick={() => onRemove(index)}
-            className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border bg-surface-raised text-muted-foreground shadow-raised transition-colors duration-fast hover:bg-tint hover:text-foreground"
-          >
-            <Icons.close size="sm" />
-          </button>
+              <Icons.close size="sm" />
+            </IconButton>
+          </div>
         </figure>
       ))}
     </div>

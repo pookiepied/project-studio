@@ -42,8 +42,8 @@ export function SearchField({
         autoFocus={autoFocus}
         onKeyDown={onKeyDown}
         className={cn(
-          'pr-[calc(var(--control-sm)+0.375rem)]',
-          appearance === 'menu' && 'border-transparent bg-transparent pl-1 focus:border-border',
+          'min-h-[var(--button-sm)] pr-[calc(var(--button-sm)+0.375rem)]',
+          appearance === 'menu' && 'border-transparent bg-transparent pl-1',
         )}
       />
       {value === '' ? null : (

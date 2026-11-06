@@ -72,7 +72,7 @@ const CLUSTER_GAP = 8
  * full size the moment a second row exists, which is a step in the frame's
  * bottom edge no matter how smoothly everything else moves.
  */
-const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
+const FOOTER_TRACK = 'auto calc(var(--button-md) + 0.5rem)'
 /**
  * How much further in the text sits once the dock stands beside it: past the air
  * between the two, and by the body's own padding, so the text clears the edge
@@ -938,7 +938,7 @@ export function Composer({
               draft keeps its size while the microphone has the slot, and a
               passage landing is measured and reshapes the frame as it arrives
               rather than once it has finished. */}
-          <div className="relative flex min-h-[var(--control-md)] flex-col justify-center">
+          <div className="relative flex min-h-[var(--button-md)] flex-col justify-center">
             <div
               inert={fieldAside}
               className={cn('transition-opacity duration-fast', fieldAside && 'opacity-0')}
@@ -1149,6 +1149,7 @@ export function Composer({
                 <IconButton
                   label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
                   size="md"
+                  tone="secondary"
                   disabled={!voiceAvailable || (conversationId === null && onStartVoice === undefined) || busy}
                   onClick={() => (conversationId === null ? onStartVoice?.() : voice.enter(conversationId))}
                 >

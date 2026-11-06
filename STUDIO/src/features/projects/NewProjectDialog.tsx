@@ -177,7 +177,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
       width="28rem"
       footer={
         <>
-          <Button variant="ghost" onClick={close} disabled={submitting}>
+          <Button variant="secondary" onClick={close} disabled={submitting}>
             Cancel
           </Button>
           <Button variant="primary" disabled={!valid || submitting} onClick={submit}>

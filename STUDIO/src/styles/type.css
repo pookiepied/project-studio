@@ -169,12 +169,17 @@
   --control-xs: calc(var(--ui-size) * 5 / 3);
   /** Compact round controls: menu affordances and row overflow buttons. */
   --control-sm: calc(var(--ui-size) * 2);
-  /** Default text actions, fields, icon buttons and composer controls. */
+  /** Default height for fields and dense rows. */
   --control-md: calc(var(--ui-size) * 7 / 3);
   /** The largest round control in the chrome. */
   --control-lg: calc(var(--ui-size) * 8 / 3);
   /** The stage control: voice mode's transport, and nothing else. */
   --control-xl: calc(var(--ui-size) * 11 / 3);
+
+  --button-xs: calc(var(--ui-size) * 28 / 13);
+  --button-sm: calc(var(--ui-size) * 32 / 13);
+  --button-md: calc(var(--ui-size) * 36 / 13);
+  --button-lg: calc(var(--ui-size) * 42 / 13);
 }
 
 /* -- Control sizes land on whole pixels --------------------------------------
@@ -220,6 +225,10 @@
     --control-md: round(calc(var(--ui-size) * 7 / 3), 1px);
     --control-lg: round(calc(var(--ui-size) * 8 / 3), 1px);
     --control-xl: round(calc(var(--ui-size) * 11 / 3), 1px);
+    --button-xs: round(calc(var(--ui-size) * 28 / 13), 1px);
+    --button-sm: round(calc(var(--ui-size) * 32 / 13), 1px);
+    --button-md: round(calc(var(--ui-size) * 36 / 13), 1px);
+    --button-lg: round(calc(var(--ui-size) * 42 / 13), 1px);
 
     /* The provider mark and its tile, for the same reason and one more: the
        mark is painted as a CSS mask over a background, and a mask on a

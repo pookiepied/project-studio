@@ -75,7 +75,7 @@ export function CommandDialog({
       width="30rem"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="primary" disabled={!valid} busy={busy} onClick={() => void submit()}>

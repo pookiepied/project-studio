@@ -34,9 +34,7 @@ export function Segmented<T extends string | number>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      // `md` rows inside an `lg` track with 2px of padding: near enough the
-      // concentric rule at this size that the corners stay parallel.
-      className="flex gap-0.5 rounded-lg bg-muted p-0.5"
+      className="flex gap-0.5 rounded-full bg-muted p-0.5"
     >
       {options.map((option) => {
         const selected = option.id === value
@@ -54,7 +52,7 @@ export function Segmented<T extends string | number>({
               // that bargain: without it a long label wraps to a second line
               // and takes the whole control's height with it, which is how a
               // two-word option once turned this into a two-line block.
-              'studio-control-flat relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-2',
+              'studio-control-flat relative flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 [--control-size:var(--button-xs)]',
               'whitespace-nowrap text-ui transition-colors duration-fast',
               selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
@@ -63,7 +61,7 @@ export function Segmented<T extends string | number>({
               <motion.span
                 layoutId={layoutId}
                 transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-md bg-surface-raised shadow-chip"
+                className="absolute inset-0 rounded-full bg-surface-raised shadow-chip"
               />
             ) : null}
             <span className="relative z-10 flex items-center gap-1.5">{option.label}</span>

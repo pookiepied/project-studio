@@ -106,7 +106,7 @@ export function FolderBrowserDialog({
       width="24rem"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="primary" disabled={listing === null || loading} onClick={pick}>

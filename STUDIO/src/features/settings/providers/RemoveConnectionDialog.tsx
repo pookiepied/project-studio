@@ -67,7 +67,7 @@ export function RemoveConnectionDialog({
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button variant="danger" busy={busy} onClick={() => void confirm()}>
+          <Button variant="danger-confirm" busy={busy} onClick={() => void confirm()}>
             Remove
           </Button>
         </>

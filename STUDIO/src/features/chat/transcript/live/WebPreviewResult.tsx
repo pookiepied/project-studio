@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
+import { Button, MenuItem, MenuSeparator, Popover } from '@/components/primitives'
 import { copyText } from '@/lib/clipboard'
 import { openExternalUrl } from '@/platform/tauri/external'
 import { useRail } from '@/stores/rail'
@@ -43,10 +43,9 @@ export function WebPreviewResult({ preview, conversationId, resultId }: {
         </span>
       </button>
       <Popover open={menuOpen} onOpenChange={setMenuOpen} align="end"
-        trigger={<button type="button" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}
-          className="flex shrink-0 items-center gap-1 rounded-lg border border-hairline px-2 py-1 text-muted-foreground hover:bg-tint hover:text-foreground">
+        trigger={<Button size="xs" hasPopup="menu" expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
           Open in<Icons.dropdown />
-        </button>}>
+        </Button>}>
         <MenuItem icon={<Icons.browserUse />} onSelect={openPreview}>Studio preview</MenuItem>
         <MenuItem icon={<Icons.openExternal />} onSelect={openBrowser}>Default browser</MenuItem>
         <MenuSeparator />

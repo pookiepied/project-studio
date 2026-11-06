@@ -168,7 +168,7 @@ export function KeepDialog({
       width="32rem"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="primary" busy={busy} onClick={() => void submit()}>

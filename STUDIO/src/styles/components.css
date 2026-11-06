@@ -219,8 +219,8 @@
     letter-spacing: -0.003em;
   }
 
-  /* A default field, button and menu row share one height. The padding follows
-     the role's real line box, so larger text and multi-line labels can grow. */
+  /* Padding follows the control's chosen height and line box so larger text
+     and multi-line labels can grow. */
   .studio-control,
   .studio-control-flat {
     min-height: var(--control-size, var(--control-md));

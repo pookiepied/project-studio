@@ -102,7 +102,7 @@ export const SHELL = {
 const COMPOSER_PADDING_BLOCK = SPACE.sm
 
 /** One row of controls and the padding around it: the capsule, and each dock. */
-const COMPOSER_DOCK_HEIGHT = `calc(var(--control-md) + ${COMPOSER_PADDING_BLOCK * 2}px)`
+const COMPOSER_DOCK_HEIGHT = `calc(var(--button-md) + ${COMPOSER_PADDING_BLOCK * 2}px)`
 
 /** The composer, which is a capsule when single-line and a rounded box when not. */
 export const COMPOSER = {

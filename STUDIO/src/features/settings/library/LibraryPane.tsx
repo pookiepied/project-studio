@@ -7,6 +7,7 @@ import { Loading, StateNote } from '@/components/state'
 import { Pane } from '@/features/settings/panes/Pane'
 import { KeepDialog } from '@/features/library/KeepDialog'
 import { base64OfFile, type KeepCandidate } from '@/features/library/client'
+import { cn } from '@/lib/cn'
 import { useLibrary, type LibraryView } from '@/features/settings/library/useLibrary'
 import {
   harnessBytesDataUrl,
@@ -270,12 +271,12 @@ function Toolbar({
                 type="button"
                 aria-pressed={on}
                 onClick={() => setFilter({ ...filter, subject: on ? null : subject })}
-                className={
-                  on
-                    ? 'rounded-full bg-foreground px-2.5 py-0.5 text-caption text-background'
-                    : 'rounded-full bg-tint px-2.5 py-0.5 text-caption text-foreground hover:bg-selected'
-                }
+                className={cn(
+                  'studio-control inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 text-caption transition-colors duration-fast [--control-size:var(--button-xs)]',
+                  on ? 'bg-selected text-foreground' : 'bg-tint text-muted-foreground hover:bg-selected',
+                )}
               >
+                <Icons.check size="xs" className={on ? undefined : 'invisible'} />
                 {subject}
               </button>
             )

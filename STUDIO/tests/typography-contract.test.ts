@@ -50,7 +50,8 @@ describe('shared interface typography', () => {
       expect(readFileSync(path, 'utf8'), path.pathname).not.toContain('flex items-start justify-between gap-6 py-3.5')
     }
     const player = source('styles/player.css')
-    expect(player).toContain('--media-control-height: var(--control-sm)')
+    expect(player).toContain('--media-control-height: var(--button-sm)')
+    expect(source('components/primitives/IconButton/IconButton.tsx')).toContain("sm: 'size-[var(--button-sm)]'")
     expect(player).toContain('--media-button-icon-width: var(--icon-sm)')
     expect(player).toContain('width: var(--control-xl)')
   })

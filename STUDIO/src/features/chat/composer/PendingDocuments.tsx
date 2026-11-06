@@ -1,4 +1,5 @@
 import { Icons } from '@/components/icons'
+import { IconButton } from '@/components/primitives'
 
 /**
  * The documents this turn will carry, resting above the field beside the
@@ -26,30 +27,27 @@ export function PendingDocuments({
       {documents.map((document, index) => (
         <span
           key={`${document.name}-${document.size}-${index}`}
-          className="group inline-flex max-w-72 items-center gap-1.5 rounded-full border bg-surface-raised py-1 pl-2.5 pr-1 text-caption text-foreground"
+          className="inline-flex max-w-[min(18rem,100%)] items-center gap-1.5 rounded-full border bg-surface-raised py-0.5 pl-2.5 pr-1 text-caption text-foreground"
         >
           <Icons.file size="sm" />
           <span className="truncate">{document.name}</span>
           <span className="shrink-0 text-muted-foreground">{formatBytes(document.size)}</span>
           {onKeep !== undefined ? (
-            <button
-              type="button"
-              aria-label={`Keep ${document.name} in the library`}
-              title="Keep in the library"
+            <IconButton
+              label={`Keep ${document.name} in the library`}
+              size="xs"
               onClick={() => onKeep(index)}
-              className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
             >
               <Icons.keep size="sm" />
-            </button>
+            </IconButton>
           ) : null}
-          <button
-            type="button"
-            aria-label={`Remove ${document.name}`}
+          <IconButton
+            label={`Remove ${document.name}`}
+            size="xs"
             onClick={() => onRemove(index)}
-            className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
           >
             <Icons.close size="sm" />
-          </button>
+          </IconButton>
         </span>
       ))}
     </div>
