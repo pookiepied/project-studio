@@ -146,10 +146,10 @@ describe('visionRefusal speaks before the provider does', () => {
     author: 'openai',
     connectionVendor: 'openai',
     connectionName: 'Work OpenAI',
+    offered: true,
     reasoningLevels: [],
     contextWindow: 16385,
     capability: capability('unsupported'),
-    pricing: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   }
   const seer: CatalogModel = { ...blind, id: 'anthropic/claude', capability: capability('supported') }
   const models: readonly CatalogModel[] = [blind, seer]

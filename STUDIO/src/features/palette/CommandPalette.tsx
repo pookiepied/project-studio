@@ -4,6 +4,7 @@ import { DURATION, EASE_IN, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import type { IconComponent } from '@/components/icons'
 import { Overlay } from '@/components/primitives'
+import { ClearSearchButton } from '@/components/primitives/Field/SearchField'
 import { ALL_SECTIONS } from '@/features/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
@@ -177,8 +178,15 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
                 choose(entries[index])
               }
             }}
-            className="w-full bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground/70"
+            className="w-full min-w-0 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground/70"
           />
+          {query === '' ? null : (
+            <ClearSearchButton onClear={() => {
+              setQuery('')
+              setCursor(0)
+              field.current?.focus()
+            }} />
+          )}
         </div>
 
         <div

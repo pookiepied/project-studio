@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
-import { Button, MenuItem, Popover, Segmented } from '@/components/primitives'
-import { DURATION, EASE_OUT } from '@/design/tokens'
+import { Button, MenuItem, MenuViews, Popover, Segmented } from '@/components/primitives'
 import { Loading, StateNote } from '@/components/state'
 import {
   capabilityServesKind,
@@ -24,7 +22,7 @@ import { ProbeLine } from './ProbeLine'
 import { RemoveConnectionDialog } from './RemoveConnectionDialog'
 import { AddConnectionDialog } from './AddConnectionDialog'
 import { AddModelDialog } from './AddModelDialog'
-import { ModelLibrary } from './ModelLibrary'
+import { ConnectionModelList } from './ConnectionModelList'
 import { DefaultsSection } from './DefaultsSection'
 import { VoiceModelSetting } from './VoiceModelSetting'
 import { useProviders, type Providers } from './useProviders'
@@ -40,7 +38,7 @@ const KIND_LABELS: Readonly<Record<ProviderKind, string>> = {
  * Providers and models: one pane over the one provider store.
  *
  * The pane is a shell around focused pieces - the hook owns every harness
- * call, the connection list owns rows, the model library owns per-connection
+ * call, the connection list owns rows, the model list owns per-connection
  * models, the defaults section owns the slots. Nothing here holds an API key:
  * the key lives in the add dialog's state for the length of one request and is
  * gone before the 201 is drawn.
@@ -169,18 +167,11 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
         />
         <p className="mt-2.5 text-caption text-muted-foreground">{chosen.description}</p>
       </div>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={chosen.id}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-          className="flex flex-col divide-y"
-        >
+      <MenuViews view={chosen.id} depth={0} resize={false}>
+        <div className="flex flex-col divide-y">
           <PurposeBody providers={providers} kind={kind} purpose={chosen} />
-        </motion.div>
-      </AnimatePresence>
+        </div>
+      </MenuViews>
     </>
   )
 }
@@ -501,7 +492,7 @@ function ConnectionRow({
 
       {expanded ? (
         <div className="mt-2 pl-9">
-          <ModelLibrary
+          <ConnectionModelList
             connection={record}
             models={models}
             noun={noun}

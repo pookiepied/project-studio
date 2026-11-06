@@ -52,7 +52,7 @@ export const TextField = forwardRef<
     placeholder?: string
     autoFocus?: boolean
     /**
-     * `password` masks the value and is the only other type this field takes.
+     * `password` masks the value. Search fields supply their own clear control.
      *
      * There is no `email`, `number` or `url` here on purpose: those types
      * bring browser validation bubbles and spinner affordances that this
@@ -62,7 +62,7 @@ export const TextField = forwardRef<
      * behaviour, and the app now has one place that needs it (an API key on
      * its way to the harness credential store).
      */
-    type?: 'text' | 'password'
+    type?: 'text' | 'password' | 'search'
     /**
      * Defaults to `off`. A password manager offering to save a harness API key
      * into a browser vault is the exact opposite of what that key's handling

@@ -15,7 +15,7 @@ import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
  * memory. None of that is reported by any provider and none of it is counted
  * by the harness, so each row would be a number invented to fill a table.
  * What is pinned here is the opposite: the divisions that exist, the estimate
- * marked as an estimate, and no row for a figure nobody produced.
+ * marked as an estimate, and unavailable sections never get invented counts.
  */
 
 afterEach(cleanup)
@@ -66,7 +66,8 @@ describe('the context tank', () => {
 
     const meter = screen.getByRole('meter', { name: 'Context used' })
     expect(meter.getAttribute('aria-valuenow')).toBe('25')
-    expect((meter.firstElementChild as HTMLElement | null)?.style.width).toBe('25%')
+    expect(meter.children).toHaveLength(100)
+    expect(meter.querySelectorAll('[data-filled]')).toHaveLength(25)
   })
 })
 

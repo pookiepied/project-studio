@@ -18,9 +18,8 @@ import { ProviderMark } from './ProviderMark'
  * `unnamed`. It exists because the element name is not enough to tell them
  * apart: a resolved logo and a monogram are both spans.
  *
- * Colour is deliberately absent from these assertions. Every mark paints
- * `currentColor`, and the rule is asserted once rather than per vendor —
- * see the note on monochrome in `ProviderMark.tsx`.
+ * Picker marks can use bundled brand assets. Catalog fallbacks keep the
+ * theme-colored mask or monogram.
  */
 
 afterEach(() => {
@@ -41,8 +40,8 @@ describe('the mark before a logo arrives', () => {
   })
 
   it('takes the initial from the vendor id, upper-cased', () => {
-    const { container } = render(<ProviderMark provider="anthropic" />)
-    expect(container.querySelector('[data-provider="anthropic"]')?.textContent).toBe('A')
+    const { container } = render(<ProviderMark provider="unlisted-ai" />)
+    expect(container.querySelector('[data-provider="unlisted-ai"]')?.textContent).toBe('U')
   })
 
   it('reports the vendor it was given rather than a bucket', () => {
@@ -96,6 +95,25 @@ describe('the tile', () => {
 })
 
 describe('the real logo', () => {
+  it('uses the local Google and Claude colors and the theme for OpenAI', () => {
+    const { container, rerender } = render(<ProviderMark provider="google" />)
+    expect(container.querySelector('img[data-provider="google"]')).not.toBeNull()
+    rerender(<ProviderMark provider="anthropic" />)
+    expect(container.querySelector('img[data-provider="anthropic"]')).not.toBeNull()
+    rerender(<ProviderMark provider="openai" />)
+    const mark = container.querySelector<HTMLElement>('[data-provider="openai"][data-mark="logo"]')
+    expect(mark?.style.backgroundColor).toBe('currentcolor')
+    expect(mark?.style.maskImage).toContain('data:image/svg+xml')
+  })
+
+  it('uses both of OpenRouter\'s published theme assets', () => {
+    const { container } = render(<ProviderMark provider="openrouter" />)
+    const grape = container.querySelector<HTMLImageElement>('img[class~="dark:hidden"]')
+    const volt = container.querySelector<HTMLImageElement>('img[class~="dark:block"]')
+    expect(grape?.src).toMatch(/7624F4/i)
+    expect(volt?.src).toMatch(/C8FF00/i)
+  })
+
   it('replaces the monogram when the harness has one, in the theme colour', async () => {
     vi.stubGlobal(
       'fetch',
@@ -116,22 +134,20 @@ describe('the real logo', () => {
     vi.stubEnv('VITE_HARNESS_BASE_URL', 'http://127.0.0.1:4319')
     vi.stubEnv('VITE_HARNESS_TOKEN', 'a-test-credential')
 
-    const { container } = render(<ProviderMark provider="deepseek" />)
+    const { container } = render(<ProviderMark provider="model-vendor" />)
 
     // The monogram is on screen first, then the real logo takes its place
     // with the same data-provider value. The logo is a mask, not an image:
     // the source SVGs are monochrome currentColor, so the background is what
     // paints through it.
-    expect(container.querySelector('[data-provider="deepseek"]')?.getAttribute('data-mark')).toBe('monogram')
+    expect(container.querySelector('[data-provider="model-vendor"]')?.getAttribute('data-mark')).toBe('monogram')
     await waitFor(() => {
-      expect(container.querySelector<HTMLSpanElement>('span[data-provider="deepseek"]')?.style.maskImage).toContain(
+      expect(container.querySelector<HTMLSpanElement>('span[data-provider="model-vendor"]')?.style.maskImage).toContain(
         'data:image/svg+xml',
       )
     })
-    const mark = container.querySelector<HTMLSpanElement>('span[data-provider="deepseek"]')
+    const mark = container.querySelector<HTMLSpanElement>('span[data-provider="model-vendor"]')
     expect(mark?.getAttribute('data-mark')).toBe('logo')
-    // DeepSeek is the vendor that used to prove the colour table worked here,
-    // which makes it the one that proves the table is gone.
     expect(mark?.style.backgroundColor).toBe('currentcolor')
   })
 

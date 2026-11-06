@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
-import { Button, Dialog, MenuItem, Popover, TextField } from '@/components/primitives'
+import { Button, Dialog, MenuItem, Popover, SearchField, TextField } from '@/components/primitives'
 import type {
   CapabilitySlot,
   HarnessFailure,
@@ -54,7 +54,7 @@ import { connectionIdFrom, LANGUAGE_PROTOCOL_CHOICES } from './draft'
  *
  * After the connection is created the dialog probes it and reports what the
  * probe actually learned: the model count it enumerated, or the provider's own
- * error sentence. From there, one button opens the model library - what is
+ * error sentence. From there, one button opens the connection's model list — what is
  * selected there is what the rest of the product offers.
  */
 
@@ -265,7 +265,7 @@ export function AddConnectionDialog({
     >
       {mode.kind === 'pick' ? (
         <div className="flex flex-col gap-3 pt-1">
-          <TextField value={search} onChange={setSearch} placeholder="Search providers" autoFocus />
+          <SearchField value={search} onChange={setSearch} placeholder="Search providers" autoFocus />
           <div className="max-h-80 overflow-y-auto">
             {filtered.map((entry) => (
               <button

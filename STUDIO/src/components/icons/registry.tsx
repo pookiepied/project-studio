@@ -29,7 +29,7 @@ import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, ArrowUpRight, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, CodeXml, Command, Copy, CornerDownRight, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
   GalleryVerticalEnd, GitBranch, GitFork, Globe, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
-  MoreHorizontal, Moon, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
+  MoreHorizontal, Moon, MessageCircleDashed, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
   RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Split,
   SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
@@ -113,6 +113,7 @@ const REGISTRY = {
   // a new one is a bubble with a plus.
   newChat: { mark: MessageSquarePlus },
   chat: { mark: MessageSquare },
+  temporaryChat: { mark: MessageCircleDashed },
   // The stopped-run question: a permission the kernel wants or a question the
   // model asked. A speech bubble carrying a question mark -- a conversation
   // that has turned and is waiting on you -- and deliberately not the mode

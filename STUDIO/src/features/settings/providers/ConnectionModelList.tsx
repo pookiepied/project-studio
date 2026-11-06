@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
-import { Button, MenuItem, Popover, TextField } from '@/components/primitives'
+import { Button, MenuItem, Popover, SearchField, TextField } from '@/components/primitives'
 import type { ProviderConnection, ProviderModel } from '@/platform/harness'
-import { ALL_SLOTS, SLOT_LABELS } from '@/domain/models/slots'
 import { FEATURED_LABEL, featuredFirst } from '@/domain/models/featured'
 import { cn } from '@/lib/cn'
 
 /**
- * The model library: one connection's models, with what each can do.
+ * Manages the models a connection offers throughout Studio.
  *
  * ---- Selection is the product's own offer -----------------------------------
  *
@@ -20,15 +19,6 @@ import { cn } from '@/lib/cn'
  * Selection is stored as hiding - the same fact the per-model gesture writes -
  * so the two can never disagree about what "offered" means.
  *
- * ---- The rows tell the truth ------------------------------------------------
- *
- * Each row shows the capabilities it actually has, the context window when the
- * provider states one, and the price when there is one to show. "Unknown"
- * reads as unknown - a word, not a missing tick - because an undescribed
- * dimension is a fact about the catalog, not a zero. A row the provider's own
- * model list no longer names is marked, greyed, and not selectable: the
- * connection was taught what its provider serves, by probe.
- *
  * ---- The shelf, and what comes first ----------------------------------------
  *
  * The featured models - Studio's own recommendation, a word of the declared
@@ -37,7 +27,7 @@ import { cn } from '@/lib/cn'
  * hundred ids is looking for the few worth reading, and they are the top ones.
  */
 
-export function ModelLibrary({
+export function ConnectionModelList({
   connection,
   models,
   noun = 'model',
@@ -81,7 +71,7 @@ export function ModelLibrary({
   return (
     <div className="flex flex-col gap-2 rounded-md border bg-surface/50 p-2">
       <div className="flex items-center gap-2">
-        <TextField value={search} onChange={setSearch} placeholder={`Search ${noun}s`} />
+        <SearchField value={search} onChange={setSearch} placeholder={`Search ${noun}s`} />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -113,15 +103,7 @@ export function ModelLibrary({
           const offeredRow = !model.hidden && model.available
           return (
             <div key={model.modelId} className="flex items-start gap-2 py-2">
-              <input
-                type="checkbox"
-                aria-label={`Offer ${model.displayName}`}
-                checked={!model.hidden}
-                disabled={!model.available}
-                onChange={() => onSelectionChange(toggleOffered(models, model.modelId))}
-                className="mt-1 size-3.5 shrink-0 accent-current"
-              />
-              <ProviderMark provider={authorVendor(model, connection)} />
+              <ProviderMark provider={authorVendor(model, connection)} bare />
               <div className="min-w-0 flex-1">
                 {renaming === model.modelId ? (
                   <div className="flex items-center gap-1.5">
@@ -160,10 +142,6 @@ export function ModelLibrary({
                   {model.featured ? (
                     <span className="text-foreground/75">{FEATURED_LABEL}</span>
                   ) : null}
-                  {capabilityChips(model)}
-                  <span>{windowText(model)}</span>
-                  <span aria-hidden>-</span>
-                  <span>{priceText(model)}</span>
                   {model.available ? null : (
                     <span className="text-danger">Not offered by the provider right now</span>
                   )}
@@ -178,6 +156,14 @@ export function ModelLibrary({
                 onHide={() => onEditModel(model.modelId, model.displayName, true)}
                 onShow={() => onEditModel(model.modelId, model.displayName, false)}
                 onRemove={() => onRemoveModel(model.modelId)}
+              />
+              <input
+                type="checkbox"
+                aria-label={`Offer ${model.displayName}`}
+                checked={!model.hidden}
+                disabled={!model.available}
+                onChange={() => onSelectionChange(toggleOffered(models, model.modelId))}
+                className="mt-1 size-3.5 shrink-0 accent-current"
               />
             </div>
           )
@@ -278,29 +264,4 @@ function authorVendor(model: ProviderModel, connection: ProviderConnection): str
   const vendor = connection.catalogProvider ?? connection.id
   const separator = model.modelId.indexOf('/')
   return separator > 0 ? model.modelId.slice(0, separator) : vendor
-}
-
-function capabilityChips(model: ProviderModel): readonly string[] {
-  const named = ALL_SLOTS.filter((slot) => model.capability[slot] === 'supported').map(
-    (slot) => SLOT_LABELS[slot],
-  )
-  return named.length === 0 ? ['Capabilities unknown'] : named
-}
-
-function windowText(model: ProviderModel): string {
-  const window = model.capability.contextWindow
-  return window === 'unknown' ? 'Context unknown' : `${window.toLocaleString()} context`
-}
-
-/**
- * The price, or the word for not having one.
- *
- * Pricing is per million tokens when it exists at all; audio and retrieval
- * vendors bill in units this contract does not model, so "unknown" is the
- * honest answer for most non-chat rows and is drawn as a word, never as 0.
- */
-function priceText(model: ProviderModel): string {
-  const { input, output } = model.pricing
-  if (input === 'unknown' || output === 'unknown') return 'Price unknown'
-  return `$${input}/M in, $${output}/M out`
 }

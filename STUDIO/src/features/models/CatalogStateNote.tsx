@@ -1,18 +1,10 @@
-import type { CatalogModel } from '@/domain/models/catalog'
 import type { HarnessFailure } from '@/platform/harness'
 
-/**
- * The sentence a catalog shows while it is not a list: the four named states
- * it can be in, written once and shared by the picker and the library - a
- * menu over a catalog that could not load must say so, not show an empty
- * list that says nothing.
- */
 export interface CatalogState {
   readonly phase: {
     readonly status: 'loading' | 'ready' | 'no-harness' | 'failed'
     readonly error: HarnessFailure | null
   }
-  readonly models: readonly CatalogModel[]
 }
 
 export function CatalogStateNote({ catalog }: { catalog: CatalogState }) {

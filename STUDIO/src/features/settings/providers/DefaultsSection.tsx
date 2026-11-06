@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, MenuItem, Popover, TextField } from '@/components/primitives'
+import { Button, MenuItem, Popover, SearchField } from '@/components/primitives'
 import { ProviderMark } from '@/features/models'
 import type {
   CapabilitySlot,
@@ -220,7 +220,7 @@ function SlotRow({
           }
         >
           <div className="p-1.5">
-            <TextField value={search} onChange={setSearch} placeholder={`Search ${noun}s`} />
+            <SearchField value={search} onChange={setSearch} placeholder={`Search ${noun}s`} />
           </div>
           <div className="max-h-64 overflow-y-auto">
             {visible.map((model) => {

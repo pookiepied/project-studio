@@ -653,7 +653,7 @@ describe('the Media categories', () => {
     // Voice: both, each tagged with the voice slots it serves.
     fireEvent.click(screen.getByRole('radio', { name: 'Voice' }))
     await screen.findByText('My ElevenLabs')
-    expect(screen.getByText('OpenAI')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('OpenAI')).toBeTruthy())
     expect(screen.getAllByText('Speech, Transcription')).toHaveLength(2)
     expect(screen.getByText('Read aloud')).toBeTruthy()
     expect(screen.getByText('Dictation')).toBeTruthy()
@@ -661,7 +661,7 @@ describe('the Media categories', () => {
     // Video: neither connection, and the empty sentence names the category.
     fireEvent.click(screen.getByRole('radio', { name: 'Video' }))
     await screen.findByText(/No provider serves video yet/)
-    expect(screen.queryByText('OpenAI')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('OpenAI')).toBeNull())
   })
 
   it('offers, when adding, only the vendors that serve the category, and says what for', async () => {
@@ -676,10 +676,9 @@ describe('the Media categories', () => {
     await screen.findByText('Add provider')
 
     fireEvent.click(screen.getByRole('radio', { name: 'Video' }))
-    // The category's own body, once the previous one has left: the button
-    // in the leaving body belongs to a component on its way out.
+    // The outgoing body is visible during its exit, but its button is inert.
     await screen.findByText(/No provider serves video yet/)
-    fireEvent.click(screen.getByText('Add provider'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add provider' }))
     const picker = dialog('Add a provider for video')
     await within(picker).findByText('MiniMax')
     // Only the video half of what MiniMax serves is named here.

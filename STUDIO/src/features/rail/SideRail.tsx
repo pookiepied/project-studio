@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { FADE, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { IconButton } from '@/components/primitives'
+import { IconButton, PageTransition } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
 import { BackgroundWorkPanel } from '@/features/jobs'
 import { BrowserPanel } from '@/features/rail/BrowserPanel'
@@ -169,26 +169,13 @@ export function SideRail({
             </header>
 
 
-            {/* Keyed by the entry, so switching plays the view transition rather
-                than swapping content inside a frame that never acknowledges it
-                changed.
-
-                `popLayout` is what makes that claim true: the outgoing view fades
-                while the incoming one fades in, without either pushing the other
-                down the scroll. Without a mode at all both stay in the flow and
-                the panel jumps; with `wait` the outgoing view vanishes first and
-                the handover dips through empty - which is exactly what this block
-                did for its first year, calling itself a crossfade. A pure
-                crossfade, like every other lateral move between same-depth views:
-                this one used to add a small rise, the vertical motion that makes a
-                horizontal handover look like a fault.
-
-                The scroll body is `relative` so the popped-out view overlays it
-                rather than the whole rail. */}
-            <div className="studio-scroll-inset relative min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-              <AnimatePresence initial={false} mode="popLayout">
-                {inspectedAgent && conversationId ? <AgentInspector key={inspectedAgent.id} task={inspectedAgent} conversationId={conversationId} /> : task ? <WorkspaceTaskDetail key={task.id} task={task} /> : active !== undefined ? (
-                  <motion.div key={active.id} {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
+            <div className="relative min-h-0 flex-1">
+              <PageTransition
+                view={inspectedAgent ? `agent:${inspectedAgent.id}` : task ? `task:${task.id}` : active ? `entry:${active.id}` : 'overview'}
+                className="studio-scroll-inset overflow-y-auto px-3 pb-4"
+              >
+                {inspectedAgent && conversationId ? <AgentInspector task={inspectedAgent} conversationId={conversationId} /> : task ? <WorkspaceTaskDetail task={task} /> : active !== undefined ? (
+                  <div className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
                     {active.kind === 'artifact' ? (
                       renderArtifact(active.artifact)
                     ) : active.kind === 'jobs' ? (
@@ -200,9 +187,9 @@ export function SideRail({
                     ) : (
                       <PlanPanel conversationId={active.conversationId} />
                     )}
-                  </motion.div>
-                ) : <WorkspaceOverview key="overview" onInspectAgent={setAgent} />}
-              </AnimatePresence>
+                  </div>
+                ) : <WorkspaceOverview onInspectAgent={setAgent} />}
+              </PageTransition>
             </div>
           </div>
         </motion.aside>

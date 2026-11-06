@@ -22,8 +22,10 @@ export function MenuSeparator() {
 
 export function MenuItem({
   onSelect,
-  selected = false,
+  selected,
   icon,
+  endIcon,
+  expanded,
   hint,
   note,
   destructive = false,
@@ -34,6 +36,8 @@ export function MenuItem({
   /** Draws a check in a reserved column, so rows stay aligned whether set or not. */
   selected?: boolean
   icon?: ReactNode
+  endIcon?: ReactNode
+  expanded?: boolean
   /** Trailing secondary text: a shortcut, a value, a count. */
   hint?: string
   /** A second line under the label, saying what the option is for. */
@@ -43,20 +47,24 @@ export function MenuItem({
   disabled?: boolean
   children: ReactNode
 }) {
-  const showCheckColumn = selected !== undefined && icon === undefined
+  const showCheckColumn = selected !== undefined
 
   return (
     <button
       type="button"
       role={showCheckColumn ? 'menuitemradio' : 'menuitem'}
       aria-checked={showCheckColumn ? selected : undefined}
+      aria-expanded={expanded}
+      aria-haspopup={expanded === undefined ? undefined : 'menu'}
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        'studio-control-flat flex w-full items-start gap-2 rounded-sm px-2 text-left text-ui',
+        'studio-menu-row studio-control-flat flex w-full items-start gap-2 rounded-sm px-2 text-left text-ui',
         'transition-colors duration-fast',
-        selected ? 'text-foreground' : 'text-muted-foreground',
-        'enabled:hover:bg-tint enabled:hover:text-foreground',
+        selected ? 'bg-selected text-foreground' : 'text-muted-foreground',
+        expanded && 'text-foreground ring-1 ring-inset ring-foreground/15',
+        !selected && !expanded && 'enabled:hover:bg-tint enabled:hover:text-foreground',
+        'enabled:active:bg-foreground/15',
         'disabled:cursor-default disabled:opacity-45',
         // Delete and its kin say so with the mark, since the label alone reads
         // like every other row until you have finished reading it. This is the
@@ -77,13 +85,12 @@ export function MenuItem({
           nudge was compensating for a line box that no longer existed, and the
           icon sat 1.26px above the text's cap height in every menu in the app,
           including the right-click one. A hand-tuned margin cannot survive a
-          change to the thing it was tuned against; a derived height can.
-
-          Reserved rather than conditional: a check that appears and pushes the
-          label sideways makes the whole menu twitch as the selection moves. */}
-      <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
-        {icon ?? (selected ? <Icons.check /> : null)}
-      </span>
+          change to the thing it was tuned against; a derived height can. */}
+      {icon === undefined ? null : (
+        <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+          {icon}
+        </span>
+      )}
 
       <span className="min-w-0 flex-1">
         <span className="block truncate">{children}</span>
@@ -100,6 +107,11 @@ export function MenuItem({
       {hint ? (
         <span className="flex h-[1lh] shrink-0 items-center">
           <span className="text-micro text-muted-foreground">{hint}</span>
+        </span>
+      ) : null}
+      {showCheckColumn || endIcon !== undefined ? (
+        <span aria-hidden className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+          {selected ? <Icons.check /> : endIcon}
         </span>
       ) : null}
     </button>

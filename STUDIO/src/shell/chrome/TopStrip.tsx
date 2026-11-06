@@ -178,7 +178,10 @@ export function TopStrip({
             changing it here is changing a default. It is not; it is a
             per-turn choice. Showing it where it cannot mean that is the fix. */}
         <WorkspaceAccess onOpen={onOpenWorkspace} />
-        {turnSettings ? <TurnMenu /> : null}
+        {/* The portaled picker can finish leaving after its trigger is hidden. */}
+        <div hidden={!turnSettings} className={turnSettings ? 'contents' : undefined}>
+          <TurnMenu available={turnSettings} />
+        </div>
       </div>
     </header>
   )

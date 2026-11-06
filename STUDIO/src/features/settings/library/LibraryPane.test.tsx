@@ -142,9 +142,9 @@ describe('LibraryPane', () => {
 
     // Search is collapsed until the magnifier asks for it: no permanent
     // field squatting on the row.
-    expect(screen.queryByRole('textbox', { name: 'Search the library' })).toBeNull()
+    expect(screen.queryByRole('searchbox', { name: 'Search the library' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
-    const field = await screen.findByRole('textbox', { name: 'Search the library' })
+    const field = await screen.findByRole('searchbox', { name: 'Search the library' })
 
     fireEvent.change(field, { target: { value: 'logo' } })
     // A word waits a beat before it is asked; the wait is shorter than the
@@ -157,7 +157,7 @@ describe('LibraryPane', () => {
     // keeping a stale filter would be a wall silently narrowed.
     fireEvent.keyDown(field, { key: 'Escape' })
     await waitFor(() =>
-      expect(screen.queryByRole('textbox', { name: 'Search the library' })).toBeNull(),
+      expect(screen.queryByRole('searchbox', { name: 'Search the library' })).toBeNull(),
     )
     await waitFor(() => {
       const last = calls.filter((asked) => asked.url.includes('/api/library?')).at(-1)
@@ -172,7 +172,7 @@ describe('LibraryPane', () => {
     await screen.findByRole('button', { name: 'Edit Bruno' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
-    fireEvent.change(await screen.findByRole('textbox', { name: 'Search the library' }), {
+    fireEvent.change(await screen.findByRole('searchbox', { name: 'Search the library' }), {
       target: { value: 'zzz' },
     })
 
@@ -183,7 +183,7 @@ describe('LibraryPane', () => {
 
     // And the words leaving give the wall back — the dismissal is a
     // round trip, not a state the pane keeps.
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search the library' }), {
+    fireEvent.keyDown(screen.getByRole('searchbox', { name: 'Search the library' }), {
       key: 'Escape',
     })
     await screen.findByRole('button', { name: 'Edit Bruno' })

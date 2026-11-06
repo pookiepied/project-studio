@@ -23,6 +23,9 @@ once is what made a hovered icon the highest-contrast pixel on screen.
 | press | the chip deepens | the button must not scale |
 | active | the chip stays (`--selected`) | the glyph must not darken |
 
+A selected menu row keeps its fill through hover. An expanded submenu trigger
+uses an inset stroke, and keyboard focus stays within the row's edge.
+
 **Focus is answered by register, not by one treatment.** A control answers
 with an edge — its border deepens, and that is all. A bloom behind the edge
 was tried at two weights and the person using the forms read both as a thick,
@@ -35,11 +38,17 @@ an assertive ring polite. One token never serves two registers; when the
 fields consumed `--ring` they inherited the outline's 45% and every click read
 as an error state.
 
-**A mark is always `--muted-foreground`.** In every state, in every row, on
+**An interface mark is always `--muted-foreground`.** In every state, in every row, on
 every surface. `.studio-icon` enforces it; nothing inherits `currentColor` from
 the text beside it. Two deliberate exceptions, both opting in via the utilities
 layer: a mark on a filled chip (unreadable otherwise) and a destructive menu
 row (the glyph is the warning).
+
+Provider identity uses `ProviderMark` in the picker and Settings. Use a
+published color asset where it suits the surface, including the published
+theme variant where one exists. Keep a monochrome logo or initial when a
+color asset is unavailable. Search fields use `SearchField` and Studio's
+clear control to keep browser colors out of the interface.
 
 **A menu note names a consequence, never the verb.** A `note` on a `MenuItem`
 adds a second line, so an item that carries one is twice the height of the
@@ -119,7 +128,7 @@ must never play the shell's entrance a second time inside itself: two stacked
 ramps compound into a hop. The shell owns the page-level handover; a page
 animates only the changes it owns, and a crossfade at that. One exception,
 for the same reason: a surface that owns a hierarchy the shell never plays —
-the model library's connection → model drill-down — uses the same push / pop /
+the model picker's provider → model drill-down — uses the same push / pop /
 sibling vocabulary for its own pages, because nothing is moving underneath
 it and direction is the only thing saying "deeper".
 
@@ -137,6 +146,11 @@ visible, not a transition. They pick from `LOOP` in `tokens/motion.ts`: `spin`
 (a ring turning, linear), `pulse` (a body breathing in place), `sweep` (a
 highlight travelling across something). A staggered set spreads its delays
 from the loop's own duration, never from a second number.
+
+Use `PageTransition` for overlapping route and Settings-section handovers.
+The outgoing page stays visible for the exit and leaves the interaction tree
+immediately. Floating menus share `floatingMotion`. Menu pages use
+`MenuViews` to resize from their measured content without scaling text.
 
 Reduced motion is handled twice, globally, and never in a component:
 `<MotionConfig reducedMotion="user">` and the media query in `styles/base.css`.

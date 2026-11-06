@@ -198,7 +198,7 @@ export function visionRefusal(
     kind: 'rejected',
     message:
       imageCount === 1
-        ? `${model.name} cannot see images. Send this turn without it, or pick a model with vision in the model library.`
-        : `${model.name} cannot see images. Send this turn without them, or pick a model with vision in the model library.`,
+        ? `${model.name} cannot see images. Send this turn without it, or choose a model with vision in Turn settings.`
+        : `${model.name} cannot see images. Send this turn without them, or choose a model with vision in Turn settings.`,
   }
 }

@@ -182,6 +182,14 @@ export function ArchivePane() {
               const checked = selected.has(conversation.id)
               return (
                 <div key={conversation.id} className="flex items-center gap-2.5 py-2.5">
+                  <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+                    {conversation.title ?? 'Untitled'}
+                  </span>
+
+                  <Button variant="secondary" size="sm" onClick={() => setArchived(conversation.id, false)}>
+                    Restore
+                  </Button>
+
                   <button
                     type="button"
                     role="checkbox"
@@ -197,14 +205,6 @@ export function ArchivePane() {
                   >
                     {checked ? <Icons.check /> : null}
                   </button>
-
-                  <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-                    {conversation.title ?? 'Untitled'}
-                  </span>
-
-                  <Button variant="secondary" size="sm" onClick={() => setArchived(conversation.id, false)}>
-                    Restore
-                  </Button>
                 </div>
               )
             })}

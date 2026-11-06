@@ -30,13 +30,14 @@ import { cn } from "@/lib/cn";
  * the harness does not count the sections of the prompt it assembles. What is
  * real is what was sent, how much of it was already cached, what came back,
  * and what the transcript has gained since - and the last of those is an
- * estimate, so it says so on its own row rather than in a footnote.
+ * estimate, so it says so on its own row rather than in a footnote. The
+ * category list names the missing measurements separately from these totals.
  *
  * ---- The line, and the figure after a compaction --------------------------
  *
  * The harness compacts the conversation at a point short of the window - a
  * reserve held back so the summariser's own request fits - and that point is
- * drawn as a thin line across the track, with its number in the details. The
+ * marked on the grid, with its number in the details. The
  * line is where the fill will stop growing and drop, which is worth knowing
  * before it happens rather than after.
  *
@@ -47,8 +48,10 @@ import { cn } from "@/lib/cn";
  * a provisional count as if it described the actual window.
  */
 
+export type ContextBandId = "sent" | "reply" | "since";
+
 interface Band {
-  readonly id: string;
+  readonly id: ContextBandId;
   readonly label: string;
   readonly note: string;
   readonly value: number;
@@ -56,39 +59,31 @@ interface Band {
   readonly estimated?: boolean;
 }
 
+const CONTEXT_CELLS = 100;
+
 /** Every band the bar draws, in the order it draws them. */
 function bandsOf(breakdown: ContextBreakdown): readonly Band[] {
   const measured = breakdown.report.measured;
-  return [
-    ...(measured === null
-      ? []
-      : measured.estimated
-        ? [
-            {
-              id: "sent",
-              label: "After compaction",
-              note: "Estimated: the summary and the recent turns kept. Re-measured on the next turn.",
-              value: measured.fresh + measured.cached + measured.reply,
-              className: "bg-foreground/55",
-              estimated: true,
-            },
-          ]
-        : [
-            {
-              id: "sent",
-              label: "Sent to the model",
-              note: "The conversation and everything the turn carried with it.",
-              value: measured.fresh + measured.cached,
-              className: "bg-foreground/55",
-            },
-            {
-              id: "reply",
-              label: "Reply",
-              note: "What the model produced, reasoning included.",
-              value: measured.reply,
-              className: "bg-foreground/30",
-            },
-          ]),
+  const bands: Band[] = [];
+  if (measured !== null && !measured.estimated) {
+    bands.push(
+      {
+        id: "sent",
+        label: "Sent to the model",
+        note: "The conversation and everything the turn carried with it.",
+        value: measured.fresh + measured.cached,
+        className: "bg-foreground/55",
+      },
+      {
+        id: "reply",
+        label: "Reply",
+        note: "What the model produced, reasoning included.",
+        value: measured.reply,
+        className: "bg-foreground/30",
+      },
+    );
+  }
+  bands.push(
     {
       id: "since",
       label: measured === null ? "This conversation" : "Since that turn",
@@ -100,23 +95,22 @@ function bandsOf(breakdown: ContextBreakdown): readonly Band[] {
       className: "bg-foreground/15",
       estimated: true,
     },
-  ].filter((band) => band.value > 0);
+  );
+  return bands.filter((band) => band.value > 0);
 }
 
 /**
- * The tank: one bar in the window's own proportions, with what is in it and
- * how big it is.
- *
- * The free space is the rest of the track rather than a band of its own, so
- * the eye reads "how much is left" as a length instead of as a subtraction.
+ * Every cell is one percent of the window, read left to right by row.
  */
 export function ContextTank({
   breakdown,
   running,
+  highlight,
 }: {
   readonly breakdown: ContextBreakdown;
   /** A turn is in flight: the bar breathes while the figure is still moving. */
   readonly running: boolean;
+  readonly highlight?: ContextBandId | null;
 }) {
   const bands = bandsOf(breakdown);
   const percent = Math.round(breakdown.used * 100);
@@ -136,16 +130,32 @@ export function ContextTank({
     );
   }
 
+  let tokens = 0;
+  const ends = bands.map((band) => {
+    tokens += band.value;
+    return { ...band, end: Math.round(tokens / breakdown.window * CONTEXT_CELLS) };
+  });
+  const threshold = breakdown.compactsAt === null ? null : Math.min(
+    CONTEXT_CELLS - 1,
+    Math.floor(breakdown.compactsAt / breakdown.window * CONTEXT_CELLS),
+  );
+
+  const highlighted = bands.find(({ id }) => id === highlight);
+  const visibleTotal = highlighted?.value ?? breakdown.total;
+  const visiblePercent = highlighted === undefined ? percent : Math.round(visibleTotal / breakdown.window * 100);
+  const visibleEstimate = highlighted === undefined ? breakdown.report.pending > 0 : highlighted.estimated === true;
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-caption text-muted-foreground">Context</span>
-        <span className="text-caption tabular-nums text-foreground">
-          {estimated ? "~" : ""}
-          {formatTokens(breakdown.total)}
-          <span className="text-muted-foreground">
+        <span className="min-w-0 truncate text-caption text-muted-foreground">{highlighted?.label ?? "Context"}</span>
+        <span className="shrink-0 tabular-nums text-foreground">
+          <span className="text-ui font-medium">
+            {visibleEstimate ? "~" : ""}
+            {formatTokens(visibleTotal)}
+          </span>
+          <span className="text-caption text-muted-foreground">
             {" / "}
-            {formatTokens(breakdown.window)} &middot; {percent}%
+            {formatTokens(breakdown.window)} &middot; {visiblePercent}%
           </span>
         </span>
       </div>
@@ -157,28 +167,26 @@ export function ContextTank({
         aria-valuemin={0}
         aria-valuemax={100}
         className={cn(
-          "relative flex h-2 w-full overflow-hidden rounded-full bg-foreground/10",
+          "grid grid-cols-[repeat(25,minmax(0,1fr))] gap-0.5",
           running && "studio-breathe",
         )}
       >
-        {bands.map((band) => (
-          <span
-            key={band.id}
-            className={band.className}
-            style={{ width: `${(band.value / breakdown.window) * 100}%` }}
-          />
-        ))}
-        {/* Where the harness compacts: a hairline on the track, not a band,
-            because it is a point and not an amount. */}
-        {breakdown.compactsAt === null ? null : (
-          <span
-            aria-hidden
-            className="absolute inset-y-0 w-px bg-background"
-            style={{
-              left: `${(breakdown.compactsAt / breakdown.window) * 100}%`,
-            }}
-          />
-        )}
+        {Array.from({ length: CONTEXT_CELLS }, (_, index) => {
+          const band = ends.find(({ end }) => index < end);
+          return (
+            <span
+              key={index}
+              aria-hidden
+              data-filled={band !== undefined ? '' : undefined}
+              className={cn(
+                "aspect-square rounded-[2px] transition-[opacity,background-color] duration-base",
+                band?.className ?? "bg-foreground/10",
+                highlighted !== undefined && band?.id !== highlighted.id && "opacity-35",
+                index === threshold && "outline outline-1 -outline-offset-1 outline-foreground/50",
+              )}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -187,8 +195,10 @@ export function ContextTank({
 /** The itemised account behind the bar, for when the bar is not enough. */
 export function ContextDetails({
   breakdown,
+  onHighlight,
 }: {
   readonly breakdown: ContextBreakdown;
+  readonly onHighlight?: (band: ContextBandId | null) => void;
 }) {
   const bands = bandsOf(breakdown);
   const measured = breakdown.report.measured;
@@ -205,7 +215,15 @@ export function ContextDetails({
     <div className="flex flex-col gap-2 pt-1">
       <ul className="flex flex-col gap-2">
         {bands.map((band) => (
-          <li key={band.id} className="flex flex-col gap-0.5">
+          <li
+            key={band.id}
+            tabIndex={onHighlight === undefined ? undefined : 0}
+            onPointerEnter={() => onHighlight?.(band.id)}
+            onPointerLeave={() => onHighlight?.(null)}
+            onFocus={() => onHighlight?.(band.id)}
+            onBlur={() => onHighlight?.(null)}
+            className="flex flex-col gap-0.5 rounded-sm"
+          >
             <div className="flex items-baseline justify-between gap-2">
               <span className="flex items-center gap-1.5 text-caption text-foreground">
                 <span
@@ -262,5 +280,17 @@ export function ContextDetails({
         </p>
       )}
     </div>
+  );
+}
+
+export function ContextCategories() {
+  return (
+    <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 gap-y-1 border-t pt-2 text-caption text-muted-foreground [&_dd]:text-right [&_dt]:whitespace-nowrap">
+      <dt>System prompt</dt><dd>Unmeasured</dd>
+      <dt>Tools</dt><dd>Unmeasured</dd>
+      <dt>Files</dt><dd>Unmeasured</dd>
+      <dt>Conversation</dt><dd>Unmeasured</dd>
+      <dt>Memory</dt><dd>N/A</dd>
+    </dl>
   );
 }

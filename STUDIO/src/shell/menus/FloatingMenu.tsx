@@ -1,6 +1,6 @@
 import { forwardRef, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
+import { floatingMotion } from '@/design/tokens'
 import { ActionItems, type ActionKind } from '@/shell/menus/ActionItems'
 import { floatingViewport, observeFloating, placeFloating } from '@/design/layout/floating'
 
@@ -66,10 +66,7 @@ export const FloatingMenu = forwardRef<
           }}
           role="menu"
           aria-label={label}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
-          transition={SPRING_SNAPPY}
+          {...floatingMotion()}
           style={{
             left: position?.left ?? placement.x,
             top: position?.top ?? placement.y,

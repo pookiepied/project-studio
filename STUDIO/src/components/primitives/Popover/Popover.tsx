@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_IN, SPRING_SNAPPY } from '@/design/tokens'
+import { floatingMotion } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 import { floatingViewport, observeFloating, placeFloating, type FloatingAlign, type FloatingSide } from '@/design/layout/floating'
+import { PresentMenuContent } from './MenuViews'
 
 /**
  * A popover anchored to its trigger.
@@ -74,6 +75,8 @@ export function Popover({
   children,
   className,
   inline = false,
+  companion,
+  initialFocus,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -94,11 +97,21 @@ export function Popover({
   children: ReactNode
   className?: string
   inline?: boolean
+  companion?: { label: string; anchor: string; content: ReactNode } | null
+  initialFocus?: string
 }) {
   const anchor = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement>(null)
+  const companionPanel = useRef<HTMLDivElement>(null)
   const focusedInline = useRef(false)
-  const [position, setPosition] = useState<ReturnType<typeof placeFloating> | null>(null)
+  const returnFocus = useRef<string | null>(null)
+  const [position, setPosition] = useState<(ReturnType<typeof placeFloating> & {
+    companion: { left: number; top: number; overlays: boolean } | null
+  }) | null>(null)
+  const companionAnchor = companion?.anchor
+  const companionOverlays = position?.companion?.overlays
+  const companionOnLeft = position !== null && position.companion !== null && position.companion.left < position.left
+  const companionTravel = companionOverlays ? 0 : companionOnLeft ? 6 : -6
 
   /**
    * Places the panel against the viewport.
@@ -115,12 +128,37 @@ export function Popover({
     // Layout sizes, not the bounding rect: the rect is multiplied by the
     // entry animation's scale transform, and placing a menu against a box
     // that will not exist a frame later is the shift described above.
-    setPosition(placeFloating({
+    const viewport = floatingViewport()
+    const placement = placeFloating({
       anchor: trigger,
       panel: { width: panelElement.offsetWidth, height: panelElement.offsetHeight },
-      viewport: floatingViewport(), side, align, gap: offset,
-    }))
-  }, [align, offset, side])
+      viewport, side, align, gap: offset,
+    })
+    const secondary = companionAnchor === undefined ? null : companionPanel.current
+    if (secondary === null) {
+      setPosition({ ...placement, companion: null })
+      return
+    }
+    const right = placement.left + panelElement.offsetWidth + OFFSET
+    const left = placement.left - secondary.offsetWidth - OFFSET
+    const edge = viewport.left + viewport.edge
+    const limit = viewport.left + viewport.width - viewport.edge
+    const adjacent = right + secondary.offsetWidth <= limit ? right : left >= edge ? left : null
+    const row = companionAnchor === undefined ? null : panelElement.querySelector(companionAnchor)
+    const rowOffset = row === null ? 0 : row.getBoundingClientRect().top - panelElement.getBoundingClientRect().top
+    const top = Math.min(
+      adjacent === null ? placement.top : placement.top + rowOffset,
+      viewport.top + viewport.height - viewport.edge - secondary.offsetHeight,
+    )
+    setPosition({
+      ...placement,
+      companion: {
+        left: adjacent ?? placement.left,
+        top: Math.max(viewport.top + viewport.edge, top),
+        overlays: adjacent === null,
+      },
+    })
+  }, [align, companionAnchor, offset, side])
 
   useLayoutEffect(() => {
     if (!open) {
@@ -129,8 +167,10 @@ export function Popover({
     }
     place()
 
-    return observeFloating(anchor.current, panel.current, place)
-  }, [open, place])
+    return observeFloating(
+      anchor.current, panel.current, place, companionAnchor === undefined ? null : companionPanel.current,
+    )
+  }, [companionAnchor, open, place])
 
   useEffect(() => {
     if (!open) return
@@ -144,25 +184,37 @@ export function Popover({
     // click *inside the menu* as a click outside it.
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
-      if (anchor.current?.contains(target) || panel.current?.contains(target)) return
+      if (anchor.current?.contains(target) || panel.current?.contains(target) || companionPanel.current?.contains(target)) return
       onOpenChange(false)
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (inline && event.key !== 'Escape' && panel.current?.contains(document.activeElement)) {
-        const items = [...panel.current.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')]
-        const index = items.findIndex((item) => item === document.activeElement)
-        const next = event.key === 'ArrowDown' ? (index + 1) % items.length
-          : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length
-          : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : null
-        if (next !== null) {
-          event.preventDefault()
-          items[next]?.focus()
+      if (event.key !== 'Escape') {
+        const focused = document.activeElement
+        const search = focused?.matches('[type="search"]') === true
+        if ((inline || initialFocus !== undefined) && (search || focused instanceof HTMLButtonElement)) {
+          const surface = companionPanel.current?.contains(focused) ? companionPanel.current : panel.current
+          if (surface?.contains(focused)) {
+            const items = [...surface.querySelectorAll<HTMLButtonElement>(
+              'button:is([role="menuitem"], [role="menuitemradio"], [data-companion-focus]):not(:disabled)',
+            )].filter((item) => item.closest('[inert]') === null)
+            const index = items.findIndex((item) => item === focused)
+            const next = event.key === 'ArrowDown' ? (index + 1) % items.length
+              : event.key === 'ArrowUp' ? (index < 0 ? items.length - 1 : (index - 1 + items.length) % items.length)
+              : !search && event.key === 'Home' ? 0
+              : !search && event.key === 'End' ? items.length - 1 : null
+            if (next !== null && items[next] !== undefined) {
+              event.preventDefault()
+              items[next].focus()
+            }
+          }
         }
+        return
       }
-      if (event.key !== 'Escape') return
       event.stopPropagation()
       onOpenChange(false)
-      if (inline) anchor.current?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus()
+      if (inline || initialFocus !== undefined) {
+        anchor.current?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus()
+      }
     }
 
     document.addEventListener('pointerdown', onPointerDown)
@@ -171,15 +223,31 @@ export function Popover({
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [open, onOpenChange, inline])
+  }, [open, onOpenChange, inline, initialFocus])
 
   useEffect(() => {
     if (!open) { focusedInline.current = false; return }
     // A panel cannot accept focus until its measured position makes it visible.
-    if (!inline || position === null || focusedInline.current) return
+    if ((!inline && initialFocus === undefined) || position === null || focusedInline.current) return
+    const item = panel.current?.querySelector<HTMLElement>(initialFocus ?? '[role="menuitem"]')
+    if (item === null || item === undefined) return
     focusedInline.current = true
-    panel.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
-  }, [open, inline, position])
+    item.focus()
+  }, [open, inline, initialFocus, position])
+
+  useEffect(() => {
+    if (!open) {
+      returnFocus.current = null
+    } else if (companionAnchor !== undefined && companionOverlays !== undefined) {
+      returnFocus.current = companionAnchor
+      companionPanel.current?.querySelector<HTMLElement>('[data-companion-focus]')?.focus()
+    } else if (companionAnchor === undefined && returnFocus.current !== null) {
+      if (companionPanel.current?.contains(document.activeElement)) {
+        panel.current?.querySelector<HTMLElement>(returnFocus.current)?.focus()
+      }
+      returnFocus.current = null
+    }
+  }, [open, companionAnchor, companionOverlays])
 
   // An inline anchor stays plain inline. As `inline-flex` it made every prose
   // link a flex box: a long link could no longer wrap across lines, and a
@@ -196,22 +264,8 @@ export function Popover({
             <motion.div
               ref={panel}
               role="menu"
-              initial={{ opacity: 0, scale: 0.97, y: (position?.side ?? side) === 'top' ? 4 : -4 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              // Retraces the entrance - back to 0.97, back toward the trigger
-              // - but on `EASE_IN`, not the house curve. That is the whole
-              // difference between a menu that closes and a menu that cuts
-              // out: `EASE_OUT` is front-loaded, so it took the panel to 38%
-              // opacity within two frames and spent the rest of the duration
-              // animating something already invisible. See the note on
-              // `EASE_IN`; it was measured, not guessed.
-              exit={{
-                opacity: 0,
-                scale: 0.97,
-                y: (position?.side ?? side) === 'top' ? 4 : -4,
-                transition: { duration: DURATION.base, ease: EASE_IN },
-              }}
-              transition={SPRING_SNAPPY}
+              inert={companionAnchor !== undefined && companionOverlays === true}
+              {...floatingMotion(0, (position?.side ?? side) === 'top' ? 4 : -4)}
               style={{
                 top: position?.top ?? 0,
                 left: position?.left ?? 0,
@@ -222,7 +276,7 @@ export function Popover({
                 // Hidden until measured. The panel has to be in the DOM to have
                 // a height worth measuring, so it renders first and is placed
                 // immediately after — one frame in which it must not be seen.
-                visibility: position ? 'visible' : 'hidden',
+                visibility: position && !(companionAnchor !== undefined && companionOverlays) ? 'visible' : 'hidden',
               }}
               className={cn(
                 // `lg` panel with 4px padding puts rows on `sm` — the
@@ -235,7 +289,34 @@ export function Popover({
                 className,
               )}
             >
-              {children}
+              <PresentMenuContent>{children}</PresentMenuContent>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>,
+        document.body,
+      )}
+      {createPortal(
+        <AnimatePresence>
+          {open && companion ? (
+            <motion.div
+              ref={companionPanel}
+              role="menu"
+              aria-label={companion.label}
+              {...floatingMotion(companionTravel)}
+              style={{
+                left: position?.companion?.left ?? 0,
+                top: position?.companion?.top ?? 0,
+                maxWidth: position?.maxWidth,
+                maxHeight: position?.maxHeight,
+                transformOrigin: companionOverlays ? 'top center' : companionOnLeft ? 'top right' : 'top left',
+                visibility: position?.companion ? 'visible' : 'hidden',
+              }}
+              className={cn(
+                'studio-floating-surface studio-blur studio-scroll-bounded fixed z-50 w-64 rounded-xl border p-1 shadow-overlay',
+                'max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)]',
+              )}
+            >
+              <PresentMenuContent>{companion.content}</PresentMenuContent>
             </motion.div>
           ) : null}
         </AnimatePresence>,

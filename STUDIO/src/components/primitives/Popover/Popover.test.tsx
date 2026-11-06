@@ -80,6 +80,46 @@ describe('a popover being dismissed', () => {
 })
 
 describe('a popover in a constrained viewport', () => {
+  it('keeps an adjacent panel inside the popover and replaces it when space runs out', () => {
+    vi.stubGlobal('innerWidth', 900)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(256)
+    const onOpenChange = vi.fn()
+    render(
+      <Popover
+        open
+        onOpenChange={onOpenChange}
+        initialFocus='[type="search"]'
+        trigger={<button type="button" aria-haspopup="menu">Open picker</button>}
+        companion={{
+          label: 'Providers',
+          anchor: '[data-browse]',
+          content: <button type="button" data-companion-focus>Back to picker</button>,
+        }}
+      >
+        <input type="search" aria-label="Search" />
+        <button type="button" data-browse>Browse</button>
+      </Popover>,
+    )
+
+    const main = screen.getByRole('menu', { name: '' })
+    const providers = screen.getByRole('menu', { name: 'Providers' })
+    const back = screen.getByRole('button', { name: 'Back to picker' })
+    expect(parseFloat(providers.style.left)).toBeGreaterThan(parseFloat(main.style.left) + 256)
+    expect(document.activeElement).toBe(back)
+    fireEvent.pointerDown(back)
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    vi.stubGlobal('innerWidth', 390)
+    fireEvent(window, new Event('resize'))
+    expect(main.hasAttribute('inert')).toBe(true)
+    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(providers.style.left).toBe(main.style.left)
+
+    fireEvent.keyDown(back, { key: 'Escape' })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open picker' }))
+  })
+
   it('preserves a caller cap as well as the viewport bound', () => {
     vi.stubGlobal('innerHeight', 1000)
     render(<Harness maxHeight="28rem" />)

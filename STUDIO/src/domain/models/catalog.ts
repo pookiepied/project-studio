@@ -1,7 +1,6 @@
 import type {
   DefaultSelection,
   ModelCapability,
-  ModelPricing,
   ProviderConnection,
   ProviderModel,
 } from '@/platform/harness'
@@ -36,7 +35,7 @@ import { authorOf, familyName } from './families'
  * conversation index stores, the submission carries, and the run resolves.
  */
 
-/** One model the picker can offer. Mapped from the wire, never invented. */
+/** A known chat model, including existing pins no longer offered for new picks. */
 export interface CatalogModel {
   /** The runtime reference: `<provider>/<model>`. What a turn is stored and sent as. */
   readonly id: string
@@ -50,16 +49,10 @@ export interface CatalogModel {
   /** The vendor whose mark the CONNECTION wears - OpenRouter on that same model's connection. */
   readonly connectionVendor: string
   readonly connectionName: string
+  readonly offered: boolean
   readonly reasoningLevels: readonly ReasoningLevel[]
   readonly contextWindow: number | 'unknown'
-  /**
-   * The rest of the wire record's own facts, carried for the library's detail
-   * pane rather than re-derived: what the model can do, and what a million
-   * tokens of it costs. Nothing here is invented; a dimension the provider
-   * never described reads "unknown", which the pane shows as such.
-   */
   readonly capability: ModelCapability
-  readonly pricing: ModelPricing
 }
 
 /**
@@ -111,10 +104,10 @@ function catalogModelOf(
     author,
     connectionVendor: vendor,
     connectionName: connection?.displayName ?? model.connectionId,
+    offered: !model.hidden && connection?.enabled === true && connection.serves.language !== undefined,
     reasoningLevels: model.reasoningLevels,
     contextWindow: model.capability.contextWindow,
     capability: model.capability,
-    pricing: model.pricing,
   }
 }
 

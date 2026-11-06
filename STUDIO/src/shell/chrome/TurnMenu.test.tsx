@@ -20,11 +20,7 @@ import { TurnMenu } from './TurnMenu'
  * settles a conversation's model and reasoning, carrying exactly what the
  * harness contract names.
  *
- * The picker is deliberately two surfaces: a short first level (the default,
- * the recents, the door) and the library dialog behind it, organised as
- * connections first and a model's own facts one drill deeper. Most tests
- * below therefore walk that path: into a connection, onto a model's row,
- * into its facts, and out through the explicit button.
+ * Browsing and searching are read-only until the user selects a model row.
  */
 
 const BASE_URL = 'http://127.0.0.1:4319'
@@ -91,11 +87,11 @@ function stubFetch(route: Route): Call[] {
  * `defaults` is the Chat slot as Settings writes it: the harness routes a
  * conversation with no model of its own through the stable alias, and that
  * alias resolves to exactly this. Empty is a machine where nobody set one. */
-function defaultRoute(models: unknown, defaults: unknown = {}): Route {
+function defaultRoute(models: unknown, defaults: unknown = {}, connections: unknown = [KNOWN_VENDOR]): Route {
   return (url, method) => {
     if (url.includes('/models')) return jsonResponse(models)
     if (url.includes('/defaults')) return jsonResponse(defaults)
-    if (url.includes('/connections')) return jsonResponse([KNOWN_VENDOR])
+    if (url.includes('/connections')) return jsonResponse(connections)
     if (url.includes('/conversations') && method === 'GET') {
       return jsonResponse([CONVERSATION])
     }
@@ -138,9 +134,15 @@ function mountPicker(options: { conversationId?: string } = {}) {
           <ChatOpener conversationId={options.conversationId} />
         ) : null}
         <TurnMenu />
+        <SettingsProbe />
       </WorkspaceProvider>
     </NavigationProvider>,
   )
+}
+
+function SettingsProbe() {
+  const { route } = useNavigation()
+  return route.kind === 'settings' ? <p>Settings section: {route.sectionId}</p> : null
 }
 
 /** The menu's panel exists only while open; everything below needs it open.
@@ -148,20 +150,25 @@ function mountPicker(options: { conversationId?: string } = {}) {
  * is often the same words, and the catalog may still be loading. */
 async function openModelPanel() {
   fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
-  await screen.findByRole('menu')
+  await screen.findByRole('searchbox', { name: 'Search models' })
 }
 
-/** The library is a dialog of its own now; this walks to it. */
-async function openLibrary() {
+async function openProviders() {
   await openModelPanel()
-  fireEvent.click(screen.getByText('Model library…'))
-  await screen.findByRole('dialog', { name: 'Model library' })
-  await screen.findByRole('textbox', { name: 'Search models' })
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'More models' }))
+  return within(await screen.findByRole('menu', { name: 'More models' }))
 }
 
-/** Walks from the landing into a connection's page. */
-async function openConnectionInLibrary(name: string | RegExp) {
-  fireEvent.click(await screen.findByRole('button', { name }))
+async function openContextPanel() {
+  await openModelPanel()
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Context window' }))
+  await screen.findByRole('button', { name: 'Context window' })
+}
+
+async function selectProviderModel(name: string | RegExp) {
+  const providers = await openProviders()
+  fireEvent.click(await providers.findByRole('menuitem', { name: 'Work Anthropic' }))
+  fireEvent.click(await providers.findByRole('menuitemradio', { name }))
 }
 
 beforeEach(() => {
@@ -178,7 +185,7 @@ afterEach(() => {
 describe('the model picker', () => {
   it('names the no-connections state instead of showing models that do not exist', async () => {
     harnessConfigured()
-    stubFetch(defaultRoute([]))
+    stubFetch(defaultRoute([], {}, []))
     mountPicker()
 
     await openModelPanel()
@@ -209,92 +216,130 @@ describe('the model picker', () => {
 
     const trigger = screen.getByRole('button', { name: 'Turn settings' })
     expect(trigger.textContent).toContain('Choose a model')
-    expect(trigger.textContent).not.toContain('Default model')
+    expect(trigger.textContent).not.toContain('Default')
 
     // The resting choice is still offered - named for what it is.
     await openModelPanel()
-    expect(within(screen.getByRole('menu')).getByText('Default model')).toBeTruthy()
+    expect(await screen.findByRole('menuitemradio', { name: 'Default' })).toBeTruthy()
   })
 
-  it('keeps the first level short: default, the door, reasoning - not every model', async () => {
+  it('keeps the first level to three shortcuts and the provider entry', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL, THIRD_FLAT, FOURTH_FLAT]))
+    mountPicker()
+
+    await openModelPanel()
+    await screen.findByRole('menuitem', { name: 'More models' })
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(4)
+    expect(screen.queryByRole('menuitemradio', { name: 'delta-pro' })).toBeNull()
+    expect(screen.queryByText('Work Anthropic')).toBeNull()
+  })
+
+  it('shows providers first and selects a model directly from the connection', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL]))
+    mountPicker()
+
+    const providers = await openProviders()
+    const row = await providers.findByRole('menuitem', { name: 'Work Anthropic' })
+    expect(row.querySelector('[data-provider="anthropic"][data-mark="logo"]')).not.toBeNull()
+    expect(providers.queryByRole('menuitemradio')).toBeNull()
+    fireEvent.click(row)
+    const model = await providers.findByRole('menuitemradio', { name: 'claude-sonnet-4.5' })
+    expect(providers.queryByText(/Input price|Output price|Capabilities|Vision/)).toBeNull()
+    fireEvent.click(model)
+    expect(screen.getByRole('button', { name: 'Turn settings' }).textContent).toContain('claude-sonnet-4.5')
+  })
+
+  it('narrows the picker as the search is typed and says so when nothing matches', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
     mountPicker()
 
     await openModelPanel()
-    const menu = screen.getByRole('menu')
-    // No connection groups, no model rows: choosing happens in the library.
-    expect(menu.textContent).not.toContain('claude-sonnet-4.5')
-    expect(menu.textContent).not.toContain('jamba-large-1.7')
-    expect(menu.textContent).not.toContain('Work Anthropic')
-    // The door is there, and so is the resting choice (queried inside the
-    // panel: the trigger's own label reads similar words).
-    expect(screen.getByText('Model library…')).toBeTruthy()
-    expect(within(menu).getByText('Default model')).toBeTruthy()
-  })
-
-  it('organises the library by connection: the landing names the connection, its page lists the models', async () => {
-    harnessConfigured()
-    mountPicker()
-    stubFetch(defaultRoute([REASONING_MODEL]))
-
-    await openLibrary()
-    // The landing is the catalog's shape, not its rows: one row for the
-    // connection, under the name the person gave it, wearing the vendor's
-    // mark and counting what it serves.
-    const row = await screen.findByRole('button', { name: /Work Anthropic/ })
-    expect(row.textContent).toContain('1 model')
-    expect(document.querySelector('[data-provider="anthropic"]')).not.toBeNull()
-    // No model rows on the landing: a library opens on its index, not a wall.
-    expect(screen.queryByRole('button', { name: /claude-sonnet-4\.5/ })).toBeNull()
-
-    // Into the connection, the model is a row; onto the row, its own page.
-    await openConnectionInLibrary(/Work Anthropic/)
-    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
-    await screen.findByText('Input price')
-  })
-
-  it('narrows the library as the search is typed, grouped by connection, and says so when nothing matches', async () => {
-    harnessConfigured()
-    stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
-    mountPicker()
-
-    await openLibrary()
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+    await screen.findByRole('menuitem', { name: 'More models' })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), {
       target: { value: 'jamba' },
     })
     // The needle matches by name; the other model's row is gone. The
     // connection heading stays - it still serves the one model that matched.
-    expect(await screen.findByRole('button', { name: /jamba-large-1\.7/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /claude-sonnet/ })).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Work Anthropic' })).toBeTruthy()
+    expect(await screen.findByRole('menuitemradio', { name: /jamba-large-1\.7/ })).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: /claude-sonnet/ })).toBeNull()
+    expect(screen.getByRole('region', { name: 'Work Anthropic' })).toBeTruthy()
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), {
       target: { value: 'nothing at all' },
     })
     await screen.findByText(/No models match "nothing at all"/)
   })
 
-  it('shows the facts a choice deserves: price, context, and what the model can do', async () => {
+  it('opens provider settings without making a model pick', async () => {
     harnessConfigured()
-    stubFetch(defaultRoute([REASONING_MODEL]))
+    const calls = stubFetch(defaultRoute([REASONING_MODEL]))
     mountPicker()
 
-    await openLibrary()
-    await openConnectionInLibrary(/Work Anthropic/)
-    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
+    const providers = await openProviders()
+    fireEvent.click(providers.getByRole('menuitem', { name: 'Manage providers' }))
+    expect(await screen.findByText('Settings section: models')).toBeTruthy()
+    expect(calls.some((call) => call.method === 'PATCH')).toBe(false)
+  })
 
-    // The wire record's own facts, shown rather than buried: prices per
-    // million tokens, the context size, and the capability chips.
-    await screen.findByText('Input price')
-    expect(screen.getByText('Output price')).toBeTruthy()
-    expect(screen.getByText('Context window')).toBeTruthy()
-    expect(screen.getByText('Tool calling')).toBeTruthy()
-    expect(screen.getByText('Vision')).toBeTruthy()
+  it('offers the same model name independently through each connection', async () => {
+    harnessConfigured()
+    const other = { ...KNOWN_VENDOR, id: 'other', catalogProvider: 'openrouter', displayName: 'Second provider' }
+    const calls = stubFetch(defaultRoute([REASONING_MODEL, { ...REASONING_MODEL, connectionId: other.id }], {}, [KNOWN_VENDOR, other]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
 
-    // The back row is named for where it returns to, and it does return.
-    fireEvent.click(screen.getByRole('button', { name: 'Work Anthropic' }))
-    expect(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ })).toBeTruthy()
+    await openModelPanel()
+    await screen.findByRole('menuitem', { name: 'More models' })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'claude-sonnet' } })
+    expect(screen.getAllByRole('menuitemradio', { name: 'claude-sonnet-4.5' })).toHaveLength(2)
+    const second = within(screen.getByRole('region', { name: 'Second provider' }))
+    fireEvent.click(second.getByRole('menuitemradio', { name: 'claude-sonnet-4.5' }))
+    await waitFor(() => {
+      const patch = calls.find((call) => call.method === 'PATCH')
+      expect(JSON.parse(patch?.body ?? '{}').modelId).toBe('openrouter/claude-sonnet-4.5')
+    })
+  })
+
+  it('shows temporary chat as unavailable without mutating a conversation', async () => {
+    harnessConfigured()
+    const calls = stubFetch(defaultRoute([REASONING_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+    await openModelPanel()
+    const control = screen.getByRole<HTMLButtonElement>('switch', { name: 'Temporary chat' })
+    expect(control.disabled).toBe(true)
+    expect(control.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(control)
+    expect(calls.some((call) => ['PATCH', 'POST', 'DELETE'].includes(call.method))).toBe(false)
+  })
+
+  it('keeps hidden models and disabled providers out of direct search and browsing', async () => {
+    harnessConfigured()
+    const disabled = { ...KNOWN_VENDOR, id: 'off', catalogProvider: 'openrouter', displayName: 'Disabled provider', enabled: false }
+    const hidden = { ...FLAT_MODEL, hidden: true }
+    stubFetch(defaultRoute([
+      REASONING_MODEL,
+      hidden,
+      { ...THIRD_FLAT, connectionId: disabled.id },
+    ], {}, [KNOWN_VENDOR, disabled]))
+    localStorage.setItem('studio.recent-models', JSON.stringify(['anthropic/jamba-large-1.7']))
+    mountPicker()
+
+    const providers = await openProviders()
+    expect(providers.queryByRole('menuitem', { name: 'Disabled provider' })).toBeNull()
+    fireEvent.click(providers.getByRole('menuitem', { name: 'Work Anthropic' }))
+    await providers.findByRole('menuitemradio', { name: 'claude-sonnet-4.5' })
+    expect(providers.queryByRole('menuitemradio', { name: 'jamba-large-1.7' })).toBeNull()
+    fireEvent.click(providers.getByRole('button', { name: 'All providers' }))
+    fireEvent.click(providers.getByRole('button', { name: 'Providers' }))
+    const search = screen.getByRole('searchbox')
+    for (const query of ['jamba', 'kappa']) {
+      fireEvent.change(search, { target: { value: query } })
+      expect(await screen.findByText(`No models match "${query}".`)).toBeTruthy()
+    }
   })
 
   it('hides the reasoning control entirely for a model that cannot reason', async () => {
@@ -302,17 +347,39 @@ describe('the model picker', () => {
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker()
 
-    await openLibrary()
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
-      target: { value: 'jamba' },
-    })
-    fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
-    await screen.findByText('Capabilities')
-    // Present and inert would be a control that lies; it is absent instead.
-    expect(screen.queryByText('Reasoning effort')).toBeNull()
+    await selectProviderModel('jamba-large-1.7')
+    await openModelPanel()
+    await screen.findByRole('menuitem', { name: 'Context window' })
+    expect(screen.queryByRole('menuitem', { name: /^Reasoning/ })).toBeNull()
   })
 
-  it('settles a library pick through an index PATCH, applied only by the explicit button', async () => {
+  it('clears an unsupported effort when the new model is selected', async () => {
+    harnessConfigured()
+    const calls = stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+    await selectProviderModel('claude-sonnet-4.5')
+    await openModelPanel()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^Reasoning/ }))
+    const slider = await screen.findByRole('slider', { name: 'Reasoning effort' })
+    fireEvent.change(slider, { target: { value: '5' } })
+    await waitFor(() => expect(calls.some((call) =>
+      call.method === 'PATCH' && JSON.parse(call.body ?? '{}').reasoningLevel === 'max',
+    )).toBe(true))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    await selectProviderModel('jamba-large-1.7')
+    await waitFor(() => {
+      const patch = calls.filter((call) => call.method === 'PATCH').at(-1)
+      expect(JSON.parse(patch?.body ?? '{}')).toEqual({
+        modelId: 'anthropic/jamba-large-1.7',
+        reasoningLevel: null,
+      })
+    })
+  })
+
+  it('settles a pick through an index PATCH only after selecting a model row', async () => {
     harnessConfigured()
     const calls = stubFetch(defaultRoute([REASONING_MODEL]))
     mountPicker({ conversationId: 'cnv_1' })
@@ -320,19 +387,13 @@ describe('the model picker', () => {
     // Open the conversation first, so the picker is holding a record.
     fireEvent.click(screen.getByText('open chat'))
 
-    await openLibrary()
-    await openConnectionInLibrary(/Work Anthropic/)
-    // Opening a model's page writes nothing: the facts appear, the dial rests
-    // on medium, and the index is untouched until the button.
-    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
-    await screen.findByText('Reasoning effort')
+    const providers = await openProviders()
+    fireEvent.click(await providers.findByRole('menuitem', { name: 'Work Anthropic' }))
+    const model = await providers.findByRole('menuitemradio', { name: 'claude-sonnet-4.5' })
     expect(
       calls.filter((call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1')),
     ).toEqual([])
-    const slider = screen.getByRole('slider', { name: 'Reasoning effort' })
-    expect(slider.getAttribute('aria-valuetext')).toBe('Medium')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+    fireEvent.click(model)
     await waitFor(() => {
       const patch = calls.find(
         (call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1'),
@@ -353,7 +414,7 @@ describe('the model picker', () => {
     )
   })
 
-  it('offers the last three explicit picks before the library, most recent first', async () => {
+  it('offers the last three explicit picks after the provider entry, most recent first', async () => {
     harnessConfigured()
     const calls = stubFetch(defaultRoute([FLAT_MODEL, ANOTHER_FLAT, THIRD_FLAT, FOURTH_FLAT]))
     mountPicker({ conversationId: 'cnv_1' })
@@ -361,10 +422,7 @@ describe('the model picker', () => {
 
     // Four picks, three seats: the oldest falls off the list entirely.
     for (const name of ['jamba-large-1\\.7', 'vox-small-1', 'kappa-mini', 'delta-pro']) {
-      await openLibrary()
-      await openConnectionInLibrary(/Work Anthropic/)
-      fireEvent.click(await screen.findByRole('button', { name: new RegExp(name) }))
-      fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+      await selectProviderModel(new RegExp(name))
       const plain = name.replace('\\.', '.')
       await waitFor(() => {
         expect(
@@ -378,16 +436,17 @@ describe('the model picker', () => {
     }
 
     await openModelPanel()
-    await screen.findByText('Recent')
-    const menu = screen.getByRole('menu')
+    await screen.findByRole('menuitem', { name: 'More models' })
+    const menu = screen.getByRole('menu', { name: '' })
     expect(menu.textContent).toContain('delta-pro')
     expect(menu.textContent).toContain('kappa-mini')
     expect(menu.textContent).toContain('vox-small-1')
     expect(menu.textContent).not.toContain('jamba-large-1.7')
+    expect(within(menu).getAllByRole('menuitemradio').map((row) => row.textContent)).toEqual([
+      'Default', 'delta-pro', 'kappa-mini', 'vox-small-1',
+    ])
 
-    // A recent is one click, not two: choosing it settles the same PATCH the
-    // library path would, with no trip through the dialog. The four picks'
-    // patches came before it; the last one is the recent's.
+    // A recent settles the same PATCH as a model selected through a provider.
     fireEvent.click(within(menu).getByText('kappa-mini'))
     await waitFor(() => {
       const patch = calls
@@ -409,9 +468,9 @@ describe('the model picker', () => {
     // Choosing the harness's default is the resting state, not a pick; it
     // must not enter a list of names.
     await openModelPanel()
-    fireEvent.click(within(screen.getByRole('menu')).getByText('Default model'))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Default' }))
     await openModelPanel()
-    expect(screen.queryByText('Recent')).toBeNull()
+    expect(localStorage.getItem('studio.recent-models')).toBeNull()
   })
 
   it('keeps the recents honest: a model the catalog no longer has stops appearing', async () => {
@@ -420,10 +479,7 @@ describe('the model picker', () => {
     const view = mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(screen.getByText('open chat'))
 
-    await openLibrary()
-    await openConnectionInLibrary(/Work Anthropic/)
-    fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+    await selectProviderModel('jamba-large-1.7')
     await waitFor(() => {
       expect(calls.some((call) => call.method === 'PATCH')).toBe(true)
     })
@@ -436,7 +492,8 @@ describe('the model picker', () => {
     fireEvent.click(screen.getByText('open chat'))
 
     await openModelPanel()
-    expect(screen.queryByText('Recent')).toBeNull()
+    expect(await screen.findByText(/No chat models available/)).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: 'jamba-large-1.7' })).toBeNull()
   })
 
   it('offers only the model levels as steps of one dial, resting on medium', async () => {
@@ -444,13 +501,13 @@ describe('the model picker', () => {
     stubFetch(defaultRoute([REASONING_MODEL]))
     mountPicker()
 
-    await openLibrary()
-    await openConnectionInLibrary(/Work Anthropic/)
-    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
+    await selectProviderModel('claude-sonnet-4.5')
+    await openModelPanel()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^Reasoning/ }))
 
     // One dial in the details pane, whose steps are the model's own levels:
     // six stops for this model, resting on medium, with no Default step.
-    const slider = screen.getByRole('slider', { name: 'Reasoning effort' })
+    const slider = await screen.findByRole('slider', { name: 'Reasoning effort' })
     expect(slider.getAttribute('max')).toBe('5')
     expect(slider.getAttribute('aria-valuetext')).toBe('Medium')
     expect(screen.getByText('The everyday balance.')).toBeTruthy()
@@ -463,19 +520,13 @@ describe('the model picker', () => {
     fireEvent.change(slider, { target: { value: '4' } })
     expect(screen.getByText('X-high')).toBeTruthy()
 
-    // The dial is part of the pick: applying carries the dragged level out.
-    // (No conversation is open here, so the choice settles on the window's
-    // settings; reopening the reasoning panel shows where it landed.)
-    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
-    // The menu item's accessible name carries its hint ("Reasoning X-high").
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Reasoning/ }))
-    // Awaited, and scoped to the menu. The menu's pages wait for each other:
-    // the root slides out before the reasoning page arrives, so the dial is
-    // one beat away rather than in the same frame as the click. (The scoping
-    // is the older reason - the dialog's own dial may still be on its way
-    // out.)
-    const settled = await within(screen.getByRole('menu')).findByRole('slider', {
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    await openModelPanel()
+    const row = await screen.findByRole('menuitem', { name: /^Reasoning/ })
+    expect(row.textContent).toContain('X-high')
+    fireEvent.click(row)
+    const settled = await screen.findByRole('slider', {
       name: 'Reasoning effort',
     })
     expect(settled.getAttribute('aria-valuetext')).toBe('X-high')
@@ -506,8 +557,7 @@ describe('the window the turn is measured against', () => {
     fireEvent.click(await screen.findByText('open chat'))
 
     await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
-    await openModelPanel()
-
+    await openContextPanel()
     expect(await screen.findByText('200k context window')).toBeTruthy()
   })
 
@@ -518,7 +568,7 @@ describe('the window the turn is measured against', () => {
     fireEvent.click(await screen.findByText('open chat'))
 
     await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
-    await openModelPanel()
+    await openContextPanel()
     expect(screen.getByRole('meter', { name: 'Context used' })).toBeTruthy()
 
     // Home has a composer and therefore a model, but no transcript - so there
@@ -527,7 +577,7 @@ describe('the window the turn is measured against', () => {
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker()
     await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
-    await openModelPanel()
+    await openContextPanel()
     expect(screen.getByText('200k context window')).toBeTruthy()
     expect(screen.queryByRole('meter', { name: 'Context used' })).toBeNull()
   })
@@ -541,39 +591,39 @@ describe('the window the turn is measured against', () => {
     mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(await screen.findByText('open chat'))
 
-    await openModelPanel()
+    await openContextPanel()
 
     expect(await screen.findByText('No model chosen')).toBeTruthy()
     expect(screen.getByRole('meter', { name: 'Context used' })).toBeTruthy()
   })
 
-  it('rules no line across the top of a menu whose head is empty', async () => {
-    // Home with nothing named: no model to describe, no window to fill, no
-    // reasoning dial. A separator is a rule BETWEEN two groups, and with
-    // nothing above it, it is a line drawn across the top of the panel
-    // against its own edge - a header with no header in it.
+  it('starts with search even when there is no selected model to describe', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker()
 
     await openModelPanel()
 
-    expect(screen.getByText('Default model')).toBeTruthy()
-    expect(within(screen.getByRole('menu')).queryAllByRole('separator')).toHaveLength(0)
+    expect(await screen.findByRole('menuitemradio', { name: 'Default' })).toBeTruthy()
+    expect(screen.getByRole('menu').querySelector('input, [role="separator"]')?.tagName).toBe('INPUT')
+    expect(screen.queryByRole('menuitem', { name: 'Context window' })).toBeNull()
   })
 
-  it('rules the line once there is a head for it to close', async () => {
+  it('keeps context details behind a disclosure and names unavailable categories', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(await screen.findByText('open chat'))
 
-    await openModelPanel()
+    await openContextPanel()
     await screen.findByRole('meter', { name: 'Context used' })
-
-    expect(
-      within(screen.getByRole('menu')).getAllByRole('separator').length,
-    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('group', { name: 'Context breakdown' })).toBeNull()
+    for (const category of ['System prompt', 'Tools', 'Files', 'Conversation', 'Memory']) {
+      expect(screen.getByText(category)).toBeTruthy()
+    }
+    expect(screen.getByText('Memory').nextElementSibling?.textContent).toBe('N/A')
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }))
+    expect(await screen.findByRole('group', { name: 'Context breakdown' })).toBeTruthy()
   })
 
   it('keeps the percentage off the strip until it is news', async () => {
@@ -625,8 +675,7 @@ describe('the Chat default, as the chat page sees it', () => {
     mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(await screen.findByText('open chat'))
 
-    await openModelPanel()
-
+    await openContextPanel()
     expect(await screen.findByText(/Following the Chat default/)).toBeTruthy()
   })
 
@@ -653,8 +702,7 @@ describe('the Chat default, as the chat page sees it', () => {
     mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(await screen.findByText('open chat'))
 
-    await openModelPanel()
-
+    await openContextPanel()
     expect(await screen.findByText('200k context window')).toBeTruthy()
   })
 
@@ -664,8 +712,7 @@ describe('the Chat default, as the chat page sees it', () => {
     mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(await screen.findByText('open chat'))
 
-    await openModelPanel()
-
+    await openContextPanel()
     expect(await screen.findByText('No model chosen')).toBeTruthy()
     expect(screen.queryByText(/Following the Chat default/)).toBeNull()
   })
@@ -673,7 +720,7 @@ describe('the Chat default, as the chat page sees it', () => {
 
 describe('the recents shortcut', () => {
   it('draws the check on the recent that is in force', async () => {
-    // These rows and "Default model" are one radio group over one question.
+    // These rows and "Default" are one radio group over one question.
     // Filtering the current answer out of the group, which this did for a
     // day, left a check column that could never fill on any recent - a
     // reserved space meaning nothing, and no way to confirm the row you just
@@ -688,13 +735,15 @@ describe('the recents shortcut', () => {
     fireEvent.click(await screen.findByText('open chat'))
 
     await openModelPanel()
-    await screen.findByText('Recent')
+    await screen.findByRole('menuitem', { name: 'More models' })
     fireEvent.click(within(screen.getByRole('menu')).getByText('kappa-mini'))
 
     await openModelPanel()
     const menu = within(screen.getByRole('menu'))
     const chosen = await menu.findByRole('menuitemradio', { name: /kappa-mini/ })
     expect(chosen.getAttribute('aria-checked')).toBe('true')
+    expect(chosen.lastElementChild?.querySelector('svg')).not.toBeNull()
+    expect(chosen.firstElementChild?.querySelector('[data-provider]')).not.toBeNull()
     expect(
       menu.getByRole('menuitemradio', { name: /delta-pro/ }).getAttribute('aria-checked'),
     ).toBe('false')
@@ -713,7 +762,7 @@ describe('the recents shortcut', () => {
     const menu = within(screen.getByRole('menu'))
 
     expect(
-      (await menu.findByRole('menuitemradio', { name: 'Default model' })).getAttribute(
+      (await menu.findByRole('menuitemradio', { name: 'Default' })).getAttribute(
         'aria-checked',
       ),
     ).toBe('true')
@@ -723,39 +772,47 @@ describe('the recents shortcut', () => {
   })
 })
 
-/**
- * Leaving the library.
- *
- * What is pinned here is the reset, not the animation: a library that
- * remembers last time's query answers a question nobody is asking yet. The
- * dismissal itself is a matter of timing between the panel and the scrim
- * behind it, which lives in the Dialog primitive and has no honest assertion
- * in jsdom - nothing there drives an exit to completion.
- */
-describe('the library on the way out', () => {
-  it('starts over when it is opened again', async () => {
+describe('the picker on the way out', () => {
+  it('clears search with a Studio icon and returns focus without replacing the field', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker()
+
+    await openModelPanel()
+    await screen.findByRole('menuitem', { name: 'More models' })
+    const search = screen.getByRole('searchbox')
+    fireEvent.change(search, { target: { value: 'jamba' } })
+    await screen.findByRole('region', { name: 'Work Anthropic' })
+    const clear = screen.getByRole('button', { name: 'Clear search' })
+    expect(clear.querySelector('.studio-icon')).not.toBeNull()
+    fireEvent.click(clear)
+    expect(screen.getByRole('searchbox')).toBe(search)
+    expect(search).toHaveProperty('value', '')
+    expect(document.activeElement).toBe(search)
+    expect(screen.queryByRole('region', { name: 'Work Anthropic' })).toBeNull()
+    expect(await screen.findByRole('menuitem', { name: 'More models' })).toBeTruthy()
+  })
+
+  it('applies a unique search match with Enter and clears the query on reopen', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker({ conversationId: 'cnv_1' })
     fireEvent.click(await screen.findByText('open chat'))
 
-    await openLibrary()
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+    await openModelPanel()
+    await screen.findByRole('menuitem', { name: 'More models' })
+    const search = screen.getByRole('searchbox', { name: 'Search models' })
+    expect(document.activeElement).toBe(search)
+    fireEvent.change(search, {
       target: { value: 'jamba' },
     })
-    fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
-    await screen.findByText('Capabilities')
-    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Model library' })).toBeNull())
-
-    await openLibrary()
-
-    // The landing, with the search cleared. Not asserted: that the model page
-    // is gone from the DOM. The library's own page transition keeps an
-    // outgoing view mounted, and nothing in jsdom drives that exit to
-    // completion - so its presence proves nothing either way.
-    expect(screen.getByRole('button', { name: /Work Anthropic/ })).toBeTruthy()
-    expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveProperty('value', '')
+    fireEvent.keyDown(search, { key: 'Enter' })
+    const trigger = screen.getByRole('button', { name: 'Turn settings' })
+    expect(trigger.textContent).toContain('jamba-large-1.7')
+    expect(document.activeElement).toBe(trigger)
+    await waitFor(() => expect(screen.queryByRole('searchbox')).toBeNull())
+    await openModelPanel()
+    expect(screen.getByRole('searchbox', { name: 'Search models' })).toHaveProperty('value', '')
   })
 })
 
@@ -775,7 +832,7 @@ describe('the menu on the way out of a pick', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'open chat' }))
 
     await openModelPanel()
-    fireEvent.click(screen.getByText('Default model'))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Default' }))
 
     expect(screen.queryAllByRole('menu')).toHaveLength(1)
   })

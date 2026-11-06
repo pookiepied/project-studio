@@ -74,6 +74,11 @@
     outline-offset: 2px;
   }
 
+  /* Menu rows touch, so the focus outline stays inside the focused row. */
+  .studio-menu-row:focus-visible {
+    outline-offset: -2px;
+  }
+
   /* Off by default: a desktop app uses the platform arrow over controls, and a
      pointer cursor is a web convention. Offered in settings because enough
      people expect the web behaviour that it is worth not arguing about. */
@@ -102,6 +107,14 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* SearchField draws the clear control using the same icon as the rest of Studio. */
+input[type='search']::-webkit-search-decoration,
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 
 /* ---------------------------------------------------------------------------

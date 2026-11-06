@@ -1,7 +1,7 @@
 import type { CatalogModel } from './catalog'
 
 /**
- * The library's first axis: the connection.
+ * The model picker's first axis: the connection.
  *
  * ---- Why the connection and not the family ---------------------------------
  *

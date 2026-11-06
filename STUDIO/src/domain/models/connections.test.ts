@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ModelCapability, ModelPricing } from '@/platform/harness'
+import type { ModelCapability } from '@/platform/harness'
 import type { CatalogModel } from './catalog'
 import { connectionCatalog } from './connections'
 
@@ -13,7 +13,6 @@ import { connectionCatalog } from './connections'
  * two headings - which is the choice a person is making.
  */
 
-const PRICING: ModelPricing = { input: 3, output: 15, cacheRead: 'unknown', cacheWrite: 'unknown' }
 
 const CAPABILITY: ModelCapability = {
   textGeneration: 'supported',
@@ -44,10 +43,10 @@ function modelFor(modelId: string, connectionId: string, connectionName = connec
     author: 'openai',
     connectionVendor: connectionId,
     connectionName,
+    offered: true,
     reasoningLevels: [],
     contextWindow: 200_000,
     capability: CAPABILITY,
-    pricing: PRICING,
   }
 }
 

@@ -82,6 +82,16 @@ export const SPRING_SNAPPY = { type: 'spring', stiffness: 460, damping: 36, mass
 /** Surfaces that scale in: dialogs, the palette. */
 export const SPRING_SURFACE = { type: 'spring', stiffness: 380, damping: 30, mass: 0.8 } as const
 
+/** A compact floating surface settles from the edge that summoned it. */
+export function floatingMotion(x = 0, y = 0) {
+  return {
+    initial: { opacity: 0, scale: 0.97, x, y },
+    animate: { opacity: 1, scale: 1, x: 0, y: 0 },
+    exit: { opacity: 0, scale: 0.97, x, y, transition: { duration: DURATION.base, ease: EASE_IN } },
+    transition: { duration: DURATION.base, ease: EASE_OUT },
+  } as const
+}
+
 export const FADE = {
   initial: { opacity: 0 },
   animate: { opacity: 1 },
@@ -147,21 +157,21 @@ const SURFACE_PUSH = {
   initial: { opacity: 0, x: 32 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -24 },
-  transition: { duration: DURATION.slow, ease: EASE_OUT },
+  transition: { duration: DURATION.slow, ease: 'easeInOut' },
 } as const
 
 const SURFACE_POP = {
   initial: { opacity: 0, x: -32 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: 24 },
-  transition: { duration: DURATION.slow, ease: EASE_OUT },
+  transition: { duration: DURATION.slow, ease: 'easeInOut' },
 } as const
 
 const SURFACE_SIBLING = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 },
-  transition: { duration: DURATION.base, ease: EASE_OUT },
+  initial: { opacity: 0, x: 0 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 0 },
+  transition: { duration: DURATION.base, ease: 'easeInOut' },
 } as const
 
 // Both elements travel across the same screen, so they share one curve and

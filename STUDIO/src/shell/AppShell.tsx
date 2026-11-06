@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { RADIUS, surfaceVariants } from '@/design/tokens'
+import { RADIUS } from '@/design/tokens'
+import { PageTransition } from '@/components/primitives'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
@@ -21,9 +21,6 @@ import { useRail } from '@/stores/rail'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 import { isTauri } from '@/platform/tauri'
-
-/** The page handover, re-read from the move at play time (`surfaceVariants` explains why). */
-const SURFACE_VARIANTS = surfaceVariants()
 
 /**
  * The window.
@@ -229,64 +226,9 @@ export function AppShell() {
             the toggle's place and the centred title's. */}
         <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' && railCollapsed ? expandRail : undefined} />
 
-        {/*
-          One surface handing over to the next, in the direction the hierarchy
-          moved (`move` comes from the navigation store; the presets come from
-          `surfaceVariants`, and the move rides `custom`).
-
-          ---- Why `AnimatePresence`, when the comment here said not to -----------
-
-          This used to be a keyed `motion.main` with no AnimatePresence: the old
-          surface was destroyed in the same commit and only the new one played an
-          entrance. That decision was made against `mode="wait"`, and everything
-          it said about `wait` is still true -- sequencing a full exit and a full
-          enter doubles the cost of every navigation, and makes the arrival depend
-          on an animation completing.
-
-          The default mode has neither of those problems, and this is what it
-          buys: both surfaces are mounted for the length of the handover, so the
-          change is a crossfade rather than a cut-then-appear; the outgoing
-          surface animates on its own clock and unmounts when it is done, so
-          navigation still cannot be blocked by anything; and because both
-          surfaces carry the same duration and curve from one preset, the
-          handover reads as one event.
-
-          ---- Why the move arrives as `custom` ----------------------------------
-
-          AnimatePresence freezes an exiting element's props: left as spread
-          attributes, the outgoing page replays the PREVIOUS move's exit, and a
-          pop out of Settings left toward the wrong side while its replacement
-          entered from the right one. `custom` is the one channel AnimatePresence
-          re-renders onto an exiting element, so the variants re-read the move at
-          the moment each pose plays (`surfaceVariants`).
-
-          ---- Why the surfaces are absolutely positioned -------------------------
-
-          Both pages are `inset-0` for the same reason the old one was `h-full`:
-          the strip above them is already out of the flow, so the page *is* the
-          container. Stacked rather than flowed, the outgoing page fades out in
-          place instead of pushing the incoming one down the document -- two
-          `h-full` blocks in the flow would each be a full page tall, and the
-          container would double in height for a quarter second.
-
-          The keyed element is still the only outlet, and `Surface` is still
-          called rather than rendered -- see the note on `Surface` below. None of
-          that reasoning changed.
-        */}
-        <AnimatePresence initial={false} custom={move}>
-          <motion.main
-            key={routeKey(route)}
-            custom={move}
-            variants={SURFACE_VARIANTS}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="absolute inset-0"
-          >
-            {/* Called, not rendered as `<Surface />`. See the note on `Surface`. */}
-            {Surface({ route, conversations, projects })}
-          </motion.main>
-        </AnimatePresence>
+        <PageTransition view={routeKey(route)} move={move} main>
+          {Surface({ route, conversations, projects })}
+        </PageTransition>
       </div>
 
       {/* Outside the page's rounded container, so the rail is a sibling of the

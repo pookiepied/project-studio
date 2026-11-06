@@ -61,7 +61,9 @@ export function placeFloating({ anchor, panel, viewport, side, align = 'start', 
 }
 
 /** Shared observation keeps an open surface attached during scroll and preference changes. */
-export function observeFloating(anchor: Element | null, panel: Element | null, place: () => void): () => void {
+export function observeFloating(
+  anchor: Element | null, panel: Element | null, place: () => void, companion?: Element | null,
+): () => void {
   window.addEventListener('resize', place)
   window.addEventListener('scroll', place, true)
   const visual = window.visualViewport
@@ -70,6 +72,7 @@ export function observeFloating(anchor: Element | null, panel: Element | null, p
   const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(place)
   if (anchor) observer?.observe(anchor)
   if (panel) observer?.observe(panel)
+  if (companion) observer?.observe(companion)
   return () => {
     window.removeEventListener('resize', place)
     window.removeEventListener('scroll', place, true)

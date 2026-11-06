@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, MenuItem, Popover, TextField } from '@/components/primitives'
+import { Button, MenuItem, Popover, SearchField } from '@/components/primitives'
 import type { ProviderConnection, ProviderModel } from '@/platform/harness'
 import { voiceModelSetting, type VoiceModelRole } from '@/features/voice/settings'
 
@@ -74,7 +74,7 @@ export function VoiceModelSetting({ models, connections, role = 'conversation' }
       {note ? <p role="status" className="text-caption text-danger">{note}</p> : null}
     </div>
     <Popover open={open} onOpenChange={setOpen} side="bottom" align="end" className="min-w-64" trigger={<Button variant="secondary" size="sm" aria-label={copy.label} disabled={saving} onClick={() => setOpen((value) => !value)}>{selected === null ? 'Choose' : 'Change'}</Button>}>
-      <div className="p-1.5"><TextField value={search} onChange={setSearch} placeholder="Search models" /></div>
+      <div className="p-1.5"><SearchField value={search} onChange={setSearch} placeholder="Search models" /></div>
       <div className="max-h-64 overflow-y-auto">{visible.map((choice) => <MenuItem key={choice.id} selected={selected === choice.id} onSelect={() => void choose(choice.id)}>{choice.name}</MenuItem>)}
       {visible.length === 0 ? <p className="px-2 py-2 text-caption text-muted-foreground">No model by that name.</p> : null}
       <MenuItem onSelect={() => void choose(null)}>{copy.clear}</MenuItem></div>

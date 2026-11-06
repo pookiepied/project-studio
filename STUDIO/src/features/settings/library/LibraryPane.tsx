@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_IN, EASE_OUT, SPRING_SNAPPY, staggerDelay } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { Button, IconButton, Segmented, TextField } from '@/components/primitives'
+import { Button, IconButton, SearchField, Segmented } from '@/components/primitives'
 import { Loading, StateNote } from '@/components/state'
 import { Pane } from '@/features/settings/panes/Pane'
 import { KeepDialog } from '@/features/library/KeepDialog'
@@ -231,7 +231,7 @@ function Toolbar({
                 transition={{ duration: DURATION.slow, ease: EASE_OUT }}
                 className="min-w-0"
               >
-                <TextField
+                <SearchField
                   value={filter.query}
                   onChange={(query) => setFilter({ ...filter, query })}
                   placeholder="Search the library"
@@ -434,8 +434,8 @@ function Card({
             transition={SPRING_SNAPPY}
             className={
               selected
-                ? 'absolute left-1.5 top-1.5 flex size-5.5 items-center justify-center rounded-full bg-foreground text-background shadow-chip'
-                : 'absolute left-1.5 top-1.5 flex size-5.5 items-center justify-center rounded-full border border-foreground/40 bg-surface/85 text-foreground shadow-chip backdrop-blur-sm'
+                ? 'absolute right-1.5 top-1.5 flex size-5.5 items-center justify-center rounded-full bg-foreground text-background shadow-chip'
+                : 'absolute right-1.5 top-1.5 flex size-5.5 items-center justify-center rounded-full border border-foreground/40 bg-surface/85 text-foreground shadow-chip backdrop-blur-sm'
             }
           >
             {selected ? <Icons.check size="xs" /> : null}
