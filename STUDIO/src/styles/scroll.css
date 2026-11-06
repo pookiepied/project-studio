@@ -99,7 +99,25 @@
     margin-block: var(--radius-lg);
   }
 
+  /* A long draft. A textarea's padding scrolls away with its text, so padding
+     alone only holds the first and last lines off the edge: everything between
+     ran to the clip and was sliced by it. The field writes `--fade-top` and
+     `--fade-bottom` from how much is left to scroll, so text dissolves on the
+     way out and the ends of the draft stay fully legible. `scroll-padding` keeps
+     the caret's line out of that band, and the track's margin keeps the thumb
+     out of it and clear of the body's corners. */
+  .studio-composer-scroll {
+    scroll-padding-block: var(--composer-edge);
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--fade-top, 0px),
+      #000 calc(100% - var(--fade-bottom, 0px)),
+      transparent
+    );
+  }
+
   .studio-composer-scroll::-webkit-scrollbar-track {
-    margin-block: 5px;
+    margin-block: var(--composer-edge);
   }
 }

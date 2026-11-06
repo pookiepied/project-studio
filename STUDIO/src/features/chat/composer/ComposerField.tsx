@@ -1,4 +1,4 @@
-import { useCallback, useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react'
+import { useCallback, useImperativeHandle, useLayoutEffect, useRef, type CSSProperties, type Ref } from 'react'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
@@ -13,7 +13,8 @@ export interface ComposerFieldHandle {
  * height is written imperatively by the measurement below, and it is also
  * suspended imperatively while measuring — see `remeasure`.
  */
-const HEIGHT_TRANSITION = `height ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
+const SHAPE_CURVE = `${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
+const HEIGHT_TRANSITION = `height ${SHAPE_CURVE}, padding ${SHAPE_CURVE}`
 
 /**
  * How tall this text would be at a given width, asked WITHOUT touching the
@@ -35,12 +36,10 @@ const HEIGHT_TRANSITION = `height ${DURATION.slow}s cubic-bezier(${EASE_OUT.join
  * `height: auto` is simply the content height — no reset needed, because there
  * is no previous height for it to floor against.
  */
-function measure(element: HTMLTextAreaElement, width: number): number {
+function measure(element: HTMLTextAreaElement, width: number): { height: number; padding: number } {
   const parent = element.parentElement
-  if (!parent) return element.scrollHeight
-
   const stand = element.cloneNode(false)
-  if (!(stand instanceof HTMLTextAreaElement)) return element.scrollHeight
+  if (!parent || !(stand instanceof HTMLTextAreaElement)) return { height: element.scrollHeight, padding: 0 }
 
   // `value` is a property, not an attribute, so a clone starts empty.
   stand.value = element.value
@@ -56,8 +55,28 @@ function measure(element: HTMLTextAreaElement, width: number): number {
 
   parent.appendChild(stand)
   const height = stand.scrollHeight
+  // Read here, not from the field: the field's own padding is animating
+  // between arrangements, and this is where it ends up.
+  const style = getComputedStyle(stand)
+  const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0)
   parent.removeChild(stand)
-  return height
+  return { height, padding }
+}
+
+/**
+ * The slot's width once the frame has finished widening.
+ *
+ * The frame animates its own width as it goes active, so reading the slot would
+ * give a moving number: a draft arriving in an idle composer would be judged
+ * against the narrow frame and retargeted on every frame of the widen. What the
+ * frame is widening into is the room its parent gives it.
+ */
+function settledSlotWidth(element: HTMLTextAreaElement): number {
+  const lane = element.closest('[data-composer-frame]')?.parentElement
+  if (!lane) return element.getBoundingClientRect().width
+  const style = getComputedStyle(lane)
+  const padding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0)
+  return lane.clientWidth - padding - COMPOSER.paddingInline * 2
 }
 
 /**
@@ -94,6 +113,7 @@ export function ComposerField({
   onMultilineChange,
   onPaste,
   multiline,
+  stacked = multiline,
   inset,
   placeholder,
   handleRef,
@@ -111,11 +131,13 @@ export function ComposerField({
    */
   onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
   /**
-   * Whether the frame currently holds the footer arrangement. The field is
-   * wider there than beside the controls, and the decision has to stay
+   * Whether the text is past one line. The field is wider in the footer
+   * arrangement than beside the controls, and this decision has to stay
    * consistent across that difference — see `remeasure`.
    */
   multiline: boolean
+  /** Whether the frame holds the footer arrangement, which an attachment asks for too. */
+  stacked?: boolean
   /** The room the clusters take on either side while they sit beside the field. */
   inset: { readonly left: number; readonly right: number }
   placeholder: string
@@ -141,6 +163,20 @@ export function ComposerField({
    */
   const committed = useRef<number | null>(null)
 
+  /**
+   * How much of each end is dissolving, from how much text lies past it. A
+   * proportion rather than a switch, so the fade grows in with the first
+   * pixels of scroll and neither end of the draft is ever dimmed.
+   */
+  const fadeEdges = useCallback(() => {
+    const element = field.current
+    if (!element) return
+    const scrolling = element.style.overflowY === 'auto'
+    const past = element.scrollHeight - element.clientHeight - element.scrollTop
+    element.style.setProperty('--fade-top', `${scrolling ? Math.min(element.scrollTop, COMPOSER.edgeFade) : 0}px`)
+    element.style.setProperty('--fade-bottom', `${scrolling ? Math.max(0, Math.min(past, COMPOSER.edgeFade)) : 0}px`)
+  }, [])
+
   // Layout, not effect. This measures the field and writes its height, and a
   // passive effect runs *after* the browser has painted — so a paste showed one
   // frame at the previous height and radius before snapping to the right ones.
@@ -152,9 +188,9 @@ export function ComposerField({
     // The slot's full width is the field's once the clusters have gone to
     // the footer; beside them, the field has that less their insets. Both
     // are end states, not the live width - see the docblock.
-    const slot = element.closest('[data-composer-slot]')
-    const full = (slot ?? element).getBoundingClientRect().width
-    const beside = full - inset.left - inset.right
+    const slotWidth = settledSlotWidth(element)
+    const full = slotWidth - COMPOSER.textInset
+    const beside = slotWidth - inset.left - inset.right
 
     // How tall the text is here, and how tall it would be beside the
     // clusters. Multiline is decided against the SECOND width in both
@@ -165,15 +201,14 @@ export function ComposerField({
     // the capsule, wrap again, and keep going. One width makes the choice
     // stable - the footer leaves exactly when the line fits where the
     // capsule will put it.
-    const natural = measure(element, multiline ? full : beside)
-    const decisive = multiline ? measure(element, beside) : natural
+    const here = measure(element, stacked ? full : beside)
+    const decisive = stacked ? measure(element, beside) : here
+    const natural = here.height
 
     // One line plus a pixel of slack, rather than comparing to a hardcoded
     // height: the line box changes with the user's text-size preference.
-    const style = getComputedStyle(element)
-    const lineHeight = Number.parseFloat(style.lineHeight) || 20
-    const blockPadding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0)
-    const next = decisive - blockPadding > lineHeight * 1.6
+    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
+    const next = decisive.height - decisive.padding > lineHeight * 1.6
     if (next !== multiline) {
       // The arrangement is about to change, and with it the width this
       // height was measured at. Nothing is committed from this pass: the
@@ -197,7 +232,8 @@ export function ComposerField({
       committed.current = clamped
       element.style.height = `${clamped}px`
     }
-  }, [inset.left, inset.right, multiline, onMultilineChange])
+    fadeEdges()
+  }, [fadeEdges, inset.left, inset.right, multiline, onMultilineChange, stacked])
 
   // `value` is the trigger, not an input: the measurement reads the element,
   // which has already re-rendered with the new text by the time this runs.
@@ -244,7 +280,11 @@ export function ComposerField({
       rows={1}
       value={value}
       placeholder={placeholder}
-      style={{ transition: HEIGHT_TRANSITION }}
+      style={{ transition: HEIGHT_TRANSITION, '--composer-edge': `${COMPOSER.edgeFade}px` } as CSSProperties}
+      onScroll={fadeEdges}
+      // The height the last measure saw was mid-run, so what is left to scroll
+      // is only known once the run has finished.
+      onTransitionEnd={fadeEdges}
       onChange={(event) => onChange(event.target.value)}
       onPaste={onPaste}
       onKeyDown={(event) => {
@@ -266,7 +306,7 @@ export function ComposerField({
         // the app, in the largest control in the app.
         'text-ui text-foreground outline-none placeholder:text-muted-foreground/70',
         'px-1',
-        multiline ? 'studio-composer-scroll py-1' : 'py-0',
+        stacked ? 'studio-composer-scroll py-2' : 'py-0',
       )}
     />
   )

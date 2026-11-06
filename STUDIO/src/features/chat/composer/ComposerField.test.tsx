@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ComposerField } from './ComposerField'
 
@@ -30,6 +30,28 @@ describe('composer appearance changes', () => {
     render(<ComposerField value="One line" onChange={vi.fn()} onSubmit={vi.fn()}
       onMultilineChange={onMultilineChange} multiline inset={{ left: 0, right: 0 }} placeholder="Reply" />)
     expect(onMultilineChange).toHaveBeenCalledWith(false)
+  })
+
+  it('dissolves only the ends that have more text past them', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000)
+    vi.spyOn(HTMLTextAreaElement.prototype, 'clientHeight', 'get').mockReturnValue(184)
+    render(<ComposerField value="A long draft" onChange={vi.fn()} onSubmit={vi.fn()}
+      onMultilineChange={vi.fn()} multiline inset={{ left: 0, right: 0 }} placeholder="Reply" />)
+    const field = screen.getByRole<HTMLTextAreaElement>('textbox')
+    const fades = () => [field.style.getPropertyValue('--fade-top'), field.style.getPropertyValue('--fade-bottom')]
+    expect(fades()).toEqual(['0px', '14px'])
+
+    field.scrollTop = 5
+    fireEvent.scroll(field)
+    expect(fades()).toEqual(['5px', '14px'])
+
+    field.scrollTop = 816
+    fireEvent.scroll(field)
+    expect(fades()).toEqual(['14px', '0px'])
   })
 
   it('remeasures an existing draft when text size changes without a width change', async () => {

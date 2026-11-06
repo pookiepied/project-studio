@@ -82,6 +82,50 @@ const field = (): string => {
   return box.value
 }
 
+describe('idle and active', () => {
+  const frame = (container: HTMLElement) => container.querySelector('[data-composer-frame]')
+
+  it('widens for the caret and draws back without touching the controls', () => {
+    const { container } = renderComposer(vi.fn(async () => ({ ok: true })), true)
+    const input = screen.getByRole('textbox')
+    const stop = screen.getByRole('button', { name: 'Stop' })
+    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+
+    fireEvent.focus(input)
+    expect(frame(container)?.getAttribute('data-active')).toBe('true')
+    // Going active only ever widens: a composer that grows taller when the
+    // caret arrives reflows the page.
+    expect(frame(container)?.getAttribute('data-stacked')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Stop' })).toBe(stop)
+
+    fireEvent.blur(input, { relatedTarget: stop })
+    expect(frame(container)?.getAttribute('data-active')).toBe('true')
+    fireEvent.blur(stop, { relatedTarget: document.body })
+    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+  })
+
+  it('stays idle when a control takes focus, so + is not slid out from under the pointer', () => {
+    const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
+    fireEvent.focus(screen.getByRole('button', { name: 'Add context' }))
+    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+  })
+
+  it('stays active while a draft is waiting, focused or not', () => {
+    const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
+    type('Half a thought')
+    expect(frame(container)?.getAttribute('data-active')).toBe('true')
+    type('')
+    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+  })
+
+  it('paints the voice dock in the filtered layer, with the controls outside it', () => {
+    const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
+    const surface = container.querySelector('[data-composer-surface]')
+    expect(surface?.querySelectorAll('[data-composer-dock]')).toHaveLength(1)
+    expect(surface?.querySelector('button, textarea')).toBeNull()
+  })
+})
+
 describe('the field holds its words until the harness takes them', () => {
   it('holds a draft when the queue is full so an existing message can be steered first', () => {
     const onSend = vi.fn(async () => ({ ok: true }))

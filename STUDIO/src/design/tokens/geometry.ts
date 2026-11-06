@@ -101,17 +101,41 @@ export const SHELL = {
 /** The live control height comes from CSS so stored text preferences remain authoritative. */
 const COMPOSER_PADDING_BLOCK = SPACE.sm
 
+/** One row of controls and the padding around it: the capsule, and each dock. */
+const COMPOSER_DOCK_HEIGHT = `calc(var(--control-md) + ${COMPOSER_PADDING_BLOCK * 2}px)`
+
 /** The composer, which is a capsule when single-line and a rounded box when not. */
 export const COMPOSER = {
   /** Above and below the control row. The resting height derives from it. */
   paddingBlock: COMPOSER_PADDING_BLOCK,
+  /**
+   * How wide it rests while nobody is at it. In control steps, so it keeps its
+   * proportions at every text size; a window narrower than this just fills.
+   */
+  idleWidth: 'calc(var(--control-md) * 14)',
+  dockHeight: COMPOSER_DOCK_HEIGHT,
+  /** Clear air between the body and the dock once it has pinched off. */
+  dockGap: 10,
+  /**
+   * The gooey filter's blur. Two edges read as joined while they are closer
+   * than about 1.35 of this, so `dockGap` has to stay clear of that or the
+   * dock never fully lets go.
+   */
+  gooBlur: 5,
+  /** Extra room left of a multiline draft, so it clears the body's corner. */
+  textInset: 4,
+  /**
+   * How far from the field's ends text dissolves while there is more of it to
+   * scroll to, and how far the scrollbar's thumb is held back from them.
+   */
+  edgeFade: 14,
   /**
    * The single-line radius: half the field's own height, so it is a capsule.
    *
    * Resolving against the live control avoids a default-size mirror. A finite
    * radius also avoids the delayed visual collapse of animating 9999px to 18px.
    */
-  restingRadius: `calc((var(--control-md) + ${COMPOSER_PADDING_BLOCK * 2}px) / 2)`,
+  restingRadius: `calc(${COMPOSER_DOCK_HEIGHT} / 2)`,
 
   /** Past this the field is a box, not a capsule. */
   multilineRadius: RADIUS.xl,

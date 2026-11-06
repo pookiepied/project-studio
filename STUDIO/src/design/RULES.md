@@ -89,6 +89,16 @@ purpose: a CSS transition and a Framer animation on the same element must not
 disagree. They did — fourteen files had reached for `duration-150`, which was
 not a step in either system.
 
+**The composer has two curves outside this set.** Its widen eases in, because
+the house ease-out covers half of any distance in two frames, which reads as a
+snap across a few hundred pixels. And a gooey neck only
+exists for the last few pixels of an edge's travel, and the house ease-out
+crosses those in about 35ms, so the effect was over before it could be seen.
+`PINCH_MOTION` holds the 300ms ceiling and slows through that stretch. It moves
+only the painted surface, never text or a control, which is what makes it safe
+to run off the reshape clock. A filter layer holds shapes alone: nothing a
+person reads or presses goes through it.
+
 **A handover between surfaces moves along the hierarchy, not the vertical.**
 Home sits under nothing, a project under home, a conversation under its
 project, and Settings is the deepest layer. So navigation is a *move* — push

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -67,12 +67,117 @@ const INSET_TRANSITION = `padding ${DURATION.slow}s cubic-bezier(${EASE_OUT.join
 const CLUSTER_GAP = 8
 /**
  * The footer track: the air above the controls plus the control row itself,
- * as one number. Carrying the air *in the track* — rather than as a row gap
- * — is what lets the track transition its height: a gap between rows appears
- * at full size the moment a second row exists, which is a step in the frame's
+ * as one number. Carrying the air *in the track* — rather than as a row gap —
+ * is what lets the track transition its height: a gap between rows appears at
+ * full size the moment a second row exists, which is a step in the frame's
  * bottom edge no matter how smoothly everything else moves.
  */
 const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
+/**
+ * How much further in the text sits once the dock stands beside it: past the air
+ * between the two, and by the body's own padding, so the text clears the edge
+ * the body has just drawn there.
+ */
+const ACTIVE_INSET = COMPOSER.dockGap + COMPOSER.paddingInline
+/**
+ * The pinch, the one curve here off the reshape clock.
+ *
+ * The body and the dock only look like one liquid for the last few pixels of the
+ * edge's travel, and the house ease-out spends about 35ms there: the neck was
+ * over before it could be seen. This keeps the ease-out's fast start, then
+ * slows through that stretch so the neck visibly thins and lets go. It only
+ * moves the painted surface, so being off the clock cannot shift any text.
+ */
+const PINCH_MOTION = '0.3s linear(0, 0.5 14%, 0.72 28%, 0.82 42%, 0.88 58%, 0.94 76%, 0.98 90%, 1)'
+const SURFACE_TRANSITION = `right ${PINCH_MOTION}, border-radius ${PINCH_MOTION}`
+const SHAPE_CURVE = `${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
+/**
+ * The frame widening, also off the reshape clock. The house ease-out covers half
+ * of any distance in its first two frames, which suits something small arriving
+ * and reads as a snap across a few hundred pixels. This eases in, then glides.
+ */
+const WIDEN_MOTION = '0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+const FRAME_TRANSITION = `border-radius ${SHAPE_CURVE}, padding ${SHAPE_CURVE}, max-width ${WIDEN_MOTION}`
+
+/** A cluster's measured room includes the grid's gap; a dock has the frame's padding both sides. */
+const dockWidth = (room: number) => room - CLUSTER_GAP + COMPOSER.paddingInline * 2
+/** What the dock and the air beside it take from the body. */
+const dockReach = (room: number) => dockWidth(room) + COMPOSER.dockGap
+
+/**
+ * The composer's painted surface: a body, and a dock behind the right-hand
+ * controls.
+ *
+ * Both are plain shapes in one layer, and the filter is what makes them liquid:
+ * blur them together, then cut the blur's alpha back to a hard edge. Anything
+ * close enough to share blur fuses, with a neck that thins as the shapes part.
+ * The controls and the text are not in this layer, so nothing a person reads or
+ * presses is ever blurred.
+ *
+ * The dock is the capsule's height and sits on the frame's bottom right, so at
+ * rest it lies wholly inside the body and the two shapes are simply the capsule.
+ * Going active on one line the body draws its right side in and pinches off it,
+ * and past one line it fuses back, because a capsule left alone beside a tall box
+ * reads as stranded and costs the draft its width. The dock itself never moves,
+ * so neither does a control riding it.
+ *
+ * `sRGB` because filters default to linear light, which would repaint the
+ * surface a different shade from the one the theme chose. The elevation is on
+ * the parent because it has to be drawn from the fused silhouette; a box-shadow
+ * on any one shape would be cut away by the threshold.
+ */
+function ComposerSurface({
+  bubble,
+  stacked,
+  focused,
+  inset,
+}: {
+  bubble: boolean
+  stacked: boolean
+  focused: boolean
+  inset: { readonly left: number; readonly right: number }
+}) {
+  const filterId = useId()
+  return (
+    <div
+      aria-hidden
+      data-composer-surface
+      className="pointer-events-none absolute inset-0 -z-10"
+      style={{
+        filter: focused ? 'var(--silhouette-lifted)' : 'var(--silhouette-raised)',
+        transition: `filter ${SHAPE_CURVE}`,
+      }}
+    >
+      <svg className="absolute size-0">
+        <filter id={filterId} colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation={COMPOSER.gooBlur} />
+          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" />
+        </filter>
+      </svg>
+      <div className="absolute inset-0" style={{ filter: `url("#${filterId}")` }}>
+        <div
+          data-composer-body
+          className="absolute inset-y-0 left-0 bg-surface-raised"
+          style={{
+            right: bubble ? dockReach(inset.right) : 0,
+            borderRadius: stacked ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
+            transition: SURFACE_TRANSITION,
+          }}
+        />
+        <div
+          data-composer-dock
+          className="absolute bottom-0 right-0 bg-surface-raised"
+          style={{
+            width: dockWidth(inset.right),
+            height: COMPOSER.dockHeight,
+            borderRadius: COMPOSER.restingRadius,
+            transition: `width ${SHAPE_CURVE}`,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
 
 /**
  * The composer.
@@ -116,6 +221,12 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  * of text has enormous dead corners, and a 16px box on a single line reads as a
  * form input. The radius animates between them, so growing feels like one
  * object changing rather than two components swapping.
+ *
+ * At rest it is a short capsule, centred. Going active - the caret, a draft, the
+ * microphone - it widens to the column, the voice controls pinch off as a capsule
+ * of their own, and both undo when it goes idle. Going active never adds height:
+ * a composer that grows taller when the caret arrives reflows the page on every
+ * click into it. See `ComposerSurface`.
  *
  * Separation is a shadow, not a border. A hairline around a white field on a
  * white surface reads as an input; a soft shadow reads as an object resting on
@@ -223,6 +334,10 @@ export function Composer({
   const [refusals, setRefusals] = useState<readonly ImageRejection[]>([])
   const picker = useRef<HTMLInputElement>(null)
   const [focused, setFocused] = useState(false)
+  // The caret specifically, which is what widens the frame. Any focus in the
+  // frame would be wrong: pressing + on an idle composer would slide the button
+  // out from under the pointer and leave its menu anchored to where it was.
+  const [fieldFocused, setFieldFocused] = useState(false)
   const [multiline, setMultiline] = useState(false)
   // How much room each cluster takes beside the field on one line. Measured
   // from the clusters themselves rather than summed from tokens, because the
@@ -402,6 +517,15 @@ export function Composer({
   const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) &&
     !sending && pendingAttachments === 0 && (!turnRunning || onQueue !== undefined)
   const dictating = dictation.stage !== 'idle'
+  const fieldAside = dictating || landing !== null
+  // Anything riding above the field needs the frame's full width, which only
+  // the box gives it; between the docks it would hang past the body's sides.
+  const stacked = multiline || images.length > 0 || documents.length > 0 ||
+    refusals.length > 0 || commandNote !== null || Boolean(improveOffer.offer?.note)
+  // Idle is a composer with nothing in it and nobody at it.
+  const active = fieldFocused || fieldAside || stacked || text.length > 0
+  const bubble = active && !stacked
+  const room = bubble ? { left: inset.left, right: inset.right + ACTIVE_INSET } : inset
 
   /**
    * Reads the picker's haul into the strip: rules first, then bytes. The
@@ -577,10 +701,16 @@ export function Composer({
     <div
       ref={frame}
       data-composer-frame
-      onFocusCapture={() => setFocused(true)}
+      data-active={active}
+      data-stacked={stacked}
+      onFocusCapture={(event) => {
+        setFocused(true)
+        if (event.target instanceof HTMLTextAreaElement) setFieldFocused(true)
+      }}
       onBlurCapture={(event) => {
         if (event.currentTarget.contains(event.relatedTarget)) return
         setFocused(false)
+        setFieldFocused(false)
       }}
       // The radius is a real style with a CSS transition, not a Framer
       // `animate`. A Framer value is only applied once the animation loop
@@ -603,12 +733,15 @@ export function Composer({
         // one that silently disagreed: the field measured 52 while the token
         // said what it should be.
         paddingBlock: COMPOSER.paddingBlock,
-        borderRadius: multiline ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
-        transitionDuration: `${DURATION.slow}s`,
-        transitionTimingFunction: `cubic-bezier(${EASE_OUT.join(', ')})`,
+        borderRadius: stacked ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
+        // `max-width`, not `width`: a percentage and a length interpolate, and
+        // the frame still fills a window narrower than its idle width.
+        maxWidth: active ? '100%' : COMPOSER.idleWidth,
+        transition: FRAME_TRANSITION,
       }}
       className={cn(
-        'relative bg-surface-raised',
+        // `isolate` so the surface's negative z-index stays inside this frame.
+        'relative isolate mx-auto w-full',
         // The field breathes on focus: a little taller, lifted a little further
         // off the page. Both are small enough to register without being watched
         // — the point is that the surface acknowledges the caret arriving, not
@@ -630,29 +763,13 @@ export function Composer({
         // capsule-to-box change snapped a frame after the field had already
         // grown. That mismatch — height first, shape a frame later — is what
         // read as the composer changing shape and correcting itself on paste.
-        'transition-[box-shadow,border-radius,padding]',
-        // Both properties, or the radius does not animate at all: naming only
-        // `box-shadow` sets `transition-property` to exactly that, so the
-        // capsule-to-box change snapped a frame after the field had already
-        // grown. That mismatch — height first, shape a frame later — is what
-        // read as the composer changing shape and correcting itself on paste.
-        // Two steps of the shared elevation scale rather than three hand-mixed
-        // shadows. The third of those was the bug: `dark:shadow-[...]` had no
-        // `focused` condition, so in dark mode it overrode *both* branches and
-        // the field stopped lifting on focus entirely — the breathing worked in
-        // light mode only. The scale carries its own dark values, so there is
-        // nothing left here to get out of step.
-        //
-        // The lift is this surface's whole focus treatment, on purpose. Fields
-        // elsewhere answer focus with a darkened border and nothing else; the
-        // composer is a surface, not a control among other controls, and the
-        // docblock above is explicit about why a drawn edge would read this
-        // object as an input. Two registers, then — an edge for a field,
-        // elevation for a surface — decided once here, not two components
-        // disagreeing.
-        focused ? 'shadow-lifted' : 'shadow-raised',
       )}
     >
+      {/* Two steps of the shared elevation scale, as a silhouette: the lift is
+          this surface's whole focus treatment, on purpose. Fields elsewhere
+          answer focus with a darkened border; the composer is a surface, not a
+          control among controls, so an edge for a field, elevation for this. */}
+      <ComposerSurface bubble={bubble} stacked={stacked} focused={focused} inset={inset} />
       {draggingFiles ? <div role="status" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2 rounded-[inherit] border border-dashed border-foreground/30 bg-surface-raised/95 text-caption text-foreground">
         <Icons.add />Drop files to attach
       </div> : null}
@@ -746,7 +863,7 @@ export function Composer({
 
           A grid rather than the row re-rendered two ways: the controls never
           move in the DOM, so nothing remounts and an open menu stays open, and
-          the relocation hangs off the same `multiline` signal that reshapes
+          the relocation hangs off the same `stacked` signal that reshapes
           the frame — the capsule-to-box radius and the footer cannot
           disagree about which state the field is in.
 
@@ -768,7 +885,7 @@ export function Composer({
           one via the global media query. */}
       <div
         style={{
-          gridTemplateRows: multiline ? FOOTER_TRACK : 'auto 0px',
+          gridTemplateRows: stacked ? FOOTER_TRACK : 'auto 0px',
           transition: TRACK_TRANSITION,
         }}
         className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0"
@@ -779,7 +896,7 @@ export function Composer({
           transition={SHAPE_MOTION}
           className={cn(
             'col-start-1 flex items-center gap-1',
-            multiline ? 'row-start-2 self-end' : 'row-start-1',
+            stacked ? 'row-start-2 self-end' : 'row-start-1',
           )}
         >
           {/* The image picker is this menu's one live item: the dialog it
@@ -802,75 +919,85 @@ export function Composer({
           data-composer-slot
           className="col-start-1 col-span-3 row-start-1 min-w-0"
           style={{
-            paddingLeft: multiline ? 0 : inset.left,
-            paddingRight: multiline ? 0 : inset.right,
+            paddingLeft: stacked ? COMPOSER.textInset : room.left,
+            paddingRight: stacked ? 0 : room.right,
             transition: INSET_TRANSITION,
           }}
         >
-          {/* While dictation is live the field steps aside and the strip of
-              real level takes its place — same slot, same line height, so
-              the capsule neither grows nor reshapes. `popLayout` keeps the
-              outgoing field in the flow's memory for the length of its exit
-              rather than collapsing the row for one frame. */}
-          <AnimatePresence initial={false} mode="popLayout">
-            {dictating ? (
-              <motion.div
-                key="dictation"
-                initial={{ opacity: 0, x: 6 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -6 }}
-                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-              >
-                <DictationBar
-                  stage={dictation.stage}
-                  elapsedMs={dictation.elapsedMs}
-                  denied={dictation.denied}
-                  note={dictation.note}
-                  onFrame={dictation.mic.onFrame}
-                />
-              </motion.div>
-            ) : landing !== null ? (
-              // The passage arriving: the same slot, the field's own type,
-              // so when the field takes over nothing on screen moves.
-              <motion.div
-                key="landing"
-                initial={{ opacity: 1 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: DURATION.fast }}
-              >
-                <TextLanding text={landing} />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="field"
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 6 }}
-                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-              >
-                <ComposerField
-                  handleRef={field}
-                  value={text}
-                  onChange={setText}
-                  onSubmit={submit}
-                  onKeyDownCapture={slashKey}
-                  onMultilineChange={setMultiline}
-                  onPaste={(event) => {
-                    const files = Array.from(event.clipboardData.files)
-                    if (files.length === 0) return
-                    // The paste becomes the strip, not text in the field: a
-                    // screenshot on the clipboard has no words to insert.
-                    event.preventDefault()
-                    ingestFiles(files)
-                  }}
-                  multiline={multiline}
-                  inset={inset}
-                  placeholder={placeholder}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* The row's height even while the field is one shorter line. The
+              clusters hold it on one line; the instant they drop, this has to,
+              or the frame dips by the difference before it starts to grow.
+
+              The field stays mounted under whatever stands in for it, hidden
+              and inert. It is what gives this slot its height, so a multiline
+              draft keeps its size while the microphone has the slot, and a
+              passage landing is measured and reshapes the frame as it arrives
+              rather than once it has finished. */}
+          <div className="relative flex min-h-[var(--control-md)] flex-col justify-center">
+            <div
+              inert={fieldAside}
+              className={cn('transition-opacity duration-fast', fieldAside && 'opacity-0')}
+            >
+              <ComposerField
+                handleRef={field}
+                value={text}
+                onChange={setText}
+                onSubmit={submit}
+                onKeyDownCapture={slashKey}
+                onMultilineChange={setMultiline}
+                onPaste={(event) => {
+                  const files = Array.from(event.clipboardData.files)
+                  if (files.length === 0) return
+                  // The paste becomes the strip, not text in the field: a
+                  // screenshot on the clipboard has no words to insert.
+                  event.preventDefault()
+                  ingestFiles(files)
+                }}
+                multiline={multiline}
+                stacked={stacked}
+                inset={room}
+                placeholder={placeholder}
+              />
+            </div>
+            <AnimatePresence initial={false}>
+              {dictating ? (
+                <motion.div
+                  key="dictation"
+                  className="absolute inset-0 flex flex-col justify-center"
+                  initial={{ opacity: 0, x: 6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -6 }}
+                  transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+                >
+                  <DictationBar
+                    stage={dictation.stage}
+                    elapsedMs={dictation.elapsedMs}
+                    denied={dictation.denied}
+                    note={dictation.note}
+                    onFrame={dictation.mic.onFrame}
+                  />
+                </motion.div>
+              ) : landing !== null ? (
+                // The passage arriving, set exactly where the field sets it, so
+                // when the field takes over nothing on screen moves. A passage
+                // past the field's height clips with it rather than pushing
+                // the frame past its ceiling.
+                <motion.div
+                  key="landing"
+                  className={cn(
+                    'absolute inset-0 flex flex-col overflow-hidden px-1',
+                    stacked ? 'justify-start py-2' : 'justify-center',
+                  )}
+                  initial={{ opacity: 1 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: DURATION.fast }}
+                >
+                  <TextLanding text={landing} />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
         </div>
 
         <motion.div
@@ -879,7 +1006,7 @@ export function Composer({
           transition={SHAPE_MOTION}
           className={cn(
             'relative flex items-center gap-1',
-            multiline ? 'col-start-3 row-start-2 self-end' : 'col-start-3 row-start-1',
+            stacked ? 'col-start-3 row-start-2 self-end' : 'col-start-3 row-start-1',
           )}
         >
           {/* Dictation sits in the field, not in the plus menu.
