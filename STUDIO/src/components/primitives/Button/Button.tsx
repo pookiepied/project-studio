@@ -9,7 +9,7 @@ type Size = 'xs' | 'sm' | 'md' | 'lg'
 /** A solid destructive fill belongs to the final confirmation. */
 const VARIANT: Record<Variant, string> = {
   primary:
-    'bg-primary text-primary-foreground shadow-chip hover:bg-primary/90 active:bg-primary active:shadow-none [&_.studio-icon]:text-primary-foreground',
+    'bg-foreground text-surface hover:bg-foreground/90 active:bg-foreground [&_.studio-icon]:text-surface',
   secondary:
     'bg-muted text-foreground hover:bg-selected active:bg-foreground/15',
   ghost: 'text-muted-foreground hover:bg-tint hover:text-foreground active:bg-selected',
@@ -22,7 +22,7 @@ const SIZE: Record<Size, string> = {
   xs: '[--control-size:var(--button-xs)] px-2 text-caption',
   sm: '[--control-size:var(--button-sm)] px-2.5 text-caption',
   md: '[--control-size:var(--button-md)] px-3 text-ui',
-  lg: '[--control-size:var(--button-lg)] px-3.5 text-ui',
+  lg: '[--control-size:var(--button-lg)] px-6 text-ui',
 }
 
 export function Button({

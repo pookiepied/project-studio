@@ -630,7 +630,7 @@ describe('the window the turn is measured against', () => {
     expect(screen.queryByRole('menuitem', { name: 'Context window' })).toBeNull()
   })
 
-  it('keeps context details behind a disclosure and names unavailable categories', async () => {
+  it('shows context categories without a second breakdown panel', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker({ conversationId: 'cnv_1' })
@@ -638,13 +638,12 @@ describe('the window the turn is measured against', () => {
 
     await openContextPanel()
     await screen.findByRole('meter', { name: 'Context used' })
+    expect(screen.queryByRole('button', { name: 'Breakdown' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Context breakdown' })).toBeNull()
     for (const category of ['System prompt', 'Tools', 'Files', 'Conversation', 'Memory']) {
       expect(screen.getByText(category)).toBeTruthy()
     }
     expect(screen.getByText('Memory').nextElementSibling?.textContent).toBe('N/A')
-    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }))
-    expect(await screen.findByRole('group', { name: 'Context breakdown' })).toBeTruthy()
   })
 
   it('keeps the percentage off the strip until it is news', async () => {

@@ -10,7 +10,7 @@ import { REASONING_LEVEL_NOTES, restingReasoningLevel, type ReasoningChoice } fr
 import { contextBreakdown, formatTokens, type ContextBreakdown, type ContextReport } from '@/domain/turn/context'
 import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { rememberRecentModel } from '@/domain/models/recents'
-import { ContextCategories, ContextDetails, ContextTank, type ContextBandId } from '@/shell/chrome/ContextTank'
+import { ContextCategories, ContextTank } from '@/shell/chrome/ContextTank'
 import { useNavigation } from '@/stores/navigation'
 import { useLiveWork, useWorkspace } from '@/stores/workspace'
 import { useCompactNow } from '@/features/chat/compaction/useCompactNow'
@@ -260,9 +260,6 @@ function ContextPanel({
   onCompact: () => void
   onBack: () => void
 }) {
-  const [detailed, setDetailed] = useState(false)
-  const [highlight, setHighlight] = useState<ContextBandId | null>(null)
-
   return (
     <>
       <BackRow onBack={onBack}>Context window</BackRow>
@@ -291,24 +288,8 @@ function ContextPanel({
                 This conversation is larger than this model's window. It will be compacted on the next message.
               </p>
             ) : null}
-            <ContextTank breakdown={breakdown} running={running} highlight={highlight} />
+            <ContextTank breakdown={breakdown} running={running} />
             <ContextCategories />
-            <button
-              type="button"
-              onClick={() => { setHighlight(null); setDetailed(!detailed) }}
-              aria-expanded={detailed}
-              className="flex items-center gap-1 self-start text-caption text-muted-foreground hover:text-foreground"
-            >
-              <Icons.disclosure state={detailed ? 'on' : 'rest'} />
-              {detailed ? 'Hide breakdown' : 'Breakdown'}
-            </button>
-            <MenuViews view={detailed ? 'breakdown' : 'summary'} depth={0} resize={false}>
-              {detailed ? (
-                <div role="group" aria-label="Context breakdown">
-                  <ContextDetails breakdown={breakdown} onHighlight={setHighlight} />
-                </div>
-              ) : null}
-            </MenuViews>
           </>
         )}
       </div>

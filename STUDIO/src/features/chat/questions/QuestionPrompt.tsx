@@ -188,7 +188,7 @@ export function QuestionPrompt({
             </Button>
           </div>
           {needsContinue ? (
-            <Button variant="primary" size="xs" busy={answering} onClick={submit}>
+            <Button variant="primary" size="lg" busy={answering} onClick={submit}>
               {rows.length > 1 ? 'Continue' : 'Submit'}
             </Button>
           ) : null}

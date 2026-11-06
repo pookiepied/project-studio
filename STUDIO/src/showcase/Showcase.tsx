@@ -170,6 +170,9 @@ function ButtonsSection() {
             </Button>
           ))}
         </Specimen>
+        <Specimen label="standalone">
+          <Button variant="primary" size="lg">Continue</Button>
+        </Specimen>
         <Specimen label="full width">
           <div className="w-64">
             <Button variant="primary" fullWidth>

@@ -216,7 +216,7 @@ function PairingScreen({ onPaired, initialRefusal }: { onPaired: () => void; ini
           autoCapitalize="characters"
           className="w-44 text-center font-mono uppercase tracking-[0.3em]"
         />
-        <Button type="submit" variant="primary" size="sm" busy={busy} disabled={code.trim() === ''}>
+        <Button type="submit" variant="primary" size="lg" busy={busy} disabled={code.trim() === ''}>
           Pair
         </Button>
       </form>

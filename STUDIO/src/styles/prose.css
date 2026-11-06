@@ -116,7 +116,8 @@
   }
 
   .studio-prose :is(h1, h2, h3, h4, h5, h6) {
-    @apply font-semibold tracking-tight;
+    font-weight: 560;
+    letter-spacing: -0.012em;
     line-height: 1.35;
     /* Headings are short and often wrap to two lines. `balance` evens those
        lines instead of leaving one word alone on the second, which `pretty` --
@@ -158,7 +159,7 @@
 
   /* Headings bind to the text beneath them, not the block above. */
   .studio-prose > * + :is(h1, h2, h3, h4, h5, h6) {
-    margin-top: 1.7em;
+    margin-top: 1.55em;
   }
   .studio-prose :is(h1, h2, h3, h4, h5, h6) + * {
     margin-top: 0.45em;
@@ -284,7 +285,9 @@
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 8h6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% no-repeat;
   }
 
-  .studio-prose strong { @apply font-semibold; }
+  /* A long emphasized phrase should stay part of the sentence. */
+  .studio-prose strong { font-weight: 525; }
+  .studio-user-prose :is(strong, h1, h2, h3, h4, h5, h6) { font-weight: 600; }
 
   .studio-prose blockquote {
     @apply rounded-r-lg border-l-2 py-1 pl-3.5;

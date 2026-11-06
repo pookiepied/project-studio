@@ -196,9 +196,10 @@ condition on it and silently disabled the composer's focus lift in dark mode.
 
 ## 5. Colour
 
-The chrome is monochrome, including the window controls. Primary buttons
-invert with the theme. Secondary buttons use a muted fill and capsules have no
-resting border.
+The chrome is monochrome, including the window controls. Primary actions use
+the theme's foreground as a solid fill, with the surface color for the label.
+Secondary actions use a muted fill. Hover and selection use graphite tints,
+and capsules have no resting border.
 Red identifies destructive actions, with a solid fill reserved for the final
 confirmation.
 
@@ -218,6 +219,9 @@ voice and becomes a second UI font.
 **Roles, never sizes.** Components name `text-body`, `text-ui`, `text-caption`,
 `text-micro`, `text-title`. Nothing writes `text-sm`. Every role derives from
 `--ui-size`, so the whole text system scales from one number.
+
+Use the large capsule for a standalone commit or a clear progression action
+such as Continue. Inline utilities and dense card actions use compact steps.
 
 Conversation documents use `--text-body`, level with interface text, through
 `.studio-prose`. User messages, assistant answers and the composer share that
