@@ -87,7 +87,7 @@ export function ModelPicker({
               No models match &quot;{query.trim()}&quot;.
             </p>
           ) : (
-            <div className="studio-scroll-bounded max-h-[min(16rem,50dvh)]">
+            <div className="studio-scroll-bounded max-h-[min(16rem,50dvh)] overflow-y-auto overscroll-contain">
               {results.map((connection) => (
                 <section key={connection.id} aria-label={connection.name}>
                   <MenuLabel>{connection.name}</MenuLabel>
@@ -185,7 +185,7 @@ export function ModelProviders({
         {connection === undefined ? 'Providers' : 'All providers'}
       </button>
       <MenuSeparator />
-      <div className="studio-scroll-bounded max-h-[min(16rem,50dvh)]">
+      <div className="studio-scroll-bounded max-h-[min(16rem,50dvh)] overflow-y-auto overscroll-contain">
         <MenuViews view={connection === undefined ? 'providers' : `connection:${connection.id}`} depth={connection === undefined ? 0 : 1}>
           {connection === undefined ? (
             connections.map((provider) => (

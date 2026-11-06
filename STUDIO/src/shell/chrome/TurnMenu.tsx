@@ -126,7 +126,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
       side="bottom"
       align="end"
       maxHeight="28rem"
-      className="studio-scroll-bounded w-64 rounded-xl"
+      className="studio-scroll-bounded w-64 overflow-y-auto overscroll-contain rounded-xl"
       initialFocus='[aria-label="Search models"]'
       companion={view === 'root' && browser !== null && catalog.phase.status === 'ready' && offered.length > 0 ? {
         label: 'More models',

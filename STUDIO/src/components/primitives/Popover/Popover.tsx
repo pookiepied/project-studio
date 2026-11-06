@@ -313,7 +313,7 @@ export function Popover({
               }}
               className={cn(
                 'studio-floating-surface studio-blur studio-scroll-bounded fixed z-50 w-64 rounded-xl border p-1 shadow-overlay',
-                'max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)]',
+                'max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain',
               )}
             >
               <PresentMenuContent>{companion.content}</PresentMenuContent>
