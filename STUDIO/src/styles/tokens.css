@@ -49,8 +49,6 @@
   --color-ring: var(--ring);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-button-edge: var(--button-edge);
-  --color-button-secondary: var(--button-secondary);
   --color-danger-confirm: var(--danger-confirm);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);

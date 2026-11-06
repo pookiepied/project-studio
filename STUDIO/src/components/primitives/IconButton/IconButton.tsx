@@ -35,7 +35,7 @@ import { cn } from '@/lib/cn'
  */
 
 type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-type Tone = 'quiet' | 'solid' | 'secondary'
+type Tone = 'quiet' | 'solid'
 
 /**
  * The three control steps, read from the scale rather than written as rem.
@@ -90,7 +90,6 @@ const TONE_CLASS: Record<Tone, string> = {
   // quiet. The arbitrary variant lands in the utilities layer, which is what
   // lets it beat the `.studio-icon` default in `styles/components.css`.
   solid: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary [&_.studio-icon]:text-primary-foreground',
-  secondary: 'border border-button-edge bg-button-secondary text-foreground hover:bg-muted active:bg-selected',
 }
 
 interface IconButtonProps {

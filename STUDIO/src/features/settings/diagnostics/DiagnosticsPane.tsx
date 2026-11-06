@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Button } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { useHarnessClient } from '@/platform/harness/react'
 import type { DiagnosticHealth, DiagnosticPolicy } from '@/platform/harness/client/diagnostics'
 import { isTauri } from '@/platform/tauri'
 import { useWorkspace } from '@/stores/workspace'
 import { clearNativeCapture, readNativeCapture, syncNativeCapture, inspectorSharing, type InspectorSharing } from '@/platform/diagnostics/native'
-
-const BUTTON = 'rounded-md border px-3 py-1.5 text-ui hover:bg-tint disabled:opacity-50'
 
 export function DiagnosticsPane() {
   const connect = useHarnessClient()
@@ -140,18 +139,18 @@ export function DiagnosticsPane() {
     {!local ? <Row label="Open this page on the desktop" hint="Diagnostic recordings are available on the local Studio host." /> : <>
       {error ? <p role="alert" className="py-3 text-ui text-muted-foreground">{error}</p> : null}
       <Row label="Local Inspector" hint="Share the retained diagnostic window through a local file, including content you allowed below. This does not start recording. Inspector archives have their own retention and deletion controls.">
-        <button className={BUTTON} disabled={busy} onClick={() => void share()}>{sharing.enabled ? 'Stop sharing with Inspector' : 'Share with local Inspector'}</button>
-        {sharing.enabled && sharing.path !== null ? <button className={BUTTON} disabled={busy} onClick={() => {
+        <Button size="sm" disabled={busy} onClick={() => void share()}>{sharing.enabled ? 'Stop sharing with Inspector' : 'Share with local Inspector'}</Button>
+        {sharing.enabled && sharing.path !== null ? <Button size="sm" disabled={busy} onClick={() => {
           void navigator.clipboard.writeText(sharing.path ?? '').then(() => setError(null)).catch(() => setError('The feed path could not be copied.'))
-        }}>Copy Inspector feed path</button> : null}
+        }}>Copy Inspector feed path</Button> : null}
       </Row>
       {sharing.enabled ? <p role="status" className="pb-3 text-caption text-muted-foreground">Inspector feed: {sharing.status}. Collected archives are managed by Inspector.</p> : null}
       <Row label="Host evidence" hint="Native lifecycle and transport events survive a harness restart until Studio quits.">
-        <button className={BUTTON} disabled={busy} onClick={() => void copyHost()}>Copy host events</button>
+        <Button size="sm" disabled={busy} onClick={() => void copyHost()}>Copy host events</Button>
       </Row>
       {!health ? <Row label="Reading recording status..." /> : <>
         <Row label="Recording" hint="Starts off each time the harness launches. Stopping keeps the captured window until you clear it or quit.">
-          <button className={BUTTON} disabled={busy} onClick={() => void change({ enabled: !health.policy.enabled })}>{health.policy.enabled ? 'Stop recording' : 'Start recording'}</button>
+          <Button size="sm" disabled={busy} onClick={() => void change({ enabled: !health.policy.enabled })}>{health.policy.enabled ? 'Stop recording' : 'Start recording'}</Button>
         </Row>
         <Row label="Conversation content" hint="May include prompts, reasoning and tool results. Choose conversations below. Changing content consent or scope clears the previous window.">
           <input aria-label="Capture conversation content" type="checkbox" disabled={busy} checked={health.policy.captureContent}
@@ -164,7 +163,7 @@ export function DiagnosticsPane() {
           </select>
         </Row> : null}
         <Row label="Captured window" hint={`${health.retainedEvents} events / ${Math.ceil(health.retainedBytes / 1024)} KB / ${health.evictedEvents} evicted / ${health.droppedEvents} dropped`}>
-          <button className={BUTTON} disabled={busy} onClick={() => void refresh()}>Refresh</button>
+          <Button size="sm" disabled={busy} onClick={() => void refresh()}>Refresh</Button>
         </Row>
         <Row label="Window size" hint="Older events are evicted when either the event or byte limit is reached.">
           <select aria-label="Maximum captured events" className="rounded-md border bg-surface p-1 text-ui" disabled={busy} value={health.policy.maxEvents}
@@ -174,8 +173,8 @@ export function DiagnosticsPane() {
         </Row>
         <Row label="Captured events" hint="Copying stops recording and includes any captured conversation content. The window is lost when the harness exits.">
           <div className="flex gap-2">
-            <button className={BUTTON} disabled={busy} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy events'}</button>
-            <button className={BUTTON} disabled={busy} onClick={() => void clear()}>Clear events</button>
+            <Button size="sm" disabled={busy} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy events'}</Button>
+            <Button size="sm" disabled={busy} onClick={() => void clear()}>Clear events</Button>
           </div>
         </Row>
       </>}

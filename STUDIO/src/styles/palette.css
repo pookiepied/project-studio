@@ -29,8 +29,6 @@
   --ring: oklch(0.145 0 0 / 45%);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --button-edge: oklch(0.145 0 0 / 22%);
-  --button-secondary: var(--surface);
   --danger-confirm: #b72740;
 
   /* -- The one hue -------------------------------------------------------
@@ -165,8 +163,6 @@
   --ring: oklch(1 0 0 / 45%);
   --primary: oklch(0.94 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --button-edge: oklch(1 0 0 / 22%);
-  --button-secondary: var(--surface-sunken);
 
   /* Lifted, like every other colour here: the same lightness that reads as
      calm on white disappears into a 0.205 surface. */

@@ -35,9 +35,9 @@ export function JobsPill({
       onClick={onToggle}
       aria-expanded={open}
       className={cn(
-        'studio-control flex max-w-full items-center gap-1.5 rounded-full border px-2.5 [--control-size:var(--button-xs)]',
+        'studio-control-flat flex max-w-full items-center gap-1.5 rounded-full px-2.5 [--control-size:var(--button-xs)]',
         'text-caption transition-colors duration-fast',
-        'border-button-edge bg-button-secondary text-muted-foreground hover:bg-muted hover:text-foreground',
+        'bg-muted text-muted-foreground hover:bg-selected hover:text-foreground',
       )}
     >
       <span className="shrink-0">

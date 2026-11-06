@@ -314,10 +314,10 @@ export function AddModelDialog({
                         selected ? current.filter((entry) => entry !== level) : [...current, level],
                       )
                     }}
-                    className={`studio-control rounded-full border px-2.5 text-caption transition-colors duration-fast [--control-size:var(--button-xs)] ${
+                    className={`studio-control-flat rounded-full px-2.5 text-caption transition-colors duration-fast [--control-size:var(--button-xs)] ${
                       selected
-                        ? 'border-transparent bg-selected text-foreground'
-                        : 'text-muted-foreground hover:bg-tint'
+                        ? 'bg-selected text-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-selected'
                     }`}
                   >
                     {level}

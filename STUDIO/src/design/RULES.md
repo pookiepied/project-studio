@@ -197,7 +197,8 @@ condition on it and silently disabled the composer's focus lift in dark mode.
 ## 5. Colour
 
 The chrome is monochrome, including the window controls. Primary buttons
-invert with the theme, and secondary buttons use a neutral surface and edge.
+invert with the theme. Secondary buttons use a muted fill and capsules have no
+resting border.
 Red identifies destructive actions, with a solid fill reserved for the final
 confirmation.
 

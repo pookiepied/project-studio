@@ -86,7 +86,12 @@ export function Dialog({
       >
         <header className="flex shrink-0 items-center justify-between px-4 pt-3.5 pb-2">
           <h2 className="studio-heading text-foreground">{title}</h2>
-          <IconButton label="Close" size="sm" onClick={onClose}>
+          <IconButton
+            label="Close"
+            size="sm"
+            onClick={onClose}
+            className="focus-visible:bg-foreground/15 [@media(forced-colors:none)]:focus-visible:outline-none!"
+          >
             <Icons.close size="sm" />
           </IconButton>
         </header>

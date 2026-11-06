@@ -11,7 +11,7 @@ const VARIANT: Record<Variant, string> = {
   primary:
     'bg-primary text-primary-foreground shadow-chip hover:bg-primary/90 active:bg-primary active:shadow-none [&_.studio-icon]:text-primary-foreground',
   secondary:
-    'border-button-edge bg-button-secondary text-foreground hover:bg-muted active:bg-selected',
+    'bg-muted text-foreground hover:bg-selected active:bg-foreground/15',
   ghost: 'text-muted-foreground hover:bg-tint hover:text-foreground active:bg-selected',
   danger: 'bg-danger/10 text-danger hover:bg-danger/15 active:bg-danger/20',
   'danger-confirm': 'bg-danger-confirm text-white hover:bg-danger-confirm/90 active:bg-danger-confirm [&_.studio-icon]:text-white',
@@ -71,8 +71,8 @@ export function Button({
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       className={cn(
-        'studio-control relative inline-flex shrink-0 items-center justify-center rounded-full border border-transparent font-medium whitespace-nowrap select-none',
-        'transition-[color,background-color,border-color,box-shadow] duration-fast',
+        'studio-control-flat relative inline-flex shrink-0 items-center justify-center rounded-full font-medium whitespace-nowrap select-none',
+        'transition-[color,background-color,box-shadow] duration-fast',
         'disabled:pointer-events-none disabled:opacity-45',
         SIZE[size],
         VARIANT[variant],

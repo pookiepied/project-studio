@@ -300,7 +300,7 @@ function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind:
         )}
 
         <div className="py-3">
-          <Button variant="secondary" icon={<Icons.add />} onClick={() => setAdding(true)}>
+          <Button variant="primary" icon={<Icons.add />} onClick={() => setAdding(true)}>
             Add provider
           </Button>
         </div>

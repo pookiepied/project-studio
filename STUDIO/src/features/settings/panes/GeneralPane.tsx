@@ -1,5 +1,5 @@
 import { Icons } from '@/components/icons'
-import { MenuItem, MenuLabel, Popover, Segmented } from '@/components/primitives'
+import { Button, MenuItem, MenuLabel, Popover, Segmented } from '@/components/primitives'
 import { PERMISSION_MODE_ICONS } from '@/features/chat/permissions/modeIcon'
 import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
@@ -93,19 +93,17 @@ export function GeneralPane() {
           align="end"
           className="min-w-64"
           trigger={
-            <button
-              type="button"
-              disabled={savingMode}
-              aria-busy={savingMode || undefined}
+            <Button
+              size="sm"
+              busy={savingMode}
               onClick={() => setOpen((value) => !value)}
-              aria-haspopup="menu"
-              aria-expanded={open}
-              className="studio-control inline-flex items-center gap-1.5 rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-fast hover:bg-tint"
+              hasPopup="menu"
+              expanded={open}
+              icon={<Glyph />}
             >
-              <Glyph />
               {mode.name}
               <Icons.dropdown />
-            </button>
+            </Button>
           }
         >
           <MenuLabel>What Studio may do</MenuLabel>

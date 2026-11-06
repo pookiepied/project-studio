@@ -146,7 +146,7 @@ function ButtonsSection() {
   return (
     <Section
       title="Buttons"
-      note="Neutral capsules for ordinary actions. Solid red is reserved for destructive confirmation."
+      note="Borderless capsules with quiet fills for secondary actions. Solid red marks destructive confirmation."
     >
       <Card>
         {BUTTON_VARIANTS.map((variant) => (
@@ -206,7 +206,7 @@ function IconButtonsSection() {
           <IconButton label="Settings, disabled" disabled>
             <Icons.settings size="md" />
           </IconButton>
-          <IconButton label="Voice mode" tone="secondary">
+          <IconButton label="Voice mode">
             <Icons.voice size="md" />
           </IconButton>
         </Specimen>
