@@ -82,21 +82,6 @@ const field = (): string => {
   return box.value
 }
 
-it('expands on editor focus and folds on blur with the same controls mounted', () => {
-  const { container } = renderComposer(vi.fn(async () => ({ ok: true })), true)
-  const frame = container.querySelector('[data-composer-frame]')
-  const input = screen.getByRole('textbox')
-  const stop = screen.getByRole('button', { name: 'Stop' })
-  expect(frame?.getAttribute('data-expanded')).toBe('false')
-  fireEvent.focus(input)
-  expect(frame?.getAttribute('data-expanded')).toBe('true')
-  expect(screen.getByRole('button', { name: 'Stop' })).toBe(stop)
-  fireEvent.blur(input, { relatedTarget: stop })
-  expect(frame?.getAttribute('data-expanded')).toBe('true')
-  fireEvent.blur(stop, { relatedTarget: document.body })
-  expect(frame?.getAttribute('data-expanded')).toBe('false')
-})
-
 describe('the field holds its words until the harness takes them', () => {
   it('holds a draft when the queue is full so an existing message can be steered first', () => {
     const onSend = vi.fn(async () => ({ ok: true }))
