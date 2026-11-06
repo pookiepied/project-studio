@@ -5,6 +5,7 @@ import { IconButton } from '@/components/primitives'
 import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
+import { WorkspaceAccess } from '@/shell/chrome/WorkspaceAccess'
 import { cn } from '@/lib/cn'
 import { useNavigation } from '@/stores/navigation'
 import { useLiveWork, useWorkspace } from '@/stores/workspace'
@@ -19,10 +20,9 @@ import { useLiveWork, useWorkspace } from '@/stores/workspace'
  * Left is the window: controls and the sidebar toggle, and nothing else.
  * Centre is what you are looking at — and it gets the room, because the
  * identity line (project, title, branch) is the thing worth reading here.
- * Right is the turn: which model, how hard it thinks, and how full its window
- * is - one control, because those are one subject. Everywhere else the strip
- * ends in nothing, so the page's own content is the last thing at the top of
- * the window rather than a control repeated on every screen.
+ * Right is the turn control and, while the conversation workspace is folded,
+ * its restore button immediately before the model selector. The selector
+ * keeps its right anchor while workspace access stays clear of the scroll edge.
  *
  * The context meter used to be a ring of its own, first beside the sidebar
  * toggle and then beside the model pill. Neither place was right: it read as
@@ -56,11 +56,14 @@ import { useLiveWork, useWorkspace } from '@/stores/workspace'
 export function TopStrip({
   compact = false,
   sidebarShown = false,
+  onOpenWorkspace,
 }: {
   /** The window is narrow: the sidebar floats over the page rather than beside it. */
   compact?: boolean
   /** The floating column is on screen (handed from the shell's handover state). */
   sidebarShown?: boolean
+  /** Present while the right workspace is folded. Opens it through the shell handover. */
+  onOpenWorkspace?: () => void
 }) {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
   const { conversations } = useWorkspace()
@@ -143,7 +146,11 @@ export function TopStrip({
           back. The drawer being out hides the line entirely - a title
           painting over the drawer's rows is overlap by another name. */}
       <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-        <div className="@container pointer-events-auto flex w-full min-w-0 justify-center max-w-[min(62%,calc(100%-22rem))] @max-[48rem]:max-w-[min(62%,calc(100%-12rem))]">
+        <div className={cn('@container pointer-events-auto flex w-full min-w-0 overflow-hidden justify-center',
+          onOpenWorkspace
+            ? 'max-w-[min(62%,max(0px,calc(100%-26rem)))] @max-[48rem]:max-w-[min(62%,max(0px,calc(100%-16rem)))]'
+            : 'max-w-[min(62%,calc(100%-22rem))] @max-[48rem]:max-w-[min(62%,calc(100%-12rem))]',
+        )}>
           {conversation !== null && !drawerOut ? (
             <IdentityLine conversation={conversation} running={turnRunning} />
           ) : null}
@@ -170,6 +177,7 @@ export function TopStrip({
             invites the reading that it is *part of* those preferences — that
             changing it here is changing a default. It is not; it is a
             per-turn choice. Showing it where it cannot mean that is the fix. */}
+        <WorkspaceAccess onOpen={onOpenWorkspace} />
         {turnSettings ? <TurnMenu /> : null}
       </div>
     </header>

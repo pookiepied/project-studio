@@ -10,6 +10,7 @@ import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useWorkspace } from '@/stores/workspace'
 import { useRail } from '@/stores/rail'
 import { SideRail } from '@/features/rail'
+import { WorkspaceAccess } from '@/shell/chrome/WorkspaceAccess'
 
 /**
  * One conversation, in a window of its own.
@@ -61,19 +62,22 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
             if (event.button !== 0 || event.target !== event.currentTarget) return
             void startWindowDrag()
           }}
-          className="absolute inset-x-0 top-0 z-30 flex items-center gap-1"
+          className="@container absolute inset-x-0 top-0 z-30 flex items-center gap-1"
           style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
         >
           <TrafficLights />
 
-          <div className="@container pointer-events-none absolute inset-x-0 flex justify-center">
-            <div className="pointer-events-auto flex min-w-0 max-w-[62%] justify-center">
+          <div className="pointer-events-none absolute inset-x-0 flex justify-center">
+            <div className={cn('@container pointer-events-auto flex w-full min-w-0 overflow-hidden justify-center', rail.collapsed
+              ? 'max-w-[min(62%,max(0px,calc(100%-26rem)))] @max-[48rem]:max-w-[min(62%,max(0px,calc(100%-16rem)))]'
+              : 'max-w-[min(62%,max(0px,calc(100%-22rem)))] @max-[48rem]:max-w-[min(62%,max(0px,calc(100%-12rem)))]',
+            )}>
               <IdentityLine conversation={conversation} />
             </div>
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
-            {rail.collapsed ? <button type="button" aria-label="Open conversation workspace" onClick={rail.expand} className="rounded-lg px-2 py-1 text-caption text-muted-foreground hover:bg-tint">Workspace</button> : null}
+            <WorkspaceAccess onOpen={rail.collapsed ? rail.expand : undefined} />
             <TurnMenu />
           </div>
         </header>

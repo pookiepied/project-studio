@@ -241,7 +241,7 @@ export function TurnMenu() {
             label={[
               label,
               reasoningLabel(model, effective.reasoningLevel),
-              percent === null ? null : `${percent}% of the context window used`,
+              breakdown === null ? null : `${breakdown.report.measured === null || breakdown.report.measured.estimated || breakdown.report.pending > 0 ? '~' : ''}${breakdown.total.toLocaleString('en-US')} tokens`,
             ]
               .filter(Boolean)
               .join(' · ')}

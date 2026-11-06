@@ -41,7 +41,7 @@ import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
 import { McpMark } from '@/components/icons/McpMark'
 import { PhotoMark } from '@/components/icons/PhotoMark'
-import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave } from '@/components/icons/drawn'
+import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave, WorkspaceOverviewMark } from '@/components/icons/drawn'
 import { DoneMark, EraserMark, HighlighterMark, PenMark, ShareScreenMark, ShowMeMark, UndoMark } from '@/components/icons/screen'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
@@ -399,6 +399,7 @@ export const Icons = {
     ]),
   ) as Record<keyof typeof REGISTRY, ReturnType<typeof fromLucide>>),
   sidebar: SidebarToggle,
+  workspace: WorkspaceOverviewMark,
   mcp: McpMark,
   voice: VoiceWave,
   stop: StopSquare,

@@ -99,6 +99,12 @@ function drawnMark(d: string, name: string) {
   return Mark
 }
 
+/** The reference overview mark: two open circles beside equal rounded lines. */
+export const WorkspaceOverviewMark = drawnMark(
+  'M5.6 4.5a2.1 2.1 0 1 1-4.2 0 2.1 2.1 0 1 1 4.2 0Z M8 4.5h6.5 M5.6 11.5a2.1 2.1 0 1 1-4.2 0 2.1 2.1 0 1 1 4.2 0Z M8 11.5h6.5',
+  'WorkspaceOverviewMark',
+)
+
 /**
  * Open, the divider sits where the expanded sidebar's edge is. Closed, it
  * retreats to the frame's left.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, RADIUS, surfaceVariants } from '@/design/tokens'
+import { RADIUS, surfaceVariants } from '@/design/tokens'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
@@ -19,7 +19,6 @@ import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
 import { useRail } from '@/stores/rail'
 import { useWorkspace } from '@/stores/workspace'
-import { Icons } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { isTauri } from '@/platform/tauri'
 
@@ -64,8 +63,8 @@ export function AppShell() {
    * the other leaves first, and the arriving one waits for it. The rule and
    * the reasons are with `usePanelHandover`; what the shell draws from is
    * the pair of `shown` flags, never the stores' own `open` directly. The
-   * rail is folded rather than closed, so its contents survive, and it says
-   * so with the pill below.
+   * rail is folded rather than closed, so its contents survive. The header's
+   * Workspace button restores it through this same handover.
    */
   const { sidebarShown, railShown, sidebarSettled, railSettled } = usePanelHandover({
     sidebarOpen,
@@ -228,7 +227,7 @@ export function AppShell() {
             facts from the shell: whether the sidebar is the floating drawer
             (narrow window) and whether that drawer is on screen decide both
             the toggle's place and the centred title's. */}
-        <TopStrip compact={compact} sidebarShown={sidebarShown} />
+        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' && railCollapsed ? expandRail : undefined} />
 
         {/*
           One surface handing over to the next, in the direction the hierarchy
@@ -294,38 +293,6 @@ export function AppShell() {
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
       {route.kind === 'chat' ? <SideRail key={route.conversationId} open={railShown} onClosed={railSettled} /> : null}
-
-      {/* The rail, folded, saying so.
-          Only this side gets a prompt. The sidebar is summoned by a control
-          that is always visible in the strip, so a second reminder of where it
-          went would be noise — but the rail has no permanent handle, and
-          something you opened vanishing with no trace is indistinguishable
-          from having been closed. A tab on the edge it went behind is the
-          smallest thing that says "still here, this way". */}
-      <AnimatePresence>
-        {route.kind === 'chat' && railCollapsed ? (
-          <motion.button
-            type="button"
-            // Bringing the rail back is the same request as opening anything
-            // into it: the handover closes the sidebar first if it is up.
-            onClick={expandRail}
-            aria-label="Open conversation workspace"
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 8 }}
-            transition={{ duration: DURATION.base, ease: EASE_OUT }}
-            className={cn(
-              'absolute top-1/2 right-0 z-30 -translate-y-1/2',
-              'flex items-center gap-1.5 rounded-l-md py-2 pr-1 pl-1.5',
-              'bg-surface-sunken text-muted-foreground shadow-panel',
-              'transition-colors duration-fast hover:text-foreground',
-            )}
-          >
-            <Icons.openLarger />
-            <span className="text-micro">Workspace</span>
-          </motion.button>
-        ) : null}
-      </AnimatePresence>
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
