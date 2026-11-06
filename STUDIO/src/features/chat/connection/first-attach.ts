@@ -33,6 +33,15 @@ export interface FirstAdmission {
    * `PendingSubmission`.
    */
   readonly text: string
+  /** Viewport positions used only by the opening chat surface. */
+  readonly origin?: FirstComposerPosition
+}
+
+export interface FirstComposerPosition {
+  readonly composerLeft: number
+  readonly composerTop: number
+  readonly draftLeft: number
+  readonly draftTop: number
 }
 
 const pending = new Map<string, FirstAdmission>()
@@ -48,6 +57,14 @@ export function rememberFirstAdmission(
 /** The receipt a first attach should open from, or null for a cold start. */
 export function firstAdmission(conversationId: string): FirstAdmission | null {
   return pending.get(conversationId) ?? null
+}
+
+/** Keeps the receipt available to readers without replaying the draft handoff. */
+export function forgetFirstComposerPosition(conversationId: string): void {
+  const admission = pending.get(conversationId)
+  if (admission?.origin !== undefined) {
+    pending.set(conversationId, { ...admission, origin: undefined })
+  }
 }
 
 /** Retires the handoff once a read has caught up to the present. */

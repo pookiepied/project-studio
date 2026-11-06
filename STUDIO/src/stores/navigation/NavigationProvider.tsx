@@ -53,7 +53,7 @@ interface NavigationValue {
   readonly move: NavigationMove
   readonly sidebarOpen: boolean
   readonly paletteOpen: boolean
-  go: (route: Route) => void
+  go: (route: Route, transition?: NavigationMove) => void
   goHome: () => void
   openChat: (conversationId: string) => void
   openProject: (projectId: string) => void
@@ -109,7 +109,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [compact, setCompact] = useState(false)
 
   const go = useCallback(
-    (next: Route) => {
+    (next: Route, transition?: NavigationMove) => {
       // Leaving Settings is any navigation out of it, not just the back
       // control -- opening a conversation from the palette is also a leaving.
       // The column was opened for Settings' sake; when that reason ends it
@@ -125,7 +125,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         if (compact) setSidebarOpen(false)
         else if (!sidebarMoved) setSidebarOpen(sidebarAtEntry)
       }
-      setMove(moveBetween(route, next))
+      setMove(transition ?? moveBetween(route, next))
       setRoute(next)
       setPaletteOpen(false)
     },

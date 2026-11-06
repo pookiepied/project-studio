@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer/Composer'
 import { useFirstTurn } from '@/features/chat/connection/first-turn'
-import { rememberFirstAdmission } from '@/features/chat/connection/first-attach'
+import { firstAdmission, rememberFirstAdmission, type FirstComposerPosition } from '@/features/chat/connection/first-attach'
 import { useVoiceModeContext } from '@/features/voice'
 import { newId } from '@/lib/id'
 import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
@@ -38,10 +38,11 @@ export function StartConversation({
   placeholder: string
 }) {
   const { beginConversation, settings, catalog } = useWorkspace()
-  const { openChat } = useNavigation()
+  const { go } = useNavigation()
+  const composer = useRef<HTMLDivElement>(null)
 
   const onStarted = useCallback(
-    (conversationId: string, text: string) => {
+    (conversationId: string, text: string, origin?: FirstComposerPosition) => {
       beginConversation({
         id: conversationId,
         firstMessage: text,
@@ -51,14 +52,35 @@ export function StartConversation({
         // mode included, which the harness holds per conversation.
         settings: effectiveTurnSettings(null, settings),
       })
-      openChat(conversationId)
+      const admission = firstAdmission(conversationId)
+      if (admission !== null && origin !== undefined) {
+        rememberFirstAdmission(conversationId, { ...admission, origin })
+      }
+      go({ kind: 'chat', conversationId }, origin === undefined ? undefined : 'sibling')
     },
-    [beginConversation, openChat, projectId, settings],
+    [beginConversation, go, projectId, settings],
   )
+  const onTypedStart = useCallback((conversationId: string, text: string) => {
+    const surface = composer.current
+    const field = surface?.querySelector('textarea')
+    const draft = field?.value === text ? field.getBoundingClientRect() : undefined
+    if (!surface || !field || !draft || draft.height === 0) {
+      onStarted(conversationId, text)
+      return
+    }
+    const composerBounds = surface.getBoundingClientRect()
+    const padding = getComputedStyle(field)
+    onStarted(conversationId, text, {
+      composerLeft: composerBounds.left,
+      composerTop: composerBounds.top,
+      draftLeft: draft.left + Number.parseFloat(padding.paddingLeft),
+      draftTop: draft.top + Number.parseFloat(padding.paddingTop),
+    })
+  }, [onStarted])
   // Read at send time, not captured: a model picked between mounting and
   // sending is the one the turn should use.
   const firstTurn = useFirstTurn({
-    onStarted,
+    onStarted: onTypedStart,
     // The project rides with the send, not with the index write that follows
     // it. A first turn is submitted before the conversation row exists, so
     // without this the run that answers it has no project to read and stands
@@ -115,12 +137,15 @@ export function StartConversation({
         <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
       ) : null}
 
-      <Composer
-        conversationId={null}
-        placeholder={placeholder}
-        onSend={onSend}
-        onStartVoice={onStartVoice}
-      />
+      <div ref={composer}>
+        <Composer
+          conversationId={null}
+          placeholder={placeholder}
+          onSend={onSend}
+          onStartVoice={onStartVoice}
+          keepSentDraftForExit
+        />
+      </div>
     </>
   )
 }

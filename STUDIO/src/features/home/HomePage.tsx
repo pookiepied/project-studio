@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { StartConversation } from '@/features/chat/composer'
+import './home.css'
 
 /**
  * The home surface.
@@ -17,14 +18,14 @@ import { StartConversation } from '@/features/chat/composer'
  * shape the page has always had. What they say has changed three times. A
  * prompt ("What are we making?") asked the person to perform on an empty
  * screen. A pair of claims ("A quieter way to work. / Everything it can
- * do, none of it in the way.") was the software describing itself, and the
- * second line meant nothing to anyone who had not read the design notes. A
- * greeting alone, tried next, left the page feeling unfurnished - one short
+ * do, none of it is.") was the software describing itself, and the
+ * second line meant nothing to anyone who had not read the design notes.
+ * A greeting alone, tried next, left the page feeling unfurnished - one short
  * line over a field reads as a form.
  *
  * So: two lines, the same lengths as before, and both about what the
- * person can do here rather than what the tool is. The first is an
- * invitation with no demand in it; the second names the three shapes a
+ * person can do here rather than what the tool is. The first is the
+ * invitation with no demand in it, the second names the three shapes a
  * first message takes, so the empty field is not a blank. This is the one
  * display moment in the app, so it carries the serif and the serif goes
  * nowhere else.
@@ -40,7 +41,7 @@ export function HomePage() {
   return (
     <div
       data-attachment-drop-zone
-      className="flex h-full flex-col items-center justify-center"
+      className="studio-home flex h-full flex-col items-center justify-center"
       style={{ paddingBottom: SHELL.topStrip.height }}
     >
       <div className="studio-content-column">
@@ -50,10 +51,12 @@ export function HomePage() {
           transition={{ duration: DURATION.slow, ease: EASE_OUT }}
           className="mb-7 text-center"
         >
-          <h1 className="studio-display text-foreground">Start with anything.</h1>
-          <p className="mt-2 text-ui text-muted-foreground">
-            A question, a task, or a thought to think through.
-          </p>
+          <div className="studio-home-intro">
+            <h1 className="studio-display text-foreground">Start with anything.</h1>
+            <p className="mt-2 text-ui text-muted-foreground">
+              A question, a task, or a thought to think through.
+            </p>
+          </div>
         </motion.div>
 
         <motion.div

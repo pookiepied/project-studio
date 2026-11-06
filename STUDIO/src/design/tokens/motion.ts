@@ -164,6 +164,13 @@ const SURFACE_SIBLING = {
   transition: { duration: DURATION.base, ease: EASE_OUT },
 } as const
 
+// Both elements travel across the same screen, so they share one curve and
+// clock. The longer distance needs a gentler start than a surface reveal.
+export const FIRST_SEND_TRAVEL = {
+  duration: 420,
+  easing: 'cubic-bezier(0.22, 0.62, 0.25, 1)',
+} as const
+
 /** The transition preset for a move between surfaces. */
 function surfaceTransition(move: SurfaceMove) {
   return move === 'push' ? SURFACE_PUSH : move === 'pop' ? SURFACE_POP : SURFACE_SIBLING

@@ -242,10 +242,13 @@ export function Composer({
   restoredMessage,
   onStop,
   onStartVoice,
+  keepSentDraftForExit = false,
 }: {
   conversationId: string | null
   /** Opens voice on a chat that does not exist yet; its first utterance creates it. */
   onStartVoice?: () => void
+  /** The start surface crossfades its draft out after an admitted send. */
+  keepSentDraftForExit?: boolean
   placeholder: string
   /**
    * Where a send goes. The answer is a receipt, not a fire-and-forget: the
@@ -665,7 +668,7 @@ export function Composer({
     void dispatched.then(
       (receipt) => {
         if (receipt === null) return
-        setSending(false)
+        if (!receipt.ok || !keepSentDraftForExit) setSending(false)
         // Clear only what the harness actually took, and only if the
         // field still holds exactly that — words typed during the round
         // trip belong to the next message, not this receipt. Same for the
@@ -678,11 +681,12 @@ export function Composer({
         ) {
           return
         }
-        setText('')
+        if (!keepSentDraftForExit) setText('')
         // Written out now rather than after the quiet window. A quit inside
         // that window would otherwise restore words the harness already
         // took, which reads as the app duplicating the message.
         clearDraft(conversationId)
+        if (keepSentDraftForExit) return
         setMultiline(false)
         setImages([])
         setDocuments([])

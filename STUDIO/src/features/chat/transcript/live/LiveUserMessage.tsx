@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, type Ref } from 'react'
 import { motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
 import { ENTER } from '@/design/tokens'
@@ -17,20 +17,24 @@ import type { TranscriptItem } from '@/features/chat/transcript/projection'
  */
 export const LiveUserMessage = memo(function LiveUserMessage({
   item,
+  firstArrival = false,
+  bubbleRef,
 }: {
   item: Extract<TranscriptItem, { kind: 'user' }>
+  firstArrival?: boolean
+  bubbleRef?: Ref<HTMLDivElement>
 }) {
   const [hovered, setHovered] = useState(false)
   return (
     <motion.div
-      initial={ENTER.initial}
+      initial={firstArrival ? false : ENTER.initial}
       animate={ENTER.animate}
       transition={ENTER.transition}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
       className="flex flex-col items-end"
     >
-      <div className="min-w-0 max-w-[90%] rounded-2xl rounded-br-md bg-selected px-4 py-3 text-foreground">
+      <div ref={bubbleRef} className="min-w-0 max-w-[90%] rounded-2xl rounded-br-md bg-selected px-4 py-3 text-foreground">
         <CollapsibleText text={item.text} />
         {item.attachments.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap justify-end gap-1">

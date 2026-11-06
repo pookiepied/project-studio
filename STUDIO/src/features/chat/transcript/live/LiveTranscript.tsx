@@ -54,6 +54,8 @@ export function LiveTranscript({
   conversationId,
   compacting = false,
   onBranch,
+  firstSubmissionId,
+  firstBubbleRef,
 }: {
   items: readonly TranscriptItem[]
   /**
@@ -75,6 +77,8 @@ export function LiveTranscript({
   compacting?: boolean
   /** Forks the conversation with everything up to the named answer. */
   onBranch?: (messageId: string) => void
+  firstSubmissionId?: string
+  firstBubbleRef?: React.Ref<HTMLDivElement>
 }) {
   // The newest assistant message, which is not the same as "the last item, if
   // it happens to be one". The log can put a user message after a reply has
@@ -110,14 +114,22 @@ export function LiveTranscript({
   // sitting still for nine seconds, dropping 24px, and returning. Nothing was
   // wrong with what any component drew; the space was reserved by the list.
   const drawn = activityItems(visible.filter((item) => !drawsNothing(item, lastAssistantId, generating)))
+  // The admitted message and its echo share a row during the opening
+  // handoff, so the journal arriving cannot replay the bubble's entrance.
+  const rows = pending === null ? drawn : [...drawn, pendingUserItem(pending)]
 
   return (
     <div className="flex flex-col gap-6">
       {hasOlder ? <EarlierBoundary loading={loading} ref={sentinel} /> : null}
 
-      {drawn.map((item) =>
+      {rows.map((item) =>
         item.kind === 'user' ? (
-          <LiveUserMessage key={item.id} item={item} />
+          <LiveUserMessage
+            key={item.submissionId === firstSubmissionId ? firstSubmissionId : item.id}
+            item={item}
+            firstArrival={item.submissionId === firstSubmissionId}
+            bubbleRef={item.submissionId === firstSubmissionId ? firstBubbleRef : undefined}
+          />
         ) : item.kind === 'submission-failed' ? (
           <SubmissionFailed key={item.id} item={item} />
         ) : item.kind === 'compaction' ? (
@@ -151,13 +163,6 @@ export function LiveTranscript({
           />
         ),
       )}
-
-      {/* The message this window sent, standing where the log will put it.
-          Above the turn's row and below every item, because that is where it
-          belongs and where it will stay — when the echo lands, the projection
-          drops this and the real item is already in the list above, so the
-          swap moves nothing. */}
-      {pending !== null ? <LiveUserMessage item={pendingUserItem(pending)} /> : null}
 
       {/* A compaction in flight, at the very tail — the cut it is working on
           lands after everything the log holds, so the wait stands where the

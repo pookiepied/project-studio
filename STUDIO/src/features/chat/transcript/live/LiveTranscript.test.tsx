@@ -205,6 +205,22 @@ function silence(container: HTMLElement): void {
 }
 
 describe('the silence between sending and the first token', () => {
+  it('keeps the first bubble mounted as the admitted draft becomes a journal message', () => {
+    const viewport = createRef<HTMLElement>()
+    const firstBubbleRef = createRef<HTMLDivElement>()
+    const opening = { viewport, conversationId: 'conv', firstSubmissionId: 'sub_1', firstBubbleRef }
+    const pending = { submissionId: 'sub_1', text: 'please answer' }
+    const view = render(<LiveTranscript {...opening} items={[]} phase={SUBMITTED} pending={pending} />)
+    const draft = screen.getByText(pending.text)
+    const bubble = firstBubbleRef.current
+    expect(bubble?.contains(draft)).toBe(true)
+
+    view.rerender(<LiveTranscript {...opening} items={[user('journal-id', pending.text)]}
+      phase={STREAMING} pending={null} />)
+    expect(screen.getByText(pending.text)).toBe(draft)
+    expect(firstBubbleRef.current).toBe(bubble)
+  })
+
   it('draws nothing while the turn is only admitted', () => {
     // The measured gap on the real provider was six seconds of a
     // seven-second turn.

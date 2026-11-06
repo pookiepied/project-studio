@@ -1,0 +1,9 @@
+@media (prefers-reduced-motion: no-preference) {
+  .studio-home-intro {
+    transition: transform var(--duration-slow) ease-out;
+  }
+
+  .studio-home:focus-within .studio-home-intro {
+    transform: translateY(-6px);
+  }
+}

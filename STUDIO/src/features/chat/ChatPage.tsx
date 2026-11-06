@@ -14,6 +14,7 @@ import { galleryItems } from '@/features/chat/gallery/items'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { TranscriptWait } from '@/features/chat/transcript/live/TranscriptWait'
+import { useFirstSendTransition } from '@/features/chat/useFirstSendTransition'
 import { useConversationTranscript } from '@/features/chat/connection/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/connection/useConversation'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
@@ -45,11 +46,8 @@ import type { Conversation } from '@/domain/conversation/types'
 /**
  * A conversation: a scrolling transcript with the composer beneath it.
  *
- * The composer is the same component and the same measure as on home, so
- * sending the first message moves the field up the screen rather than replacing
- * it with a different one. Nothing about the control changes — only its
- * position — which makes the transition read as the room rearranging rather
- * than as a new page.
+ * The first admitted draft becomes a bubble that rises into the transcript
+ * as the composer moves to its resting position beneath it.
  *
  * Both ends fade into the surface instead of meeting a bar. The strip above and
  * the composer below paint no fill, so a gradient is what separates them from
@@ -243,7 +241,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   }
   /** The conversation whose words have been revealed; the gallery's always are. */
   const [revealedFor, setRevealedFor] = useState<string | null>(null)
-  const revealed = gallery || revealedFor === conversation.id
+  const arrival = useFirstSendTransition(conversation.id)
+  const arriving = arrival.submissionId !== undefined
+  const revealed = gallery || arriving || revealedFor === conversation.id
   // Something to show: an item from the log, or the message this window
   // just sent and is waiting to see echoed. A first send in a new
   // conversation is words too, and must not wait on a replay that has
@@ -454,7 +454,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           {!revealed && !hasWords ? null : (
             <motion.div
               key={conversation.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={arriving ? false : { opacity: 0, y: 12 }}
               animate={revealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
               transition={{ duration: DURATION.slow, ease: EASE_OUT }}
             >
@@ -466,6 +466,8 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                 conversationId={conversation.id}
                 compacting={compactingHere}
                 onBranch={gallery ? undefined : onBranch}
+                firstSubmissionId={arrival.submissionId}
+                firstBubbleRef={arrival.message}
               />
             </motion.div>
           )}
@@ -659,30 +661,32 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
             {queue.error ? <p role="alert" className="mb-2 text-caption text-muted-foreground">{queue.error}</p> : null}
             <QueuedMessages messages={queue.messages} disabled={queue.changing} onAction={(message, action) => { void queue.change(message, action) }} />
-            <Composer
-              conversationId={conversation.id}
-              queueFull={queue.messages.length >= 3}
-              restoredMessage={queue.restoredMessage}
-              // A queued follow-up does not answer the tool's question. Keep
-              // that distinction visible while the answer holds the run.
-              placeholder={
-                approvals.questions.length > 0 || questions.rows.length > 0
-                  ? 'Answer above, or queue a follow-up'
-                  : isTurnRunning(live.phase)
-                    ? 'Queue a follow-up'
-                    : 'Reply'
-              }
-              onSend={sendTurn}
-              onQueue={(text, images, documents) => sendTurn(text, images, documents, 'queue')}
-              // Admitted counts. A turn the harness has taken but not yet
-              // started producing is still a turn: the words are gone, the
-              // stop control is the only thing that can call it back, and on
-              // the real provider that window has been most of the turn's
-              // length. Reading `streaming` alone is what left the composer
-              // idle for six of a seven-second turn.
-              busy={isTurnRunning(live.phase)}
-              onStop={stopWithComputerCleanup}
-            />
+            <div ref={arrival.composer}>
+              <Composer
+                conversationId={conversation.id}
+                queueFull={queue.messages.length >= 3}
+                restoredMessage={queue.restoredMessage}
+                // A queued follow-up does not answer the tool's question. Keep
+                // that distinction visible while the answer holds the run.
+                placeholder={
+                  approvals.questions.length > 0 || questions.rows.length > 0
+                    ? 'Answer above, or queue a follow-up'
+                    : isTurnRunning(live.phase)
+                      ? 'Queue a follow-up'
+                      : 'Reply'
+                }
+                onSend={sendTurn}
+                onQueue={(text, images, documents) => sendTurn(text, images, documents, 'queue')}
+                // Admitted counts. A turn the harness has taken but not yet
+                // started producing is still a turn: the words are gone, the
+                // stop control is the only thing that can call it back, and on
+                // the real provider that window has been most of the turn's
+                // length. Reading `streaming` alone is what left the composer
+                // idle for six of a seven-second turn.
+                busy={isTurnRunning(live.phase)}
+                onStop={stopWithComputerCleanup}
+              />
+            </div>
           </div>
         )}
       </div>
