@@ -113,6 +113,31 @@ describe('the chip is the default', () => {
     expect(screen.queryByRole('link')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /react docs/ }))
     expect(screen.getByRole('link', { name: /React/ })).toBeTruthy()
+    expect(screen.queryByText('React documentation')).toBeNull()
+  })
+
+  it('limits search previews independently and shows fetched pages as links', () => {
+    const search = call({
+      toolCallId: 'search', toolName: 'native_web_search', input: present({ query: 'framework docs' }),
+      output: present([1, 2, 3, 4].map((number) =>
+        `${String(number)}. Result ${String(number)}\nhttps://example.com/${String(number)}\nSnippet`,
+      ).join('\n\n')),
+    })
+    const fetch = call({
+      toolCallId: 'fetch', toolName: 'native_fetch', input: present({ url: 'https://example.com/article' }),
+      output: present('# Fetched article\nSource: https://example.com/article\n\nLong page text'),
+    })
+    render(<ToolGroups conversationId="conv" groups={groupsOf(
+      { toolName: search.toolName, calls: [search] },
+      { toolName: fetch.toolName, calls: [fetch] },
+    )} />)
+    fireEvent.click(screen.getByRole('button', { name: /framework docs.*4 sources/ }))
+    expect(screen.getAllByRole('link')).toHaveLength(3)
+    fireEvent.click(screen.getByRole('button', { name: /Read Fetched article/ }))
+    expect(screen.getByRole('link', { name: /Fetched article/ }).getAttribute('href')).toBe('https://example.com/article')
+    expect(screen.queryByText('Long page text')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show 1 more' }))
+    expect(screen.getByRole('link', { name: /Result 4/ })).toBeTruthy()
   })
 
   it('renders every call as its own row, with no count line in front', () => {

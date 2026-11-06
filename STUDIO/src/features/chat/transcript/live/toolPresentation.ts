@@ -5,7 +5,7 @@ import { webKind } from './webCall'
 /** Placement is independent of execution grouping and of the assistant's answer. */
 export interface ToolPresentation {
   /** The representation inside the activity disclosure; none leaves no row. */
-  readonly activity: 'row' | 'steps' | 'research' | 'none'
+  readonly activity: 'row' | 'steps' | 'compact-research' | 'none'
   /** A standalone result rendered from invocation onward, including failures. */
   readonly artifact: 'media' | null
   /** A recorded result surfaced after completion, when the output proves one. */
@@ -22,7 +22,7 @@ export const TOOL_PRESENTATIONS = {
   browser: { activity: 'steps', artifact: null, result: 'browser' },
   computer: { activity: 'steps', artifact: null, result: 'computer' },
   media: { activity: 'none', artifact: 'media', result: null },
-  research: { activity: 'research', artifact: null, result: null },
+  research: { activity: 'compact-research', artifact: null, result: null },
   changes: { activity: 'row', artifact: null, result: 'changes' },
   background: { activity: 'row', artifact: null, result: 'background' },
 } satisfies Record<string, ToolPresentation>

@@ -21,9 +21,9 @@ import { ExtensionToolDetails } from './tools/ExtensionToolDetails'
 import { RollingCount } from './RollingCount'
 import { ImageReads, readImages, type ReadImage } from './ImageReads'
 import { BrowserReport } from './BrowserReport'
-import { researchArtifact, readWebCall } from './webCall'
-import { WebResearchArtifact } from '@/features/artifacts/kinds/WebResearchArtifact'
+import { readWebCall } from './webCall'
 import { toolPresentation } from './toolPresentation'
+import { hostOf } from '@/lib/url'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { isRecord } from '@/lib/guards'
@@ -73,23 +73,59 @@ function CallRow({ call, live, conversationId }: { call: ToolCallView; live: boo
   const family = familyOf(call.toolName)
   const presentation = toolPresentation(call.toolName)
   if (presentation.activity === 'steps' && family !== null) return <BrowserReport calls={[call]} live={live} conversationId={conversationId} family={family} presentation="activity" />
-  if (presentation.activity === 'research') return <ResearchRow call={call} live={live} />
+  if (presentation.activity === 'compact-research') return <ResearchRow call={call} live={live} />
   return <ToolCallRow call={call} live={live} />
 }
 
+const RESEARCH_PREVIEW_LIMIT = 3
+
 function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const [open, setOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
   const step = readWebCall(call)
-  const failed = resultState(call, live) === 'failed'
-  const pending = call.errorText === null && !call.output?.present
-  const running = live && pending
-  const verb = failed ? 'Could not research' : step?.kind === 'search'
+  if (step === null) return null
+  const state = resultState(call, live)
+  const failed = state === 'failed'
+  const pending = state === 'pending' || state === 'running'
+  const searching = step.kind === 'search'
+  const verb = failed ? searching ? 'Search failed' : 'Could not read' : searching
     ? pending ? 'Searching' : 'Searched' : pending ? 'Reading' : 'Read'
-  const subject = step?.kind === 'search' ? step.query : step?.url
-  return <DisclosureRow leading={<Icons.browserUse />} entering={live} open={open}
-    onToggle={() => setOpen((value) => !value)} flush
-    label={<span className={cn('min-w-0 truncate', failed && 'text-danger', running && 'studio-shimmer')}>{verb} {subject} {pending && !live ? 'pending' : null}</span>}>
-    <WebResearchArtifact artifact={researchArtifact([call])} />
+  const subject = searching ? step.query : step.title ?? step.url
+  const sources = searching ? step.hits : /^https?:\/\//i.test(step.url)
+    ? [{ title: step.title ?? hostOf(step.url), url: step.url }]
+    : []
+  const extra = sources.length - RESEARCH_PREVIEW_LIMIT
+  const status = failed ? step.error || 'The tool reported an error.'
+    : pending ? live ? 'Working…' : 'No result recorded yet.'
+    : sources.length === 0 ? searching ? 'No results.' : 'No page link recorded.' : null
+
+  return <DisclosureRow leading={searching ? <Icons.search /> : <Icons.browserUse />} entering={live} open={open}
+    onToggle={() => setOpen((value) => !value)}
+    label={<>
+      <span className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{verb} {subject} {state === 'pending' ? 'pending' : null}</span>
+      {searching && state === 'success' && sources.length > 0
+        ? <span className="shrink-0">· {sources.length} {sources.length === 1 ? 'source' : 'sources'}</span>
+        : null}
+    </>}>
+    {status !== null ? <p className="break-words text-caption text-muted-foreground">{status}</p> : (
+      <>
+        <ul className="min-w-0">
+          {(showAll ? sources : sources.slice(0, RESEARCH_PREVIEW_LIMIT)).map((source, index) => (
+            <li key={`${source.url}:${String(index)}`}>
+              <a href={source.url} target="_blank" rel="noreferrer noopener"
+                className="flex min-w-0 items-baseline gap-2 rounded-md py-0.5 text-caption hover:text-foreground hover:underline">
+                <span className="min-w-0 truncate">{source.title}</span>
+                <span className="max-w-[40%] shrink-0 truncate text-muted-foreground">{hostOf(source.url)}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+        {extra > 0 ? <button type="button" onClick={() => setShowAll((value) => !value)}
+          className="rounded-md py-0.5 text-caption text-muted-foreground hover:text-foreground hover:underline">
+          {showAll ? 'Show fewer' : `Show ${String(extra)} more`}
+        </button> : null}
+      </>
+    )}
   </DisclosureRow>
 }
 

@@ -176,7 +176,7 @@ describe('a burst of research', () => {
       />,
     )
     expect(screen.getByText('Read')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /tauri rounded corners/ }))
-    expect(screen.getByText('1 source for “tauri rounded corners”')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /tauri rounded corners.*1 source/ }))
+    expect(screen.getByRole('link', { name: /Result 1/ })).toBeTruthy()
   })
 })
