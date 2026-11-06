@@ -65,7 +65,7 @@ export function SplashScreen({
           transition: { duration: SPLASH.markExitDuration, ease: EASE_OUT },
         }}
         transition={{ duration: 0.8, ease: EASE_OUT }}
-        className="text-foreground"
+        className="text-[color:var(--brand-ink)]"
       >
         {/* Keyed by the pass: a new key is the animation from the start,
             and `wait` lets the finished mark leave before the next pass

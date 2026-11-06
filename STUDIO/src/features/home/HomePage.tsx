@@ -17,7 +17,7 @@ export function HomePage() {
       <div className="studio-content-column">
         <div className="studio-home-intro mb-7 text-center" data-leaving={!present || undefined}>
           <div className="studio-home-clover-hitbox mx-auto w-fit">
-            <StudioMark entrance size={72} className="studio-home-clover" />
+            <StudioMark entrance size={72} className="studio-home-clover text-[color:var(--brand-ink)]" />
           </div>
           <p className="mt-2 truncate font-display text-lg leading-tight text-muted-foreground">
             <q cite="https://www.gutenberg.org/files/1497/1497-h/1497-h.htm" title="Plato, The Republic (translated by Benjamin Jowett)">
