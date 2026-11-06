@@ -1,6 +1,6 @@
 import { useReducedMotion } from 'framer-motion'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { FIRST_SEND_TRAVEL } from '@/design/tokens'
+import { FIRST_SEND_MOTION } from '@/design/tokens'
 import { firstAdmission, forgetFirstComposerPosition } from '@/features/chat/connection/first-attach'
 
 export function useFirstSendTransition(conversationId: string) {
@@ -19,27 +19,29 @@ export function useFirstSendTransition(conversationId: string) {
     forgetFirstComposerPosition(conversationId)
     const bubble = message.current
     const field = composer.current
-    const row = bubble?.parentElement
-    if (reducedMotion || bubble === null || !row || field === null || typeof bubble.animate !== 'function') return
+    if (reducedMotion || bubble === null || field === null || typeof bubble.animate !== 'function') return
 
     // Measure the resting layout before either element moves. The draft's
     // first line sits inside the bubble's padding when it takes over.
     const bubbleBounds = bubble.getBoundingClientRect()
-    const rowBounds = row.getBoundingClientRect()
     const composerBounds = field.getBoundingClientRect()
-    const padding = getComputedStyle(bubble)
-    const draftLeft = arrival.origin.draftLeft - Number.parseFloat(padding.paddingLeft)
-    const messageLeft = Math.max(rowBounds.left, Math.min(draftLeft, rowBounds.right - bubbleBounds.width))
-    const messageTop = arrival.origin.draftTop - Number.parseFloat(padding.paddingTop)
-    const move = (element: HTMLElement, x: number, y: number) => element.animate(
-      [{ transform: `translate(${x}px, ${y}px)` }, { transform: 'translate(0, 0)' }],
-      FIRST_SEND_TRAVEL,
-    )
-    const messageFlight = move(bubble, messageLeft - bubbleBounds.left, messageTop - bubbleBounds.top)
-    const composerFlight = move(field,
-      arrival.origin.composerLeft - composerBounds.left,
-      arrival.origin.composerTop - composerBounds.top,
-    )
+    const messageTop = arrival.origin.draftTop - Number.parseFloat(getComputedStyle(bubble).paddingTop)
+    const messageStart = `translateY(${messageTop - bubbleBounds.top}px)`
+    const composerStart = `translateY(${arrival.origin.composerTop - composerBounds.top}px)`
+    const { formationMs, travelMs, travelEasing } = FIRST_SEND_MOTION
+    const duration = formationMs + travelMs
+    const offset = formationMs / duration
+    // Both timelines hold their vertical position until the bubble is formed.
+    const messageFlight = bubble.animate([
+      { transform: `${messageStart} scale(0.96)`, opacity: 0, easing: 'ease-out' },
+      { transform: messageStart, opacity: 1, offset, easing: travelEasing },
+      { transform: 'translateY(0)', opacity: 1 },
+    ], { duration })
+    const composerFlight = field.animate([
+      { transform: composerStart },
+      { transform: composerStart, offset, easing: travelEasing },
+      { transform: 'translateY(0)' },
+    ], { duration })
     return () => {
       messageFlight.cancel()
       composerFlight.cancel()

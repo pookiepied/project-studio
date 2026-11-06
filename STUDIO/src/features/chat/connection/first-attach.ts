@@ -38,9 +38,7 @@ export interface FirstAdmission {
 }
 
 export interface FirstComposerPosition {
-  readonly composerLeft: number
   readonly composerTop: number
-  readonly draftLeft: number
   readonly draftTop: number
 }
 

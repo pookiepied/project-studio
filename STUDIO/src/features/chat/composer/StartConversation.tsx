@@ -71,9 +71,7 @@ export function StartConversation({
     const composerBounds = surface.getBoundingClientRect()
     const padding = getComputedStyle(field)
     onStarted(conversationId, text, {
-      composerLeft: composerBounds.left,
       composerTop: composerBounds.top,
-      draftLeft: draft.left + Number.parseFloat(padding.paddingLeft),
       draftTop: draft.top + Number.parseFloat(padding.paddingTop),
     })
   }, [onStarted])
