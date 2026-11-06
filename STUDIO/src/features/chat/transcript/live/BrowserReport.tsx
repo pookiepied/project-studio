@@ -180,7 +180,7 @@ function BrowserStepRow({
         chevron="hover"
         flush
       >
-        <ToolResultPanel title={family.label} call={call} live={live}>
+        <ToolResultPanel title={family.label} call={call} live={live} scroll={false}>
           {view === null ? null : <BrowserCard call={view} conversationId={conversationId} family={family} preview={compact ? 'thumbnail' : 'full'} />}
         </ToolResultPanel>
       </DisclosureRow>

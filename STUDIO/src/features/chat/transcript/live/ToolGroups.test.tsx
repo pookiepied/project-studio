@@ -111,6 +111,20 @@ describe('the chip is the default', () => {
     }
   })
 
+  it('expands long computer output inline without a scrolling panel', () => {
+    const toolName = 'mcp__15_studio-computer__26_studio_computer_screenshot'
+    const output = `${'Computer output line.\n'.repeat(8)}Final output line.`
+    const { container } = render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName, calls: [call({
+      toolName, output: present({ content: [{ type: 'text', text: output }] }),
+    })] })} />)
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByRole('region', { name: 'Computer details' }).classList.contains('overflow-auto')).toBe(false)
+    expect(container.querySelector('pre')?.textContent).not.toContain('Final output line.')
+    fireEvent.click(screen.getByRole('button', { name: 'Show full output' }))
+    expect(container.querySelector('pre')?.textContent).toContain('Final output line.')
+    expect(container.querySelector('pre')?.classList.contains('overflow-auto')).toBe(false)
+  })
+
   it('keeps web sources behind a compact research row', () => {
     render(<NavigationProvider><WorkspaceProvider><RailProvider><ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'web_search', calls: [call({
       toolName: 'web_search', input: present({ query: 'react docs' }),

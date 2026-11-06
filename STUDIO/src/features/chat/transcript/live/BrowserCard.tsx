@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn'
 import { useState } from 'react'
+import { ShowMoreButton } from '@/components/primitives'
 import { MediaLightbox } from '@/features/artifacts/media/MediaLightbox'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserCallView } from './browserCall'
@@ -34,6 +35,9 @@ export function BrowserCard({
   const { frame, url, title, said } = call
   const frameUrl = useAttachmentFrame(conversationId, frame)
   const [open, setOpen] = useState(false)
+  const [showOutput, setShowOutput] = useState(false)
+  const outputPreview = said?.split('\n', 7).slice(0, 6).join('\n').slice(0, 480).trimEnd()
+  const hasMore = outputPreview !== undefined && outputPreview.length < (said?.trimEnd().length ?? 0)
 
   return (
     <div className="flex flex-col gap-2">
@@ -85,11 +89,13 @@ export function BrowserCard({
         </div>
       )}
 
-      {said === null ? null : (
-        <pre className="studio-selectable max-h-64 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-muted-foreground">
-          {said}
+      {said === null ? null : <>
+        <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-muted-foreground">
+          {hasMore && !showOutput ? `${outputPreview}…` : said}
         </pre>
-      )}
+        {hasMore ? <ShowMoreButton expanded={showOutput} onToggle={() => setShowOutput((value) => !value)}
+          moreLabel="Show full output" lessLabel="Show less" className="self-start" /> : null}
+      </>}
     </div>
   )
 }

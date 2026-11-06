@@ -116,7 +116,7 @@ export function ActivityBlock({
         </span>
       }
     >
-      <div role="region" aria-label="Tool activity" tabIndex={0} className="studio-scroll-bounded flex max-h-[32rem] min-w-0 flex-col gap-1 overflow-auto overscroll-contain">
+      <div role="region" aria-label="Tool activity" className="flex min-w-0 flex-col gap-1">
         {segments.map((segment, index) => segment.kind === 'tools'
           ? <ToolGroups key={segment.id} groups={segment.groups} live={active} conversationId={conversationId} />
           : <ThinkingBlock key={segment.id} text={segment.text} span={{ since: segment.startedAt, until: segment.updatedAt }} live={active && index === segments.length - 1} />)}
