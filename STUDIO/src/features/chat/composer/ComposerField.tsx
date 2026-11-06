@@ -1,5 +1,6 @@
 import { useCallback, useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
+import { cn } from '@/lib/cn'
 
 export interface ComposerFieldHandle {
   focus: () => void
@@ -169,8 +170,10 @@ export function ComposerField({
 
     // One line plus a pixel of slack, rather than comparing to a hardcoded
     // height: the line box changes with the user's text-size preference.
-    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
-    const next = decisive > lineHeight * 1.6
+    const style = getComputedStyle(element)
+    const lineHeight = Number.parseFloat(style.lineHeight) || 20
+    const blockPadding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0)
+    const next = decisive - blockPadding > lineHeight * 1.6
     if (next !== multiline) {
       // The arrangement is about to change, and with it the width this
       // height was measured at. Nothing is committed from this pass: the
@@ -253,7 +256,7 @@ export function ComposerField({
         event.preventDefault()
         onSubmit()
       }}
-      className={[
+      className={cn(
         'studio-selectable block w-full resize-none bg-transparent',
         // `text-ui`, not `text-body`. The composer is a control, and it reads
         // as one: it sits in the chrome, beside buttons, and its text should
@@ -262,10 +265,9 @@ export function ComposerField({
         // field while the buttons beside it were 12 — the smallest text in
         // the app, in the largest control in the app.
         'text-ui text-foreground outline-none placeholder:text-muted-foreground/70',
-        // No vertical padding: the row centres its children, and padding here
-        // would fight that and leave the caret sitting low in the capsule.
-        'px-1 py-0',
-      ].join(' ')}
+        'px-1',
+        multiline ? 'studio-composer-scroll py-1' : 'py-0',
+      )}
     />
   )
 }

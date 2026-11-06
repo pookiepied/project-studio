@@ -13,6 +13,25 @@ afterEach(() => {
 })
 
 describe('composer appearance changes', () => {
+  it('does not count multiline padding as another line when a draft shrinks', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const computedStyle = window.getComputedStyle.bind(window)
+    const style = document.createElement('textarea').style
+    style.lineHeight = '12px'
+    style.paddingTop = '4px'
+    style.paddingBottom = '4px'
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) =>
+      element instanceof HTMLTextAreaElement ? style : computedStyle(element))
+    vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockReturnValue(20)
+    const onMultilineChange = vi.fn()
+    render(<ComposerField value="One line" onChange={vi.fn()} onSubmit={vi.fn()}
+      onMultilineChange={onMultilineChange} multiline inset={{ left: 0, right: 0 }} placeholder="Reply" />)
+    expect(onMultilineChange).toHaveBeenCalledWith(false)
+  })
+
   it('remeasures an existing draft when text size changes without a width change', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

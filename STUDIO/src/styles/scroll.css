@@ -98,4 +98,8 @@
   .studio-scroll-bounded::-webkit-scrollbar-track {
     margin-block: var(--radius-lg);
   }
+
+  .studio-composer-scroll::-webkit-scrollbar-track {
+    margin-block: 5px;
+  }
 }

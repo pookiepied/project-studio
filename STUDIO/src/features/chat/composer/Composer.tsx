@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -73,6 +73,30 @@ const CLUSTER_GAP = 8
  * bottom edge no matter how smoothly everything else moves.
  */
 const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
+
+/** The filter joins the two shapes behind the toolbar, leaving controls sharp. */
+function ComposerDockSurface({ expanded }: { expanded: boolean }) {
+  const filterId = useId()
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[var(--control-md)]">
+      <svg className="absolute size-0">
+        <defs>
+          <filter id={filterId} x="-10%" y="-50%" width="120%" height="200%">
+            <feGaussianBlur stdDeviation="3" />
+            <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" />
+          </filter>
+        </defs>
+      </svg>
+      <div className={cn('absolute inset-0 transition-opacity duration-slow ease-[var(--ease-out-quint)]',
+        expanded ? 'opacity-[0.055]' : 'opacity-0')} style={{ filter: `url("#${filterId}")` }}>
+        <div className={cn('absolute inset-y-px left-0 right-[47%] origin-right rounded-full bg-foreground transition-transform duration-slow ease-[var(--ease-out-quint)]',
+          expanded ? 'scale-x-100' : 'scale-x-25')} />
+        <div className={cn('absolute inset-y-px left-[47%] right-0 origin-left rounded-full bg-foreground transition-transform duration-slow ease-[var(--ease-out-quint)]',
+          expanded ? 'scale-x-100' : 'scale-x-25')} />
+      </div>
+    </div>
+  )
+}
 
 /**
  * The composer.
@@ -771,8 +795,9 @@ export function Composer({
           gridTemplateRows: multiline ? FOOTER_TRACK : 'auto 0px',
           transition: TRACK_TRANSITION,
         }}
-        className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0"
+        className="relative isolate grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0"
       >
+        <ComposerDockSurface expanded={multiline} />
         <motion.div
           ref={leftCluster}
           layout="position"
@@ -804,6 +829,7 @@ export function Composer({
           style={{
             paddingLeft: multiline ? 0 : inset.left,
             paddingRight: multiline ? 0 : inset.right,
+            paddingTop: multiline ? 4 : 0,
             transition: INSET_TRANSITION,
           }}
         >
