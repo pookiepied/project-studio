@@ -26,6 +26,7 @@ import { BrowserReport } from './BrowserReport'
 import { readWebCall } from './webCall'
 import { toolPresentation } from './toolPresentation'
 import { hostOf } from '@/lib/url'
+import { openExternalUrl } from '@/platform/tauri/external'
 
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { isRecord } from '@/lib/guards'
@@ -84,6 +85,7 @@ const RESEARCH_PREVIEW_LIMIT = 3
 function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const [open, setOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [linkError, setLinkError] = useState(false)
   const step = readWebCall(call)
   if (step === null) return null
   const state = resultState(call, live)
@@ -124,8 +126,16 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
             {(showAll ? sources : sources.slice(0, RESEARCH_PREVIEW_LIMIT)).map((source, index) => (
               <tr key={`${source.url}:${String(index)}`}>
                 <td className="py-1.5">
-                  <a href={source.url} target="_blank" rel="noreferrer noopener"
-                    className="block truncate hover:underline" title={source.title}>{source.title}</a>
+                  {searching ? (
+                    <a href={source.url} target="_blank" rel="noreferrer noopener"
+                      className="block truncate hover:underline" title={source.title}>{source.title}</a>
+                  ) : (
+                    <button type="button" className="block max-w-full truncate text-left hover:underline"
+                      onClick={() => {
+                        setLinkError(false)
+                        void openExternalUrl(source.url).catch(() => setLinkError(true))
+                      }}>{source.url}</button>
+                  )}
                 </td>
                 <td className="py-1.5 pl-3 text-muted-foreground">
                   <span className="flex min-w-0 items-center gap-2">
@@ -137,6 +147,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
             ))}
           </tbody>
         </table>
+        {linkError ? <p role="alert" className="mt-1 text-danger">Could not open the link.</p> : null}
         {extra > 0 ? <ShowMoreButton expanded={showAll} onToggle={() => setShowAll((value) => !value)}
           moreLabel={`Show ${String(extra)} more`} className="mt-2" /> : null}
       </div> : null}

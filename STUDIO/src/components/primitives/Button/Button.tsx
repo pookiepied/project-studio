@@ -103,7 +103,6 @@ export function Button({
   className,
   role,
   label,
-  expanded,
   children,
 }: {
   onClick?: () => void
@@ -121,7 +120,6 @@ export function Button({
   role?: 'menuitem'
   /** Accessible name, when the visible text alone does not say enough. */
   label?: string
-  expanded?: boolean
   children: ReactNode
 }) {
   const inert = disabled || busy
@@ -131,7 +129,6 @@ export function Button({
       type={type}
       role={role}
       aria-label={label}
-      aria-expanded={expanded}
       onClick={onClick}
       disabled={inert}
       aria-busy={busy || undefined}

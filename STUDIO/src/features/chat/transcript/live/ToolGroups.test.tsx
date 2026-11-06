@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { present } from '@/platform/harness/contracts/chunks'
+import { openExternalUrl } from '@/platform/tauri/external'
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
@@ -12,6 +13,11 @@ import { WorkspaceProvider } from '@/stores/workspace'
 
 import { RollingCount, STEP_MS } from './RollingCount'
 import { ToolGroups } from './ToolGroups'
+
+vi.mock('@/platform/tauri/external', async (original) => ({
+  ...await original<typeof import('@/platform/tauri/external')>(),
+  openExternalUrl: vi.fn().mockResolvedValue(undefined),
+}))
 
 afterEach(() => {
   // The config does not set `globals: true`, so testing-library's automatic
@@ -136,10 +142,13 @@ describe('the chip is the default', () => {
     expect(searchDetails.classList.contains('overflow-auto')).toBe(false)
     expect(screen.getByRole('columnheader', { name: 'Source' })).toBeTruthy()
     expect(screen.getAllByRole('link')).toHaveLength(3)
-    expect(screen.queryByRole('link', { name: 'https://example.com/article' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'https://example.com/article' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Fetched article' }))
     expect(screen.getByRole('columnheader', { name: 'Link' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'https://example.com/article' }).getAttribute('href')).toBe('https://example.com/article')
+    const pageLink = screen.getByRole('button', { name: 'https://example.com/article' })
+    expect(pageLink.hasAttribute('title')).toBe(false)
+    fireEvent.click(pageLink)
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/article')
     expect(screen.queryByText('Long page text')).toBeNull()
     const showMore = screen.getByRole('button', { name: 'Show 1 more' })
     expect(showMore.getAttribute('aria-expanded')).toBe('false')
