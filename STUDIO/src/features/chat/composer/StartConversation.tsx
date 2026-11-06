@@ -1,13 +1,13 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { visionRefusal } from '@/domain/attachments/images'
+import type { PermissionMode } from '@/domain/permissions/modes'
 import { Composer } from '@/features/chat/composer/Composer'
 import { useFirstTurn } from '@/features/chat/connection/first-turn'
 import { firstAdmission, rememberFirstAdmission, type FirstComposerPosition } from '@/features/chat/connection/first-attach'
 import { useVoiceModeContext } from '@/features/voice'
 import { newId } from '@/lib/id'
 import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
-import { effectiveTurnSettings } from '@/domain/turn/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { turnSettingsToWire } from '@/platform/harness'
@@ -40,6 +40,10 @@ export function StartConversation({
   const { beginConversation, settings, catalog } = useWorkspace()
   const { go } = useNavigation()
   const composer = useRef<HTMLDivElement>(null)
+  const [permissionOverride, setPermissionOverride] = useState<PermissionMode | null>(null)
+  const draftSettings = useMemo(() => ({
+    ...settings, permission: permissionOverride ?? settings.permission,
+  }), [permissionOverride, settings])
 
   const onStarted = useCallback(
     (conversationId: string, text: string, origin?: FirstComposerPosition) => {
@@ -50,7 +54,7 @@ export function StartConversation({
         // The settings the turn went out with, so the record and the
         // admission path's own write describe the same conversation - the
         // mode included, which the harness holds per conversation.
-        settings: effectiveTurnSettings(null, settings),
+        settings: draftSettings,
       })
       const admission = firstAdmission(conversationId)
       if (admission !== null && origin !== undefined) {
@@ -58,7 +62,7 @@ export function StartConversation({
       }
       go({ kind: 'chat', conversationId }, origin === undefined ? undefined : 'sibling')
     },
-    [beginConversation, go, projectId, settings],
+    [beginConversation, draftSettings, go, projectId],
   )
   const onTypedStart = useCallback((conversationId: string, text: string) => {
     const surface = composer.current
@@ -84,7 +88,7 @@ export function StartConversation({
     // without this the run that answers it has no project to read and stands
     // in the conversation's own scratch directory - with the project open on
     // screen the whole time.
-    settings: () => turnSettingsToWire(effectiveTurnSettings(null, settings), projectId),
+    settings: () => turnSettingsToWire(draftSettings, projectId),
   })
 
   // Voice from an empty page: the id is minted now, but nothing exists until
@@ -95,13 +99,13 @@ export function StartConversation({
   const onStartVoice = useCallback(() => {
     const conversationId = newId('cnv')
     voice.enter(conversationId, {
-      settings: turnSettingsToWire(effectiveTurnSettings(null, settings), projectId),
+      settings: turnSettingsToWire(draftSettings, projectId),
       onAdmitted: (text, receipt) => {
         rememberFirstAdmission(conversationId, { offset: receipt.offset, submissionId: receipt.submissionId, text })
         onStarted(conversationId, text)
       },
     })
-  }, [onStarted, projectId, settings, voice])
+  }, [draftSettings, onStarted, projectId, voice])
 
   /** The send-time refusal for images a blind model cannot take. */
   const [attachRefusal, setAttachRefusal] = useState<SeamFailure | null>(null)
@@ -109,7 +113,7 @@ export function StartConversation({
   const onSend = useCallback(
     async (text: string, images: readonly TurnImageWire[], documents: readonly File[]) => {
       const refusal = visionRefusal(
-        effectiveTurnSettings(null, settings).modelId,
+        draftSettings.modelId,
         images.length,
         catalog.models,
       )
@@ -123,7 +127,7 @@ export function StartConversation({
     // The method, not the object: only `start` is called, and `firstTurn`
     // is new each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [catalog.models, firstTurn.start, settings],
+    [catalog.models, draftSettings.modelId, firstTurn.start],
   )
 
   return (
@@ -138,6 +142,7 @@ export function StartConversation({
       <div ref={composer}>
         <Composer
           conversationId={null}
+          draftPermission={{ value: draftSettings.permission, onChange: setPermissionOverride }}
           placeholder={placeholder}
           onSend={onSend}
           onStartVoice={onStartVoice}

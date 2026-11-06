@@ -28,8 +28,10 @@ import { useEffect, useState } from 'react'
  * the desktop, rather than rendering as controls that change nothing.
  */
 export function GeneralPane() {
-  const { settings, setSettings } = useWorkspace()
+  const { settings, setDefaultPermission } = useWorkspace()
   const [open, setOpen] = useState(false)
+  const [savingMode, setSavingMode] = useState(false)
+  const [modeSaveFailed, setModeSaveFailed] = useState(false)
   const mode = findPermissionMode(settings.permission)
   const Glyph = PERMISSION_MODE_ICONS[mode.id]
   const onDesktop = isTauri()
@@ -69,6 +71,15 @@ export function GeneralPane() {
     setLaunchAtStartup(await setLaunchAtStartupPreference(enabled))
   }
 
+  const chooseMode = async (permission: typeof settings.permission) => {
+    setOpen(false)
+    setModeSaveFailed(false)
+    if (permission === settings.permission) return
+    setSavingMode(true)
+    setModeSaveFailed(!(await setDefaultPermission(permission)))
+    setSavingMode(false)
+  }
+
   return (
     <Pane
       title="General"
@@ -84,6 +95,8 @@ export function GeneralPane() {
           trigger={
             <button
               type="button"
+              disabled={savingMode}
+              aria-busy={savingMode || undefined}
               onClick={() => setOpen((value) => !value)}
               aria-haspopup="menu"
               aria-expanded={open}
@@ -101,15 +114,13 @@ export function GeneralPane() {
               key={candidate.id}
               selected={candidate.id === settings.permission}
               note={candidate.note}
-              onSelect={() => {
-                setSettings({ ...settings, permission: candidate.id })
-                setOpen(false)
-              }}
+              onSelect={() => void chooseMode(candidate.id)}
             >
               {candidate.name}
             </MenuItem>
           ))}
         </Popover>
+        {modeSaveFailed ? <p role="alert" className="text-caption text-danger">Could not save the execution default.</p> : null}
       </Row>
 
       {onDesktop && (

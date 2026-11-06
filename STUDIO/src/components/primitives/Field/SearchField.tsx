@@ -32,6 +32,11 @@ export function SearchField({
   const input = useRef<HTMLInputElement>(null)
   return (
     <div className="relative w-full min-w-0">
+      {appearance === 'menu' ? (
+        <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center">
+          <Icons.search size="sm" />
+        </span>
+      ) : null}
       <TextField
         ref={input}
         type="search"
@@ -43,7 +48,7 @@ export function SearchField({
         onKeyDown={onKeyDown}
         className={cn(
           'min-h-[var(--button-sm)] pr-[calc(var(--button-sm)+0.375rem)]',
-          appearance === 'menu' && 'border-transparent bg-transparent pl-1',
+          appearance === 'menu' && 'rounded-full border-0 bg-tint pl-8 focus:bg-selected',
         )}
       />
       {value === '' ? null : (

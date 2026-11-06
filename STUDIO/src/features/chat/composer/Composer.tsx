@@ -19,6 +19,7 @@ import { base64OfBytes } from '@/lib/base64'
 import { KeepDialog } from '@/features/library/KeepDialog'
 import type { KeepCandidate } from '@/features/library/client'
 import { PermissionControl } from '@/features/chat/composer/PermissionControl'
+import type { PermissionMode } from '@/domain/permissions/modes'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
@@ -242,9 +243,11 @@ export function Composer({
   restoredMessage,
   onStop,
   onStartVoice,
+  draftPermission,
   keepSentDraftForExit = false,
 }: {
   conversationId: string | null
+  draftPermission?: { value: PermissionMode; onChange: (value: PermissionMode) => void }
   /** Opens voice on a chat that does not exist yet; its first utterance creates it. */
   onStartVoice?: () => void
   /** The start surface crossfades its draft out after an admitted send. */
@@ -917,7 +920,7 @@ export function Composer({
               conversation it shows and settles that conversation's own stored
               mode; on home there is nothing stored, so it is the window's
               setting. */}
-          <PermissionControl conversationId={conversationId} />
+          <PermissionControl conversationId={conversationId} draftPermission={draftPermission} />
         </motion.div>
 
         <div
@@ -1149,7 +1152,6 @@ export function Composer({
                 <IconButton
                   label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
                   size="md"
-                  tone="secondary"
                   disabled={!voiceAvailable || (conversationId === null && onStartVoice === undefined) || busy}
                   onClick={() => (conversationId === null ? onStartVoice?.() : voice.enter(conversationId))}
                 >

@@ -84,7 +84,6 @@ export function useConversationWrites(
 
   const setConversationPermission = useCallback(
     (conversationId: string, permission: PermissionMode) => {
-      setSettings((current) => ({ ...current, permission }))
       // The wire value is translated here, at the one boundary the store
       // already owns; the picker's vocabulary never leaves the domain.
       void mutateIndex(
@@ -93,7 +92,7 @@ export function useConversationWrites(
         (conversation) => ({ ...conversation, permissionMode: permission }),
       )
     },
-    [mutateIndex, setSettings],
+    [mutateIndex],
   )
 
   const beginConversation = useCallback<ConversationWrites['beginConversation']>(

@@ -229,10 +229,21 @@ export function Popover({
     if (!open) { focusedInline.current = false; return }
     // A panel cannot accept focus until its measured position makes it visible.
     if ((!inline && initialFocus === undefined) || position === null || focusedInline.current) return
-    const item = panel.current?.querySelector<HTMLElement>(initialFocus ?? '[role="menuitem"]')
-    if (item === null || item === undefined) return
-    focusedInline.current = true
-    item.focus()
+    const surface = panel.current
+    const item = surface?.querySelector<HTMLElement>(initialFocus ?? '[role="menuitem"]')
+    if (!surface || !item) return
+    const focus = () => {
+      item.focus()
+      focusedInline.current = document.activeElement === item
+      return focusedInline.current
+    }
+    if (focus()) return
+    // The motion surface may still be hidden when React settles its position.
+    const observer = new MutationObserver(() => {
+      if (focus()) observer.disconnect()
+    })
+    observer.observe(surface, { attributes: true, attributeFilter: ['class', 'style', 'inert'] })
+    return () => observer.disconnect()
   }, [open, inline, initialFocus, position])
 
   useEffect(() => {

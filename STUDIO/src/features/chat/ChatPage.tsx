@@ -571,7 +571,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                 transition={{ duration: DURATION.fast, ease: EASE_OUT }}
                 onClick={scrollToBottom}
                 aria-label="Jump to latest"
-                className="studio-blur pointer-events-auto flex size-[var(--button-lg)] items-center justify-center rounded-full border border-button-edge shadow-lifted"
+                className="studio-blur pointer-events-auto flex size-[var(--button-lg)] items-center justify-center rounded-full shadow-lifted transition-colors duration-fast hover:bg-muted focus-visible:bg-muted focus-visible:outline-none!"
               >
                 <Icons.jumpToLatest />
               </motion.button>

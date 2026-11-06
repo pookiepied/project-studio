@@ -11,28 +11,27 @@ import { useWorkspace } from '@/stores/workspace'
  * permission decision - so with a conversation open the picker shows that
  * conversation's stored mode and writes a change straight into the index,
  * the same way the model picker does. On a surface with no conversation
- * (home, a project page) it is the window's setting, which the first turn
- * then carries. A stored value outranking the window's is what makes the
- * picker truthful on reload: the harness holds a mode whether or not this
- * window remembers choosing it.
+ * (home, a project page) the draft starts from the saved default and may
+ * override it for its first turn.
  */
-export function PermissionControl({ conversationId }: { conversationId: string | null }) {
-  const { conversations, settings, setSettings, setConversationPermission } = useWorkspace()
+export function PermissionControl({ conversationId, draftPermission }: {
+  conversationId: string | null
+  draftPermission?: { value: PermissionMode; onChange: (value: PermissionMode) => void }
+}) {
+  const { conversations, settings, setConversationPermission } = useWorkspace()
   const [open, setOpen] = useState(false)
 
   const conversation =
     conversationId === null
       ? undefined
       : conversations.find((candidate) => candidate.id === conversationId)
-  // A conversation the store has never heard of cannot have a stored mode,
-  // and the window's setting is the truth.
-  const mode = findPermissionMode(conversation?.permissionMode ?? settings.permission)
+  const mode = findPermissionMode(conversation?.permissionMode ?? draftPermission?.value ?? settings.permission)
   const Mark = PERMISSION_MODE_ICONS[mode.id]
   const loud = mode.id === 'auto'
 
   const pick = (candidate: PermissionMode) => {
-    if (conversation === undefined) setSettings({ ...settings, permission: candidate })
-    else setConversationPermission(conversation.id, candidate)
+    if (conversationId === null) draftPermission?.onChange(candidate)
+    else setConversationPermission(conversationId, candidate)
     setOpen(false)
   }
 
@@ -47,7 +46,7 @@ export function PermissionControl({ conversationId }: { conversationId: string |
         <IconButton
           label={`What Studio may do: ${mode.name}`}
           active={open}
-          className={loud && !open ? 'bg-tint hover:bg-selected' : undefined}
+          className={`focus-visible:outline-none! focus-visible:bg-selected ${loud && !open ? 'bg-tint hover:bg-selected' : ''}`}
           onClick={() => setOpen(!open)}
         >
           <Mark size="md" />

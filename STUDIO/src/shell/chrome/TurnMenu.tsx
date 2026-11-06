@@ -89,7 +89,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
     if (active !== null) {
       setConversationSettings(active.id, { modelId, reasoningLevel })
     } else {
-      setSettings({ ...settings, modelId, reasoningLevel })
+      setSettings((current) => ({ ...current, modelId, reasoningLevel }))
     }
     setOpen(false)
     trigger.current?.focus()
@@ -99,7 +99,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
     if (active !== null) {
       setConversationSettings(active.id, { modelId: effective.modelId, reasoningLevel })
     } else {
-      setSettings({ ...settings, reasoningLevel })
+      setSettings((current) => ({ ...current, reasoningLevel }))
     }
   }
 

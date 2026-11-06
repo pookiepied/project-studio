@@ -665,6 +665,10 @@ small viewports. Scroll coalescing retains ordering relative to clicks.
 Shared native preference-store/browser storage subscriptions update every window
 without persistence echoes. The existing client recorder emits only the fixed
 `client.window` / `appearance_received` stage, with no preference values.
+The execution default records `client.window` /
+`execution_default_save_requested` with no preference value or storage error.
+Persistence uses the existing local preference boundary. Submission and
+conversation identities remain owned by the existing admission path.
 Validation for this correction is tracked in `report/browser-window-fixes.md`;
 the previous extension's gate counts below are not this correction's results.
 

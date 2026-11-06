@@ -80,6 +80,23 @@ describe('a popover being dismissed', () => {
 })
 
 describe('a popover in a constrained viewport', () => {
+  it('focuses the initial field when the motion surface becomes visible', async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(() => undefined)
+    render(
+      <Popover open onOpenChange={vi.fn()} initialFocus='[type="search"]' trigger={<button>Open</button>}>
+        <input type="search" aria-label="Search" />
+      </Popover>,
+    )
+    const search = screen.getByRole('searchbox')
+    expect(focus).toHaveBeenCalled()
+    expect(document.activeElement).not.toBe(search)
+    focus.mockRestore()
+
+    screen.getByRole('menu').style.opacity = '0.9'
+    await frames(1)
+    expect(document.activeElement).toBe(search)
+  })
+
   it('keeps an adjacent panel inside the popover and replaces it when space runs out', () => {
     vi.stubGlobal('innerWidth', 900)
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(256)

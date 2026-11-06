@@ -1,4 +1,5 @@
 import type { CatalogModel } from '@/domain/models/catalog'
+import type { Dispatch, SetStateAction } from 'react'
 import type { ReasoningChoice } from '@/domain/models/types'
 import type { PermissionMode } from '@/domain/permissions/modes'
 import type { Conversation, TurnSettings } from '@/domain/conversation/types'
@@ -193,7 +194,7 @@ export interface ConversationWrites {
    * Settles the execution mode a conversation is held with, in the index -
    * its own method rather than a fourth key on `setConversationSettings`,
    * because the mode is a consent with its own control and its own rate of
-   * change. The window's settings follow, and the harness reads the stored
+   * change. The harness reads the stored
    * value at every permission decision, so a change lands on the very next
    * ask, including one a running turn raises.
    */
@@ -299,7 +300,8 @@ export interface WorkspaceValue extends BoundClient, ConversationWrites, Project
   /** The model catalog the picker reads: harness-served rows, or a named state. */
   readonly catalog: ModelCatalogState
   readonly settings: TurnSettings
-  setSettings: (settings: TurnSettings) => void
+  setSettings: Dispatch<SetStateAction<TurnSettings>>
+  setDefaultPermission: (permission: PermissionMode) => Promise<boolean>
   /**
    * Asks the supervisor to start the harness and re-reads when it does. The
    * remedy Task 34's notice names, reachable from anywhere that can see this

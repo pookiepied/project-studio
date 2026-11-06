@@ -5,6 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { VoiceModeProvider } from '@/features/voice'
+import type { TurnSettings } from '@/domain/conversation/types'
+import { loadDefaultPermission, saveDefaultPermission } from '@/platform/execution-preference'
 
 import { HomePage } from './HomePage'
 
@@ -23,22 +25,25 @@ import { HomePage } from './HomePage'
  * for a send that never ran.
  */
 
+const defaults: TurnSettings = { permission: 'ask', modelId: null, reasoningLevel: null }
 const workspace = {
   beginConversation: vi.fn(),
-  settings: { permission: 'ask' },
-  setSettings: vi.fn(),
+  settings: defaults,
   // The send path reads the catalog to judge whether the turn's model can
   // see images; an empty catalog means "unknown", which passes.
   catalog: { phase: { status: 'ready' as const, error: null }, models: [] },
 }
-const openChat = vi.fn()
+const go = vi.fn()
+const contact = vi.fn()
+const submitTurn = vi.fn()
 
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => workspace,
   // The composer's slash reads the compacting set; nothing here compacts.
   useLiveWork: () => ({ compacting: new Set<string>(), markCompacting: vi.fn(), bumpContext: vi.fn() }),
 }))
-vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ openChat }) }))
+vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ go }) }))
+vi.mock('@/platform/harness/contact', () => ({ defaultContactFor: () => contact }))
 
 // jsdom has no ResizeObserver; the composer's field measures itself with one.
 class ResizeObserverStub {
@@ -51,7 +56,12 @@ vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  contact.mockResolvedValue({ kind: 'absent' })
+  workspace.settings = defaults
+  localStorage.clear()
 })
+
+contact.mockResolvedValue({ kind: 'absent' })
 
 function field(): HTMLTextAreaElement {
   const box = screen.getByRole('textbox')
@@ -86,9 +96,31 @@ describe('the composer that starts a conversation', () => {
 
     await waitFor(() => expect(screen.getByText(/was not sent/)).toBeTruthy())
     expect(workspace.beginConversation).not.toHaveBeenCalled()
-    expect(openChat).not.toHaveBeenCalled()
+    expect(go).not.toHaveBeenCalled()
     // Task 32's rule, kept intact across a page that has no transcript: the
     // field holds the words until a receipt says the harness took them.
     expect(field().value).toBe('this one bounces')
+  })
+
+  it.each(['auto', 'ask'] as const)('sends %s with the first turn and conversation record', async (mode) => {
+    expect(await saveDefaultPermission('auto')).toBe(true)
+    workspace.settings = { ...workspace.settings, permission: await loadDefaultPermission() }
+    contact.mockResolvedValue({ kind: 'ready', client: { submitTurn } })
+    submitTurn.mockResolvedValue({ ok: true, value: { offset: '1_0', submissionId: 'sub_first' } })
+    render(<VoiceModeProvider><HomePage /></VoiceModeProvider>)
+
+    const permission = screen.getByRole('button', { name: 'What Studio may do: Auto' })
+    if (mode === 'ask') {
+      fireEvent.click(permission)
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /^Ask/ }))
+    }
+    fireEvent.change(field(), { target: { value: 'start a new conversation' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(workspace.beginConversation).toHaveBeenCalledWith(expect.objectContaining({
+      settings: expect.objectContaining({ permission: mode }),
+    })))
+    expect(submitTurn).toHaveBeenCalledWith('start a new conversation', expect.objectContaining({ permissionMode: mode }), [])
+    expect(await loadDefaultPermission()).toBe('auto')
   })
 })

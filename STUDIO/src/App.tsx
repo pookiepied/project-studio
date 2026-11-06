@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { AppearanceProvider, type Appearance } from '@/design/theme'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
+import type { PermissionMode } from '@/domain/permissions/modes'
 import {
   detachedConversationId,
   browserConversationId,
@@ -38,7 +39,10 @@ import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
  * reaches navigation. A slimmer stack would work until the first artifact
  * opened, then throw.
  */
-export default function App({ initialAppearance }: { initialAppearance: Appearance }) {
+export default function App({ initialAppearance, initialPermission }: {
+  initialAppearance: Appearance
+  initialPermission: PermissionMode
+}) {
   useFileDropGuard()
   // Read once and never stored: the URL is fixed for the life of a window, so
   // this is a fact about which window this is, not state.
@@ -116,7 +120,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
             none of the stores, and inside Tauri it is a pass-through that
             never asks. See `PairingGate`. */}
         <PairingGate>
-          <WorkspaceProvider>
+          <WorkspaceProvider initialPermission={initialPermission}>
             <NavigationProvider>
               <ConversationWorkspace detached={detached}>
                 <CaptureMonitor />

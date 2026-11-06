@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { GeneralPane } from './GeneralPane'
@@ -16,7 +16,7 @@ import { GeneralPane } from './GeneralPane'
 
 const workspace = vi.hoisted(() => ({
   settings: { permission: 'ask' },
-  setSettings: vi.fn(),
+  setDefaultPermission: vi.fn(),
 }))
 
 vi.mock('@/stores/workspace', () => ({
@@ -25,6 +25,7 @@ vi.mock('@/stores/workspace', () => ({
 
 afterEach(() => {
   cleanup()
+  workspace.setDefaultPermission.mockReset()
   Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
 })
 
@@ -45,5 +46,17 @@ describe('GeneralPane', () => {
     // The rest of the pane is not part of the degradation.
     expect(screen.getByText('Execution mode')).not.toBeNull()
     expect(screen.getByText('Studio version')).not.toBeNull()
+  })
+
+  it('reports a failed default save and keeps the previous mode', async () => {
+    workspace.setDefaultPermission.mockResolvedValue(false)
+    render(<GeneralPane />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Auto/ }))
+
+    expect(workspace.setDefaultPermission).toHaveBeenCalledWith('auto')
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not save the execution default')
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
   })
 })

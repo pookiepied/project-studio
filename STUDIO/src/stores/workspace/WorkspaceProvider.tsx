@@ -1,6 +1,8 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { DEFAULT_PERMISSION_MODE, type PermissionMode } from '@/domain/permissions/modes'
 import type { TurnSettings } from '@/domain/conversation/types'
+import { recordClientObservation } from '@/platform/diagnostics/events'
+import { saveDefaultPermission } from '@/platform/execution-preference'
 import { bindClient } from '@/stores/workspace/bound-client'
 import { LiveWorkProvider } from '@/stores/workspace/LiveWorkProvider'
 import { useConversationWrites } from '@/stores/workspace/useConversationWrites'
@@ -43,9 +45,22 @@ const DEFAULT_TURN_SETTINGS: TurnSettings = {
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null)
 
-export function WorkspaceProvider({ children }: { children: ReactNode }) {
+export function WorkspaceProvider({ children, initialPermission = DEFAULT_PERMISSION_MODE }: {
+  children: ReactNode
+  initialPermission?: PermissionMode
+}) {
   const sync = useHarnessSync()
-  const [settings, setSettings] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
+  const [settings, setSettings] = useState<TurnSettings>(() => ({
+    ...DEFAULT_TURN_SETTINGS, permission: initialPermission,
+  }))
+  const setDefaultPermission = useCallback(async (permission: PermissionMode) => {
+    recordClientObservation({
+      name: 'client.window', phase: 'progress', attributes: { stage: 'execution_default_save_requested' },
+    })
+    const saved = await saveDefaultPermission(permission)
+    if (saved) setSettings((current) => ({ ...current, permission }))
+    return saved
+  }, [])
   const conversationWrites = useConversationWrites(sync, setSettings)
   const projectWrites = useProjectWrites(sync)
   const bound = useMemo(() => bindClient(sync.clientRef), [sync.clientRef])
@@ -67,6 +82,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       catalog,
       settings,
       setSettings,
+      setDefaultPermission,
       ensureStore: sync.ensureStore,
     }),
     [
@@ -78,6 +94,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       storePhase,
       catalog,
       settings,
+      setDefaultPermission,
       sync.ensureStore,
     ],
   )

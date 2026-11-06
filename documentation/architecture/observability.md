@@ -611,6 +611,13 @@ no preference value, window title or content is recorded. Received preferences
 are applied without another persistence write. Subscription disposal suppresses
 late UI updates; a catch-up read closes the initial load/subscription gap.
 
+The default execution mode uses the existing desktop preference store or browser
+local storage. `client.window` / `execution_default_save_requested` records
+only the local request stage. The mode, stored values, and storage errors are
+excluded. Storage completion is reported by the Settings UI. New conversations
+carry the chosen mode through the existing submission boundary. The preference
+does not change an existing conversation's execution authority.
+
 The separate [Studio Inspector](studio-inspector.md) consumes this contract.
 The native `diagnostic_inspector_status` / `diagnostic_inspector_configure`
 commands are excluded diagnostic self-control. Its explicit, default-off local

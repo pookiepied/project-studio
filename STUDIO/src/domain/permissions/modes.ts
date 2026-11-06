@@ -37,14 +37,14 @@ export const PERMISSION_MODES: readonly PermissionModeSpec[] = [
   {
     id: 'ask',
     name: 'Ask',
-    note: 'Ask before anything, unless you said always.',
+    note: 'Ask unless already allowed.',
     detail:
       'Every file write, command, and network request stops and asks first. An answer you gave as "always" holds, so a project you have let Studio edit is edited without asking and still stops before running anything.',
   },
   {
     id: 'auto',
     name: 'Auto',
-    note: 'Proceed unless a rule says ask.',
+    note: 'Run unless a rule says ask.',
     detail:
       'Anything left at its default proceeds. Only the things a rule explicitly marks as ask will stop. Undo history still records every change.',
   },

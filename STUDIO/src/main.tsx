@@ -5,6 +5,7 @@ import App from '@/App'
 import { applyAppearance, loadAppearance } from '@/design/theme'
 import { assertScaleDefaults } from '@/design/tokens'
 import { flushDrafts, primeDrafts } from '@/features/chat/composer/drafts'
+import { loadDefaultPermission } from '@/platform/execution-preference'
 
 // Before anything writes to the root: compares the defaults `styles/type.css`
 // declares against the ones `typography.ts` owns, and complains in development
@@ -21,7 +22,7 @@ assertScaleDefaults()
 // is built `visible: false` and only shows on `app_ready`, so this resolves
 // inside a frame nobody sees. Rendering first and correcting afterwards was
 // the alternative, and it costs a visible flash at the wrong size and theme.
-const appearance = await loadAppearance()
+const [appearance, initialPermission] = await Promise.all([loadAppearance(), loadDefaultPermission()])
 applyAppearance(appearance)
 
 // Unsent composer text, read before the first composer mounts so its initial
@@ -44,6 +45,6 @@ if (!container) throw new Error('Missing #root element')
 
 createRoot(container).render(
   <StrictMode>
-    <App initialAppearance={appearance} />
+    <App initialAppearance={appearance} initialPermission={initialPermission} />
   </StrictMode>,
 )
