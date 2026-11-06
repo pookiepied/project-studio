@@ -69,6 +69,7 @@ export function Popover({
   side = 'bottom',
   align = 'start',
   offset = OFFSET,
+  maxWidth,
   maxHeight,
   children,
   className,
@@ -86,6 +87,8 @@ export function Popover({
    * the button's, where it would sit on the surface's border.
    */
   offset?: number
+  /** Optional content cap; the visible viewport remains the upper bound. */
+  maxWidth?: string
   /** Optional content cap; the visible viewport remains the upper bound. */
   maxHeight?: string
   children: ReactNode
@@ -212,7 +215,7 @@ export function Popover({
               style={{
                 top: position?.top ?? 0,
                 left: position?.left ?? 0,
-                maxWidth: position?.maxWidth,
+                maxWidth: position && maxWidth ? `min(${maxWidth}, ${position.maxWidth}px)` : position?.maxWidth ?? maxWidth,
                 maxHeight: position && maxHeight ? `min(${maxHeight}, ${position.maxHeight}px)` : position?.maxHeight,
                 minWidth: position && position.maxWidth < 192 ? 0 : undefined,
                 transformOrigin: (position?.side ?? side) === 'top' ? 'bottom center' : 'top center',

@@ -367,12 +367,13 @@ export function markOfName(name: string): MarkName | null {
  * marks every other surface uses, monochrome like the brand fills, so a chip
  * row still reads as one family rather than two icon systems.
  */
-type FormatMark = 'database' | 'codeXml' | 'fileCog'
+type FormatMark = 'database' | 'codeXml' | 'fileCog' | 'image'
 
 const FORMAT_ICONS: Readonly<Record<FormatMark, (typeof Icons)[keyof typeof Icons]>> = {
   database: Icons.database,
   codeXml: Icons.codeXml,
   fileCog: Icons.fileCog,
+  image: Icons.image,
 }
 
 const BY_EXTENSION_FORMAT: Readonly<Record<string, FormatMark>> = {
@@ -380,6 +381,19 @@ const BY_EXTENSION_FORMAT: Readonly<Record<string, FormatMark>> = {
   xml: 'codeXml',
   yaml: 'fileCog',
   yml: 'fileCog',
+  png: 'image',
+  jpg: 'image',
+  jpeg: 'image',
+  gif: 'image',
+  webp: 'image',
+  avif: 'image',
+  bmp: 'image',
+  ico: 'image',
+  tif: 'image',
+  tiff: 'image',
+  heic: 'image',
+  heif: 'image',
+  svg: 'image',
 }
 
 const BY_LANGUAGE_FORMAT: Readonly<Record<string, FormatMark>> = {

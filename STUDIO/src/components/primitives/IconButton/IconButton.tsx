@@ -1,4 +1,4 @@
-import { forwardRef, useState, type ReactNode } from 'react'
+import { forwardRef, useState, type AriaRole, type ReactNode } from 'react'
 import { IconStateProvider, type IconState } from '@/components/icons/Icon'
 import { Tooltip } from '@/components/primitives/Tooltip/Tooltip'
 import { cn } from '@/lib/cn'
@@ -93,6 +93,7 @@ const TONE_CLASS: Record<Tone, string> = {
 
 interface IconButtonProps {
   label: string
+  role?: AriaRole
   onClick?: () => void
   size?: Size
   tone?: Tone
@@ -105,7 +106,7 @@ interface IconButtonProps {
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, onClick, size = 'md', tone = 'quiet', active = false, disabled = false, tooltipSide = 'top', className, children },
+  { label, role, onClick, size = 'md', tone = 'quiet', active = false, disabled = false, tooltipSide = 'top', className, children },
   ref,
 ) {
   const [pointer, setPointer] = useState<'rest' | 'hover' | 'press'>('rest')
@@ -118,6 +119,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       <button
         ref={ref}
         type="button"
+        role={role}
         onClick={onClick}
         disabled={disabled}
         aria-label={label}

@@ -129,6 +129,11 @@ describe('splitFilePath', () => {
 })
 
 describe('FileTypeMark', () => {
+  it('uses the shared image mark for a PNG path', () => {
+    const { container } = render(<FileTypeMark path="artifacts/flower.PNG" />)
+    expect(container.querySelector('svg.lucide-photo-rounded')).not.toBeNull()
+  })
+
   it('draws the language glyph for a known file', () => {
     const { container } = render(<FileTypeMark path="x.ts" />)
     const path = container.querySelector('svg path')

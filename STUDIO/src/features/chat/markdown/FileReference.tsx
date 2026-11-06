@@ -1,9 +1,9 @@
 import { useContext, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { Button, Popover } from '@/components/primitives'
-import { splitFilePath } from '@/components/icons/fileTypes'
+import { IconButton, Popover } from '@/components/primitives'
+import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
 import { copyText } from '@/lib/clipboard'
-import { isTauri, pickDirectory } from '@/platform/tauri/window'
+import { isTauri } from '@/platform/tauri/window'
 import { revealPath } from '@/platform/tauri/reveal'
 import { useConversationWorkspaceRoot } from './useWorkspaceRoot'
 import { resolvePathReference, type PathReference } from './pathReference'
@@ -40,7 +40,12 @@ export function FileReference({ reference, variant = 'chip', streaming = false }
   const conversationId = useContext(ReplyConversation)
   if (streaming) return variant === 'caption'
     ? <FilePathLabel path={reference.raw} />
-    : <code className="studio-file-reference">{reference.raw}</code>
+    : <code className="studio-file-reference">
+        <span className="inline-flex min-w-0 max-w-full items-baseline">
+          <FileTypeMark path={reference.target} className="mr-1.5 self-center" />
+          <span className="min-w-0 truncate">{reference.raw}</span>
+        </span>
+      </code>
   return <InteractiveFileReference key={`${conversationId}:${reference.raw}`} reference={reference} variant={variant} />
 }
 
@@ -49,12 +54,9 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [chosenRoot, setChosenRoot] = useState<string | null>(null)
-
   const workspaceRoot = useConversationWorkspaceRoot()
 
-  const resolved = resolvePathReference(reference, workspaceRoot ?? chosenRoot)
-  const canChooseRoot = isTauri() && reference.kind === 'relative' && workspaceRoot === null && chosenRoot === null
+  const resolved = resolvePathReference(reference, workspaceRoot)
   const { name, dir } = splitFilePath(reference.raw)
   // The chip keeps the reference in the order the reply wrote it - it sits
   // mid-sentence, and reordering the words ("chart.png workspace") would
@@ -78,7 +80,7 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
       : reference.kind === 'unix'
         ? 'That path is not available on this computer.'
         : resolved === null
-          ? 'The folder this relative path belongs to is not known here.'
+          ? 'Folder unknown.'
           : null
 
   // The full path the panel shows and copies: resolved where it can be,
@@ -106,16 +108,6 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
       },
     )
   }
-  const chooseRoot = () => {
-    if (busy) return
-    setBusy(true)
-    setError(null)
-    void pickDirectory().then(
-      (path) => { setChosenRoot(path); setBusy(false) },
-      () => { setError('The folder picker could not be opened.'); setBusy(false) },
-    )
-  }
-
   // `chip` is the inline-code presentation, a `code` element so the existing
   // prose styling keeps applying; `caption` is the block header's, where a
   // chip inside the frame would be a box in a box. One component, two
@@ -124,7 +116,7 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
   return (
     <Wrapper className={variant === 'caption' ? 'inline-flex min-w-0 max-w-full' : 'studio-file-reference'}>
       <Popover inline open={open} onOpenChange={setOpen}
-        className="max-w-[min(24rem,calc(100vw-1rem))] p-1"
+        maxWidth="18rem"
         trigger={
           <span className="inline-flex min-w-0 max-w-full items-baseline gap-1.5">
             <button type="button" aria-haspopup="menu" aria-expanded={open}
@@ -137,6 +129,7 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
                 </>
               ) : (
                 <>
+                  <FileTypeMark path={reference.target} className="mr-1.5 self-center" />
                   {head !== null ? <span className="min-w-0 truncate font-normal text-muted-foreground">{head}</span> : null}
                   <span className="min-w-0 truncate">{tail}</span>
                 </>
@@ -144,6 +137,7 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
             </button>
             {unavailable === null ? (
               <button type="button" aria-label={`Show ${reference.raw} in File Explorer`} disabled={busy} aria-busy={busy}
+                title="Open folder in File Explorer"
                 className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center self-center rounded-xs text-muted-foreground transition-colors duration-fast outline-none hover:bg-tint hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={reveal}>
                 <Icons.projectOpen size="xs" />
@@ -152,7 +146,7 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
           </span>
         }>
         <div className="flex min-w-0 flex-col gap-2 p-1.5">
-          <p className="min-w-0 select-text break-all rounded-xs bg-muted px-2 py-1.5 font-mono text-caption text-foreground">{fullPath}</p>
+          <p className="max-h-24 min-w-0 select-text overflow-auto break-all rounded-xs bg-muted px-2 py-1.5 font-mono text-caption text-foreground">{fullPath}</p>
           {reference.line !== null ? (
             <p className="text-caption text-muted-foreground">
               Line {reference.line}{reference.column !== null ? `, column ${reference.column}` : ''}
@@ -161,18 +155,13 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
           {error !== null ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
           {unavailable !== null ? <p className="text-caption text-muted-foreground">{unavailable}</p> : null}
           <div className="flex flex-wrap items-center gap-1.5">
-            <Button role="menuitem" size="xs" variant="secondary" onClick={copy}>
-              {copied ? 'Copied' : 'Copy path'}
-            </Button>
+            <IconButton role="menuitem" size="sm" label={copied ? 'Copied' : 'Copy path'} active={copied} onClick={copy}>
+              {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
+            </IconButton>
             {unavailable === null ? (
-              <Button role="menuitem" size="xs" variant="primary" busy={busy} onClick={reveal}>
-                Show in File Explorer
-              </Button>
-            ) : null}
-            {canChooseRoot ? (
-              <Button role="menuitem" size="xs" variant="secondary" busy={busy} onClick={chooseRoot}>
-                Choose base folder
-              </Button>
+              <IconButton role="menuitem" size="sm" label="Open folder in File Explorer" disabled={busy} onClick={reveal}>
+                <Icons.projectOpen size="sm" />
+              </IconButton>
             ) : null}
           </div>
         </div>

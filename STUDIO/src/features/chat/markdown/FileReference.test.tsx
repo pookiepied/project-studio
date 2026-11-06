@@ -54,6 +54,29 @@ function panel() {
 }
 
 describe('a file reference chip', () => {
+  it.each(['workspace/flower.png', 'src/app.ts', 'tools/setup.exe'])(
+    'shows a file-type mark on the inline reference %s', (path) => {
+      render(<FileReference reference={reference(path)} />)
+      expect(label(path).firstElementChild?.classList.contains('studio-icon')).toBe(true)
+    },
+  )
+
+  it('uses icon actions for copying and opening the folder without launching the file', async () => {
+    mocks.desktop = true
+    mocks.reveal.mockResolvedValue(undefined)
+    const writeText = stubClipboard()
+    render(<FileReference reference={reference('C:\\Proj\\setup.exe')} />)
+    fireEvent.click(label('C:\\Proj\\setup.exe'))
+    const copy = panel().getByRole('menuitem', { name: 'Copy path' })
+    const folder = panel().getByRole('menuitem', { name: 'Open folder in File Explorer' })
+    expect(copy.textContent).toBe('')
+    expect(folder.textContent).toBe('')
+    fireEvent.click(copy)
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('C:\\Proj\\setup.exe'))
+    fireEvent.click(folder)
+    await waitFor(() => expect(mocks.reveal).toHaveBeenCalledWith('C:\\Proj\\setup.exe'))
+  })
+
   it('keeps the reference as written and opens the panel with the resolved path', () => {
     const { container } = render(
       <FileReference reference={reference('C:\\Proj\\app.ts:42:7')} />,
@@ -94,7 +117,7 @@ describe('a file reference chip', () => {
     // The verbs that still work are still there: a missing path takes away
     // nothing except the navigation that failed.
     expect(panel().getByRole('menuitem', { name: 'Copy path' })).toBeTruthy()
-    expect(panel().getByRole('menuitem', { name: 'Show in File Explorer' })).toBeTruthy()
+    expect(panel().getByRole('menuitem', { name: 'Open folder in File Explorer' })).toBeTruthy()
   })
 
   it('does not claim a desktop it does not have', async () => {
@@ -105,7 +128,7 @@ describe('a file reference chip', () => {
     expect(screen.queryByRole('button', { name: 'Show C:\\Proj\\app.ts in File Explorer' })).toBeNull()
     fireEvent.click(label('C:\\Proj\\app.ts'))
     expect(panel().getByText('Opening File Explorer needs the Studio desktop app.')).toBeTruthy()
-    expect(panel().queryByRole('menuitem', { name: 'Show in File Explorer' })).toBeNull()
+    expect(panel().queryByRole('menuitem', { name: 'Open folder in File Explorer' })).toBeNull()
     fireEvent.click(panel().getByRole('menuitem', { name: 'Copy path' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('C:\\Proj\\app.ts'))
   })
@@ -134,52 +157,57 @@ describe('a file reference chip', () => {
     mocks.desktop = true
     render(<FileReference reference={reference('docs/readme.md')} />)
     fireEvent.click(label('docs/readme.md'))
-    expect(panel().getByText('The folder this relative path belongs to is not known here.')).toBeTruthy()
+    expect(panel().getByText('Folder unknown.')).toBeTruthy()
     expect(panel().getByText('docs/readme.md')).toBeTruthy()
+    expect(panel().getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))).toEqual(['Copy path'])
   })
 
-  it('lets a person choose a base folder when the conversation has none', async () => {
+  it('opens Explorer directly once the conversation workspace is known', async () => {
     mocks.desktop = true
-    mocks.pickDirectory.mockResolvedValue('C:\\Chosen Folder')
     mocks.reveal.mockResolvedValue(undefined)
-    render(<FileReference reference={reference('docs/readme.md')} />)
+    const view = render(<FileReference reference={reference('docs/readme.md')} />)
     fireEvent.click(label('docs/readme.md'))
-    fireEvent.click(panel().getByRole('menuitem', { name: 'Choose base folder' }))
-    await waitFor(() => expect(panel().getByText('C:\\Chosen Folder\\docs\\readme.md')).toBeTruthy())
+    expect(panel().queryByRole('menuitem', { name: 'Open folder in File Explorer' })).toBeNull()
+    mocks.workspaceRoot = 'C:\\Workspace Folder'
+    view.rerender(<FileReference reference={reference('docs/readme.md')} />)
+    expect(panel().getByText('C:\\Workspace Folder\\docs\\readme.md')).toBeTruthy()
     expect(mocks.reveal).not.toHaveBeenCalled()
-    fireEvent.click(panel().getByRole('menuitem', { name: 'Show in File Explorer' }))
-    await waitFor(() => expect(mocks.reveal).toHaveBeenCalledWith('C:\\Chosen Folder\\docs\\readme.md'))
+    fireEvent.click(panel().getByRole('menuitem', { name: 'Open folder in File Explorer' }))
+    await waitFor(() => expect(mocks.reveal).toHaveBeenCalledWith('C:\\Workspace Folder\\docs\\readme.md'))
+    expect(mocks.pickDirectory).not.toHaveBeenCalled()
   })
 
-  it('keeps an unresolved reference unchanged when the folder picker is cancelled', async () => {
+  it('copies an unresolved reference without opening a folder picker', async () => {
     mocks.desktop = true
-    mocks.pickDirectory.mockResolvedValue(null)
+    const writeText = stubClipboard()
     render(<FileReference reference={reference('docs/readme.md')} />)
     fireEvent.click(label('docs/readme.md'))
-    fireEvent.click(panel().getByRole('menuitem', { name: 'Choose base folder' }))
-    await waitFor(() => expect(mocks.pickDirectory).toHaveBeenCalledTimes(1))
-    expect(panel().queryByRole('menuitem', { name: 'Show in File Explorer' })).toBeNull()
+    fireEvent.click(panel().getByRole('menuitem', { name: 'Copy path' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('docs/readme.md'))
+    expect(panel().queryByRole('menuitem', { name: 'Open folder in File Explorer' })).toBeNull()
+    expect(mocks.pickDirectory).not.toHaveBeenCalled()
     expect(mocks.reveal).not.toHaveBeenCalled()
   })
 
-  it('does not carry a chosen base folder into another conversation', async () => {
+  it('does not carry a workspace folder into another conversation', () => {
     mocks.desktop = true
-    mocks.pickDirectory.mockResolvedValue('C:\\Chosen')
+    mocks.workspaceRoot = 'C:\\First Workspace'
     const view = render(<ReplyConversation.Provider value="one"><FileReference reference={reference('docs/readme.md')} /></ReplyConversation.Provider>)
     fireEvent.click(label('docs/readme.md'))
-    fireEvent.click(panel().getByRole('menuitem', { name: 'Choose base folder' }))
-    await waitFor(() => expect(panel().getByText('C:\\Chosen\\docs\\readme.md')).toBeTruthy())
+    expect(panel().getByText('C:\\First Workspace\\docs\\readme.md')).toBeTruthy()
+    mocks.workspaceRoot = null
     view.rerender(<ReplyConversation.Provider value="two"><FileReference reference={reference('docs/readme.md')} /></ReplyConversation.Provider>)
     expect(screen.queryByRole('button', { name: /File Explorer/ })).toBeNull()
   })
 
-  it('reports a folder picker failure without losing the copy action', async () => {
+  it('reports an Explorer failure without losing the copy action', async () => {
     mocks.desktop = true
-    mocks.pickDirectory.mockRejectedValue(new Error('OS failure with private path'))
+    mocks.workspaceRoot = 'C:\\Workspace'
+    mocks.reveal.mockRejectedValue(new Error('OS failure with private path'))
     render(<FileReference reference={reference('docs/readme.md')} />)
     fireEvent.click(label('docs/readme.md'))
-    fireEvent.click(panel().getByRole('menuitem', { name: 'Choose base folder' }))
-    expect((await screen.findByRole('alert')).textContent).toBe('The folder picker could not be opened.')
+    fireEvent.click(panel().getByRole('menuitem', { name: 'Open folder in File Explorer' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('File Explorer could not be opened.')
     expect(panel().getByRole('menuitem', { name: 'Copy path' })).toBeTruthy()
   })
 
@@ -188,7 +216,7 @@ describe('a file reference chip', () => {
     const { container } = render(<FileReference reference={reference(longPath)} />)
     fireEvent.click(label(longPath))
     const surface = screen.getByRole('menu')
-    expect(surface.className).toContain('max-w-[min(24rem,calc(100vw-1rem))]')
+    expect(surface.style.maxWidth).toMatch(/^min\(18rem, \d+px\)$/)
     expect(panel().getByText(longPath).className).toContain('break-all')
     fireEvent.keyDown(document, { key: 'Escape' })
     // The dismissal is the trigger's state change; the panel's exit animation
@@ -200,8 +228,10 @@ describe('a file reference chip', () => {
     const view = render(<Markdown text={'Saved to `C:\\Proj\\chart.png`.'} streaming />)
     expect(view.container.querySelector('button[aria-haspopup="menu"]')).toBeNull()
     expect(view.container.querySelector('code.studio-file-reference')?.textContent).toBe('C:\\Proj\\chart.png')
+    expect(view.container.querySelector('code.studio-file-reference svg.lucide-photo-rounded')).not.toBeNull()
     view.rerender(<Markdown text={'Saved to `C:\\Proj\\chart.png`.'} />)
     expect(view.container.querySelector('button[aria-haspopup="menu"]')).not.toBeNull()
+    expect(view.container.querySelector('code.studio-file-reference svg.lucide-photo-rounded')).not.toBeNull()
     // Streaming rendered the chip many times; none of it may have asked the
     // desktop for anything.
     expect(mocks.reveal).not.toHaveBeenCalled()

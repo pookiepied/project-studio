@@ -236,9 +236,7 @@ export async function openConversationWindow(
  * person a quiet nothing on cancel, because changing your mind after opening
  * a dialog is the most common outcome it has, not a failure.
  *
- * Project creation and an unresolved relative file reference both ask the
- * person to choose a folder. The existing `dialog:allow-open` grant permits
- * only the picker; selecting a base folder never reveals a file automatically.
+ * Project creation uses the picker to set its workspace folder.
  */
 export async function pickDirectory(): Promise<string | null> {
   if (!isTauri()) return null
