@@ -525,7 +525,8 @@ export function Composer({
   // Idle is a composer with nothing in it and nobody at it.
   const active = fieldFocused || fieldAside || stacked || text.length > 0
   const bubble = active && !stacked
-  const room = bubble ? { left: inset.left, right: inset.right + ACTIVE_INSET } : inset
+  const besideDock = { left: inset.left, right: inset.right + ACTIVE_INSET }
+  const room = bubble ? besideDock : inset
 
   /**
    * Reads the picker's haul into the strip: rules first, then bytes. The
@@ -955,7 +956,11 @@ export function Composer({
                 }}
                 multiline={multiline}
                 stacked={stacked}
-                inset={room}
+                // Always this width, never `room`, which widens once the box
+                // has merged the dock back. Judged at both, a line that wraps
+                // on one and fits on the other flips between the arrangements
+                // without end, and React takes the app down with it.
+                inset={besideDock}
                 placeholder={placeholder}
               />
             </div>

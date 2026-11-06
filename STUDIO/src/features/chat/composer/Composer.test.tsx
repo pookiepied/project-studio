@@ -118,6 +118,24 @@ describe('idle and active', () => {
     expect(frame(container)?.getAttribute('data-active')).toBe('false')
   })
 
+  it('settles on a line that wraps beside the dock but would fit in the box', () => {
+    // The box gives text more room than the row with the dock does. Judged at
+    // each one's own width, this line wraps, goes to the box, fits, goes back,
+    // and wraps again, until React gives up and takes the app down.
+    const lane = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600)
+    const height = vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {
+      return Number.parseFloat(this.style.width) < 565 ? 40 : 20
+    })
+    try {
+      const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
+      type('A line right on the edge of wrapping')
+      expect(frame(container)?.getAttribute('data-stacked')).toBe('true')
+    } finally {
+      lane.mockRestore()
+      height.mockRestore()
+    }
+  })
+
   it('paints the voice dock in the filtered layer, with the controls outside it', () => {
     const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
     const surface = container.querySelector('[data-composer-surface]')
