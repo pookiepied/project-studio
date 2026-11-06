@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Icons } from '@/components/icons'
+import { ShowMoreButton } from '@/components/primitives'
 import { Markdown } from '@/features/chat/markdown'
 
 /** Height cap while collapsed, in px. Roughly nine lines. */
@@ -109,14 +109,8 @@ export function CollapsibleText({ text }: { text: string }) {
       </div>
 
       {overflowing ? (
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="mt-1.5 inline-flex items-center gap-1 self-start text-caption text-muted-foreground transition-colors hover:text-foreground"
-        >
-          {expanded ? 'Show less' : 'Show more'}
-          <Icons.disclosure state={expanded ? 'on' : 'rest'} />
-        </button>
+        <ShowMoreButton expanded={expanded} onToggle={() => setExpanded((value) => !value)}
+          lessLabel="Show less" className="mt-1.5 self-start" />
       ) : null}
     </div>
   )

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
+import { ShowMoreButton } from '@/components/primitives'
 import { WorkingDots } from '@/components/state'
 import { AnimatedItem, AnimatedList } from '@/features/artifacts/ArtifactMotion'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
@@ -171,7 +172,7 @@ function StepBody({ step, indented = false }: { step: ResearchStep; indented?: b
 function SearchBody({ step, className }: { step: SearchStep; className?: string }) {
   const [open, setOpen] = useState(false)
   const shown = open ? step.hits : step.hits.slice(0, HITS_SHOWN)
-  const hidden = step.hits.length - shown.length
+  const hidden = step.hits.length - HITS_SHOWN
   const done = step.status === 'done'
 
   return (
@@ -192,14 +193,9 @@ function SearchBody({ step, className }: { step: SearchStep; className?: string 
           </AnimatedItem>
         ))}
       </AnimatedList>
-      {hidden > 0 || (open && step.hits.length > HITS_SHOWN) ? (
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="mt-0.5 self-start rounded-md px-1.5 py-1 text-caption text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-        >
-          {open ? 'Show fewer' : `Show ${String(hidden)} more`}
-        </button>
+      {hidden > 0 ? (
+        <ShowMoreButton expanded={open} onToggle={() => setOpen((value) => !value)}
+          moreLabel={`Show ${String(hidden)} more`} className="mt-2 self-start" />
       ) : null}
     </div>
   )

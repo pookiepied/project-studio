@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
+import { ShowMoreButton } from '@/components/primitives'
+import { SiteMark } from '@/features/artifacts/kinds/SiteMark'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 
@@ -122,15 +124,18 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
                   <a href={source.url} target="_blank" rel="noreferrer noopener"
                     className="block truncate hover:underline" title={source.title}>{source.title}</a>
                 </td>
-                <td className="truncate py-1.5 pl-3 text-muted-foreground" title={hostOf(source.url)}>{hostOf(source.url)}</td>
+                <td className="py-1.5 pl-3 text-muted-foreground">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <SiteMark href={source.url} />
+                    <span className="min-w-0 truncate" title={hostOf(source.url)}>{hostOf(source.url)}</span>
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {extra > 0 ? <button type="button" onClick={() => setShowAll((value) => !value)}
-          className="rounded-md py-0.5 text-caption text-muted-foreground hover:text-foreground hover:underline">
-          {showAll ? 'Show fewer' : `Show ${String(extra)} more`}
-        </button> : null}
+        {extra > 0 ? <ShowMoreButton expanded={showAll} onToggle={() => setShowAll((value) => !value)}
+          moreLabel={`Show ${String(extra)} more`} className="mt-2" /> : null}
       </div> : null}
     </ToolResultPanel>
   </DisclosureRow>

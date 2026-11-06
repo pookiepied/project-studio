@@ -140,8 +140,11 @@ describe('the chip is the default', () => {
     expect(screen.getByRole('columnheader', { name: 'Page' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Fetched article/ }).getAttribute('href')).toBe('https://example.com/article')
     expect(screen.queryByText('Long page text')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Show 1 more' }))
+    const showMore = screen.getByRole('button', { name: 'Show 1 more' })
+    expect(showMore.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(showMore)
     expect(screen.getByRole('link', { name: /Result 4/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show fewer' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   it('renders every call as its own row, with no count line in front', () => {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
+import { ShowMoreButton } from '@/components/primitives'
 import { FileTypeMark } from '@/components/icons/fileTypes'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 import { recordedChanges, type RecordedChange } from '@/features/changes/recordedChanges'
@@ -67,9 +68,9 @@ function ChangedFiles({ changes, conversationId, resultId }: {
         </button>
       </li>)}
     </ul>
-    {changes.length > 3 ? <button type="button" aria-expanded={all} onClick={() => setAll((value) => !value)} className="mt-2 text-muted-foreground hover:text-foreground">
-      {all ? 'Show fewer files' : `Show ${changes.length - 3} more ${changes.length === 4 ? 'file' : 'files'}`}
-    </button> : null}
+    {changes.length > 3 ? <ShowMoreButton expanded={all} onToggle={() => setAll((value) => !value)}
+      moreLabel={`Show ${changes.length - 3} more ${changes.length === 4 ? 'file' : 'files'}`}
+      lessLabel="Show fewer files" className="mt-2" /> : null}
   </section>
 }
 
