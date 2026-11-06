@@ -94,6 +94,7 @@ export function ComposerField({
   onMultilineChange,
   onPaste,
   multiline,
+  expanded = multiline,
   inset,
   placeholder,
   handleRef,
@@ -111,11 +112,11 @@ export function ComposerField({
    */
   onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
   /**
-   * Whether the frame currently holds the footer arrangement. The field is
-   * wider there than beside the controls, and the decision has to stay
-   * consistent across that difference — see `remeasure`.
+   * Whether the draft needs the footer arrangement even after blur.
    */
   multiline: boolean
+  /** The actual arrangement, which can also expand on focus. */
+  expanded?: boolean
   /** The room the clusters take on either side while they sit beside the field. */
   inset: { readonly left: number; readonly right: number }
   placeholder: string
@@ -165,8 +166,8 @@ export function ComposerField({
     // the capsule, wrap again, and keep going. One width makes the choice
     // stable - the footer leaves exactly when the line fits where the
     // capsule will put it.
-    const natural = measure(element, multiline ? full : beside)
-    const decisive = multiline ? measure(element, beside) : natural
+    const natural = measure(element, expanded ? full : beside)
+    const decisive = expanded ? measure(element, beside) : natural
 
     // One line plus a pixel of slack, rather than comparing to a hardcoded
     // height: the line box changes with the user's text-size preference.
@@ -197,7 +198,7 @@ export function ComposerField({
       committed.current = clamped
       element.style.height = `${clamped}px`
     }
-  }, [inset.left, inset.right, multiline, onMultilineChange])
+  }, [expanded, inset.left, inset.right, multiline, onMultilineChange])
 
   // `value` is the trigger, not an input: the measurement reads the element,
   // which has already re-rendered with the new text by the time this runs.
@@ -266,7 +267,7 @@ export function ComposerField({
         // the app, in the largest control in the app.
         'text-ui text-foreground outline-none placeholder:text-muted-foreground/70',
         'px-1',
-        multiline ? 'studio-composer-scroll py-1' : 'py-0',
+        expanded ? 'studio-composer-scroll py-1' : 'py-0',
       )}
     />
   )

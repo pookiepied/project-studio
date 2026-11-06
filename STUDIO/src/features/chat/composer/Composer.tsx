@@ -88,7 +88,7 @@ function ComposerDockSurface({ expanded }: { expanded: boolean }) {
         </defs>
       </svg>
       <div className={cn('absolute inset-0 transition-opacity duration-slow ease-[var(--ease-out-quint)]',
-        expanded ? 'opacity-[0.055]' : 'opacity-0')} style={{ filter: `url("#${filterId}")` }}>
+        expanded ? 'opacity-[0.09]' : 'opacity-0')} style={{ filter: `url("#${filterId}")` }}>
         <div className={cn('absolute inset-y-px left-0 right-[47%] origin-right rounded-full bg-foreground transition-transform duration-slow ease-[var(--ease-out-quint)]',
           expanded ? 'scale-x-100' : 'scale-x-25')} />
         <div className={cn('absolute inset-y-px left-[47%] right-0 origin-left rounded-full bg-foreground transition-transform duration-slow ease-[var(--ease-out-quint)]',
@@ -426,6 +426,7 @@ export function Composer({
   const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) &&
     !sending && pendingAttachments === 0 && (!turnRunning || onQueue !== undefined)
   const dictating = dictation.stage !== 'idle'
+  const expanded = focused || multiline || dictating || landing !== null
 
   /**
    * Reads the picker's haul into the strip: rules first, then bytes. The
@@ -601,7 +602,10 @@ export function Composer({
     <div
       ref={frame}
       data-composer-frame
-      onFocusCapture={() => setFocused(true)}
+      data-expanded={expanded}
+      onFocusCapture={(event) => {
+        if (event.target instanceof HTMLTextAreaElement) setFocused(true)
+      }}
       onBlurCapture={(event) => {
         if (event.currentTarget.contains(event.relatedTarget)) return
         setFocused(false)
@@ -627,53 +631,13 @@ export function Composer({
         // one that silently disagreed: the field measured 52 while the token
         // said what it should be.
         paddingBlock: COMPOSER.paddingBlock,
-        borderRadius: multiline ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
+        borderRadius: expanded ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
         transitionDuration: `${DURATION.slow}s`,
         transitionTimingFunction: `cubic-bezier(${EASE_OUT.join(', ')})`,
       }}
       className={cn(
         'relative bg-surface-raised',
-        // The field breathes on focus: a little taller, lifted a little further
-        // off the page. Both are small enough to register without being watched
-        // — the point is that the surface acknowledges the caret arriving, not
-        // that it performs. A control this central looking identical whether or
-        // not it is ready for typing is the specific thing that made the page
-        // read as a picture of an app rather than one you are using.
-        // One height, always the taller one.
-        //
-        // The field used to grow on focus. It was the right instinct and the
-        // wrong mechanism: the control at the centre of the page changing size
-        // when the caret arrives means the page reflows every time you click
-        // into it, and on paste the height and the radius resolved a frame
-        // apart, which is what read as the composer changing shape and
-        // correcting itself. The roomier size was better in both states, so it
-        // is simply the size now. Focus is still acknowledged — by the shadow,
-        // which costs no layout.
-        // Both properties, or the radius does not animate at all: naming only
-        // `box-shadow` sets `transition-property` to exactly that, so the
-        // capsule-to-box change snapped a frame after the field had already
-        // grown. That mismatch — height first, shape a frame later — is what
-        // read as the composer changing shape and correcting itself on paste.
         'transition-[box-shadow,border-radius,padding]',
-        // Both properties, or the radius does not animate at all: naming only
-        // `box-shadow` sets `transition-property` to exactly that, so the
-        // capsule-to-box change snapped a frame after the field had already
-        // grown. That mismatch — height first, shape a frame later — is what
-        // read as the composer changing shape and correcting itself on paste.
-        // Two steps of the shared elevation scale rather than three hand-mixed
-        // shadows. The third of those was the bug: `dark:shadow-[...]` had no
-        // `focused` condition, so in dark mode it overrode *both* branches and
-        // the field stopped lifting on focus entirely — the breathing worked in
-        // light mode only. The scale carries its own dark values, so there is
-        // nothing left here to get out of step.
-        //
-        // The lift is this surface's whole focus treatment, on purpose. Fields
-        // elsewhere answer focus with a darkened border and nothing else; the
-        // composer is a surface, not a control among other controls, and the
-        // docblock above is explicit about why a drawn edge would read this
-        // object as an input. Two registers, then — an edge for a field,
-        // elevation for a surface — decided once here, not two components
-        // disagreeing.
         focused ? 'shadow-lifted' : 'shadow-raised',
       )}
     >
@@ -760,7 +724,7 @@ export function Composer({
           rows, so nothing has to appear or vanish. On one line the second
           track is zeroed and the clusters sit in the side columns with the
           field between them: the capsule, exactly the height its tokens say,
-          everything on a single row. Past the first line the field takes the
+          everything on a single row. On focus or with a longer draft, the field takes the
           first row across all three columns and both clusters drop into the
           second track, a footer along the bottom of the frame — the text then
           wraps the full width of the field, and no line of it reaches the row
@@ -770,7 +734,7 @@ export function Composer({
 
           A grid rather than the row re-rendered two ways: the controls never
           move in the DOM, so nothing remounts and an open menu stays open, and
-          the relocation hangs off the same `multiline` signal that reshapes
+          the relocation hangs off the same `expanded` signal that reshapes
           the frame — the capsule-to-box radius and the footer cannot
           disagree about which state the field is in.
 
@@ -792,19 +756,19 @@ export function Composer({
           one via the global media query. */}
       <div
         style={{
-          gridTemplateRows: multiline ? FOOTER_TRACK : 'auto 0px',
+          gridTemplateRows: expanded ? FOOTER_TRACK : 'auto 0px',
           transition: TRACK_TRANSITION,
         }}
         className="relative isolate grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0"
       >
-        <ComposerDockSurface expanded={multiline} />
+        <ComposerDockSurface expanded={expanded} />
         <motion.div
           ref={leftCluster}
           layout="position"
           transition={SHAPE_MOTION}
           className={cn(
             'col-start-1 flex items-center gap-1',
-            multiline ? 'row-start-2 self-end' : 'row-start-1',
+            expanded ? 'row-start-2 self-end' : 'row-start-1',
           )}
         >
           {/* The image picker is this menu's one live item: the dialog it
@@ -827,9 +791,9 @@ export function Composer({
           data-composer-slot
           className="col-start-1 col-span-3 row-start-1 min-w-0"
           style={{
-            paddingLeft: multiline ? 0 : inset.left,
-            paddingRight: multiline ? 0 : inset.right,
-            paddingTop: multiline ? 4 : 0,
+            paddingLeft: expanded ? 0 : inset.left,
+            paddingRight: expanded ? 0 : inset.right,
+            paddingTop: expanded ? 4 : 0,
             transition: INSET_TRANSITION,
           }}
         >
@@ -891,6 +855,7 @@ export function Composer({
                     ingestFiles(files)
                   }}
                   multiline={multiline}
+                  expanded={expanded}
                   inset={inset}
                   placeholder={placeholder}
                 />
@@ -905,7 +870,7 @@ export function Composer({
           transition={SHAPE_MOTION}
           className={cn(
             'relative flex items-center gap-1',
-            multiline ? 'col-start-3 row-start-2 self-end' : 'col-start-3 row-start-1',
+            expanded ? 'col-start-3 row-start-2 self-end' : 'col-start-3 row-start-1',
           )}
         >
           {/* Dictation sits in the field, not in the plus menu.
