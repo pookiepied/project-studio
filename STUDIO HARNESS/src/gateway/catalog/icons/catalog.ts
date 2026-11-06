@@ -1,3 +1,4 @@
+import { isRetiredProvider } from "../../retired-providers.js";
 import type { IconCache } from "./cache.js";
 import { VALID_ID, normalizeId, type IconSource } from "./source.js";
 
@@ -54,7 +55,7 @@ export class ProviderIconCatalog {
    */
   async get(id: string): Promise<string | undefined> {
     const key = normalizeId(id);
-    if (key.length === 0 || !VALID_ID.test(key)) return undefined;
+    if (key.length === 0 || !VALID_ID.test(key) || isRetiredProvider(key)) return undefined;
 
     const hit = this.#resolved.get(key);
     if (hit !== undefined) return hit;

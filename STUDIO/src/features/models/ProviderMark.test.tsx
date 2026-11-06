@@ -95,6 +95,36 @@ describe('the tile', () => {
 })
 
 describe('the real logo', () => {
+  it.each([
+    'baseten', 'cerebras', 'cloudflare-workers-ai', 'fireworks', 'groq', 'minimax', 'nvidia',
+  ])('bundles the %s color logo', (provider) => {
+    const { container } = render(<ProviderMark provider={provider} />)
+    expect(container.querySelector('img[data-mark="logo"]')?.getAttribute('src')).toMatch(
+      /^(?:data:image\/|\/src\/features\/models\/marks\/)/,
+    )
+  })
+
+  it.each(['moonshotai', 'openai', 'xai', 'x-ai', 'zai', 'z-ai'])(
+    'bundles the %s logo as a theme-colored mask',
+    (provider) => {
+      const { container } = render(<ProviderMark provider={provider} />)
+      const mark = container.querySelector<HTMLElement>('span[data-mark="logo"]')
+      expect(mark?.style.maskImage).toContain('data:image/svg+xml')
+      expect(mark?.style.backgroundColor).toBe('currentcolor')
+    },
+  )
+
+  it('uses the same OpenCode marks for Go while keeping their ids distinct', () => {
+    const { container, rerender } = render(<ProviderMark provider="opencode" />)
+    const standard = [...container.querySelectorAll<HTMLImageElement>('img[data-provider="opencode"]')]
+    expect(standard).toHaveLength(2)
+    expect(standard[0]?.src).not.toBe(standard[1]?.src)
+
+    rerender(<ProviderMark provider="opencode-go" />)
+    const go = [...container.querySelectorAll<HTMLImageElement>('img[data-provider="opencode-go"]')]
+    expect(go.map((image) => image.src)).toEqual(standard.map((image) => image.src))
+  })
+
   it('uses the local Google and Claude colors and the theme for OpenAI', () => {
     const { container, rerender } = render(<ProviderMark provider="google" />)
     expect(container.querySelector('img[data-provider="google"]')).not.toBeNull()

@@ -15,7 +15,6 @@
     { "id": "nvidia", "kind": "language", "enabled": true },
     { "id": "openrouter", "kind": "language", "enabled": true },
     { "id": "cloudflare-workers-ai", "kind": "language", "enabled": true },
-    { "id": "github-copilot", "kind": "language", "enabled": true },
     { "id": "opencode", "kind": "language", "enabled": true },
     { "id": "opencode-go", "kind": "language", "enabled": true },
     { "id": "minimax", "kind": "language", "enabled": true },

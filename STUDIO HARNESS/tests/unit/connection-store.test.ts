@@ -18,6 +18,7 @@ import {
 import { customProviderEnvVar } from "../../src/gateway/language/local/runtime.js";
 import {
   ConnectionStore,
+  readStoredConnections,
 } from "../../src/gateway/connections/connection-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
@@ -81,6 +82,26 @@ afterEach(async () => {
 });
 
 describe("provider connection store", () => {
+  it("hides a saved Copilot connection and rejects new keys without changing the stored key", async () => {
+    const id = "copilot-work";
+    const key = { scope: "provider-connection", id } as const;
+    const record = { ...draft(id), catalogProvider: "github-copilot" };
+    db.prepare("INSERT INTO provider_connection_record (id, record_json, updated_at) VALUES (?, ?, ?)")
+      .run(id, JSON.stringify(record), Date.now());
+    await credentials.set(key, "existing-key");
+
+    expect(await store.list()).toEqual([]);
+    expect(await store.get(id)).toBeUndefined();
+    expect(readStoredConnections(db)).toEqual([]);
+    await expect(store.update(id, { apiKey: "replacement-key" })).rejects.toThrow(ProviderConfigurationError);
+    await expect(store.add(draft("github-copilot", "new-key"))).rejects.toThrow(/no longer supported/);
+    await expect(store.add({ ...draft("copilot-other", "new-key"), catalogProvider: "github-copilot" }))
+      .rejects.toThrow(/no longer supported/);
+    expect(await credentials.get(key)).toBe("existing-key");
+    expect(await credentials.get({ scope: "provider-connection", id: "github-copilot" })).toBeNull();
+    expect(db.prepare("SELECT id FROM provider_connection_record WHERE id = ?").get(id)).toBeDefined();
+  });
+
   it("returns an added connection from list and get", async () => {
     const added = await store.add(draft());
 

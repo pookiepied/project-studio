@@ -17,6 +17,43 @@ import {
 } from "../../src/gateway/language/local/runtime.js";
 
 describe("model specifiers", () => {
+  it("keeps GitHub Copilot out of the runtime even if saved settings still name it", async () => {
+    const credentials = new PiCredentialStore(new InMemoryCredentialStore());
+    const provider = "github-copilot";
+    const baseUrl = "https://example.test/v1";
+    const api = "openai-completions";
+    const model = {
+      id: "gpt-4o",
+      contextWindow: undefined,
+      maxTokens: undefined,
+      reasoningLevels: [],
+    };
+    const runtime = createLocalRuntime({
+      credentials,
+      config: {
+        defaultProvider: provider,
+        defaultModel: model.id,
+        customProviders: [{
+          id: provider,
+          name: provider,
+          api,
+          baseUrl,
+          models: [model],
+          contextWindow: undefined,
+          maxTokens: undefined,
+        }],
+        extraModels: [{ provider, api, baseUrl, models: [{ ...model, name: model.id }] }],
+      },
+    });
+
+    expect(runtime.target()).toBeUndefined();
+    expect(runtime.models.getProvider(provider)).toBeUndefined();
+    expect(runtime.models.getModel(provider, model.id)).toBeUndefined();
+    expect(await runtime.models.getAuth(provider)).toBeUndefined();
+    expect(runtime.listModels().some((entry) => entry.provider === provider)).toBe(false);
+    expect(runtime.models.getProvider("openai")).toBeDefined();
+  });
+
   it("keeps a stored Azure provider reference and its credential usable after Pi renames the provider", async () => {
     const secrets = new InMemoryCredentialStore();
     const credentials = new PiCredentialStore(secrets);

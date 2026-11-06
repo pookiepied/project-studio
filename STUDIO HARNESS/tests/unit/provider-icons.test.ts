@@ -89,6 +89,17 @@ function build(stub: { fetcher: Fetcher }, cacheDir: string, now: () => number =
 const temp = () => mkdtempSync(join(tmpdir(), "icons-"));
 
 describe("the provider icon catalog", () => {
+  it("does not fetch a logo for a retired provider", async () => {
+    const stub = createStub({
+      modelsDev: ["github-copilot"],
+      modelsDevBodies: { "github-copilot": ANTHROPIC_MD },
+    });
+    const catalog = build(stub, temp());
+
+    expect(await catalog.get("GitHub-Copilot")).toBeUndefined();
+    expect(stub.calls).toEqual([]);
+  });
+
   it("takes the first source's answer and caches it on disk", async () => {
     const dir = temp();
     const stub = createStub({

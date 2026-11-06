@@ -13,6 +13,7 @@ import {
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
 import { REASONING_LEVELS, type ReasoningLevel } from "../../../contracts/models.js";
+import { isRetiredProvider, RETIRED_PROVIDER_IDS } from "../../retired-providers.js";
 import { API_LOADERS } from "./apis.js";
 import type {
   CustomProviderConfig,
@@ -301,6 +302,7 @@ function createModelsCollection(options: {
   readonly credentials: CredentialStore;
 }): MutableModels {
   const models = builtinModels({ credentials: options.credentials });
+  for (const id of RETIRED_PROVIDER_IDS) models.deleteProvider(id);
 
   // Pi 1.x renamed Azure's provider, but stored selections and keychain
   // entries still name the old id. An alias keeps both usable without
@@ -319,7 +321,7 @@ function createModelsCollection(options: {
 
   for (const custom of options.customProviders) {
     const load = API_LOADERS[custom.api];
-    if (!load) continue;
+    if (!load || isRetiredProvider(custom.id)) continue;
 
     models.setProvider(
       createProvider({
@@ -335,7 +337,7 @@ function createModelsCollection(options: {
 
   for (const group of options.extraModels ?? []) {
     const load = API_LOADERS[group.api];
-    if (!load || group.models.length === 0) continue;
+    if (!load || group.models.length === 0 || isRetiredProvider(group.provider)) continue;
 
     // The user's hand-entered models join the vendor's own catalog rather
     // than replacing it: re-registering the provider with only the extras

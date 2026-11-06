@@ -7,18 +7,21 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ProviderConfigurationError } from "../../src/contracts/models.js";
 import { curatedKinds, curationPath, readCuration } from "../../src/gateway/catalog/curation.js";
 import { listLibraryProviders } from "../../src/gateway/catalog/index.js";
-import { languageCatalogProviders } from "../../src/gateway/language/pi-catalog.js";
+import {
+  isLanguageCatalogProvider,
+  languageCatalogModels,
+  languageCatalogProviders,
+} from "../../src/gateway/language/pi-catalog.js";
 
 /**
  * The curation file is the whole answer to "which vendors does the library
  * offer". Three things are pinned: the shipped file is the curated list the
- * user gave on 2026-09-19 and nothing more; the library obeys it, so a
+ * user chose and nothing more; the library obeys it, so a
  * vendor Pi knows but the file disables is not offered; and a malformed or
  * missing file is a configuration error naming the path, never a silent
  * widening to everything.
  */
 
-/** The language vendors curated in on 2026-09-19 (Vercel AI Gateway went the same day). */
 const CURATED_LANGUAGE = [
   "anthropic",
   "openai",
@@ -34,7 +37,6 @@ const CURATED_LANGUAGE = [
   "nvidia",
   "openrouter",
   "cloudflare-workers-ai",
-  "github-copilot",
   "opencode",
   "opencode-go",
   "minimax",
@@ -82,6 +84,13 @@ describe("the shipped curation", () => {
 });
 
 describe("the library under the curation", () => {
+  it("does not expose the retired GitHub Copilot integration through either catalog", async () => {
+    expect((await listLibraryProviders()).map((entry) => entry.id)).not.toContain("github-copilot");
+    expect(languageCatalogProviders()).not.toContain("github-copilot");
+    expect(isLanguageCatalogProvider("github-copilot")).toBe(false);
+    expect(languageCatalogModels("github-copilot")).toEqual([]);
+  });
+
   it("offers the curated vendors and none of the disabled ones", async () => {
     const ids = (await listLibraryProviders()).map((entry) => entry.id);
     for (const id of CURATED_LANGUAGE) expect(ids).toContain(id);

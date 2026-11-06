@@ -58,7 +58,6 @@ const ALIASES: Readonly<Record<string, string>> = {
   zhipuai: "zhipu",
   moonshotai: "kimi",
   moonshot: "kimi",
-  "github-copilot": "copilot",
   togetherai: "together",
   "together-ai": "together",
   "ibm-granite": "ibm",

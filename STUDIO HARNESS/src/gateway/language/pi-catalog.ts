@@ -4,6 +4,7 @@ import * as v from "valibot";
 
 import { REASONING_LEVELS, type ReasoningLevel } from "../../contracts/models.js";
 import { languageProtocolSchema, type LanguageProtocol, type ModelPricing } from "../../contracts/providers.js";
+import { isRetiredProvider } from "../retired-providers.js";
 
 /**
  * The language gateway's catalog: Pi's own generated language models.
@@ -15,21 +16,19 @@ import { languageProtocolSchema, type LanguageProtocol, type ModelPricing } from
  * contract type, so a Pi type never leaves the language gateway.
  *
  * Pi ships one model record per model per provider, regenerated with every
- * package release, so nothing here is cached or copied - the counts this
- * module reports move with the installed package and no earlier. 35 providers
- * and 1072 language models at the version this task was built against; the
- * functions below read the live package rather than restating those numbers.
+ * package release. Studio filters retired providers at this boundary and
+ * reads the remaining catalog directly from the installed package.
  */
 
 export type PiLanguageModel = Model<Api>;
 
-/** The providers Pi's language catalog knows, straight from the package. */
+/** The providers Studio exposes from Pi's language catalog. */
 export function languageCatalogProviders(): readonly BuiltinProvider[] {
-  return getBuiltinProviders();
+  return getBuiltinProviders().filter((provider) => !isRetiredProvider(provider));
 }
 
 export function isLanguageCatalogProvider(providerId: string): boolean {
-  return getBuiltinProviders().some((provider) => provider === currentProviderId(providerId));
+  return languageCatalogProviders().some((provider) => provider === currentProviderId(providerId));
 }
 
 /** Existing connection rows keep their provider id when Pi renames it. */
@@ -40,7 +39,7 @@ function currentProviderId(providerId: string): string {
 /** Every model one provider serves, in the package's own order. */
 export function languageCatalogModels(providerId: string): readonly PiLanguageModel[] {
   const currentId = currentProviderId(providerId);
-  const known = getBuiltinProviders().find((provider) => provider === currentId);
+  const known = languageCatalogProviders().find((provider) => provider === currentId);
   if (known === undefined) return [];
   const models = getBuiltinModels(known);
   return currentId === providerId ? models : models.map((model) => ({ ...model, provider: providerId }));

@@ -19,6 +19,7 @@ import {
   type ErrorReporter,
 } from "../../observability/error-reporter.js";
 import type { StudioDatabase } from "../../storage/database.js";
+import { isRetiredProvider } from "../retired-providers.js";
 
 /**
  * Created by migration 8, not here.
@@ -83,6 +84,9 @@ export class ConnectionStore {
   async add(draft: ProviderConnectionDraft): Promise<ProviderConnection> {
     this.#validateApiKey(draft.apiKey);
     const preliminary = this.#validate(this.#draftRecord(draft, "absent"));
+    if (usesRetiredProvider(preliminary)) {
+      throw new ProviderConfigurationError("This provider is no longer supported.");
+    }
     const key = this.#credentialKey(preliminary.id);
 
     return this.#serialize(preliminary.id, async () => {
@@ -237,6 +241,7 @@ export class ConnectionStore {
       this.#reportCorrupt(rowId);
       return undefined;
     }
+    if (usesRetiredProvider(preliminary)) return undefined;
 
     let status: CredentialStatus;
     try {
@@ -555,13 +560,18 @@ export function readStoredConnections(db: StudioDatabase): readonly StoredConnec
     if ("apiKey" in fields || "credential" in fields) continue;
 
     const result = v.safeParse(providerConnectionSchema, { ...fields, credential: "absent" });
-    if (!result.success || result.output.id !== id) continue;
+    if (!result.success || result.output.id !== id || usesRetiredProvider(result.output)) continue;
     stored.push({
       connection: result.output,
       updatedAt: typeof updatedAt === "number" ? updatedAt : 0,
     });
   }
   return stored;
+}
+
+function usesRetiredProvider(connection: ProviderConnection): boolean {
+  return isRetiredProvider(connection.id) ||
+    (connection.catalogProvider !== undefined && isRetiredProvider(connection.catalogProvider));
 }
 
 /**
