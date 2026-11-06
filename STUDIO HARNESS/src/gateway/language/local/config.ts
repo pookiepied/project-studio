@@ -3,6 +3,7 @@ import * as v from "valibot";
 import { ProviderConfigurationError, reasoningLevelSchema, type ReasoningLevel } from "../../../contracts/models.js";
 import { DEFAULT_CUSTOM_API, supportedCustomApis } from "./apis.js";
 import { assertValidProviderId } from "./credential-bridge.js";
+import type { ProviderConnection, ProviderModel } from "../../../contracts/providers.js";
 
 /**
  * A provider Project Studio does not ship, described by the user.
@@ -90,9 +91,15 @@ export interface LocalModelConfig {
   readonly defaultModel: string | undefined;
   readonly customProviders: readonly CustomProviderConfig[];
   readonly extraModels: readonly ExtraProviderModelGroup[];
+  readonly connections?: readonly LocalConnectionModels[];
 }
 
 const DEFAULT_API = DEFAULT_CUSTOM_API;
+
+export interface LocalConnectionModels {
+  readonly connection: ProviderConnection;
+  readonly manualModels: readonly ProviderModel[];
+}
 
 const customProviderModelSchema = v.union([
   v.pipe(v.string(), v.minLength(1)),

@@ -11,6 +11,7 @@ import {
   type CredentialKey,
   type SecureCredentialStore,
 } from "../../../credentials/credential-store.js";
+import { connectionIdFromProvider } from "../connection-reference.js";
 
 /**
  * Presents Project Studio's OS keychain as Pi's `CredentialStore`.
@@ -51,6 +52,11 @@ export function assertValidProviderId(providerId: string): string {
   return providerId;
 }
 
+export interface ExactConnectionCredential {
+  readonly legacyProvider: string | undefined;
+  readonly readKey: () => Promise<string | undefined>;
+}
+
 export class PiCredentialStore implements CredentialStore {
   readonly #secrets: SecureCredentialStore;
   /**
@@ -63,6 +69,7 @@ export class PiCredentialStore implements CredentialStore {
   readonly #connectionKey:
     | ((providerId: string) => Promise<string | undefined>)
     | undefined;
+  readonly #exactConnection: ((id: string) => ExactConnectionCredential | undefined) | undefined;
 
   /**
    * Per-provider write serialization. Pi documents `modify` as the only write
@@ -75,12 +82,22 @@ export class PiCredentialStore implements CredentialStore {
   constructor(
     secrets: SecureCredentialStore,
     connectionKey?: (providerId: string) => Promise<string | undefined>,
+    exactConnection?: (id: string) => ExactConnectionCredential | undefined,
   ) {
     this.#secrets = secrets;
     this.#connectionKey = connectionKey;
+    this.#exactConnection = exactConnection;
   }
 
   async read(providerId: string): Promise<Credential | undefined> {
+    const connectionId = connectionIdFromProvider(providerId);
+    if (connectionId !== undefined) {
+      const connection = this.#exactConnection?.(connectionId);
+      if (connection === undefined) return undefined;
+      const key = await connection.readKey();
+      if (key !== undefined && key !== "") return { type: "api_key", key };
+      return connection.legacyProvider === undefined ? undefined : this.#read(connection.legacyProvider);
+    }
     assertValidProviderId(providerId);
     if (this.#connectionKey !== undefined) {
       const fromConnection = await this.#connectionKey(providerId);
@@ -109,17 +126,20 @@ export class PiCredentialStore implements CredentialStore {
     providerId: string,
     fn: (current: Credential | undefined) => Promise<Credential | undefined>,
   ): Promise<Credential | undefined> {
-    assertValidProviderId(providerId);
+    const connectionId = connectionIdFromProvider(providerId);
+    const storageId = assertValidProviderId(connectionId === undefined
+      ? providerId
+      : this.#exactConnection?.(connectionId)?.legacyProvider ?? providerId);
 
-    return this.#serialize(providerId, async () => {
-      const current = await this.#read(providerId);
+    return this.#serialize(storageId, async () => {
+      const current = await this.#read(storageId);
       const next = await fn(current);
 
       // Pi's contract: undefined means "leave the entry unchanged".
       if (next === undefined) return current;
 
-      await this.#writeRaw(providerId, JSON.stringify(next));
-      await this.#addToIndex(providerId);
+      await this.#writeRaw(storageId, JSON.stringify(next));
+      await this.#addToIndex(storageId);
       return next;
     });
   }

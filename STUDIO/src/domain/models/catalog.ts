@@ -31,13 +31,13 @@ import { authorOf, familyName } from './families'
  * serves someone else's model under a bare id, the connection's vendor
  * otherwise.
  *
- * `id` is the runtime reference - `<vendor>/<model>` - the one string the
+ * `id` is the runtime reference supplied by the Harness, the one string the
  * conversation index stores, the submission carries, and the run resolves.
  */
 
 /** A known chat model, including existing pins no longer offered for new picks. */
 export interface CatalogModel {
-  /** The runtime reference: `<provider>/<model>`. What a turn is stored and sent as. */
+  /** The runtime reference that a turn is stored and sent as. */
   readonly id: string
   /** The connection that serves it, as the user named it. */
   readonly connectionId: string
@@ -49,6 +49,7 @@ export interface CatalogModel {
   /** The vendor whose mark the CONNECTION wears - OpenRouter on that same model's connection. */
   readonly connectionVendor: string
   readonly connectionName: string
+  readonly connectionEnabled?: boolean
   readonly offered: boolean
   readonly reasoningLevels: readonly ReasoningLevel[]
   readonly contextWindow: number | 'unknown'
@@ -97,13 +98,14 @@ function catalogModelOf(
   const vendor = connection === undefined ? model.connectionId : connectionVendorOf(connection)
   const author = authorOf(model.modelId, vendor)
   return {
-    id: `${vendor}/${model.modelId}`,
+    id: model.runtimeReference ?? `${vendor}/${model.modelId}`,
     connectionId: model.connectionId,
     modelId: model.modelId,
     name: displayNameOf(model.displayName, author),
     author,
     connectionVendor: vendor,
     connectionName: connection?.displayName ?? model.connectionId,
+    connectionEnabled: connection?.enabled ?? false,
     offered: !model.hidden && connection?.enabled === true && connection.serves.language !== undefined,
     reasoningLevels: model.reasoningLevels,
     contextWindow: model.capability.contextWindow,
@@ -127,7 +129,7 @@ export function catalogFrom(
 ): CatalogModel[] {
   const byId = new Map(connections.map((connection) => [connection.id, connection]))
   return models
-    .filter((model) => model.available && model.capability.textGeneration !== 'unsupported')
+    .filter((model) => model.available && model.runtimeReference !== null && model.capability.textGeneration !== 'unsupported')
     .map((model) => catalogModelOf(model, byId.get(model.connectionId)))
 }
 
@@ -137,7 +139,16 @@ export function findCatalogModel(
   id: string | null,
 ): CatalogModel | undefined {
   if (id === null) return undefined
-  return models.find((model) => model.id === id)
+  const exact = models.find((model) => model.id === id)
+  if (exact !== undefined) return exact
+
+  // Old pins kept only the vendor. Mirror the legacy key lookup's connection order.
+  let legacy: CatalogModel | undefined
+  for (const model of models) {
+    if (model.connectionEnabled === false || id !== `${model.connectionVendor}/${model.modelId}`) continue
+    if (legacy === undefined || model.connectionId < legacy.connectionId) legacy = model
+  }
+  return legacy
 }
 
 /**

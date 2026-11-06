@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Api, Model } from "@earendil-works/pi-ai";
+import { resolveModel } from "@flue/runtime/internal";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthContext } from "../../src/admission/context.js";
@@ -17,7 +18,10 @@ import {
   type LocalModelProviderAdapter,
 } from "../../src/gateway/language/adapters/local-adapter.js";
 import { createProviderBootstrapCoordinator } from "../../src/gateway/language/bootstrap.js";
+import { PiCredentialStore } from "../../src/gateway/language/local/credential-bridge.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
+import { diagnosticRecorder } from "../../src/observability/recorder.js";
+import { createRootExecutionContext, runWithExecutionContext } from "../../src/execution/context.js";
 
 /**
  * A keyless, IPv4-only OpenAI-compatible server reached as `localhost` - the
@@ -248,7 +252,7 @@ describe("a keyless local OpenAI-compatible provider added while the harness run
     await providers.addManualModel("9router", { modelId: MODEL_ID, displayName: MODEL_ID }, AUTH);
     await providers.setDefault("textGeneration", { connectionId: "9router", modelId: MODEL_ID }, AUTH);
 
-    expect(adapter.assertTargetResolvable()).toMatchObject({ provider: "9router", id: MODEL_ID });
+    expect(adapter.assertTargetResolvable()).toMatchObject({ provider: "connection:9router", id: MODEL_ID });
     expect(await textOf(adapter, aliasFor("default"))).toBe("pong");
   });
 
@@ -362,5 +366,101 @@ describe("a keyless local OpenAI-compatible provider added while the harness run
 
     expect(model.modelId).toBe(MODEL_ID);
     expect((await providers.listModels({ connectionId: "9router" })).map((row) => row.modelId)).toContain(MODEL_ID);
+  });
+});
+
+describe("connection-qualified language routing", () => {
+  it("keeps a self-hosted connection's pre-existing key under its own id", async () => {
+    const { providers, adapter, credentials } = compose({ reload: true });
+    await new PiCredentialStore(credentials).modify("9router", async () => ({
+      type: "api_key", key: "legacy-custom-key",
+    }));
+    await addRouter(providers);
+    await providers.addManualModel("9router", { modelId: MODEL_ID, displayName: MODEL_ID }, AUTH);
+    const selected = resolveModel(`project-studio/connection:9router/${MODEL_ID}`);
+
+    expect(await textOf(adapter, selected)).toBe("pong");
+    expect(router.requests[0]?.authorization).toBe("Bearer legacy-custom-key");
+  });
+
+  it("uses the chosen endpoint and key for identical vendor models and for Default", async () => {
+    const { providers, catalog, adapter } = compose({ reload: true });
+    const second = await startFakeRouter();
+    try {
+      const modelId = "~anthropic/claude-sonnet-latest";
+      for (const [id, port, apiKey] of [
+        ["a-personal", router.port, "personal-test-key"],
+        ["b-work", second.port, "work-test-key"],
+      ] as const) {
+        await providers.addConnection({
+          id, displayName: id, source: "local", enabled: true, catalogProvider: "openrouter",
+          serves: { language: "openai-completions" },
+          baseUrl: `http://127.0.0.1:${port}/v1`, apiKey,
+        }, AUTH);
+      }
+      const listed = (await catalog.listModels()).filter((model) => model.modelId === modelId);
+      expect(listed.map((model) => model.runtimeReference)).toEqual([
+        `connection:a-personal/${modelId}`, `connection:b-work/${modelId}`,
+      ]);
+      const served = await catalog.servedModelReferences();
+      expect(served).toContain(`openrouter/${modelId}`);
+      expect(served).toContain(`connection:a-personal/${modelId}`);
+      expect(served).toContain(`connection:b-work/${modelId}`);
+
+      const selected = resolveModel(`project-studio/connection:b-work/${modelId}`);
+      diagnosticRecorder.clear();
+      diagnosticRecorder.configure({ enabled: true, captureContent: false, conversations: [] });
+      const root = createRootExecutionContext({});
+      expect(await runWithExecutionContext(root, () => textOf(adapter, selected))).toBe("pong");
+      const events = diagnosticRecorder.read().events;
+      expect(events.find((event) => event.name === "provider.stream" && event.phase === "start"))
+        .toMatchObject({
+          identity: { parentOperationId: root.operationId },
+          attributes: { provider: "openrouter", connectionId: "b-work", model: modelId },
+        });
+      expect(JSON.stringify(events)).not.toContain("work-test-key");
+      diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+      expect(router.requests).toEqual([]);
+      expect(second.requests[0]).toMatchObject({
+        path: "/v1/chat/completions", authorization: "Bearer work-test-key",
+        body: { model: modelId },
+      });
+
+      await providers.setDefault("textGeneration", { connectionId: "a-personal", modelId }, AUTH);
+      expect(await textOf(adapter, resolveModel("project-studio/default"))).toBe("pong");
+      expect(router.requests[0]).toMatchObject({
+        authorization: "Bearer personal-test-key", body: { model: modelId },
+      });
+
+      await providers.updateConnection("b-work", { enabled: false }, AUTH);
+      expect(await catalog.servedModelReferences()).not.toContain(selected.id);
+      expect(() => adapter.stream(selected, { messages: [] })).toThrow(/not available/);
+      expect(second.requests).toHaveLength(1);
+    } finally {
+      diagnosticRecorder.configure({ enabled: false, captureContent: false, conversations: [] });
+      diagnosticRecorder.clear();
+      second.server.closeAllConnections();
+      await new Promise<void>((resolve) => second.server.close(() => resolve()));
+    }
+  });
+
+  it("does not borrow another account or the vendor environment key for an override", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "ambient-test-key");
+    try {
+      const { providers, adapter } = compose({ reload: true });
+      for (const id of ["a-personal", "b-work"]) {
+        await providers.addConnection({
+          id, displayName: id, source: "local", enabled: true, catalogProvider: "openrouter",
+          serves: { language: "openai-completions" },
+          baseUrl: `http://127.0.0.1:${router.port}/v1`,
+          ...(id === "a-personal" ? { apiKey: "personal-test-key" } : {}),
+        }, AUTH);
+      }
+      const selected = resolveModel("project-studio/connection:b-work/~anthropic/claude-sonnet-latest");
+      await expect(textOf(adapter, selected)).rejects.toThrow(/not configured/i);
+      expect(router.requests).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

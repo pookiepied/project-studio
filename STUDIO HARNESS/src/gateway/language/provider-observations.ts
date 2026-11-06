@@ -12,13 +12,15 @@ export function observeProviderStream(
   target: Model<Api>,
   options: SimpleStreamOptions | undefined,
   start: (options: SimpleStreamOptions) => AssistantMessageEventStream,
+  connectionId?: string,
 ): AssistantMessageEventStream {
   if (!diagnosticRecorder.enabled) return start(options ?? {});
   const recordObservation = createObservationWriter();
   const parent = executionIdentity();
   const identity = { ...parent, operationId: createStudioUuid(), attemptId: createStudioUuid(),
     ...(parent.operationId === undefined ? {} : { parentOperationId: parent.operationId }) };
-  const attributes = { provider: target.provider, model: target.id, api: target.api };
+  const attributes = { provider: target.provider, model: target.id, api: target.api,
+    ...(connectionId === undefined ? {} : { connectionId }) };
   const started = performance.now();
   let itemIndex = 0;
   recordObservation({ name: "provider.stream", phase: "start", identity, attributes });

@@ -68,6 +68,7 @@ export interface ModelPricing {
 /** `providerModelSchema` — one element of what `GET /models` returns. */
 export interface ProviderModel {
   readonly connectionId: string
+  readonly runtimeReference?: string | null
   /** Exactly as the provider names it, so a call needs no translation. */
   readonly modelId: string
   readonly displayName: string
@@ -220,6 +221,7 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
 
   const connectionId = text(value['connectionId'])
   const modelId = text(value['modelId'])
+  const runtimeReference = text(value['runtimeReference'])
   const displayName = text(value['displayName'])
   const capability = parseModelCapability(value['capability'])
   const reasoningLevels = parseReasoningLevels(value['reasoningLevels'])
@@ -253,6 +255,7 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
   return {
     connectionId,
     modelId,
+    ...(value['runtimeReference'] === undefined ? {} : { runtimeReference }),
     displayName,
     capability,
     reasoningLevels,

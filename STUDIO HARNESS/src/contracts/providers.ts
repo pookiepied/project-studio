@@ -316,6 +316,8 @@ export type ModelPricing = v.InferOutput<typeof modelPricingSchema>;
 export const providerModelSchema = v.object({
   connectionId: v.pipe(v.string(), v.minLength(1)),
   modelId: v.pipe(v.string(), v.minLength(1)),
+  // Derived by the catalog for language rows. Null marks a row with no route.
+  runtimeReference: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
   displayName: v.pipe(v.string(), v.minLength(1)),
   capability: modelCapabilitySchema,
   // Optional with an empty default so records stored before this field

@@ -30,6 +30,7 @@ import { isRetiredProvider } from "../retired-providers.js";
  * outside both.
  */
 const TABLE_NAME = "provider_connection_record";
+const connectionQueues = new WeakMap<StudioDatabase, Map<string, Promise<unknown>>>();
 
 export interface ConnectionStoreOptions {
   readonly db: StudioDatabase;
@@ -41,12 +42,30 @@ export class ConnectionStore {
   readonly #db: StudioDatabase;
   readonly #credentials: SecureCredentialStore;
   readonly #reporter: ErrorReporter;
-  readonly #queues = new Map<string, Promise<unknown>>();
+  readonly #queues: Map<string, Promise<unknown>>;
 
   constructor(options: ConnectionStoreOptions) {
     this.#db = options.db;
     this.#credentials = options.credentials;
     this.#reporter = options.reporter ?? createDomainReporter("models");
+    this.#queues = connectionQueues.get(options.db) ?? new Map<string, Promise<unknown>>();
+    connectionQueues.set(options.db, this.#queues);
+  }
+
+  readLanguageRouteKey(selected: ProviderConnection): Promise<string | undefined> {
+    // Endpoint edits and key rotation are one settings operation. Wait for
+    // both before a runtime snapshot is allowed to present a credential.
+    return this.#serialize(selected.id, async () => {
+      const current = readStoredConnections(this.#db)
+        .find(({ connection }) => connection.id === selected.id)?.connection;
+      if (current === undefined || !current.enabled ||
+          current.catalogProvider !== selected.catalogProvider ||
+          current.baseUrl !== selected.baseUrl ||
+          current.serves.language !== selected.serves.language) {
+        throw new ProviderConfigurationError("The selected connection changed. Check it in provider settings.");
+      }
+      return (await this.#credentials.get(connectionCredentialKey(selected.id))) ?? undefined;
+    });
   }
 
   async list(): Promise<readonly ProviderConnection[]> {

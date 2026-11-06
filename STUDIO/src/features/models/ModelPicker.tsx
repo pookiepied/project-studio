@@ -48,10 +48,12 @@ export function ModelPicker({
     ))
   }, [models, needle, ready])
 
-  const shortcuts = [...new Set([selected, ...loadRecentModelIds()])]
-    .map((id) => findCatalogModel(models, id))
-    .filter((model): model is CatalogModel => model !== undefined)
-    .slice(0, 3)
+  const shortcuts = new Map<string, CatalogModel>()
+  for (const id of [selected, ...loadRecentModelIds()]) {
+    const model = findCatalogModel(models, id)
+    if (model !== undefined) shortcuts.set(model.id, model)
+    if (shortcuts.size === 3) break
+  }
 
   return (
     <>
@@ -116,9 +118,10 @@ export function ModelPicker({
                   More models
                 </MenuItem>
                 <ModelRows
-                  models={shortcuts.length > 0 ? shortcuts : models.slice(0, 3)}
+                  models={shortcuts.size > 0 ? [...shortcuts.values()] : models.slice(0, 3)}
                   selected={selected}
                   onChoose={onChoose}
+                  showConnection
                 />
               </>
             )}
@@ -226,10 +229,11 @@ function ProviderRow({ provider, onSelect }: { provider: CatalogConnection; onSe
   )
 }
 
-function ModelRows({ models, selected, onChoose }: {
+function ModelRows({ models, selected, onChoose, showConnection = false }: {
   models: readonly CatalogModel[]
   selected: string | null
   onChoose: Choose
+  showConnection?: boolean
 }) {
   return models.map((model) => (
     <MenuItem
@@ -237,6 +241,9 @@ function ModelRows({ models, selected, onChoose }: {
       icon={<ProviderMark provider={model.author} bare />}
       selected={model.id === selected}
       onSelect={() => onChoose(model.id)}
+      hint={showConnection && models.some((other) =>
+        other.name === model.name && other.connectionId !== model.connectionId,
+      ) ? model.connectionName : undefined}
     >
       {model.name}
     </MenuItem>

@@ -411,10 +411,11 @@ describe("provider model catalog", () => {
 
     const served = await catalog.servedModelReferences();
 
-    // The reference is the vendor the catalog draws from, not the user's own
-    // connection name - the same vocabulary the run resolves.
+    // Previously saved vendor references remain readable alongside the exact route.
     expect(served.has(`openai/${first.modelId}`)).toBe(true);
     expect(served.has(`work-openai/${first.modelId}`)).toBe(false);
+    expect(first.runtimeReference).toBe(`connection:work-openai/${first.modelId}`);
+    expect(served.has(`connection:work-openai/${first.modelId}`)).toBe(true);
   });
   it("marks language rows the probe omits unavailable, and leaves media rows to their own listing", async () => {
     const google: ProviderConnectionDraft = {

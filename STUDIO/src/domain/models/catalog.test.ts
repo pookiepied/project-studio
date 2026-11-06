@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelCapability, ModelPricing, ProviderConnection, ProviderModel } from '@/platform/harness'
-import { catalogFrom } from './catalog'
+import { catalogFrom, resolveTurnModel } from './catalog'
 
 /**
  * The mapping from the wire to the picker's row. Nothing is invented; what
@@ -59,6 +59,26 @@ function wire(connectionId: string, modelId: string, displayName: string): Provi
 }
 
 describe('catalogFrom', () => {
+  it('distinguishes two accounts serving the same vendor model while reading old pins', () => {
+    const modelId = 'anthropic/claude-test'
+    const homeId = `connection:home/${modelId}`
+    const workId = `connection:work/${modelId}`
+    const models = catalogFrom(
+      [connection('work', 'openrouter'), connection('home', 'openrouter')],
+      [
+        { ...wire('work', modelId, 'Claude'), runtimeReference: workId },
+        { ...wire('home', modelId, 'Claude'), runtimeReference: homeId },
+        { ...wire('work', 'unsendable', 'Unavailable'), runtimeReference: null },
+      ],
+    )
+    const catalog = { models, defaults: { textGeneration: { connectionId: 'work', modelId } } }
+    expect(models.map((model) => model.id)).toEqual([workId, homeId])
+    expect(resolveTurnModel(catalog, workId).model?.connectionId).toBe('work')
+    expect(resolveTurnModel(catalog, homeId).model?.connectionId).toBe('home')
+    expect(resolveTurnModel(catalog, `openrouter/${modelId}`).model?.connectionId).toBe('home')
+    expect(resolveTurnModel(catalog, null)).toMatchObject({ following: true, model: { id: workId } })
+  })
+
   it("drops the author's own name from the front of a title that repeats it", () => {
     const [row] = catalogFrom(
       [connection('openrouter', 'openrouter')],

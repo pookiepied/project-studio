@@ -521,7 +521,10 @@ describe("the runtime derives from the merged store", () => {
 
     // The vendor's own chat models are served; nothing else is.
     expect(served.has("openrouter/anthropic/claude-sonnet-4.5")).toBe(true);
-    expect([...served].every((reference) => reference.startsWith("openrouter/"))).toBe(true);
+    expect(served.has("connection:openrouter/anthropic/claude-sonnet-4.5")).toBe(true);
+    expect([...served].every((reference) =>
+      reference.startsWith("openrouter/") || reference.startsWith("connection:openrouter/"),
+    )).toBe(true);
   });
 
   it("offers nothing for a connection that is disabled", async () => {

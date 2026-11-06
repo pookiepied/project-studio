@@ -24,6 +24,9 @@ import {
   type ErrorReporter,
 } from "../../observability/error-reporter.js";
 import { supportedCustomApis } from "../language/local/apis.js";
+import { manualLanguageModelBaseUrl } from "../language/local/runtime.js";
+import { languageCatalogModels } from "../language/pi-catalog.js";
+import { connectionModelReference } from "../language/connection-reference.js";
 import type { StudioDatabase } from "../../storage/database.js";
 import { ConnectionStore } from "./connection-store.js";
 import { catalogModelsFor, type CatalogSourceModel } from "../catalog/index.js";
@@ -131,6 +134,10 @@ export class ModelCatalog {
       }
 
       const baseModels = await this.#baseModels(connection, manuals);
+      const language = connection.serves.language !== undefined;
+      const vendorModels = new Set(language && connection.catalogProvider !== undefined
+        ? languageCatalogModels(connection.catalogProvider).map((model) => model.id) : []);
+      const manualRoute = manualLanguageModelBaseUrl(connection) !== undefined;
       const connectionOverrides = overrides.get(connection.id);
       // Availability is a fact about the provider's own list, which describes
       // language models; media ids are not enumerable through the same
@@ -160,7 +167,9 @@ export class ModelCatalog {
         ) {
           continue;
         }
-        models.push(model);
+        models.push(withRuntimeReference(
+          connection, model, vendorModels.has(model.modelId) || (model.origin === "manual" && manualRoute),
+        ));
       }
     }
 
@@ -276,7 +285,7 @@ export class ModelCatalog {
       origin: "manual",
     });
     this.#edits.writeManual(created);
-    return created;
+    return withRuntimeReference(connection, created, manualLanguageModelBaseUrl(connection) !== undefined);
   }
 
   async removeModel(connectionId: string, modelId: string): Promise<void> {
@@ -394,13 +403,12 @@ export class ModelCatalog {
   }
 
   /**
-   * The model references the catalog currently serves, as the run names them:
-   * `<catalogProvider ?? connectionId>/<modelId>` per row.
+   * The exact model references offered by the catalog, plus legacy vendor
+   * references still carried by older saved conversations.
    *
-   * This is the same derivation the webview's picker applies to decide what a
-   * choice is worth, kept beside the catalog so the admission path can check a
-   * submission's model against the list the picker was filled from. Hidden
-   * rows are included: hiding is a display fact, not an unprovisioning.
+   * The picker reads the exact reference from the catalog so admission can
+   * check a submission against the same routes the picker was filled from.
+   * Hiding or a probe's advisory omission must not invalidate a saved pin.
    *
    * A row is only served when the runtime can actually resolve it: chat
    * models from Pi's own catalog (or declared beside them with the
@@ -424,6 +432,7 @@ export class ModelCatalog {
       if (connection === undefined) continue;
       const protocol = connection.serves.language;
       if (protocol === undefined || !connection.enabled) continue;
+      if (typeof model.runtimeReference === "string") served.add(model.runtimeReference);
 
       if (model.origin === "catalog") {
         if (model.capability.textGeneration !== "supported") continue;
@@ -532,6 +541,9 @@ export class ModelCatalog {
       throw new ProviderConfigurationError(
         `Model "${reference.output.connectionId}/${reference.output.modelId}" is not offered by its provider right now, so it cannot fill the "${slotResult.output}" slot.`,
       );
+    }
+    if (slotResult.output === "textGeneration" && typeof model.runtimeReference !== "string") {
+      throw new ProviderConfigurationError("This model has no chat route on the selected connection.");
     }
 
     this.#upsertDefault(slotResult.output, reference.output);
@@ -682,6 +694,18 @@ export class ModelCatalog {
       throw new ProviderConfigurationError("Provider default could not be removed.");
     }
   }
+}
+
+function withRuntimeReference(
+  connection: ProviderConnection,
+  model: ProviderModel,
+  routable: boolean,
+): ProviderModel {
+  if (connection.serves.language === undefined || model.capability.textGeneration === "unsupported") return model;
+  return {
+    ...model,
+    runtimeReference: routable ? connectionModelReference(connection.id, model.modelId) : null,
+  };
 }
 
 /**

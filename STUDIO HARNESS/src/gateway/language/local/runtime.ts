@@ -12,12 +12,16 @@ import {
 } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
-import { REASONING_LEVELS, type ReasoningLevel } from "../../../contracts/models.js";
+import { ProviderConfigurationError, REASONING_LEVELS, type ReasoningLevel } from "../../../contracts/models.js";
+import type { ProviderConnection } from "../../../contracts/providers.js";
 import { isRetiredProvider, RETIRED_PROVIDER_IDS } from "../../retired-providers.js";
+import { connectionProviderId, inheritsVendorCredential } from "../connection-reference.js";
+import { isLanguageCatalogProvider, majorityBaseUrlFor } from "../pi-catalog.js";
 import { API_LOADERS } from "./apis.js";
 import type {
   CustomProviderConfig,
   ExtraProviderModelGroup,
+  LocalConnectionModels,
   LocalModelConfig,
 } from "./config.js";
 
@@ -102,7 +106,10 @@ function isLoopback(baseUrl: string): boolean {
  * loopback placeholder. Reporting a keyless local server as unconfigured would
  * hide models that work perfectly well.
  */
-function customProviderAuth(config: CustomProviderConfig): ApiKeyAuth {
+function customProviderAuth(
+  config: Pick<CustomProviderConfig, "id" | "name" | "baseUrl">,
+  allowAmbient = true,
+): ApiKeyAuth {
   const envVar = customProviderEnvVar(config.id);
   const loopback = isLoopback(config.baseUrl);
 
@@ -119,6 +126,7 @@ function customProviderAuth(config: CustomProviderConfig): ApiKeyAuth {
     async resolve({ ctx, credential }): Promise<AuthResult | undefined> {
       const stored = credential?.key;
       if (stored) return { auth: { apiKey: stored }, source: "stored key" };
+      if (!allowAmbient) return undefined;
 
       const fromEnv = await ctx.env(envVar);
       if (fromEnv) return { auth: { apiKey: fromEnv }, source: envVar };
@@ -211,6 +219,7 @@ export function createLocalRuntime(
     customProviders: options.config.customProviders,
     extraModels: options.config.extraModels,
     credentials: options.credentials,
+    connections: options.config.connections,
   });
 
   const targetFor = (): Model<Api> | undefined =>
@@ -300,6 +309,7 @@ function createModelsCollection(options: {
   readonly customProviders: readonly CustomProviderConfig[];
   readonly extraModels?: readonly ExtraProviderModelGroup[];
   readonly credentials: CredentialStore;
+  readonly connections?: readonly LocalConnectionModels[] | undefined;
 }): MutableModels {
   const models = builtinModels({ credentials: options.credentials });
   for (const id of RETIRED_PROVIDER_IDS) models.deleteProvider(id);
@@ -318,6 +328,8 @@ function createModelsCollection(options: {
       streamSimple: azure.streamSimple.bind(azure),
     });
   }
+
+  for (const entry of options.connections ?? []) registerConnection(models, entry);
 
   for (const custom of options.customProviders) {
     const load = API_LOADERS[custom.api];
@@ -373,10 +385,6 @@ function createModelsCollection(options: {
               id: group.provider,
               name: group.provider,
               baseUrl: group.baseUrl,
-              api: group.api,
-              models: [],
-              contextWindow: undefined,
-              maxTokens: undefined,
             }),
           },
         models: [...(existing?.getModels() ?? []), ...extraModels],
@@ -390,4 +398,82 @@ function createModelsCollection(options: {
   applyOpenRouterDefaultReasoning(models);
 
   return models;
+}
+
+export function manualLanguageModelBaseUrl(connection: ProviderConnection): string | undefined {
+  const api = connection.serves.language;
+  if (api === undefined || API_LOADERS[api] === undefined) return undefined;
+  return connection.baseUrl ?? (connection.catalogProvider === undefined
+    ? undefined : majorityBaseUrlFor(connection.catalogProvider));
+}
+
+function registerConnection(models: MutableModels, { connection, manualModels }: LocalConnectionModels): void {
+  const api = connection.serves.language;
+  if (!connection.enabled || api === undefined) return;
+  const vendor = connection.catalogProvider ?? connection.id;
+  if (isRetiredProvider(vendor) || isRetiredProvider(connection.id)) return;
+  const builtin = connection.catalogProvider === undefined ? undefined : models.getProvider(vendor);
+  const id = connectionProviderId(connection.id);
+  const known = (builtin?.getModels() ?? []).map((model) => ({
+    ...model,
+    provider: id,
+    baseUrl: connection.baseUrl ?? model.baseUrl,
+    ...(vendor === OPENROUTER_PROVIDER && model.reasoning
+      ? { thinkingLevelMap: { ...model.thinkingLevelMap, off: null } }
+      : {}),
+  }));
+  const baseUrl = manualLanguageModelBaseUrl(connection);
+  const load = API_LOADERS[api];
+  const manualApi = load === undefined ? undefined : lazyApi(load);
+  const knownIds = new Set(known.map((model) => model.id));
+  const manual = baseUrl === undefined || manualApi === undefined ? [] : customProviderModels({
+    id,
+    name: connection.displayName,
+    baseUrl,
+    api,
+    models: manualModels
+      .filter((model) => !knownIds.has(model.modelId) && model.capability.textGeneration !== "unsupported")
+      .map((model) => ({
+        id: model.modelId,
+        reasoningLevels: model.reasoningLevels,
+        vision: model.capability.vision === "supported",
+        contextWindow: typeof model.capability.contextWindow === "number" ? model.capability.contextWindow : undefined,
+        maxTokens: typeof model.capability.maxOutputTokens === "number" ? model.capability.maxOutputTokens : undefined,
+      })),
+    contextWindow: undefined,
+    maxTokens: undefined,
+  }).map((model) => vendor === OPENROUTER_PROVIDER && model.reasoning
+    ? { ...model, thinkingLevelMap: { ...model.thinkingLevelMap, off: null } }
+    : model);
+  if (known.length === 0 && manual.length === 0) return;
+
+  const apiKey = builtin?.auth.apiKey;
+  const auth = builtin !== undefined && inheritsVendorCredential(connection) ? builtin.auth : {
+    apiKey: apiKey !== undefined && connection.baseUrl === undefined
+      ? { ...apiKey, resolve: (request: Parameters<typeof apiKey.resolve>[0]) =>
+          request.credential === undefined ? Promise.resolve(undefined) : apiKey.resolve(request) }
+      : customProviderAuth({
+          id: connection.id,
+          name: connection.displayName,
+          baseUrl: baseUrl ?? "",
+        }, connection.catalogProvider === undefined && !isLanguageCatalogProvider(connection.id)),
+  };
+
+  // Pi resolves auth by the connection route. Its protocol implementation
+  // still sees the vendor and the original model id it uses for the wire.
+  const providerFor = (model: Model<Api>) => {
+    const provider = knownIds.has(model.id) ? builtin : manualApi;
+    if (provider === undefined) {
+      throw new ProviderConfigurationError("The model is not available on the selected connection.");
+    }
+    return provider;
+  };
+  models.setProvider({
+    id,
+    name: connection.displayName,
+    auth,
+    getModels: () => [...known, ...manual],
+    stream: (model, context, options) => providerFor(model).stream({ ...model, provider: vendor }, context, options),
+    streamSimple: (model, context, options) => providerFor(model).streamSimple({ ...model, provider: vendor }, context, options),
+  });
 }

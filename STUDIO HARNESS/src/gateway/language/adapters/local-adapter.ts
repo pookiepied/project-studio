@@ -29,6 +29,7 @@ import type { LocalModelConfig } from "../local/config.js";
 import { tracePrompt } from "../prompt-trace.js";
 import { observeProviderStream } from "../provider-observations.js";
 import { imageWindowFor, windowImages } from "../image-window.js";
+import { connectionIdFromProvider } from "../connection-reference.js";
 import { recordObservation } from "../../../observability/recorder.js";
 
 /** Pi wire-protocol slug standing in for "whatever the user's model speaks". */
@@ -225,9 +226,15 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     options?: SimpleStreamOptions,
   ): AssistantMessageEventStream {
     const target = this.#resolveTarget(alias);
+    const connectionId = connectionIdFromProvider(target.provider);
+    const connection = this.#config.connections?.find((entry) => entry.connection.id === connectionId)?.connection;
+    const observedTarget = connection === undefined
+      ? target : { ...target, provider: connection.catalogProvider ?? connection.id };
     // The last point the request is ours. Off unless STUDIO_PROMPT_TRACE=1.
-    tracePrompt(`${target.provider}/${target.id}`, context, options);
-    return observeProviderStream(target, options, (observed) => this.#runtime.models.streamSimple(target, requestImages(target, context), observed));
+    tracePrompt(`${observedTarget.provider}/${target.id}`, context, options);
+    return observeProviderStream(observedTarget, options, (observed) =>
+      this.#runtime.models.streamSimple(target, requestImages(observedTarget, context), observed),
+    connectionId);
   }
 
   /**
@@ -343,7 +350,7 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
   async #rankedBackgroundSpecifiers(): Promise<readonly string[]> {
     const available = await this.#runtime.models.getAvailable();
     const ranked = [...available]
-      .filter((model) => model.cost.input + model.cost.output >= 0)
+      .filter((model) => connectionIdFromProvider(model.provider) === undefined && model.cost.input + model.cost.output >= 0)
       .sort(
         (a, b) =>
           a.cost.input +
@@ -380,17 +387,7 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     // alias's own id, which carries the `<provider>/<model>` reference the
     // conversation index stores. Delegation hands Pi the model and the auth
     // for it.
-    const target = this.#resolveTarget(alias);
-    // The last point the request is ours. Off unless STUDIO_PROMPT_TRACE=1.
-    tracePrompt(`${target.provider}/${target.id}`, context, options);
-    // `streamSimple`, not `stream`: the options crossing this boundary are
-    // protocol-independent, because the alias is not a real wire protocol and
-    // nothing upstream knows which one the target speaks. Only `streamSimple`
-    // translates them — `reasoning` becomes Google's `thinkingConfig` or
-    // OpenAI's `reasoning_effort` there. `stream` takes options already in the
-    // target's protocol and silently ignores anything else, which is how every
-    // model reasoned invisibly: the request never asked for the trace.
-    return observeProviderStream(target, options, (observed) => this.#runtime.models.streamSimple(target, requestImages(target, context), observed));
+    return this.#streamAlias(alias, context, options);
   };
 
   /**

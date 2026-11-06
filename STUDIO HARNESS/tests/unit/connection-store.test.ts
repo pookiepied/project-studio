@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type ProviderConnectionDraft,
@@ -82,6 +82,30 @@ afterEach(async () => {
 });
 
 describe("provider connection store", () => {
+  it("does not hand a rotated key to an older endpoint while the connection is being edited", async () => {
+    const selected = await store.add(draft("work", "old-key"));
+    const reader = new ConnectionStore({ db, credentials });
+    let markWritten = () => {};
+    let releaseWrite = () => {};
+    const written = new Promise<void>((resolve) => { markWritten = resolve; });
+    const release = new Promise<void>((resolve) => { releaseWrite = resolve; });
+    const set = credentials.set.bind(credentials);
+    vi.spyOn(credentials, "set").mockImplementationOnce(async (key, secret) => {
+      await set(key, secret);
+      markWritten();
+      await release;
+    });
+
+    const update = store.update("work", { baseUrl: "https://new.example.test/v1", apiKey: "new-key" });
+    await written;
+    const check = expect(reader.readLanguageRouteKey(selected)).rejects.toThrow(/connection changed/);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    releaseWrite();
+    const updated = await update;
+    await check;
+    expect(await reader.readLanguageRouteKey(updated)).toBe("new-key");
+  });
+
   it("hides a saved Copilot connection and rejects new keys without changing the stored key", async () => {
     const id = "copilot-work";
     const key = { scope: "provider-connection", id } as const;

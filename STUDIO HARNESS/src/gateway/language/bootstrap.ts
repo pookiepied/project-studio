@@ -24,11 +24,12 @@ import {
   type ExtraProviderModelGroup,
   type LocalModelConfig,
 } from "./local/config.js";
-import { PiCredentialStore } from "./local/credential-bridge.js";
+import { PiCredentialStore, type ExactConnectionCredential } from "./local/credential-bridge.js";
+import { connectionProviderId, inheritsVendorCredential } from "./connection-reference.js";
 import { createLocalRuntime } from "./local/runtime.js";
-import { readStoredConnections } from "../connections/connection-store.js";
+import { ConnectionStore, readStoredConnections } from "../connections/connection-store.js";
 import { catalogBaseUrlFor } from "../connections/connection-probe.js";
-import { languageCatalogModels } from "./pi-catalog.js";
+import { isLanguageCatalogProvider, languageCatalogModels } from "./pi-catalog.js";
 import { ModelEdits } from "../connections/model-edits.js";
 import type { ProviderModel } from "../../contracts/providers.js";
 import { readDefaultSelectionRow } from "../connections/model-catalog.js";
@@ -88,7 +89,11 @@ function createLocalAdapter(
   const runtimeFor = (resolved: LocalModelConfig) =>
     createLocalRuntime({
       config: resolved,
-      credentials: new PiCredentialStore(credentials, connectionKeyLookup(database, credentials)),
+      credentials: new PiCredentialStore(
+        credentials,
+        connectionKeyLookup(database, credentials),
+        exactConnectionLookup(database, credentials, resolved),
+      ),
     });
 
   const adapter = new LocalModelProviderAdapter({ config, runtime: runtimeFor(config) });
@@ -154,6 +159,25 @@ function connectionKeyLookup(
       // have before connections carried their own keys.
       return undefined;
     }
+  };
+}
+
+function exactConnectionLookup(
+  database: StudioDatabase | undefined,
+  credentials: SecureCredentialStore,
+  config: LocalModelConfig,
+): ((id: string) => ExactConnectionCredential | undefined) | undefined {
+  if (database === undefined) return undefined;
+  const connections = new Map(config.connections?.map(({ connection }) => [connection.id, connection]));
+  const store = new ConnectionStore({ db: database, credentials });
+  return (id) => {
+    const selected = connections.get(id);
+    if (selected === undefined) return undefined;
+    const legacyCustom = selected.catalogProvider === undefined && !isLanguageCatalogProvider(id);
+    return {
+      legacyProvider: legacyCustom || inheritsVendorCredential(selected) ? id : undefined,
+      readKey: () => store.readLanguageRouteKey(selected),
+    };
   };
 }
 
@@ -248,11 +272,17 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
 
   const selection = resolveDefaultSelectionFromSettings(database, rows);
 
-  return tolerantLocalModelConfig({
-    ...(selection === undefined ? {} : { defaultSelection: selection }),
-    customProviders: mergeCustomProviders(custom),
-    extraModels: extras,
-  });
+  return {
+    ...tolerantLocalModelConfig({
+      ...(selection === undefined ? {} : { defaultSelection: selection }),
+      customProviders: mergeCustomProviders(custom),
+      extraModels: extras,
+    }),
+    connections: rows.map(({ connection }) => ({
+      connection,
+      manualModels: [...(manuals.get(connection.id)?.values() ?? [])],
+    })),
+  };
 }
 
 /**
@@ -272,7 +302,7 @@ function resolveDefaultSelectionFromSettings(
     );
     if (match !== undefined) {
       return {
-        provider: match.connection.catalogProvider ?? match.connection.id,
+        provider: connectionProviderId(match.connection.id),
         model: row.modelId,
       };
     }

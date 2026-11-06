@@ -39,6 +39,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
     : null
   const effective = effectiveTurnSettings(active, settings)
   const { model, following } = resolveTurnModel(catalog, effective.modelId)
+  const selected = following ? null : model?.id ?? effective.modelId
   const breakdown = active === null ? null : contextBreakdown(
     contextReports.get(active.id) ?? EMPTY_REPORT,
     model?.contextWindow ?? null,
@@ -134,7 +135,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
         content: <ModelProviders
           models={offered}
           connectionId={browser.connectionId}
-          selected={effective.modelId}
+          selected={selected}
           onConnection={(connectionId) => setBrowser({ connectionId })}
           onChoose={chooseModel}
           onBack={() => setBrowser(null)}
@@ -203,7 +204,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
             catalog={catalog}
             models={offered}
             hasConnections={catalog.connections.length > 0}
-            selected={effective.modelId}
+            selected={selected}
             query={query}
             browsing={browser !== null}
             onSearch={(value) => { setBrowser(null); setQuery(value) }}

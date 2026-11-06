@@ -414,6 +414,27 @@ describe('the model picker', () => {
     )
   })
 
+  it('saves the exact account selected when both connections offer the same model', async () => {
+    harnessConfigured()
+    const second = { ...KNOWN_VENDOR, id: 'personal-anthropic', displayName: 'Personal Anthropic' }
+    const workRef = `connection:${KNOWN_VENDOR.id}/${REASONING_MODEL.modelId}`
+    const personalRef = `connection:${second.id}/${REASONING_MODEL.modelId}`
+    const calls = stubFetch(defaultRoute([
+      { ...REASONING_MODEL, runtimeReference: workRef },
+      { ...REASONING_MODEL, connectionId: second.id, runtimeReference: personalRef },
+    ], {}, [KNOWN_VENDOR, second]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+
+    const providers = await openProviders()
+    fireEvent.click(await providers.findByRole('menuitem', { name: second.displayName }))
+    fireEvent.click(await providers.findByRole('menuitemradio', { name: REASONING_MODEL.displayName }))
+    await waitFor(() => {
+      const patch = calls.find((call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1'))
+      expect(JSON.parse(patch?.body ?? '{}').modelId).toBe(personalRef)
+    })
+  })
+
   it('offers the last three explicit picks after the provider entry, most recent first', async () => {
     harnessConfigured()
     const calls = stubFetch(defaultRoute([FLAT_MODEL, ANOTHER_FLAT, THIRD_FLAT, FOURTH_FLAT]))
