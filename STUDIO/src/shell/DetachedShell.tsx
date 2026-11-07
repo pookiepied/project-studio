@@ -1,16 +1,17 @@
+import { useState } from 'react'
 import { SHELL } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
 import { VoiceModeProvider } from '@/features/voice'
-import { startWindowDrag } from '@/platform/tauri'
-import { IdentityLine } from '@/shell/chrome/IdentityLine'
-import { TrafficLights } from '@/shell/chrome/TrafficLights'
-import { TurnMenu } from '@/shell/chrome/TurnMenu'
+import { isTauri, startWindowDrag } from '@/platform/tauri'
+import { ConversationMenu, ConversationRename } from '@/shell/chrome/ConversationMenu'
+import { ActionsMenu } from '@/shell/menus/ActionsMenu'
+import { SelectionMenu } from '@/shell/menus/SelectionMenu'
+import { WindowControls } from '@/shell/chrome/WindowControls'
 import { useWorkspace } from '@/stores/workspace'
 import { useRail } from '@/stores/rail'
 import { SideRail } from '@/features/rail'
-import { WorkspaceAccess } from '@/shell/chrome/WorkspaceAccess'
 
 /**
  * One conversation, in a window of its own.
@@ -29,7 +30,7 @@ import { WorkspaceAccess } from '@/shell/chrome/WorkspaceAccess'
  * there is nowhere else in it to go, and offering a way out would make it a
  * second main window rather than a detached view.
  *
- * The identity line stays, because it names what you are looking at and a
+ * The title stays, because it names what you are looking at and a
  * window with no title is one you cannot pick out of a task switcher. The turn
  * settings stay, because the composer is here and they belong to the next
  * message — which is the same rule the main window follows.
@@ -38,6 +39,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
   const { conversations } = useWorkspace()
   const rail = useRail()
   const conversation = conversations.find((item) => item.id === conversationId)
+  const [renaming, setRenaming] = useState(false)
 
   if (!conversation) return <Missing />
 
@@ -65,26 +67,29 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
           className="@container absolute inset-x-0 top-0 z-30 flex items-center gap-1"
           style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
         >
-          <TrafficLights />
+          {renaming ? (
+            <ConversationRename conversation={conversation} onDone={() => setRenaming(false)} />
+          ) : (
+            <span className="min-w-0 truncate pl-[11px] text-body font-medium text-foreground">
+              {conversation.title ?? 'New conversation'}
+            </span>
+          )}
 
-          <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-            <div className={cn('@container pointer-events-auto flex w-full min-w-0 overflow-hidden justify-center', rail.collapsed
-              ? 'max-w-[min(62%,max(0px,calc(100%-26rem)))] @max-[48rem]:max-w-[min(62%,max(0px,calc(100%-16rem)))]'
-              : 'max-w-[min(62%,max(0px,calc(100%-22rem)))] @max-[48rem]:max-w-[min(62%,max(0px,calc(100%-12rem)))]',
-            )}>
-              <IdentityLine conversation={conversation} />
-            </div>
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-0.5">
-            <WorkspaceAccess onOpen={rail.collapsed ? rail.expand : undefined} />
-            <TurnMenu />
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <ConversationMenu
+              conversation={conversation}
+              onRename={() => setRenaming(true)}
+              onOpenWorkspace={rail.collapsed ? rail.expand : undefined}
+            />
+            <WindowControls />
           </div>
         </header>
 
         <ChatPage conversation={conversation} />
       </div>
       <SideRail key={conversationId} open={rail.open} />
+      {isTauri() ? <ActionsMenu /> : null}
+      <SelectionMenu />
       </VoiceModeProvider>
     </div>
   )

@@ -37,7 +37,7 @@ export function JobsPill({
       className={cn(
         'studio-control-flat flex max-w-full items-center gap-1.5 rounded-full px-2.5 [--control-size:var(--button-xs)]',
         'text-caption transition-colors duration-fast',
-        'bg-muted text-muted-foreground hover:bg-selected hover:text-foreground',
+        'bg-muted text-muted-foreground hover:bg-soft hover:text-foreground',
       )}
     >
       <span className="shrink-0">

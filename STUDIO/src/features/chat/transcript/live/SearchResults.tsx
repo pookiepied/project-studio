@@ -144,7 +144,7 @@ function ContentFileView({ file, query }: { file: SearchContentFile; query: Sear
   return (
     <div className="py-1">
       <div className="flex items-baseline gap-1.5">
-        <FileTypeMark path={file.path} className="shrink-0 self-center text-muted-foreground" />
+        <FileTypeMark path={file.path} className="shrink-0 self-center" />
         <span className="truncate text-ui" title={file.path}>
           {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
           <span className="font-medium text-foreground">{name}</span>
@@ -217,7 +217,7 @@ function PathRow({ path }: { path: string }) {
   const { name, dir } = splitFilePath(path)
   return (
     <div className="flex items-baseline gap-1.5 py-px">
-      <FileTypeMark path={path} className="shrink-0 self-center text-muted-foreground" />
+      <FileTypeMark path={path} className="shrink-0 self-center" />
       <span className="studio-selectable truncate" title={path}>
         {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
         <span className="text-foreground">{name}</span>
@@ -230,7 +230,7 @@ function CountRow({ path, count }: { path: string; count: number }) {
   const { name, dir } = splitFilePath(path)
   return (
     <div className="flex items-baseline gap-1.5 py-px">
-      <FileTypeMark path={path} className="shrink-0 self-center text-muted-foreground" />
+      <FileTypeMark path={path} className="shrink-0 self-center" />
       <span className="studio-selectable truncate" title={path}>
         {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
         <span className="text-foreground">{name}</span>

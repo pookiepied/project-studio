@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { DURATION, EASE_OUT } from '@/design/tokens'
+import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { ProviderMark } from '@/features/models'
 import { ModelPicker, ModelProviders } from '@/features/models/ModelPicker'
@@ -21,11 +21,17 @@ import { capital } from '@/lib/text'
 type View = 'root' | 'reasoning' | 'context'
 const EMPTY_REPORT: ContextReport = { measured: null, pending: 0 }
 
-export function TurnMenu({ available = true }: { available?: boolean }) {
+/**
+ * The model chip in the composer's tools, and the menu it opens.
+ *
+ * It takes the conversation from the composer rather than the route, because
+ * a detached window shows a conversation the route knows nothing about.
+ */
+export function TurnMenu({ conversationId }: { conversationId: string | null }) {
   const { settings, setSettings, setConversationSettings, conversations, catalog, ensureStore } = useWorkspace()
   const { contextReports, running, contextRevisions } = useLiveWork()
   const { compacting, compactNow: compact } = useCompactNow()
-  const { route, openSettings } = useNavigation()
+  const { openSettings } = useNavigation()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('root')
   const [query, setQuery] = useState('')
@@ -34,9 +40,9 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
   const offered = useMemo(() => catalog.models.filter((candidate) => candidate.offered), [catalog.models])
 
   // The display and submission resolve the model against the same turn settings.
-  const active = route.kind === 'chat'
-    ? conversations.find((item) => item.id === route.conversationId) ?? null
-    : null
+  const active = conversationId === null
+    ? null
+    : conversations.find((item) => item.id === conversationId) ?? null
   const effective = effectiveTurnSettings(active, settings)
   const { model, following } = resolveTurnModel(catalog, effective.modelId)
   const selected = following ? null : model?.id ?? effective.modelId
@@ -51,17 +57,16 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
   const revision = activeId === null ? 0 : (contextRevisions.get(activeId) ?? 0)
 
   useEffect(() => {
-    if (open && available) return
-    setOpen(false)
+    if (open) return
     setView('root')
     setQuery('')
     setBrowser(null)
-  }, [open, available])
+  }, [open])
 
   const [readiness, setReadiness] = useState<{ conversationId: string; value: CompactionReadiness } | null>(null)
   const [compactError, setCompactError] = useState<{ conversationId: string; message: string } | null>(null)
   useEffect(() => {
-    if (!open || !available || view !== 'context' || activeId === null) return
+    if (!open || view !== 'context' || activeId === null) return
     let watching = true
     void (async () => {
       const address = await resolveHarnessAddress()
@@ -70,7 +75,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
       if (watching) setReadiness(result.ok && result.value !== null ? { conversationId: activeId, value: result.value } : null)
     })()
     return () => { watching = false }
-  }, [open, available, view, activeId, turnRunning, revision, isCompacting])
+  }, [open, view, activeId, turnRunning, revision, isCompacting])
 
   const compactNow = () => {
     if (activeId === null || isCompacting) return
@@ -122,10 +127,11 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
 
   return (
     <Popover
-      open={open && available}
+      open={open}
       onOpenChange={setOpen}
-      side="bottom"
-      align="end"
+      side="top"
+      align="start"
+      offset={COMPOSER.menuOffset}
       maxHeight="28rem"
       className="studio-scroll-bounded w-64 overflow-y-auto overscroll-contain rounded-xl"
       initialFocus='[aria-label="Search models"]'
@@ -149,7 +155,7 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
             reasoning,
             breakdown === null ? null : `${breakdown.report.measured === null || breakdown.report.measured.estimated || breakdown.report.pending > 0 ? '~' : ''}${breakdown.total.toLocaleString('en-US')} tokens`,
           ].filter(Boolean).join(' · ')}
-          side="bottom"
+          side="top"
         >
           <button
             ref={trigger}
@@ -159,9 +165,9 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
             aria-haspopup="menu"
             aria-expanded={open}
             className={cn(
-              'flex max-w-56 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui',
-              'text-muted-foreground transition-colors duration-fast',
-              open ? 'bg-selected text-foreground' : 'hover:bg-tint',
+              'flex h-[var(--button-xs)] min-w-0 max-w-56 items-center gap-1.5 rounded-full px-2.5 text-ui',
+              'bg-model-chip text-model-chip-foreground transition-[filter] duration-fast',
+              open ? 'brightness-95' : 'hover:brightness-[0.97]',
             )}
           >
             <motion.span
@@ -172,14 +178,13 @@ export function TurnMenu({ available = true }: { available?: boolean }) {
               className="flex min-w-0 items-center gap-1.5"
             >
               {model ? <ProviderMark provider={model.author} bare /> : null}
-              <span className="min-w-0 truncate @max-[48rem]:hidden">{label}</span>
+              <span className="min-w-0 truncate">{label}</span>
             </motion.span>
             {percent !== null && percent >= 60 ? (
-              <span className="shrink-0 tabular-nums text-muted-foreground @max-[48rem]:hidden">
+              <span className="shrink-0 tabular-nums opacity-70">
                 {percent}%
               </span>
             ) : null}
-            <Icons.dropdown className="opacity-60" />
           </button>
         </Tooltip>
       }

@@ -83,7 +83,7 @@ export function MediaLightbox({
               {...(poster
                 ? {
                     fallback: (
-                      <span aria-hidden className="block size-full bg-selected">
+                      <span aria-hidden className="block size-full bg-soft">
                         <img src={poster} alt="" className="size-full object-contain opacity-60" />
                       </span>
                     ),

@@ -1,4 +1,5 @@
 import { Icons } from '@/components/icons'
+import { FileTypeMark } from '@/components/icons/fileTypes'
 import { AnimatedItem, AnimatedList } from '@/features/artifacts/ArtifactMotion'
 import { StatusDot } from '@/features/artifacts/sections/StatusDot'
 import { hostOf } from '@/lib/url'
@@ -37,7 +38,7 @@ function Section({ section }: { section: ArtifactSection }) {
   return (
     <div className="min-w-0">
       {section.title ? (
-        <p className="mb-1.5 text-micro font-medium text-muted-foreground uppercase">
+        <p className="mb-1.5 text-caption font-medium text-muted-foreground">
           {section.title}
         </p>
       ) : null}
@@ -145,7 +146,7 @@ export function Stats({ items }: { items: readonly ArtifactStat[] }) {
     <div className="flex flex-wrap gap-x-6 gap-y-2">
       {items.map((stat) => (
         <div key={stat.label} className="min-w-0">
-          <p className="text-micro text-muted-foreground uppercase">{stat.label}</p>
+          <p className="text-caption text-muted-foreground">{stat.label}</p>
           {/* Tabular figures, so a row of counts does not jitter its own
               alignment as the numbers change during a stream. */}
           <p className="text-ui font-medium text-foreground tabular-nums">{stat.value}</p>
@@ -191,7 +192,7 @@ function FileChanges({ items }: { items: readonly ArtifactFileChange[] }) {
     <AnimatedList className="gap-0.5">
       {items.map((item, index) => (
         <AnimatedItem key={item.path} index={index} className="flex items-center gap-2 py-0.5">
-          <Icons.file />
+          <FileTypeMark path={item.path} />
 
           {/* The path truncates from the *left*. A repo path is
               `src/features/chat/transcript/AssistantMessage.tsx`, and the end

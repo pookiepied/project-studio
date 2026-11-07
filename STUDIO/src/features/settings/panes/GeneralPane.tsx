@@ -1,5 +1,5 @@
 import { Icons } from '@/components/icons'
-import { Button, MenuItem, MenuLabel, Popover, Segmented } from '@/components/primitives'
+import { Button, MenuItem, MenuLabel, Popover, Switch } from '@/components/primitives'
 import { PERMISSION_MODE_ICONS } from '@/features/chat/permissions/modeIcon'
 import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
@@ -130,15 +130,10 @@ export function GeneralPane() {
               : 'Closing the window quits Studio, stopping any turn still running.'
           }
         >
-          <Segmented
-            layoutId="settings-close-to-tray"
-            ariaLabel="Keep running when the window closes"
-            value={windowPreferences.closeToTray ? 'on' : 'off'}
-            onChange={(value) => void updateWindow({ closeToTray: value === 'on' })}
-            options={[
-              { id: 'off', label: 'Off' },
-              { id: 'on', label: 'On' },
-            ]}
+          <Switch
+            label="Keep running when the window closes"
+            checked={windowPreferences.closeToTray}
+            onChange={(value) => void updateWindow({ closeToTray: value })}
           />
         </Row>
       )}
@@ -152,15 +147,10 @@ export function GeneralPane() {
               : 'Studio starts only when you open it.'
           }
         >
-          <Segmented
-            layoutId="settings-launch-at-startup"
-            ariaLabel="Launch at startup"
-            value={launchAtStartup ? 'on' : 'off'}
-            onChange={(value) => void updateStartup(value === 'on')}
-            options={[
-              { id: 'off', label: 'Off' },
-              { id: 'on', label: 'On' },
-            ]}
+          <Switch
+            label="Launch at startup"
+            checked={launchAtStartup}
+            onChange={(value) => void updateStartup(value)}
           />
         </Row>
       )}

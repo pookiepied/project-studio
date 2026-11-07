@@ -1,31 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { fieldAt } from '@/lib/field'
+import { transcriptOf } from '@/shell/menus/ActionItems'
 import { FloatingMenu, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
- * The right-click menu.
+ * The right-click.
  *
- * It replaces the webview's own, which offers Back, Reload, View Source and
- * Inspect — commands from a document viewer, in an app with no address bar,
- * several of which do visible damage. `suppressWebviewChrome` blocks that menu
- * in desktop windows; this is what appears instead, styled like the rest of
- * the app and carrying app-native verbs.
+ * The webview's own menu offers Back, Reload, View Source and Inspect, which
+ * mean nothing here, so `suppressWebviewChrome` blocks it in desktop windows.
+ * Nothing stands in for it unless there is something to act on: a text field, or
+ * selected text. Elsewhere a right-click does nothing, on purpose; the app's own
+ * verbs live in the header and Ctrl K.
  *
- * The contents change with what is under the pointer. In a text field it is
- * the field's verbs: cut, copy, paste, select all. Over a selection it is
- * about the text: copy it, select it all, or ask about it as a new
- * conversation. Anywhere else it is about the app: a new conversation, a
- * reload of the interface, search, and settings. Each list is only its own;
- * see `ActionItems` for why the app verbs no longer trail the others.
- *
- * The verbs themselves are shared with the selection menu through
- * `ActionItems`, so the two cannot drift apart — they are the same list of
- * actions, summoned two ways, and the duplication that preceded the shared
- * component was how one would eventually change without the other.
- *
- * Placement is clamped to the window rather than left to overflow, because a
- * context menu opens wherever the pointer happens to be, and near the bottom
- * edge that is off screen.
+ * A selection in a transcript belongs to `SelectionMenu`, whose toolbar is
+ * already up beside it.
  */
 
 export function ActionsMenu() {
@@ -43,14 +31,19 @@ export function ActionsMenu() {
     const onContextMenu = (event: MouseEvent) => {
       event.preventDefault()
       const selection = window.getSelection()?.toString().trim() ?? ''
-      const kind = fieldAt(event.target) ? 'field' : selection ? 'selection' : 'page'
+      const target = event.target instanceof HTMLElement ? event.target : null
+      const kind = fieldAt(event.target) ? 'field' : selection ? 'selection' : null
+      if (kind === null || (kind === 'selection' && transcriptOf(target) !== null)) {
+        setPosition(null)
+        return
+      }
       setPosition({
         kind,
         x: event.clientX,
         y: event.clientY,
         origin: 'top left',
         selection,
-        target: event.target as HTMLElement | null,
+        target,
       })
     }
 
@@ -81,7 +74,7 @@ export function ActionsMenu() {
     <FloatingMenu
       ref={menuRef}
       placement={position}
-      label={position?.kind === 'field' ? 'text field actions' : position?.kind === 'selection' ? 'selection actions' : 'page actions'}
+      label={position?.kind === 'field' ? 'text field actions' : 'selection actions'}
       close={close}
     />
   )

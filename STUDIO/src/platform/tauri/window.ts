@@ -11,8 +11,27 @@ import { open } from '@tauri-apps/plugin-dialog'
  * browser so the same shell runs under `pnpm dev` without Tauri.
  */
 
-/** Matches the `width`/`height` defaults in tauri.conf.json. */
-const DEFAULT_WINDOW_SIZE = { width: 1040, height: 720 } as const
+/**
+ * The sizes Settings offers. These are sizes and not modes: the layout follows
+ * the window's width as it does at any size a person drags it to, so a preset
+ * adds nothing to keep working.
+ *
+ * Both are the OS window, which is the panel plus the frame's margin on each side
+ * (`--window-inset` in styles/layout.css). Compact matches the `width`/`height`
+ * defaults in tauri.conf.json: the reference's 720x845 panel, with the sidebar as
+ * a drawer. Standard is wide enough to keep the sidebar open (`SHELL.compactWidth`).
+ */
+const WINDOW_SIZES = {
+  compact: { width: 776, height: 901 },
+  standard: { width: 1040, height: 720 },
+} as const
+
+export type WindowSize = keyof typeof WINDOW_SIZES
+
+type ResizeDirection = Parameters<ReturnType<typeof getCurrentWindow>['startResizeDragging']>[0]
+
+/** How wide the invisible resize band is, just outside the visible panel. */
+const RESIZE_BAND = 8
 
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
@@ -53,13 +72,9 @@ export async function quitApp(): Promise<void> {
  *
  * The declarative alternative, `data-tauri-drag-region`, does two things rather
  * than one: it drags, and it toggles maximize on double-click. That second
- * behaviour is not wanted anywhere in this app and is actively harmful here,
- * because the window's rounded corner is a DWM attribute
- * (`DWMWCP_ROUND`, see `src-tauri/src/window.rs`) and Windows squares the
- * corners of any maximized window. So one stray double-click on the title bar
- * turns a frameless, round-cornered panel into a hard rectangle — and it looks
- * like the app broke, because nothing in the CSS changed and nothing says the
- * window is now maximized.
+ * behaviour is not wanted anywhere in this app, because a maximized window
+ * loses the panel's margin and corner. So one stray double-click on the title
+ * bar turns a floating, round-cornered panel into a full-screen rectangle.
  *
  * Calling `startDragging` from a pointerdown gives the drag without the second
  * behaviour. Maximizing stays where it is discoverable and deliberate: the zoom
@@ -71,18 +86,132 @@ export async function startWindowDrag(): Promise<void> {
 }
 
 /**
- * Put the window back to the size it ships with.
+ * Put the window at one of the offered sizes.
  *
  * The counterpart to remembering the size across launches: once a window
  * restores whatever you last dragged it to, there has to be a way back, or a
  * single bad drag on a second monitor is permanent.
  */
-export async function resetWindowSize(): Promise<void> {
+export async function applyWindowSize(size: WindowSize): Promise<void> {
   if (!isTauri()) return
   const current = getCurrentWindow()
   await current.unmaximize()
-  await current.setSize(new LogicalSize(DEFAULT_WINDOW_SIZE.width, DEFAULT_WINDOW_SIZE.height))
+  const { width, height } = WINDOW_SIZES[size]
+  await current.setSize(new LogicalSize(width, height))
   await current.center()
+}
+
+/** The panel inside the OS window, as the resize band needs to see it. */
+export interface WindowPanel {
+  width: number
+  height: number
+  inset: number
+  radius: number
+}
+
+/**
+ * Which way to resize from a point just outside the panel, if any.
+ *
+ * The OS only offers a resize at the window's outer edge, and that edge now
+ * sits an invisible margin away from what the person can see. So the band
+ * follows the panel instead, and around the corners it follows the curve: a
+ * straight band would leave the visible corner with nothing to grab.
+ */
+export function resizeDirectionAt(x: number, y: number, panel: WindowPanel): ResizeDirection | null {
+  const { width, height, inset, radius } = panel
+  const left = inset
+  const top = inset
+  const right = width - inset
+  const bottom = height - inset
+
+  const nearLeft = x < left + radius
+  const nearRight = x >= right - radius
+  const nearTop = y < top + radius
+  const nearBottom = y >= bottom - radius
+  if ((nearLeft || nearRight) && (nearTop || nearBottom)) {
+    const distance = Math.hypot(
+      x - (nearLeft ? left + radius : right - radius),
+      y - (nearTop ? top + radius : bottom - radius),
+    )
+    if (distance < radius || distance >= radius + RESIZE_BAND) return null
+    if (nearTop) return nearLeft ? 'NorthWest' : 'NorthEast'
+    return nearLeft ? 'SouthWest' : 'SouthEast'
+  }
+
+  if (y >= top && y < bottom) {
+    if (x < left && x >= left - RESIZE_BAND) return 'West'
+    if (x >= right && x < right + RESIZE_BAND) return 'East'
+  }
+  if (x >= left && x < right) {
+    if (y < top && y >= top - RESIZE_BAND) return 'North'
+    if (y >= bottom && y < bottom + RESIZE_BAND) return 'South'
+  }
+  return null
+}
+
+const RESIZE_CURSOR: Record<ResizeDirection, string> = {
+  North: 'ns-resize',
+  South: 'ns-resize',
+  East: 'ew-resize',
+  West: 'ew-resize',
+  NorthEast: 'nesw-resize',
+  SouthWest: 'nesw-resize',
+  NorthWest: 'nwse-resize',
+  SouthEast: 'nwse-resize',
+}
+
+/**
+ * Turns the OS window into the frame around the rounded panel.
+ *
+ * Windows cannot round a window to the panel's radius or shadow a transparent
+ * one, so the panel is inset and draws both itself. Three things come with
+ * that and live here: a maximized window has no margin and no corner, the
+ * resize band has to follow the panel in, and a first launch must not open
+ * taller than the screen it landed on.
+ */
+export async function installWindowFrame(): Promise<void> {
+  if (!isTauri()) return
+  const current = getCurrentWindow()
+  const root = document.documentElement
+  root.dataset.window = 'framed'
+
+  const measure = (name: string) =>
+    Number.parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0
+  const directionAt = (event: PointerEvent) =>
+    resizeDirectionAt(event.clientX, event.clientY, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      inset: measure('--window-inset-px') / (measure('--ui-zoom') || 1),
+      radius: measure('--window-radius'),
+    })
+
+  document.addEventListener('pointermove', (event) => {
+    const direction = directionAt(event)
+    root.style.cursor = direction === null ? '' : RESIZE_CURSOR[direction]
+  })
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      const direction = directionAt(event)
+      if (direction === null) return
+      event.preventDefault()
+      void current.startResizeDragging(direction)
+    },
+    true,
+  )
+
+  const syncMaximized = async () => {
+    root.dataset.window = (await current.isMaximized()) ? 'maximized' : 'framed'
+  }
+  await current.onResized(() => void syncMaximized())
+  await syncMaximized()
+
+  const width = Math.min(window.innerWidth, window.screen.availWidth)
+  const height = Math.min(window.innerHeight, window.screen.availHeight)
+  if (width < window.innerWidth || height < window.innerHeight) {
+    await current.setSize(new LogicalSize(width, height))
+    await current.center()
+  }
 }
 
 /** Signals the Rust side that the first paint happened; shows the window. */

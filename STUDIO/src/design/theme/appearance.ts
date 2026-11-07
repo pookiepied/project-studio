@@ -1,12 +1,19 @@
 import { openStore as openStoreFile, watchStoreKey } from '@/platform/store'
 import { recordClientObservation } from '@/platform/diagnostics/events'
 import { isTauri } from '@/platform/tauri'
+import { setInterfaceZoom } from '@/platform/tauri/zoom'
 import {
   CODE_OFFSET_CHOICES,
   DEFAULT_CODE_OFFSET,
+  DEFAULT_TYPEFACE,
+  DEFAULT_UI_SCALE,
   DEFAULT_UI_SIZE,
+  TYPEFACE_CHOICES,
+  UI_SCALE_CHOICES,
   UI_SIZE_CHOICES,
   type CodeOffset,
+  type Typeface,
+  type UiScale,
   type UiSize,
 } from '@/design/tokens'
 
@@ -20,6 +27,10 @@ export interface Appearance {
   readonly codeOffset: CodeOffset
   /** Show a pointer cursor over controls, rather than the platform arrow. */
   readonly pointerCursor: boolean
+  /** The whole window's scale, in percent. Independent of `uiSize`. */
+  readonly uiScale: UiScale
+  /** What replies are set in. */
+  readonly typeface: Typeface
 }
 
 const DEFAULT_APPEARANCE: Appearance = {
@@ -27,6 +38,8 @@ const DEFAULT_APPEARANCE: Appearance = {
   uiSize: DEFAULT_UI_SIZE,
   codeOffset: DEFAULT_CODE_OFFSET,
   pointerCursor: false,
+  uiScale: DEFAULT_UI_SCALE,
+  typeface: DEFAULT_TYPEFACE,
 }
 
 const STORAGE_KEY = 'studio.appearance'
@@ -173,6 +186,8 @@ function coerce(parsed: unknown): Appearance {
       typeof value.pointerCursor === 'boolean'
         ? value.pointerCursor
         : DEFAULT_APPEARANCE.pointerCursor,
+    uiScale: UI_SCALES.includes(value.uiScale) ? (value.uiScale as UiScale) : DEFAULT_APPEARANCE.uiScale,
+    typeface: TYPEFACES.includes(value.typeface) ? (value.typeface as Typeface) : DEFAULT_APPEARANCE.typeface,
   }
 }
 
@@ -182,7 +197,9 @@ export function isDefaultAppearance(appearance: Appearance): boolean {
     appearance.theme === DEFAULT_APPEARANCE.theme &&
     appearance.uiSize === DEFAULT_APPEARANCE.uiSize &&
     appearance.codeOffset === DEFAULT_APPEARANCE.codeOffset &&
-    appearance.pointerCursor === DEFAULT_APPEARANCE.pointerCursor
+    appearance.pointerCursor === DEFAULT_APPEARANCE.pointerCursor &&
+    appearance.uiScale === DEFAULT_APPEARANCE.uiScale &&
+    appearance.typeface === DEFAULT_APPEARANCE.typeface
   )
 }
 
@@ -199,6 +216,8 @@ function isTheme(value: unknown): value is Theme {
    — the user's setting "not applying", with nothing in the code failing. */
 const UI_SIZES: readonly unknown[] = UI_SIZE_CHOICES
 const CODE_OFFSETS: readonly unknown[] = CODE_OFFSET_CHOICES
+const UI_SCALES: readonly unknown[] = UI_SCALE_CHOICES
+const TYPEFACES: readonly unknown[] = TYPEFACE_CHOICES
 
 function isUiSize(value: unknown): value is UiSize {
   return UI_SIZES.includes(value)
@@ -266,10 +285,19 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
   // to either one.
   root.style.setProperty('--code-offset', `${appearance.codeOffset}px`)
   root.classList.toggle('pointer-cursor', appearance.pointerCursor)
+  root.style.setProperty('--font-reading', READING_FONT[appearance.typeface])
+  setInterfaceZoom(appearance.uiScale)
 
   publishBrowserTheme(resolved)
 
   return resolved
+}
+
+/** Serif is the system's: a text face for long reading, with nothing to load. */
+const READING_FONT: Readonly<Record<Typeface, string>> = {
+  sans: 'var(--font-sans)',
+  serif: "Georgia, Cambria, 'Times New Roman', serif",
+  mono: 'var(--font-mono)',
 }
 
 /**
@@ -284,7 +312,7 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
  */
 const SURFACE_FOR_THEME: Readonly<Record<ResolvedTheme, string>> = {
   light: '#ffffff',
-  dark: '#171717',
+  dark: '#242424',
 }
 
 /**

@@ -239,11 +239,7 @@ export function AppShell() {
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
       {isTauri() ? <ActionsMenu /> : null}
-      {/* The same actions, offered the moment text is selected rather than
-          after a right-click. Mounted beside `ActionsMenu` because the two
-          share their verbs (`ActionItems`) and hand off to each other — a
-          right-click closes this one; this one never opens over that one. */}
-      {isTauri() ? <SelectionMenu /> : null}
+      <SelectionMenu />
       </VoiceModeProvider>
     </div>
   )

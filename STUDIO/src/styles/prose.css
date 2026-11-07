@@ -73,6 +73,7 @@
   }
 
   .studio-prose {
+    font-family: var(--font-reading, inherit);
     font-size: var(--text-body);
     line-height: var(--leading-body);
     color: var(--foreground);
@@ -225,7 +226,7 @@
   .studio-prose a.studio-citation + a.studio-citation { margin-inline-start: 0.2em; }
   .studio-prose a.studio-citation:hover,
   .studio-prose a.studio-citation[aria-expanded='true'] {
-    background: var(--selected);
+    background: var(--soft);
     color: var(--foreground);
   }
 
@@ -289,6 +290,19 @@
   .studio-prose strong { font-weight: 525; }
   .studio-user-prose :is(strong, h1, h2, h3, h4, h5, h6) { font-weight: 600; }
 
+  /* Accent, like the composer's caret. Bars this thin are read by position and
+     movement, so the pale blue on white holds up where text in it would not. */
+  .studio-stream-caret {
+    display: inline-block;
+    width: 2px;
+    height: 0.95em;
+    margin-left: 2px;
+    border-radius: 999px;
+    background: var(--accent);
+    vertical-align: baseline;
+    transform: translateY(0.15em);
+  }
+
   .studio-prose blockquote {
     @apply rounded-r-lg border-l-2 py-1 pl-3.5;
     color: var(--muted-foreground);
@@ -313,6 +327,9 @@
 
   /* A filename names an object in the conversation, not a snippet to execute. */
   .studio-prose :not(pre) > code.studio-file-reference {
+    padding: 1px 6px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--tone, var(--muted-foreground)) 11%, transparent);
     font-family: inherit;
     font-size: 1em;
     font-weight: 500;

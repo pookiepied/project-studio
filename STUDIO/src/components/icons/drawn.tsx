@@ -1,6 +1,5 @@
-import { useContext } from 'react'
 
-import { defineIcon, IconStateContext, type Glyph, type IconState } from '@/components/icons/Icon'
+import { defineIcon, type Glyph } from '@/components/icons/Icon'
 import { ICON_STEP, type IconSize } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
@@ -83,7 +82,7 @@ function drawnMark(d: string, name: string) {
         viewBox="0 0 16 16"
         fill="none"
         stroke="currentColor"
-        strokeWidth={1.2}
+        strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden
@@ -104,26 +103,6 @@ export const WorkspaceOverviewMark = drawnMark(
   'M5.6 4.5a2.1 2.1 0 1 1-4.2 0 2.1 2.1 0 1 1 4.2 0Z M8 4.5h6.5 M5.6 11.5a2.1 2.1 0 1 1-4.2 0 2.1 2.1 0 1 1 4.2 0Z M8 11.5h6.5',
   'WorkspaceOverviewMark',
 )
-
-/**
- * Open, the divider sits where the expanded sidebar's edge is. Closed, it
- * retreats to the frame's left.
- *
- * Hover deliberately does not move it. A preview on hover made the mark
- * restless: the divider twitched every time the pointer crossed the button on
- * its way somewhere else, which is most of the times it is crossed. The
- * movement means "the panel changed", so it should happen when the panel
- * changes and at no other time — the chip already answers "you are here".
- */
-const SLIDE_X: Record<IconState, number> = {
-  rest: 0,
-  hover: 0,
-  press: 0,
-  on: 3.4,
-  live: 0,
-}
-
-const FRAME = 'M4.6 3.2h6.8a2.4 2.4 0 0 1 2.4 2.4v4.8a2.4 2.4 0 0 1-2.4 2.4H4.6a2.4 2.4 0 0 1-2.4-2.4V5.6a2.4 2.4 0 0 1 2.4-2.4Z'
 
 /**
  * Voice mode.
@@ -282,76 +261,3 @@ PauseBars.displayName = 'pause'
  * drawn at rather than at whatever size that call site happened to be.
  */
 export const PlayTriangle = defineIcon({ f: ['M5 4 13 8 5 12Z'] } satisfies Glyph, 'play')
-
-export function SidebarToggle({
-  size = 'text',
-  state,
-  className,
-  style,
-}: {
-  size?: IconSize
-  state?: IconState
-  className?: string
-  style?: React.CSSProperties
-}) {
-  const inherited = useContext(IconStateContext)
-  const active = state ?? inherited
-  const box = size === 'text' ? '1.1em' : ICON_STEP[size]
-
-  const svg = {
-    viewBox: '0 0 16 16',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.2,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-  }
-
-  return (
-    <span
-      aria-hidden
-      className={cn('studio-icon relative inline-flex shrink-0 items-center justify-center', className)}
-      style={{ width: box, height: box, ...style }}
-    >
-      <svg {...svg} className="absolute inset-0 size-full">
-        <path d={FRAME} />
-      </svg>
-
-      {/* The divider is an HTML element, not part of the SVG.
-
-          Worth explaining, because it looks like the odd choice and it is the
-          only one that actually paints. Moving a shape *inside* an SVG was
-          attempted at every level — `line`, nested `svg`, `g`, driven both by
-          framer variants and by a CSS transition — and each failed differently
-          and silently: framer writes a positional value to an SVG element's
-          same-named attribute rather than producing a transform, `fill-box`
-          collapses on a shape with no width, and a transition on a `<g>`
-          transform never settles in Chromium (the inline style updated to
-          `translateX(0px)` while the computed transform stayed where it began).
-
-          Outside the SVG none of that exists. A div with a transform is the
-          best-defined thing in the browser. The frame stays vector because it
-          has a curve; the divider is a straight bar 1.2px wide, which is the
-          same weight the stroke paints at, so the two read as one mark.
-
-          Percentages keep it locked to the frame at any size: the mark is
-          drawn on a 16-unit grid, so 35% is x=5.6 and the bar spans the frame's
-          interior height exactly. */}
-      <span
-        aria-hidden
-        className="absolute rounded-full bg-current"
-        style={{
-          // `left`, not a transform. A percentage transform resolves against
-          // the element's own width, and this element is 1.2px wide — so the
-          // whole travel would have been a quarter of a pixel. `left` resolves
-          // against the containing box, which is the frame.
-          left: `${((5.6 + SLIDE_X[active]) / 16) * 100}%`,
-          top: '20%',
-          height: '60%',
-          width: 1.2,
-          transition: 'left var(--duration-base) var(--ease-out-quint)',
-        }}
-      />
-    </span>
-  )
-}

@@ -33,7 +33,7 @@ import { cn } from '@/lib/cn'
  *
  * ---- Stroke -----------------------------------------------------------------
  *
- * The painted line is held at ~1.2px at every step by `vector-effect:
+ * The painted line is held at 1.5px at every step by `vector-effect:
  * non-scaling-stroke` (applied in `styles/components.css` via `.studio-icon`), which reads
  * the width in device pixels rather than viewBox units. Without it the same
  * mark paints 1.17px in a menu and 1.83px at the `lg` step, and the set stops
@@ -60,7 +60,7 @@ interface LucideIconProps {
  * definite to return to. Without it a glyph animated to a missing label stays
  * wherever it was, and poses accumulate across hover and press.
  */
-function complete(v: Variants | undefined): Variants | undefined {
+export function complete(v: Variants | undefined): Variants | undefined {
   if (!v) return undefined
   const rest = v.rest ?? {}
   return {
@@ -98,7 +98,7 @@ export function fromLucide(Mark: LucideIcon, name: string, variants?: Variants) 
         className={cn('studio-icon inline-flex shrink-0 items-center justify-center', className)}
         style={{ width: box, height: box, ...style }}
       >
-        <Mark size="100%" strokeWidth={1.2} />
+        <Mark size="100%" strokeWidth={1.5} />
       </motion.span>
     )
   })

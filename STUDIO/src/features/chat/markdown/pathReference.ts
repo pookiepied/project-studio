@@ -130,6 +130,27 @@ export function parsePathReference(text: string): PathReference | null {
   return { raw: text, target, line, column, kind }
 }
 
+/** Files that carry no extension, which would otherwise read as folders. */
+const EXTENSIONLESS_FILES = /^(?:makefile|dockerfile|license|licence|readme|changelog|notice|gemfile|rakefile|procfile|jenkinsfile)$/i
+
+/**
+ * Whether a reference reads as a folder, for choosing its mark and nothing else.
+ *
+ * A trailing separator says so outright. Past that this is a best reading: a
+ * path with a separator and no extension is nearly always a directory. Nothing
+ * touches the disk to settle it, and being wrong costs one glyph. Reveal never
+ * consults this; the native side decides what a path is.
+ */
+export function namesFolder(reference: PathReference): boolean {
+  if (reference.line !== null) return false
+  const written = reference.raw
+  if (/[\\/]$/.test(written)) return true
+  const separator = Math.max(written.lastIndexOf('\\'), written.lastIndexOf('/'))
+  if (separator === -1) return false
+  const name = written.slice(separator + 1)
+  return !name.includes('.') && !EXTENSIONLESS_FILES.test(name)
+}
+
 /**
  * The absolute path a reference names, or null when this client cannot name
  * one. Rooted kinds already carry their answer; a relative reference is

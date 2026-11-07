@@ -59,8 +59,8 @@ function Arriving() {
           <Icons.artifact />
         </WorkingHalo>
         <div className="min-w-0 flex-1">
-          <div className="h-[1.15em] w-40 rounded bg-selected" />
-          <div className="mt-1.5 h-[1em] w-24 rounded bg-selected/70" />
+          <div className="h-[1.15em] w-40 rounded bg-soft" />
+          <div className="mt-1.5 h-[1em] w-24 rounded bg-soft/70" />
         </div>
       </div>
     </Arrive>

@@ -3,7 +3,6 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { SHELL } from '@/design/tokens'
 import { windowFrame } from './windowFrame'
 
 afterEach(() => {
@@ -11,12 +10,11 @@ afterEach(() => {
 })
 
 describe('the window frame', () => {
-  it('is the rounded corner and the hairline on the desktop, where the app is its own window', () => {
+  it('is the rounded, shadowed panel with no border on the desktop, where the app is its own window', () => {
     Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true })
 
     const frame = windowFrame()
-    expect(frame.style.borderRadius).toBe(SHELL.windowRadius)
-    expect(frame.className).toContain('border-hairline')
+    expect(frame.className).toBe('studio-window')
   })
 
   it('is nothing in a browser, where the tab is the window', () => {

@@ -88,7 +88,7 @@ describe('the activity disclosure', () => {
     const row = screen.getByRole('button', { name: 'Researching the web' }).parentElement
     expect(row?.classList.contains('mt-4')).toBe(true)
     expect(row?.classList.contains('mb-4')).toBe(true)
-    expect(row?.querySelector('svg')?.classList.contains('lucide-globe')).toBe(true)
+    expect(row?.querySelector('svg')?.classList.contains('studio-mark-browserUse')).toBe(true)
     view.rerender(<Arriving live><ActivityBlock conversationId="conv" active textBefore textAfter segments={[
       tools('a', call('search', 'web_search')),
     ]} /></Arriving>)

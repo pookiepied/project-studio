@@ -77,7 +77,7 @@ describe('CodeBlock', () => {
     const { container } = render(<CodeBlock code='print("hi")' fence="brainfuck" />)
     expect(screen.getByText('BRAINFUCK')).toBeTruthy()
     // No language mark exists for it: the coding mark, not a guess.
-    expect(container.querySelector('svg.lucide-code')).not.toBeNull()
+    expect(container.querySelector('svg.studio-mark-coding')).not.toBeNull()
     expect(container.querySelector('svg[fill="currentColor"]')).toBeNull()
   })
 
@@ -87,7 +87,7 @@ describe('CodeBlock', () => {
     // carries it instead of the generic coding mark.
     const { container } = render(<CodeBlock code={'main = putStrLn "hi"'} fence="haskell" />)
     expect(container.querySelector('svg[fill="currentColor"]')).not.toBeNull()
-    expect(container.querySelector('svg.lucide-code')).toBeNull()
+    expect(container.querySelector('svg.studio-mark-coding')).toBeNull()
   })
 
   it('colors the languages the set commits to, including through an alias', { timeout: 20_000 }, async () => {

@@ -8,7 +8,7 @@ import { windowFrame } from '@/shell/chrome/windowFrame'
 import { copyText } from '@/lib/clipboard'
 import { harnessFailureReason } from '@/platform/harness'
 import { describeHarnessFailure } from '@/shell/harness-failure'
-import { TrafficLights } from '@/shell/chrome/TrafficLights'
+import { WindowControls } from '@/shell/chrome/WindowControls'
 
 /** How long "Copied" stands before the mark returns. Matches `CodeBlock`. */
 const COPIED_MS = 1600
@@ -87,7 +87,6 @@ export function DiagnosticWindow() {
         className="flex shrink-0 items-center gap-3 border-b"
         style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
       >
-        <TrafficLights />
         {/* The name of the thing being shown, the way an editor names the open
             file. The code rather than a sentence, because the sentence is on
             the page that opened this window and a second copy of it here is
@@ -99,6 +98,7 @@ export function DiagnosticWindow() {
           {failure.code}
         </span>
         {reason !== null ? <CopyButton text={reason} /> : null}
+        <WindowControls />
       </header>
 
       {!read ? null : reason === null ? (

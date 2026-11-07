@@ -43,6 +43,7 @@ vi.mock('@/stores/workspace', () => ({
   useLiveWork: () => ({ compacting: new Set<string>(), markCompacting: vi.fn(), bumpContext: vi.fn() }),
 }))
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ go }) }))
+vi.mock('@/shell/chrome/TurnMenu', () => ({ TurnMenu: () => null }))
 vi.mock('@/platform/harness/contact', () => ({ defaultContactFor: () => contact }))
 
 // jsdom has no ResizeObserver; the composer's field measures itself with one.
@@ -109,7 +110,7 @@ describe('the composer that starts a conversation', () => {
     submitTurn.mockResolvedValue({ ok: true, value: { offset: '1_0', submissionId: 'sub_first' } })
     render(<VoiceModeProvider><HomePage /></VoiceModeProvider>)
 
-    const permission = screen.getByRole('button', { name: 'What Studio may do: Auto' })
+    const permission = screen.getByRole('button', { name: 'More options. Studio may: Auto' })
     if (mode === 'ask') {
       fireEvent.click(permission)
       fireEvent.click(screen.getByRole('menuitemradio', { name: /^Ask/ }))

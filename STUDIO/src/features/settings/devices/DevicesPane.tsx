@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { Icons } from '@/components/icons'
-import { Button, IconButton, Segmented, TextField } from '@/components/primitives'
+import { Button, IconButton, Switch, TextField } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { copyText } from '@/lib/clipboard'
 import type { PairedDevice, RemoteAddresses } from '@/platform/remote-access'
@@ -56,18 +56,13 @@ function DesktopPane() {
   return (
     <Pane title="Other devices" description={DESCRIPTION}>
       <Row label="Open on other devices" hint={switchHint(remote.reach)}>
-        <Segmented
-          layoutId="settings-other-devices"
-          ariaLabel="Open on other devices"
-          value={on ? 'on' : 'off'}
+        <Switch
+          label="Open on other devices"
+          checked={on}
           onChange={(value) => {
             if (remote.switching) return
-            void (value === 'on' ? remote.turnOn() : remote.turnOff())
+            void (value ? remote.turnOn() : remote.turnOff())
           }}
-          options={[
-            { id: 'off', label: 'Off' },
-            { id: 'on', label: 'On' },
-          ]}
         />
       </Row>
 

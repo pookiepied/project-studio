@@ -158,4 +158,39 @@ describe('composer drafts', () => {
     expect(stored).toMatchObject({ cnv_a: { text: 'par' } })
     vi.useRealTimers()
   })
+
+  it('keeps a quote beside the draft, and forgets each on its own', async () => {
+    const drafts = await freshModule()
+    await drafts.primeDrafts()
+    drafts.writeDraft('cnv_a', 'my answer')
+    drafts.writeQuote('cnv_a', 'what they said')
+
+    drafts.clearDraft('cnv_a')
+    expect(drafts.readQuote('cnv_a')).toBe('what they said')
+
+    drafts.clearQuote('cnv_a')
+    expect(drafts.readQuote('cnv_a')).toBe('')
+  })
+
+  it('tells a listening composer when a quote changes', async () => {
+    const drafts = await freshModule()
+    await drafts.primeDrafts()
+    const heard = vi.fn()
+    const stop = drafts.subscribeQuotes(heard)
+
+    drafts.writeQuote('cnv_a', 'one')
+    drafts.clearQuote('cnv_a')
+    expect(heard).toHaveBeenCalledTimes(2)
+
+    stop()
+    drafts.writeQuote('cnv_a', 'two')
+    expect(heard).toHaveBeenCalledTimes(2)
+  })
+
+  it('sends a quote as a Markdown quotation ahead of the words', async () => {
+    const drafts = await freshModule()
+    expect(drafts.withQuotation('', 'just words')).toBe('just words')
+    expect(drafts.withQuotation('one\ntwo', 'why?')).toBe('> one\n> two\n\nwhy?')
+    expect(drafts.withQuotation('one', '  ')).toBe('> one')
+  })
 })

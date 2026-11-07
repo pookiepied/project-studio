@@ -41,7 +41,7 @@ export function FileDiff({ path, diff, syntax = false }: { path: string; diff: L
     // lines. The transcript's prose sets its colour the same way.
     <div className="overflow-hidden rounded-md border border-hairline bg-code-surface text-foreground shadow-chip">
       <div className="flex items-center gap-2 border-b border-hairline py-2 pl-3 pr-3">
-        <FileTypeMark path={path} className="text-muted-foreground" />
+        <FileTypeMark path={path} />
         <span className="truncate font-mono text-ui" title={path}>
           {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
           {name}

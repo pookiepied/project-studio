@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { VOICE_UNAVAILABLE_REASON, VoiceModeProvider } from '@/features/voice'
 import { Composer } from './Composer'
+import { clearDraft, clearQuote, readQuote, writeQuote } from './drafts'
 import type { TurnImageWire } from '@/platform/harness'
 
 // The permission control beside the field reads the workspace store, and
@@ -15,9 +16,10 @@ const liveWork = vi.hoisted(() => ({
   markCompacting: vi.fn(),
   bumpContext: vi.fn(),
 }))
+const workspace = vi.hoisted(() => ({ settings: { permission: 'ask' } }))
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
-    settings: { permission: 'ask' },
+    settings: workspace.settings,
     setSettings: vi.fn(),
     // The permission control now reads the conversation's stored mode; this
     // test runs on a surface with no conversations, so the window setting is
@@ -82,65 +84,72 @@ const field = (): string => {
   return box.value
 }
 
-describe('idle and active', () => {
+describe('the box', () => {
   const frame = (container: HTMLElement) => container.querySelector('[data-composer-frame]')
 
-  it('widens for the caret and draws back without touching the controls', () => {
+  it('brings its edge with the caret, and takes it away again', () => {
     const { container } = renderComposer(vi.fn(async () => ({ ok: true })), true)
     const input = screen.getByRole('textbox')
     const stop = screen.getByRole('button', { name: 'Stop' })
-    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+    expect(frame(container)?.getAttribute('data-focused')).toBe('false')
 
     fireEvent.focus(input)
-    expect(frame(container)?.getAttribute('data-active')).toBe('true')
-    // Going active only ever widens: a composer that grows taller when the
-    // caret arrives reflows the page.
-    expect(frame(container)?.getAttribute('data-stacked')).toBe('false')
+    expect(frame(container)?.getAttribute('data-focused')).toBe('true')
     expect(screen.getByRole('button', { name: 'Stop' })).toBe(stop)
 
     fireEvent.blur(input, { relatedTarget: stop })
-    expect(frame(container)?.getAttribute('data-active')).toBe('true')
-    fireEvent.blur(stop, { relatedTarget: document.body })
-    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+    expect(frame(container)?.getAttribute('data-focused')).toBe('false')
   })
 
-  it('stays idle when a control takes focus, so + is not slid out from under the pointer', () => {
+  it('leaves the edge to the field, not to a control in the row', () => {
     const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
     fireEvent.focus(screen.getByRole('button', { name: 'Add context' }))
-    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+    expect(frame(container)?.getAttribute('data-focused')).toBe('false')
   })
 
-  it('stays active while a draft is waiting, focused or not', () => {
-    const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
+  it('keeps send in its place, inert until there is something to send', () => {
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    const send = screen.getByRole('button', { name: 'Send' })
+    expect(send.hasAttribute('disabled')).toBe(true)
+
     type('Half a thought')
-    expect(frame(container)?.getAttribute('data-active')).toBe('true')
-    type('')
-    expect(frame(container)?.getAttribute('data-active')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('settles on a line that wraps beside the dock but would fit in the box', () => {
-    // The box gives text more room than the row with the dock does. Judged at
-    // each one's own width, this line wraps, goes to the box, fits, goes back,
-    // and wraps again, until React gives up and takes the app down.
-    const lane = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600)
-    const height = vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {
-      return Number.parseFloat(this.style.width) < 565 ? 40 : 20
-    })
+  it('offers the web as coming soon rather than as a working control', () => {
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    expect(screen.getByRole('button', { name: 'Web search is coming soon' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('holds the model control it is given among its tools', () => {
+    render(
+      <VoiceModeProvider>
+        <Composer conversationId="cnv_1" placeholder="Reply" onSend={vi.fn(async () => ({ ok: true }))} turnControl={<button type="button">Model</button>} />
+      </VoiceModeProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Model' })).toBeTruthy()
+  })
+})
+
+describe('the three dots', () => {
+  it('marks the row when Studio may act without asking', () => {
+    workspace.settings.permission = 'auto'
     try {
       const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
-      type('A line right on the edge of wrapping')
-      expect(frame(container)?.getAttribute('data-stacked')).toBe('true')
+      expect(screen.getByRole('button', { name: /^More options\. Studio may:/ })).toBeTruthy()
+      expect(container.querySelector('[data-mode-marker]')).not.toBeNull()
     } finally {
-      lane.mockRestore()
-      height.mockRestore()
+      workspace.settings.permission = 'ask'
     }
   })
 
-  it('paints the voice dock in the filtered layer, with the controls outside it', () => {
+  it('stays unmarked on Ask, and holds the mode and dictation', async () => {
     const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
-    const surface = container.querySelector('[data-composer-surface]')
-    expect(surface?.querySelectorAll('[data-composer-dock]')).toHaveLength(1)
-    expect(surface?.querySelector('button, textarea')).toBeNull()
+    expect(container.querySelector('[data-mode-marker]')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+    expect(await screen.findByText('What Studio may do')).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: VOICE_UNAVAILABLE_REASON })).toBeTruthy()
   })
 })
 
@@ -572,23 +581,20 @@ describe('voice on an insecure origin', () => {
     Reflect.deleteProperty(window, 'isSecureContext')
   })
 
-  it('keeps the voice controls in place and disabled, with the reason as their label', () => {
+  it('keeps the voice controls in place and disabled, with the reason as their label', async () => {
     Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true })
     const onSend = vi.fn(async () => ({ ok: true }))
     renderComposer(onSend)
 
-    // Both voice controls answer as disabled, and the reason is each one's
-    // label - the dictate control and voice mode carry the same sentence
-    // because they refuse for the same reason.
-    const disabled = screen.getAllByRole('button', {
-      name: VOICE_UNAVAILABLE_REASON,
-    })
-    expect(disabled).toHaveLength(2)
-    for (const control of disabled) expect(control.hasAttribute('disabled')).toBe(true)
-    expect(screen.queryByRole('button', { name: 'Dictate' })).toBeNull()
+    // Voice mode stays in the row and dictation stays in the menu; both answer
+    // as disabled, and the reason is each one's label.
+    const voice = screen.getByRole('button', { name: VOICE_UNAVAILABLE_REASON })
+    expect(voice.hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: 'Voice mode' })).toBeNull()
-    // The line that used to stand where these buttons are is gone; the
-    // field's cluster is icons again.
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+    const dictate = await screen.findByRole('menuitem', { name: VOICE_UNAVAILABLE_REASON })
+    expect(dictate.hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('menuitem', { name: 'Dictate' })).toBeNull()
     expect(screen.queryByRole('note')).toBeNull()
     // Everything else still answers: the field and its send control are not
     // part of the degradation.
@@ -623,12 +629,13 @@ describe('voice on an insecure origin', () => {
     }
   })
 
-  it('keeps the voice controls enabled on a secure origin', () => {
+  it('keeps the voice controls enabled on a secure origin', async () => {
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
     const onSend = vi.fn(async () => ({ ok: true }))
     renderComposer(onSend)
 
-    expect(screen.getByRole('button', { name: 'Dictate' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+    expect(await screen.findByRole('menuitem', { name: 'Dictate' })).toBeTruthy()
     const voice = screen.getByRole('button', { name: 'Voice mode' })
     expect(voice.hasAttribute('disabled')).toBe(false)
   })
@@ -929,5 +936,76 @@ describe('the slash, from the field', () => {
     // The action ran; the composer holds no sentence about a success — the
     // transcript's row is the one place the state is said.
     expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
+describe('the quote strip', () => {
+  afterEach(() => {
+    clearQuote('cnv_1')
+    clearDraft('cnv_1')
+  })
+
+  const send = () => fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+  it('docks the passage and takes the caret when Reply fills it', async () => {
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    act(() => writeQuote('cnv_1', 'what was said'))
+
+    expect(await screen.findByText('what was said')).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+  })
+
+  it('sends the passage ahead of the words, then lets it go', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    writeQuote('cnv_1', 'first\nsecond')
+    renderComposer(onSend)
+    type('why?')
+    send()
+
+    await waitFor(() => expect(readQuote('cnv_1')).toBe(''))
+    expect(onSend).toHaveBeenCalledWith('> first\n> second\n\nwhy?', [], [])
+    expect(field()).toBe('')
+  })
+
+  it('keeps the passage when the harness refuses the message', async () => {
+    const onSend = vi.fn(async () => ({ ok: false }))
+    writeQuote('cnv_1', 'what was said')
+    renderComposer(onSend)
+    type('why?')
+    send()
+
+    await waitFor(() => expect(onSend).toHaveBeenCalled())
+    await act(async () => { await Promise.resolve() })
+    expect(readQuote('cnv_1')).toBe('what was said')
+    expect(field()).toBe('why?')
+  })
+
+  it('does not send a passage with nothing said about it', () => {
+    writeQuote('cnv_1', 'what was said')
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    expect(screen.getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('removes the passage and leaves the words', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    writeQuote('cnv_1', 'what was said')
+    renderComposer(onSend)
+    type('a fresh thought')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove quote' }))
+    send()
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('a fresh thought', [], []))
+  })
+})
+
+describe('the quote strip leaving', () => {
+  it('stays on screen for its exit, then goes', async () => {
+    writeQuote('cnv_1', 'what was said')
+    renderComposer(vi.fn(async () => ({ ok: true })))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove quote' }))
+
+    expect(readQuote('cnv_1')).toBe('')
+    expect(screen.queryByText('what was said')).not.toBeNull()
+    await waitFor(() => expect(screen.queryByText('what was said')).toBeNull())
   })
 })

@@ -44,7 +44,7 @@ export function SplashScreen({
   return (
     <motion.div
       aria-hidden
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-surface"
+      className="studio-window-fill z-[100] flex items-center justify-center bg-surface"
       exit={{ opacity: 0, transition: { duration: SPLASH.exitDuration, ease: EASE_OUT } }}
     >
       {/* The mark leaves before the surface does.

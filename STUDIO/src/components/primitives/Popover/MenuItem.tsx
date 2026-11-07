@@ -59,11 +59,12 @@ export function MenuItem({
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        'studio-menu-row studio-control-flat flex w-full items-start gap-2 rounded-sm px-2 text-left text-ui [--control-size:calc((var(--button-sm)+var(--button-md))/2)]',
+        'studio-menu-row studio-control-flat flex w-full items-start gap-2 rounded-[12px] px-2 text-left text-ui [--control-size:calc((var(--button-sm)+var(--button-md))/2)]',
         'transition-colors duration-fast',
-        selected ? 'bg-selected text-foreground' : 'text-muted-foreground',
+        'text-foreground',
+        selected && 'bg-selected',
         expanded && 'text-foreground ring-1 ring-inset ring-foreground/15',
-        !selected && !expanded && 'enabled:hover:bg-tint enabled:hover:text-foreground',
+        !selected && !expanded && 'enabled:hover:bg-tint',
         'enabled:active:bg-foreground/15',
         'disabled:cursor-default disabled:opacity-45',
         destructive && '[&_.studio-icon]:text-danger/80 hover:[&_.studio-icon]:text-danger',
@@ -107,7 +108,7 @@ export function MenuItem({
       ) : null}
       {showCheckColumn || endIcon !== undefined ? (
         <span aria-hidden className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
-          {selected ? <Icons.check /> : endIcon}
+          {selected ? <Icons.check className="text-accent" /> : endIcon}
         </span>
       ) : null}
     </button>

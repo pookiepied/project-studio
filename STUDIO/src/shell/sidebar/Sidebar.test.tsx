@@ -7,18 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Sidebar } from './Sidebar'
 
 /**
- * One list at a time.
+ * The left column holds conversations and projects on every route. Settings
+ * carries its own section list inside its page (`SettingsNav`).
  *
- * The left column holds where you can go. On the app surfaces that is
- * conversations and projects; while Settings is the route it is the settings
- * tree, in the same column, at the same width, with a way back at the top --
- * and the conversations are off the screen, because a column showing both
- * lists is the second-nav-column mistake this task exists to end.
- *
- * The stores are stubbed rather than mounted: what is under test here is which
- * list the column holds, not the state machines behind either list. The
- * settings route is reached exactly as the shortcut and the palette reach it,
- * through the navigation store's own shape of the route.
+ * The stores are stubbed rather than mounted: what is under test here is what the
+ * column holds, not the state machines behind it.
  */
 
 const CONVERSATION = {
@@ -71,34 +64,13 @@ vi.mock('@/features/chat/connection/fork', () => ({
 afterEach(cleanup)
 
 describe('the sidebar column while Settings is the route', () => {
-  it('holds the settings tree -- groups and rows -- and a way back at the top', () => {
+  it('keeps the conversations: Settings carries its own section list', () => {
     navigation.route = { kind: 'settings', sectionId: 'general' }
     render(<Sidebar open compact={false} onNewProject={() => {}} />)
 
-    expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeTruthy()
-    // Group headings are the tree's `<p>` labels. One group shares its name
-    // with a row inside it -- Account, which is filed under itself -- so the
-    // query names the heading kind, not just the words.
-    for (const group of ['Application', 'Account', 'Providers', 'Extensions', 'Agent', 'Coding', 'Archived']) {
-      expect(
-        screen.getByText((_content, element) => element?.tagName === 'P' && _content === group),
-      ).toBeTruthy()
-    }
-    expect(screen.getByRole('button', { name: 'Models' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
-  })
-
-  it('holds no conversations, no project controls and no footer shortcuts', () => {
-    navigation.route = { kind: 'settings', sectionId: 'general' }
-    render(<Sidebar open compact={false} onNewProject={() => {}} />)
-
-    expect(screen.queryByText('A conversation being read')).toBeNull()
-    expect(screen.queryByText('Conversations')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'New conversation' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Sidebar options' })).toBeNull()
-    // Account the row is the tree's own; Account the footer shortcut is gone.
-    expect(screen.getAllByRole('button', { name: 'Account' })).toHaveLength(1)
+    expect(screen.getByText('A conversation being read')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'New conversation' })).toBeTruthy()
+    expect(screen.queryByRole('navigation', { name: 'Settings sections' })).toBeNull()
   })
 })
 

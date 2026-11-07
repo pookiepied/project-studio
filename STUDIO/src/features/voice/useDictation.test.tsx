@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { DictationBar } from './DictationBar'
-import { useDictation } from './useDictation'
+import { DictationControls, DictationPrompt } from './DictationBar'
+import type { DictationStage } from './useDictation'
+import { appendTake, useDictation } from './useDictation'
 
 /**
  * The dictation hook, against the microphone.
@@ -58,13 +59,7 @@ describe('a permission question that is never answered', () => {
 
   it('gives the waiting its own face, so a stall does not read as no microphone', () => {
     render(
-      <DictationBar
-        stage="requesting"
-        elapsedMs={0}
-        denied={false}
-        note={null}
-        onFrame={() => () => {}}
-      />,
+      <DictationPrompt stage="requesting" denied={false} note={null} />,
     )
 
     expect(screen.getByText('Asking for the microphone')).toBeTruthy()
@@ -75,26 +70,72 @@ describe('a permission question that is never answered', () => {
   })
 })
 
-describe('the live strip', () => {
-  it('shows the clock and the escape hint while recording, and no words', () => {
-    render(
-      <DictationBar stage="recording" elapsedMs={4200} denied={false} note={null} onFrame={() => () => {}} />,
-    )
-    expect(screen.getByText('Esc cancels')).toBeTruthy()
+function controls(stage: DictationStage, actions: Partial<Parameters<typeof DictationControls>[0]> = {}) {
+  return (
+    <DictationControls
+      stage={stage}
+      elapsedMs={4200}
+      onFrame={() => () => {}}
+      onCancel={vi.fn()}
+      onPause={vi.fn()}
+      onResume={vi.fn()}
+      onFinish={vi.fn()}
+      {...actions}
+    />
+  )
+}
+
+describe('the take controls', () => {
+  it('shows the clock, and offers cancel, pause and finish while recording', () => {
+    const onCancel = vi.fn()
+    const onPause = vi.fn()
+    const onFinish = vi.fn()
+    render(controls('recording', { onCancel, onPause, onFinish }))
+
     expect(screen.getByText('0:04')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop and transcribe' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(onPause).toHaveBeenCalledTimes(1)
+    expect(onFinish).toHaveBeenCalledTimes(1)
+  })
+
+  it('turns Pause into Resume, and stills the dot', () => {
+    const onResume = vi.fn()
+    const { container } = render(controls('paused', { onResume }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(onResume).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('.studio-recording-dot')?.hasAttribute('data-paused')).toBe(true)
   })
 
   it('keeps the bars and swaps the clock for the word when transcribing', () => {
-    const { container, rerender } = render(
-      <DictationBar stage="recording" elapsedMs={4200} denied={false} note={null} onFrame={() => () => {}} />,
-    )
-    const bars = container.querySelector('[aria-hidden]')
-    rerender(
-      <DictationBar stage="processing" elapsedMs={4200} denied={false} note={null} onFrame={() => () => {}} />,
-    )
-    // The same element: the strip did not empty and refill, one thing in it changed.
-    expect(container.querySelector('[aria-hidden]')).toBe(bars)
+    const { container, rerender } = render(controls('recording'))
+    const bars = container.querySelector('.justify-end[aria-hidden]')
+    rerender(controls('processing'))
+
+    // The same element: the row did not empty and refill, one thing in it changed.
+    expect(container.querySelector('.justify-end[aria-hidden]')).toBe(bars)
     expect(screen.getByText('Transcribing')).toBeTruthy()
-    expect(screen.queryByText('Esc cancels')).toBeNull()
+    expect(screen.queryByText('0:04')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')).toBe(true)
+  })
+})
+
+describe('the prompt while there are no words', () => {
+  it('invites speech, and says when the take is paused', async () => {
+    const { rerender } = render(<DictationPrompt stage="recording" denied={false} note={null} />)
+    expect(screen.getByText("Go ahead, I'm listening")).toBeTruthy()
+
+    rerender(<DictationPrompt stage="paused" denied={false} note={null} />)
+    expect(await screen.findByText('Paused')).toBeTruthy()
+  })
+})
+
+describe('a take following a draft', () => {
+  it('is what the field shows during the take and what it keeps after', () => {
+    expect(appendTake('Typed first.  ', 'Then spoken.')).toBe('Typed first. Then spoken.')
+    expect(appendTake('   ', 'Only spoken.')).toBe('Only spoken.')
   })
 })

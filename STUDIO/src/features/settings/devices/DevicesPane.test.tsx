@@ -108,9 +108,9 @@ afterEach(() => {
 })
 
 async function turnOn() {
-  await screen.findByRole('radio', { name: 'On' })
+  await screen.findByRole('switch', { name: 'Open on other devices' })
   await act(async () => {
-    fireEvent.click(screen.getByRole('radio', { name: 'On' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Open on other devices' }))
   })
 }
 
@@ -119,7 +119,7 @@ describe('DevicesPane', () => {
     render(<DevicesPane />)
 
     expect(screen.getByText(/done from Studio on the PC/)).not.toBeNull()
-    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.queryByRole('switch')).toBeNull()
   })
 
   it('shows nothing reachable until the switch is on, and none of the sections', async () => {
@@ -324,7 +324,7 @@ describe('DevicesPane', () => {
     await screen.findByText('Pairing code')
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('radio', { name: 'Off' }))
+      fireEvent.click(screen.getByRole('switch', { name: 'Open on other devices' }))
     })
 
     await waitFor(() => expect(screen.queryByText('Pairing code')).toBeNull())

@@ -53,6 +53,20 @@
     color: var(--muted-foreground);
   }
 
+  /* A file's mark wears its kind's tone; a kind without one stays muted. */
+  .studio-tone-accent { --tone: var(--tone-accent); }
+  .studio-tone-blue { --tone: var(--tone-blue); }
+  .studio-tone-teal { --tone: var(--tone-teal); }
+  .studio-tone-green { --tone: var(--tone-green); }
+  .studio-tone-yellow { --tone: var(--tone-yellow); }
+  .studio-tone-orange { --tone: var(--tone-orange); }
+  .studio-tone-red { --tone: var(--tone-red); }
+  .studio-tone-purple { --tone: var(--tone-purple); }
+
+  .studio-file-mark {
+    color: var(--tone, var(--muted-foreground));
+  }
+
   /* Icon stroke, held constant in device pixels.
 
      The marks are drawn on a 24-unit grid and set anywhere from 12 to 22px, so
@@ -150,6 +164,28 @@
     50% {
       opacity: 0.65;
     }
+  }
+
+  /* A take in progress. Red is the one meaning this colour has in the composer,
+     and the glow is what lets a dot this small hold its own beside the clock.
+     Paused, it goes still and grey, so the state reads without the label. */
+  .studio-recording-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--danger);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 22%, transparent);
+    animation: studio-breathe 1.6s ease-in-out infinite;
+    transition:
+      background-color var(--duration-fast) ease-out,
+      box-shadow var(--duration-fast) ease-out;
+  }
+
+  .studio-recording-dot[data-paused] {
+    background: var(--muted-foreground);
+    box-shadow: none;
+    animation: none;
   }
 
   /* The editorial serif. Display sizes carry the page's one statement -- the

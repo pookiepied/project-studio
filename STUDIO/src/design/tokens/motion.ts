@@ -92,6 +92,17 @@ export function floatingMotion(x = 0, y = 0) {
   } as const
 }
 
+/**
+ * The Reply pill: a small thing answering a gesture, so it travels further and
+ * shrinks more than a panel does, rising from the selection beneath it.
+ */
+export const PILL_MOTION = {
+  initial: { opacity: 0, scale: 0.86, y: 6 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.9, y: 4, transition: { duration: DURATION.base, ease: EASE_IN } },
+  transition: { duration: DURATION.base, ease: EASE_OUT },
+} as const
+
 export const FADE = {
   initial: { opacity: 0 },
   animate: { opacity: 1 },

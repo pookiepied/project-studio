@@ -72,7 +72,7 @@ export function AnimatedItem({
  */
 export function WorkingHalo({ working, children }: { working: boolean; children: ReactNode }) {
   return (
-    <span className="relative flex size-7 shrink-0 items-center justify-center rounded-lg bg-selected text-muted-foreground">
+    <span className="relative flex size-7 shrink-0 items-center justify-center rounded-lg bg-soft text-muted-foreground">
       {working ? (
         <motion.span
           aria-hidden

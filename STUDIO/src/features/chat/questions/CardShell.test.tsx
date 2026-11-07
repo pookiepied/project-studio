@@ -84,7 +84,7 @@ describe('the shared card shell', () => {
     const text = container.textContent ?? ''
     expect(text.indexOf('Permission')).toBeGreaterThanOrEqual(0)
     expect(text.indexOf('Permission')).toBeLessThan(text.indexOf('Write '))
-    expect(container.querySelector('svg.lucide-message-circle-question-mark')).not.toBeNull()
+    expect(container.querySelector('svg.studio-mark-ask')).not.toBeNull()
   })
 
   it('offers Always only when the conversation belongs to a project', () => {

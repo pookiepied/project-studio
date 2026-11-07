@@ -27,11 +27,8 @@ import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/compo
  * does without asking to be read: the same length on every row, so none of
  * them looks like the important one.
  *
- * The panel opens off the capsule, not off the plus. The button sits inside
- * the capsule's padding, and a panel placed against the button's edge sat on
- * the capsule's border. The distance is the padding twice over: once to
- * reach the capsule's edge, and the same again above it, so the gap outside
- * the capsule is the gap the button has inside it.
+ * The panel opens off the composer's box, not off the paperclip, so the gap
+ * outside the box is the same on every menu that opens from its tools.
  */
 export function AddMenu({ onAttach }: { onAttach?: () => void }) {
   const [open, setOpen] = useState(false)
@@ -47,16 +44,16 @@ export function AddMenu({ onAttach }: { onAttach?: () => void }) {
       onOpenChange={setOpen}
       side="top"
       align="start"
-      offset={COMPOSER.paddingBlock * 2}
+      offset={COMPOSER.menuOffset}
       className="min-w-56"
       trigger={
         <IconButton
           label="Add context"
-          size="md"
+          size="xs"
           active={open}
           onClick={() => setOpen((value) => !value)}
         >
-          <Icons.add size="md" />
+          <Icons.paperclip size="md" />
         </IconButton>
       }
     >

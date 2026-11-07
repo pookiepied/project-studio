@@ -157,7 +157,7 @@ export function Tooltip({
               // flips with the theme and always reads as a separate object
               // rather than a lighter patch of the same one.
                 'studio-floating-surface pointer-events-none fixed z-50 max-w-80 whitespace-normal break-words rounded-lg px-2 py-1',
-                'bg-primary text-primary-foreground',
+                'bg-tooltip text-tooltip-foreground',
                 'text-caption shadow-overlay',
               )}
             >

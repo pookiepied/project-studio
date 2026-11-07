@@ -1,5 +1,5 @@
 import { createContext, memo, useContext, type ComponentProps, type ReactNode } from 'react'
-import ReactMarkdown, { defaultUrlTransform, type Components, type ExtraProps } from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform, type Components, type ExtraProps, type Options } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -10,6 +10,7 @@ import { MarkdownLink } from './MarkdownLink'
 import { FileReference } from './FileReference'
 import { parsePathReference } from './pathReference'
 import { prepareMath } from './prepareMath'
+import { rehypeCaret } from './rehypeCaret'
 import { rehypeReply, type Sources } from './rehypeReply'
 import { VISUAL_FENCES, VisualBlock } from './visuals'
 import { LOCAL_IMAGE, remarkReplyFiles, ReplyImage } from './ReplyImage'
@@ -159,6 +160,8 @@ function textOf(node: FenceNode): string {
   return text.replace(/\n$/, '')
 }
 
+type PluggableList = NonNullable<Options['rehypePlugins']>
+
 const StreamingContext = createContext(false)
 const UserContext = createContext(false)
 const InsideLink = createContext(false)
@@ -288,7 +291,7 @@ const COMPONENTS: Components = {
   a: ReplyLink,
 }
 
-export const Markdown = memo(function Markdown({ text, streaming = false, user = false, sources }: { text: string; streaming?: boolean; user?: boolean; sources?: Sources }): ReactNode {
+export const Markdown = memo(function Markdown({ text, streaming = false, user = false, sources, caret = false }: { text: string; streaming?: boolean; user?: boolean; sources?: Sources; /** This block holds the end of a reply still being written. */ caret?: boolean }): ReactNode {
   // The maths plugins join the pipeline only for a reply that carries a
   // formula, and only once they have arrived (`useMath`). The sanitiser
   // keeps its place between raw and katex either way.
@@ -300,11 +303,12 @@ export const Markdown = memo(function Markdown({ text, streaming = false, user =
       skipHtml={user}
       remarkPlugins={math === null ? [remarkGfm, remarkReplyFiles] : [remarkGfm, remarkReplyFiles, math.remark]}
       urlTransform={urlTransform}
-      rehypePlugins={
-        user ? (math === null ? [reply] : [reply, math.rehype]) : math === null
-          ? [rehypeRaw, [rehypeSanitize, SCHEMA], reply]
-          : [rehypeRaw, [rehypeSanitize, SCHEMA], reply, math.rehype]
-      }
+      rehypePlugins={[
+        ...(user ? [] : [rehypeRaw, [rehypeSanitize, SCHEMA]] as PluggableList),
+        reply,
+        ...(math === null ? [] : [math.rehype]),
+        ...(caret ? [rehypeCaret] : []),
+      ]}
       components={COMPONENTS}
     >
       {source}

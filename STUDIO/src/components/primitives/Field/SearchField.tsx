@@ -48,7 +48,7 @@ export function SearchField({
         onKeyDown={onKeyDown}
         className={cn(
           'min-h-[var(--button-sm)] pr-[calc(var(--button-sm)+0.375rem)]',
-          appearance === 'menu' && 'rounded-full border-0 bg-tint pl-8 focus:bg-selected',
+          appearance === 'menu' && 'rounded-full border-0 bg-tint pl-8 focus:bg-soft',
         )}
       />
       {value === '' ? null : (

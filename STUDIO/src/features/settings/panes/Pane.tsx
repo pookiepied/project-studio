@@ -19,17 +19,25 @@ export function Pane({
   return (
     <div className="studio-settings-pane">
       <header className="mb-5">
-        {/* The editorial serif, because this is a page title and that is the
-            serif's one job (ADR 0043). It was set in `text-title` — Inter,
-            semibold — which made Settings the only page in the app whose
-            heading answered to a different voice than the home greeting and the
-            dialog headers. One page disagreeing is what reads as the app using
-            several fonts at random rather than two with a rule. */}
         <h1 className="studio-heading text-foreground">{title}</h1>
         {description ? <p className="mt-1 text-ui text-muted-foreground">{description}</p> : null}
       </header>
-      <div className="flex flex-col divide-y">{children}</div>
+      <div className="studio-settings-rows flex flex-col">{children}</div>
     </div>
+  )
+}
+
+/**
+ * A titled group of settings: the pane's unit once a pane holds more than one
+ * kind of thing. Its children are `Row`s or a control that owns the full width.
+ */
+export function PaneSection({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="studio-settings-section">
+      <h2 className="text-ui font-medium text-foreground">{title}</h2>
+      {hint ? <p className="mt-0.5 text-caption text-muted-foreground">{hint}</p> : null}
+      <div className="studio-settings-rows mt-3 flex flex-col">{children}</div>
+    </section>
   )
 }
 

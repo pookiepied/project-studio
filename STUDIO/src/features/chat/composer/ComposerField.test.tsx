@@ -13,25 +13,6 @@ afterEach(() => {
 })
 
 describe('composer appearance changes', () => {
-  it('does not count multiline padding as another line when a draft shrinks', () => {
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-    const computedStyle = window.getComputedStyle.bind(window)
-    const style = document.createElement('textarea').style
-    style.lineHeight = '12px'
-    style.paddingTop = '4px'
-    style.paddingBottom = '4px'
-    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) =>
-      element instanceof HTMLTextAreaElement ? style : computedStyle(element))
-    vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockReturnValue(20)
-    const onMultilineChange = vi.fn()
-    render(<ComposerField value="One line" onChange={vi.fn()} onSubmit={vi.fn()}
-      onMultilineChange={onMultilineChange} multiline inset={{ left: 0, right: 0 }} placeholder="Reply" />)
-    expect(onMultilineChange).toHaveBeenCalledWith(false)
-  })
-
   it('dissolves only the ends that have more text past them', () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -39,8 +20,7 @@ describe('composer appearance changes', () => {
     })
     vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000)
     vi.spyOn(HTMLTextAreaElement.prototype, 'clientHeight', 'get').mockReturnValue(184)
-    render(<ComposerField value="A long draft" onChange={vi.fn()} onSubmit={vi.fn()}
-      onMultilineChange={vi.fn()} multiline inset={{ left: 0, right: 0 }} placeholder="Reply" />)
+    render(<ComposerField value="A long draft" onChange={vi.fn()} onSubmit={vi.fn()} placeholder="Reply" />)
     const field = screen.getByRole<HTMLTextAreaElement>('textbox')
     const fades = () => [field.style.getPropertyValue('--fade-top'), field.style.getPropertyValue('--fade-bottom')]
     expect(fades()).toEqual(['0px', '14px'])
@@ -73,8 +53,7 @@ describe('composer appearance changes', () => {
     })
     const onChange = vi.fn()
     const onSubmit = vi.fn()
-    render(<ComposerField value="Keep my draft" onChange={onChange} onSubmit={onSubmit}
-      onMultilineChange={vi.fn()} multiline={false} inset={{ left: 0, right: 0 }} placeholder="Reply" />)
+    render(<ComposerField value="Keep my draft" onChange={onChange} onSubmit={onSubmit} placeholder="Reply" />)
     const field = screen.getByRole<HTMLTextAreaElement>('textbox')
     expect(field.style.height).toBe(`${Math.ceil(11 * 1.55)}px`)
 

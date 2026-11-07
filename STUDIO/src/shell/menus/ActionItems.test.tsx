@@ -4,30 +4,20 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { readDraft } from '@/features/chat/composer/drafts'
-import { readClipboardText } from '@/lib/clipboard'
+import { clearQuote, readQuote } from '@/features/chat/composer/drafts'
+import { copyText, readClipboardText } from '@/lib/clipboard'
 import { fieldAt } from '@/lib/field'
 import { ActionItems } from './ActionItems'
 
 /**
- * Three lists, each only about the thing that summoned it. What is pinned:
- * a text field gets the field's verbs and none of the app's; a selection
- * gets its three and none of the app's; the page gets the app's; and "Ask
- * about this" carries the selection into the home draft as a quotation.
+ * Two lists, each only about the thing that summoned it. What is pinned: a text
+ * field gets Cut, Copy and Paste; a selection gets Copy, and Reply only in a
+ * transcript, which docks it in that conversation's composer.
  */
 
-const goHome = vi.fn()
 vi.mock('@/lib/clipboard', () => ({
   copyText: vi.fn(async () => true),
   readClipboardText: vi.fn(async () => ''),
-}))
-
-vi.mock('@/stores/navigation', () => ({
-  useNavigation: () => ({
-    goHome,
-    setPaletteOpen: vi.fn(),
-    openSettings: vi.fn(),
-  }),
 }))
 
 afterEach(() => {
@@ -35,7 +25,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-const labels = () => screen.getAllByRole('menuitem').map((item) => item.textContent?.trim())
+const labels = () => screen.getAllByRole('button').map((item) => item.textContent?.trim())
 
 /** A textarea with its caret placed, for the field list to read. */
 function fieldWith(value: string, from: number, to: number): HTMLTextAreaElement {
@@ -46,43 +36,31 @@ function fieldWith(value: string, from: number, to: number): HTMLTextAreaElement
   return field
 }
 
-describe('the action lists', () => {
+describe('the action toolbar', () => {
   it('gives a text field its own verbs and nothing else', () => {
     const field = fieldWith('hello world', 0, 5)
     render(<ActionItems kind="field" selection="" target={field} close={vi.fn()} />)
-
-    expect(labels()).toEqual(['Cut', 'Copy', 'Paste', 'Select all'])
-    expect(screen.queryByText('New conversation')).toBeNull()
-    expect(screen.queryByText('Reload interface')).toBeNull()
+    expect(labels()).toEqual(['Cut', 'Copy', 'Paste'])
   })
 
   it('greys Cut and Copy when the field has no selection', () => {
     const field = fieldWith('hello', 2, 2)
     render(<ActionItems kind="field" selection="" target={field} close={vi.fn()} />)
 
-    const disabled = (name: string) => screen.getByRole('menuitem', { name }).hasAttribute('disabled')
+    const disabled = (name: string) => screen.getByRole('button', { name }).hasAttribute('disabled')
     expect(disabled('Cut')).toBe(true)
     expect(disabled('Copy')).toBe(true)
     expect(disabled('Paste')).toBe(false)
   })
 
-  it('wakes Cut and Copy when Select all widens the selection under them', () => {
+  it('wakes Cut and Copy when the field gains a selection', () => {
     const field = fieldWith('hello', 2, 2)
     render(<ActionItems kind="field" selection="" target={field} close={vi.fn()} />)
-    const disabled = (name: string) => screen.getByRole('menuitem', { name }).hasAttribute('disabled')
-    expect(disabled('Cut')).toBe(true)
-
-    // jsdom's `select()` does not raise `selectionchange`; the browser does,
-    // and the rows listen for it rather than for their own verb.
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Select all' }))
+    field.setSelectionRange(0, 5)
     act(() => {
       document.dispatchEvent(new Event('selectionchange'))
     })
-
-    expect(field.selectionStart).toBe(0)
-    expect(field.selectionEnd).toBe(5)
-    expect(disabled('Cut')).toBe(false)
-    expect(disabled('Copy')).toBe(false)
+    expect(screen.getByRole('button', { name: 'Cut' }).hasAttribute('disabled')).toBe(false)
   })
 
   it('pastes what the clipboard holds at the caret', async () => {
@@ -91,7 +69,7 @@ describe('the action lists', () => {
     const close = vi.fn()
     render(<ActionItems kind="field" selection="" target={field} close={close} />)
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Paste' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Paste' }))
     await act(async () => {
       await Promise.resolve()
     })
@@ -100,24 +78,31 @@ describe('the action lists', () => {
     expect(close).toHaveBeenCalledTimes(1)
   })
 
-  it('gives a selection its three verbs and none of the app\'s', () => {
+  it('offers only Copy for a selection outside a transcript', () => {
     render(<ActionItems kind="selection" selection="three words here" target={null} close={vi.fn()} />)
-    expect(labels()).toEqual(['Copy', 'Select all', 'Ask about this'])
+    expect(labels()).toEqual(['Copy'])
   })
 
-  it('gives the page the app\'s verbs', () => {
-    render(<ActionItems kind="page" selection="" target={null} close={vi.fn()} />)
-    expect(labels()).toEqual(['New conversation', 'Reload interface', 'SearchCtrl K', 'Settings'])
-  })
-
-  it('carries the selection home as a quotation, ready for the question', () => {
+  it('copies the selection and closes', () => {
     const close = vi.fn()
-    render(<ActionItems kind="selection" selection={'first line\nsecond line'} target={null} close={close} />)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Ask about this' }))
+    render(<ActionItems kind="selection" selection="three words" target={null} close={close} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
 
-    expect(readDraft(null)).toBe('> first line\n> second line\n\n')
-    expect(goHome).toHaveBeenCalledTimes(1)
+    expect(copyText).toHaveBeenCalledWith('three words')
     expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('docks a reply in the composer of the transcript it came from', () => {
+    const close = vi.fn()
+    const { container } = render(<div data-transcript="cnv_7"><p>said earlier</p></div>)
+    const target = container.querySelector('p')
+    render(<ActionItems kind="selection" selection="said earlier" target={target} close={close} />)
+    expect(labels()).toEqual(['Copy', 'Reply'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    expect(readQuote('cnv_7')).toBe('said earlier')
+    expect(close).toHaveBeenCalledTimes(1)
+    clearQuote('cnv_7')
   })
 
   it('knows a text field from the rest of the page', () => {

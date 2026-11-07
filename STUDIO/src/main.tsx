@@ -6,6 +6,7 @@ import { applyAppearance, loadAppearance } from '@/design/theme'
 import { assertScaleDefaults } from '@/design/tokens'
 import { flushDrafts, primeDrafts } from '@/features/chat/composer/drafts'
 import { loadDefaultPermission } from '@/platform/execution-preference'
+import { indicatorKind, installWindowFrame, overlayKind } from '@/platform/tauri'
 
 // Before anything writes to the root: compares the defaults `styles/type.css`
 // declares against the ones `typography.ts` owns, and complains in development
@@ -24,6 +25,14 @@ assertScaleDefaults()
 // the alternative, and it costs a visible flash at the wrong size and theme.
 const [appearance, initialPermission] = await Promise.all([loadAppearance(), loadDefaultPermission()])
 applyAppearance(appearance)
+
+// Before first paint for the same reason: the panel's inset and corner are part
+// of the first frame, and the window is still hidden while this runs. The
+// indicator and the screen overlay are bare transparent windows with no panel.
+// A frame that fails to install costs the inset, never the app's first paint.
+if (indicatorKind() === null && overlayKind() === null) {
+  await installWindowFrame().catch((error: unknown) => console.error('Window frame failed', error))
+}
 
 // Unsent composer text, read before the first composer mounts so its initial
 // value is the draft rather than an empty field corrected a frame later.

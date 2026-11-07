@@ -87,6 +87,54 @@ export function readDraft(conversationId: string | null): string {
   return cache[conversationId ?? NEW_CONVERSATION]?.text ?? ''
 }
 
+/**
+ * The passage a message is replying to, kept beside its draft.
+ *
+ * Filed in the same map under its own key, so it survives a quit and a change
+ * of conversation exactly as the words do, and goes the same way when it is
+ * evicted. Unlike a draft it is written from outside the composer, by the Reply
+ * pill, so a mounted composer has to hear about it.
+ */
+const quoteKey = (conversationId: string | null) => `quote:${conversationId ?? NEW_CONVERSATION}`
+const quoteListeners = new Set<() => void>()
+
+export function readQuote(conversationId: string | null): string {
+  return readDraft(quoteKey(conversationId))
+}
+
+/** Sets the passage, replacing any other: a message replies to one thing. */
+export function writeQuote(conversationId: string | null, text: string): void {
+  writeDraft(quoteKey(conversationId), text)
+  quoteListeners.forEach((listener) => listener())
+}
+
+/** Forgets the passage at once, for the same reason `clearDraft` does. */
+export function clearQuote(conversationId: string | null): void {
+  clearDraft(quoteKey(conversationId))
+  quoteListeners.forEach((listener) => listener())
+}
+
+export function subscribeQuotes(listener: () => void): () => void {
+  quoteListeners.add(listener)
+  return () => {
+    quoteListeners.delete(listener)
+  }
+}
+
+/** Markdown's quotation, line by line, so a multi-line passage stays one quote. */
+export function quotation(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')
+}
+
+/** What leaves for the harness: the passage as a quotation, then the words. */
+export function withQuotation(quote: string, words: string): string {
+  if (quote === '') return words
+  return words.trim() === '' ? quotation(quote) : `${quotation(quote)}\n\n${words}`
+}
+
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 
 /**

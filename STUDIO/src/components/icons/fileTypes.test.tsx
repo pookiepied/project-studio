@@ -4,7 +4,7 @@
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { FileTypeMark, fileTypeOf, formatOfName, markOfName, splitFilePath } from './fileTypes'
+import { FileTypeMark, fileToneClass, fileTypeOf, formatOfName, markOfName, splitFilePath } from './fileTypes'
 
 afterEach(() => {
   // The config does not set `globals: true`, so testing-library's automatic
@@ -17,6 +17,33 @@ afterEach(() => {
  * carries decides the glyph, an unknown or missing extension decides the
  * generic file mark, and nothing anywhere guesses.
  */
+describe('file kinds without a language', () => {
+  const glyph = (path: string, folder = false) => {
+    const { container } = render(<FileTypeMark path={path} folder={folder} />)
+    return container.innerHTML
+  }
+
+  it('gives programs, archives and folders their own marks and tones', () => {
+    expect(glyph('C:/Apps/Studio.exe')).toContain('studio-mark-fileExecutable')
+    expect(glyph('C:/Apps/Studio.exe')).toContain('studio-tone-orange')
+    expect(glyph('release.zip')).toContain('studio-mark-fileZip')
+    expect(glyph('src/features', true)).toContain('studio-mark-projectOpen')
+    expect(fileToneClass('src/features', true)).toBe('studio-tone-accent')
+  })
+
+  it('reads dotfiles by whole name', () => {
+    expect(glyph('.env')).toContain('studio-mark-fileSecret')
+    expect(glyph('.env.local')).toContain('studio-mark-fileSecret')
+    expect(glyph('.gitignore')).toContain('studio-mark-fileCog')
+  })
+
+  it('tones a language mark and leaves an unknown file neutral', () => {
+    expect(fileToneClass('main.rs')).toBe('studio-tone-orange')
+    expect(fileToneClass('notes.unknownkind')).toBeUndefined()
+    expect(glyph('notes.unknownkind')).toContain('studio-mark-file')
+  })
+})
+
 describe('fileTypeOf', () => {
   it('names the mark each known extension earns', () => {
     expect(fileTypeOf('src/x.ts')).toBe('typescript')
@@ -109,14 +136,14 @@ describe('brand-less formats', () => {
 
   it('draws the stand-in on a chip where no brand mark exists', () => {
     const { container } = render(<FileTypeMark path="db/query.sql" />)
-    expect(container.querySelector('svg.lucide-database')).not.toBeNull()
+    expect(container.querySelector('svg.studio-mark-database')).not.toBeNull()
   })
 
   it('draws yaml and xml stand-ins too', () => {
     const yaml = render(<FileTypeMark path="config/prod.yaml" />)
-    expect(yaml.container.querySelector('svg.lucide-file-cog')).not.toBeNull()
+    expect(yaml.container.querySelector('svg.studio-mark-fileCog')).not.toBeNull()
     const xml = render(<FileTypeMark path="feed.xml" />)
-    expect(xml.container.querySelector('svg.lucide-code-xml')).not.toBeNull()
+    expect(xml.container.querySelector('svg.studio-mark-codeXml')).not.toBeNull()
   })
 })
 
@@ -143,10 +170,10 @@ describe('FileTypeMark', () => {
   })
 
   it('falls back to the registry file mark for an unknown kind', () => {
-    const { container } = render(<FileTypeMark path="notes.txt" />)
+    const { container } = render(<FileTypeMark path="notes.unknownkind" />)
     // The fallback goes through the registry, so it is the stroked generic
     // file -- never an invented glyph.
-    expect(container.querySelector('svg.lucide-file-text')).not.toBeNull()
+    expect(container.querySelector('svg.studio-mark-file')).not.toBeNull()
   })
 })
 
@@ -180,8 +207,8 @@ describe('what counts as an extension', () => {
   })
 
   it('draws the generic file for a dotfile rather than a guessed glyph', () => {
-    const { container } = render(<FileTypeMark path=".gitignore" />)
-    expect(container.querySelector('svg.lucide-file-text')).not.toBeNull()
+    const { container } = render(<FileTypeMark path=".someconfig" />)
+    expect(container.querySelector('svg.studio-mark-file')).not.toBeNull()
   })
 
   it('does not let the format fallback read a dotfile as an extension either', () => {
@@ -189,6 +216,6 @@ describe('what counts as an extension', () => {
     // begins, so a dotfile could miss the first and still be glyphed by the
     // second. `.md` is the shape that separates the two rules.
     const { container } = render(<FileTypeMark path=".md" />)
-    expect(container.querySelector('svg.lucide-file-text')).not.toBeNull()
+    expect(container.querySelector('svg.studio-mark-file')).not.toBeNull()
   })
 })

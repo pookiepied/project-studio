@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '@/components/icons'
 import { extensionMark } from '@/components/icons/extensionMark'
-import { Button, IconButton, Segmented } from '@/components/primitives'
+import { Button, IconButton, Switch } from '@/components/primitives'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Pane } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
@@ -228,19 +228,14 @@ function ServerRow({
             <IconButton label="Remove" onClick={() => setConfirming(true)}>
               <Icons.delete />
             </IconButton>
-            <Segmented
-              layoutId={`mcp-${server.id}`}
-              ariaLabel={`${server.title} default`}
-              value={enabled ? 'on' : 'off'}
+            <Switch
+              label={`${server.title} default`}
+              checked={enabled}
               onChange={(value) => {
-                const next = value === 'on'
+                const next = value
                 setEnabled(next)
                 onToggle(next)
               }}
-              options={[
-                { id: 'off', label: 'Off' },
-                { id: 'on', label: 'On' },
-              ]}
             />
           </>
         )}

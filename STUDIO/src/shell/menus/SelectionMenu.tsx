@@ -1,38 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { fieldAt } from '@/lib/field'
+import { transcriptOf } from '@/shell/menus/ActionItems'
 import { EDGE_PADDING, FloatingMenu, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
 /**
- * The selection menu.
- *
- * ---- What it is ------------------------------------------------------------
- *
- * The same action list the right-click menu carries (`ActionItems` — one
- * list, two ways to summon it), offered the moment text is selected rather
- * than after a right-click. Selecting a phrase and acting on it is one
- * gesture in the user's head; routing it through a second gesture was the
- * app making its vocabulary harder to reach than its contents.
+ * The toolbar over selected transcript text: Copy and Reply.
  *
  * ---- When it appears -------------------------------------------------------
  *
- * On the pointer *rising* from a drag, on a double-click, and on the keys
- * that make a selection (Shift, the arrows, Home and friends). Never during
- * the drag itself — a menu chasing a moving caret is noise — and never from
- * a click that selected nothing.
+ * On the pointer *rising* from a drag, on a double-click, and on the keys that
+ * make a selection. Never during the drag itself, because a toolbar chasing a
+ * moving caret is noise, and never from a click that selected nothing. Only in a
+ * transcript: text selected on any other page is usually being copied, and
+ * Ctrl C or a right-click serves that without anything rising over the page.
  *
  * ---- Where it appears ------------------------------------------------------
  *
  * Centred over the selection's own rectangle: above it where there is room,
- * below it at the top of the window, growing from whichever edge it hugs. The
- * transcript scrolls under the top fades, so the menu follows its selection
- * on scroll rather than being dismissed by it — a menu that vanishes because
- * the page moved is a menu that punished the user for reading.
+ * below it at the top of the window. The transcript scrolls under the top fades,
+ * so the toolbar follows its selection on scroll rather than being dismissed by
+ * it, and leaves with the text when the text leaves the window.
  *
  * ---- When it leaves --------------------------------------------------------
  *
- * Any click outside it, Escape, the right-click menu opening, or the
- * selection collapsing. "Select all" deliberately does not dismiss it: that
- * verb is usually the first half of Copy.
+ * Any click outside it, Escape, or the selection collapsing. A right-click on
+ * the selection leaves it up, since this is what a right-click would offer.
  */
 
 /** Reads the current selection into menu state, or null if there is nothing to act on. */
@@ -87,6 +79,11 @@ export function SelectionMenu() {
       return
     }
 
+    if (transcriptOf(read.target) === null) {
+      setPlacement(null)
+      return
+    }
+
     setPlacement({
       x: read.rect.left, y: read.rect.top, anchor: read.rect,
       origin: 'bottom left', kind: 'selection',
@@ -107,6 +104,7 @@ export function SelectionMenu() {
     // lands. Inside the menu, the rows handle their own clicks.
     const onPointerDown = (event: PointerEvent) => {
       if (menuRef.current?.contains(event.target as Node)) return
+      if (event.button === 2) return
       close()
     }
 
@@ -151,9 +149,9 @@ export function SelectionMenu() {
       place()
     }
 
-    // The right-click menu supersedes this one; two menus over one selection
-    // is a decision the user did not make.
-    const onContextMenu = () => close()
+    // Right-clicking the selection keeps the toolbar; right-clicking elsewhere
+    // ends the selection, and `place` finds nothing.
+    const onContextMenu = () => place()
 
     document.addEventListener('pointerup', onPointerUp)
     document.addEventListener('pointerdown', onPointerDown, true)

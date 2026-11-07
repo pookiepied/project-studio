@@ -34,8 +34,8 @@ import { cn } from '@/lib/cn'
  * gesture cannot leave the glyph stuck mid-press.
  */
 
-type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-type Tone = 'quiet' | 'solid'
+type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'header'
+type Tone = 'quiet' | 'solid' | 'accent' | 'wash'
 
 /**
  * The three control steps, read from the scale rather than written as rem.
@@ -56,6 +56,7 @@ const SIZE_CLASS: Record<Size, string> = {
   md: 'size-[var(--button-md)]',
   lg: 'size-[var(--button-lg)]',
   xl: 'size-[var(--control-xl)]',
+  header: 'size-[var(--header-control)]',
 }
 
 /**
@@ -90,6 +91,10 @@ const TONE_CLASS: Record<Tone, string> = {
   // quiet. The arbitrary variant lands in the utilities layer, which is what
   // lets it beat the `.studio-icon` default in `styles/components.css`.
   solid: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary [&_.studio-icon]:text-primary-foreground',
+  // The composer's send: the one filled control in Family A.
+  accent: 'bg-accent text-accent-foreground hover:bg-accent/90 active:bg-accent [&_.studio-icon]:text-accent-foreground',
+  // On the accent wash, where a grey mark reads as a different control.
+  wash: 'text-accent-wash-foreground hover:bg-accent-wash-foreground/12 active:bg-accent-wash-foreground/20 [&_.studio-icon]:text-accent-wash-foreground',
 }
 
 interface IconButtonProps {

@@ -1,4 +1,5 @@
 import { Icons } from '@/components/icons'
+import { FileTypeMark } from '@/components/icons/fileTypes'
 import { IconButton } from '@/components/primitives'
 
 /**
@@ -29,7 +30,7 @@ export function PendingDocuments({
           key={`${document.name}-${document.size}-${index}`}
           className="inline-flex max-w-[min(18rem,100%)] items-center gap-1.5 rounded-full border bg-surface-raised py-0.5 pl-2.5 pr-1 text-caption text-foreground"
         >
-          <Icons.file size="sm" />
+          <FileTypeMark path={document.name} size="sm" />
           <span className="truncate">{document.name}</span>
           <span className="shrink-0 text-muted-foreground">{formatBytes(document.size)}</span>
           {onKeep !== undefined ? (

@@ -133,7 +133,7 @@ function mountPicker(options: { conversationId?: string } = {}) {
         {options.conversationId !== undefined ? (
           <ChatOpener conversationId={options.conversationId} />
         ) : null}
-        <TurnMenu />
+        <TurnMenu conversationId={options.conversationId ?? null} />
         <SettingsProbe />
       </WorkspaceProvider>
     </NavigationProvider>,

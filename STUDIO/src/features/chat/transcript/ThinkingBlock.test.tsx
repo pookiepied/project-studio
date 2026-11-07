@@ -38,11 +38,11 @@ afterEach(() => {
  * The classes the disclosure mark's wrapper carries. It is the row's second
  * icon-set mark — the thinking mark before the words is one too, since the
  * row left the brand mark — so `studio-icon` no longer identifies it on its
- * own. Lucide names the concept on the svg itself; the state classes the row
+ * own. The adapter names the concept on the svg itself; the state classes the row
  * drives live on the wrapper span around it.
  */
 function disclosureClasses(container: HTMLElement): string {
-  const svg = container.querySelector('button svg.lucide-chevron-right')
+  const svg = container.querySelector('button svg.studio-mark-disclosure')
   if (svg === null) throw new Error('expected a disclosure mark in the row')
   return svg.parentElement?.getAttribute('class') ?? ''
 }
@@ -183,7 +183,7 @@ describe('a run that has opened but delivered nothing', () => {
   it('carries no disclosure, because there is nothing behind it', () => {
     const { container } = render(<ThinkingBlock text="" span={measured(OPENED, null)} live />)
 
-    expect(container.querySelector('button svg.lucide-chevron-right')).toBeNull()
+    expect(container.querySelector('button svg.studio-mark-disclosure')).toBeNull()
   })
 
   it('is not a control: no tab stop, and nothing opens', () => {
@@ -218,12 +218,12 @@ describe('the thinking mark', () => {
     const { container: finished } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
-    expect(finished.querySelector('button svg.lucide-lightbulb')).not.toBeNull()
+    expect(finished.querySelector('button svg.studio-mark-thinking')).not.toBeNull()
 
     const { container: live } = render(
       <ThinkingBlock text="half a thought" span={measured(OPENED, null)} live />,
     )
-    expect(live.querySelector('button svg.lucide-lightbulb')).not.toBeNull()
+    expect(live.querySelector('button svg.studio-mark-thinking')).not.toBeNull()
   })
 
   it('is not the brand mark', () => {

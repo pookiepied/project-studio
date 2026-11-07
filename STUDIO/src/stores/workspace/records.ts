@@ -85,8 +85,8 @@ export function mapProject(project: ProjectRecordLike): Project {
       path: folder.path,
     })),
     // A checked-out branch is git's fact to report. Until some surface
-    // reports it, there is none to show - which IdentityLine already
-    // renders as "no branch control".
+    // reports it, there is none to show - which the header's menu
+    // renders as "no branch row".
     branch: null,
     branches: [],
     createdAt: project.createdAt,

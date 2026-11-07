@@ -211,12 +211,9 @@ function TextSegment({
   return (
     <Arrive className="studio-prose min-w-0">
       <ReplyConversation.Provider value={identity.conversationId ?? null}><StreamedMarkdown text={shown} streaming={growing || revealing} /></ReplyConversation.Provider>
-      {growing || revealing ? (
-        <span
-          aria-hidden
-          className="ml-0.5 inline-block h-[0.95em] w-[2px] translate-y-[0.15em] animate-pulse rounded-full bg-foreground/70 align-baseline"
-        />
-      ) : null}
+      {/* Before the first word there is no text to stand beside. After it, the
+          caret is the markdown's own: see `rehypeCaret`. */}
+      {shown === '' && growing ? <span aria-hidden className="studio-stream-caret animate-pulse" /> : null}
     </Arrive>
   )
 }

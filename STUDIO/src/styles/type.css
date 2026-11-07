@@ -11,7 +11,7 @@
    The offsets below mirror that file. If you change one, change both.
    --------------------------------------------------------------------------- */
 :root {
-  --ui-size: 13px;
+  --ui-size: 15px;
   /* Code text is an *offset* from the interface text, never an absolute size.
 
      A mono face at the same nominal size as its sans surroundings paints
@@ -97,6 +97,10 @@
   --icon-sm: calc(var(--ui-size) + 1px);
   --icon-md: calc(var(--ui-size) + 3px);
   --icon-lg: calc(var(--ui-size) + 9px);
+
+  /* The header's marks and controls, measured from Family A at its 15px text. */
+  --header-mark: calc(var(--ui-size) * 20 / 15);
+  --header-control: calc(var(--ui-size) * 29 / 15);
 
   /* The left edge of a row's label: one `sm` mark across, plus the gap the row
      puts between its mark and its words. A follow-on line -- a failure's

@@ -45,7 +45,7 @@ export function InlineRename({
         if (event.key === 'Escape') onCancel()
       }}
       size={fit ? Math.max(draft.length, 14) : undefined}
-      className={cn('bg-selected text-ui text-foreground outline-none', fit ? null : 'w-full', className)}
+      className={cn('bg-soft text-ui text-foreground outline-none', fit ? null : 'w-full', className)}
     />
   )
 }

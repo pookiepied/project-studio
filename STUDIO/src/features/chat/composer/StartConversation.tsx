@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { visionRefusal } from '@/domain/attachments/images'
 import type { PermissionMode } from '@/domain/permissions/modes'
 import { Composer } from '@/features/chat/composer/Composer'
+import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useFirstTurn } from '@/features/chat/connection/first-turn'
 import { firstAdmission, rememberFirstAdmission, type FirstComposerPosition } from '@/features/chat/connection/first-attach'
 import { useVoiceModeContext } from '@/features/voice'
@@ -142,6 +143,7 @@ export function StartConversation({
       <div ref={composer}>
         <Composer
           conversationId={null}
+          turnControl={<TurnMenu conversationId={null} />}
           draftPermission={{ value: draftSettings.permission, onChange: setPermissionOverride }}
           placeholder={placeholder}
           onSend={onSend}

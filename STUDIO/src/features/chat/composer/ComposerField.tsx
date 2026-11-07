@@ -7,14 +7,11 @@ export interface ComposerFieldHandle {
 }
 
 /**
- * The height animation, on the reshape clock (`SHAPE_MOTION` in `Composer`):
- * the same slow duration and the same ease-out the footer track and the
- * controls' relocation use. A string rather than a Framer value because the
- * height is written imperatively by the measurement below, and it is also
- * suspended imperatively while measuring — see `remeasure`.
+ * The height animation. A string rather than a Framer value because the height
+ * is written imperatively by the measurement below.
  */
 const SHAPE_CURVE = `${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
-const HEIGHT_TRANSITION = `height ${SHAPE_CURVE}, padding ${SHAPE_CURVE}`
+const HEIGHT_TRANSITION = `height ${SHAPE_CURVE}`
 
 /**
  * How tall this text would be at a given width, asked WITHOUT touching the
@@ -36,10 +33,10 @@ const HEIGHT_TRANSITION = `height ${SHAPE_CURVE}, padding ${SHAPE_CURVE}`
  * `height: auto` is simply the content height — no reset needed, because there
  * is no previous height for it to floor against.
  */
-function measure(element: HTMLTextAreaElement, width: number): { height: number; padding: number } {
+function measure(element: HTMLTextAreaElement, width: number): number {
   const parent = element.parentElement
   const stand = element.cloneNode(false)
-  if (!parent || !(stand instanceof HTMLTextAreaElement)) return { height: element.scrollHeight, padding: 0 }
+  if (!parent || !(stand instanceof HTMLTextAreaElement)) return element.scrollHeight
 
   // `value` is a property, not an attribute, so a clone starts empty.
   stand.value = element.value
@@ -55,28 +52,8 @@ function measure(element: HTMLTextAreaElement, width: number): { height: number;
 
   parent.appendChild(stand)
   const height = stand.scrollHeight
-  // Read here, not from the field: the field's own padding is animating
-  // between arrangements, and this is where it ends up.
-  const style = getComputedStyle(stand)
-  const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0)
   parent.removeChild(stand)
-  return { height, padding }
-}
-
-/**
- * The slot's width once the frame has finished widening.
- *
- * The frame animates its own width as it goes active, so reading the slot would
- * give a moving number: a draft arriving in an idle composer would be judged
- * against the narrow frame and retargeted on every frame of the widen. What the
- * frame is widening into is the room its parent gives it.
- */
-function settledSlotWidth(element: HTMLTextAreaElement): number {
-  const lane = element.closest('[data-composer-frame]')?.parentElement
-  if (!lane) return element.getBoundingClientRect().width
-  const style = getComputedStyle(lane)
-  const padding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0)
-  return lane.clientWidth - padding - COMPOSER.paddingInline * 2
+  return height
 }
 
 /**
@@ -90,18 +67,6 @@ function settledSlotWidth(element: HTMLTextAreaElement): number {
  * is what lets the motion be visible without it ever being wrong.) The
  * measurement suspends the transition while it works — see `remeasure`.
  *
- * `onMultilineChange` reports whether the field is past one line, which is
- * what lets the frame move from a capsule to a rounded box and its controls
- * from beside the text to a footer row under it. The frame cannot work that
- * out for itself — it would have to measure the same element twice.
- *
- * Every measurement is taken at the width the field will END at, not the
- * width it has now. The slot around it is animating its insets whenever the
- * arrangement changes, so the live width is a moving number for a quarter
- * of a second; a height measured against it would be retargeted on every
- * frame of that, and the height animation would never settle into one run.
- * The slot's full width and the insets are known, so the end is known.
- *
  * Enter sends, Shift+Enter breaks. IME composition is excluded: during a
  * Japanese or Chinese conversion Enter commits the candidate and must not also
  * send the message.
@@ -110,19 +75,15 @@ export function ComposerField({
   value,
   onChange,
   onSubmit,
-  onMultilineChange,
   onPaste,
-  multiline,
-  stacked = multiline,
-  inset,
   placeholder,
   handleRef,
   onKeyDownCapture,
+  followEnd = false,
 }: {
   value: string
   onChange: (value: string) => void
   onSubmit: () => void
-  onMultilineChange: (multiline: boolean) => void
   /**
    * What to do with a paste that carries files -- a screenshot on the
    * clipboard arrives as one. Text pastes never reach this: the field is a
@@ -130,16 +91,6 @@ export function ComposerField({
    * event.
    */
   onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
-  /**
-   * Whether the text is past one line. The field is wider in the footer
-   * arrangement than beside the controls, and this decision has to stay
-   * consistent across that difference — see `remeasure`.
-   */
-  multiline: boolean
-  /** Whether the frame holds the footer arrangement, which an attachment asks for too. */
-  stacked?: boolean
-  /** The room the clusters take on either side while they sit beside the field. */
-  inset: { readonly left: number; readonly right: number }
   placeholder: string
   handleRef?: Ref<ComposerFieldHandle>
   /**
@@ -148,6 +99,8 @@ export function ComposerField({
    * nothing further with it. Absent or false, the key is the field's.
    */
   onKeyDownCapture?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean
+  /** Keeps the end of the text in view, for words arriving rather than typed. */
+  followEnd?: boolean
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
 
@@ -185,40 +138,7 @@ export function ComposerField({
     const element = field.current
     if (!element) return
 
-    // The slot's full width is the field's once the clusters have gone to
-    // the footer; beside them, the field has that less their insets. Both
-    // are end states, not the live width - see the docblock.
-    const slotWidth = settledSlotWidth(element)
-    const full = slotWidth - COMPOSER.textInset
-    const beside = slotWidth - inset.left - inset.right
-
-    // How tall the text is here, and how tall it would be beside the
-    // clusters. Multiline is decided against the SECOND width in both
-    // directions, never the width the footer arrangement gives. The two
-    // differ by the clusters, and that gap is an oscillation waiting to
-    // happen: a line that fits the full frame but not the narrower column
-    // would flip to the footer, unwrap now that it has room, flip back to
-    // the capsule, wrap again, and keep going. One width makes the choice
-    // stable - the footer leaves exactly when the line fits where the
-    // capsule will put it.
-    const here = measure(element, stacked ? full : beside)
-    const decisive = stacked ? measure(element, beside) : here
-    const natural = here.height
-
-    // One line plus a pixel of slack, rather than comparing to a hardcoded
-    // height: the line box changes with the user's text-size preference.
-    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
-    const next = decisive.height - decisive.padding > lineHeight * 1.6
-    if (next !== multiline) {
-      // The arrangement is about to change, and with it the width this
-      // height was measured at. Nothing is committed from this pass: the
-      // frame re-renders with the new arrangement before it paints, this
-      // runs again with the right width, and the height gets one target
-      // instead of two a frame apart.
-      onMultilineChange(next)
-      return
-    }
-
+    const natural = measure(element, element.getBoundingClientRect().width)
     const clamped = Math.min(natural, COMPOSER.maxHeight)
     element.style.overflowY = natural > COMPOSER.maxHeight ? 'auto' : 'hidden'
     // `stable` reserves the thumb gutter whether it is needed or not. Otherwise
@@ -233,11 +153,19 @@ export function ComposerField({
       element.style.height = `${clamped}px`
     }
     fadeEdges()
-  }, [fadeEdges, inset.left, inset.right, multiline, onMultilineChange, stacked])
+  }, [fadeEdges])
 
   // `value` is the trigger, not an input: the measurement reads the element,
   // which has already re-rendered with the new text by the time this runs.
   useLayoutEffect(remeasure, [value, remeasure])
+
+  // After the measure above, which is what decides whether the field scrolls.
+  useLayoutEffect(() => {
+    const element = field.current
+    if (!followEnd || !element) return
+    element.scrollTop = element.scrollHeight
+    fadeEdges()
+  }, [value, followEnd, fadeEdges])
 
   // Appearance changes can alter line height without changing the field's
   // width. The width observer below cannot see that in a fixed-height field.
@@ -251,9 +179,7 @@ export function ComposerField({
   // window being resized can. Without this, a resize left the height at what
   // it was until the next keystroke corrected it. Width only — the observer
   // also fires for the height this code writes itself, and those
-  // notifications must not loop back into another measure. It also fires on
-  // every frame of the insets' transition; each of those measures at the
-  // same end width and commits nothing new.
+  // notifications must not loop back into another measure.
   useLayoutEffect(() => {
     const element = field.current
     if (!element) return
@@ -298,15 +224,8 @@ export function ComposerField({
       }}
       className={cn(
         'studio-selectable block w-full resize-none bg-transparent',
-        // `text-ui`, not `text-body`. The composer is a control, and it reads
-        // as one: it sits in the chrome, beside buttons, and its text should
-        // match the row of controls it shares a capsule with rather than the
-        // transcript above it. Under `text-body` it was 11px inside a 52px
-        // field while the buttons beside it were 12 — the smallest text in
-        // the app, in the largest control in the app.
         'text-ui text-foreground outline-none placeholder:text-muted-foreground/70',
-        'px-1',
-        stacked ? 'studio-composer-scroll py-2' : 'py-0',
+        'studio-composer-scroll px-2 py-2',
       )}
     />
   )

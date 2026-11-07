@@ -79,7 +79,7 @@ export function MediaFrame({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-block-inner bg-selected"
+      className="relative w-full overflow-hidden rounded-block-inner bg-soft"
       // The aspect ratio is reserved *before* the media exists, so the
       // finished frame drops into a space already the right size. Without it
       // the transcript jumps by the height of an image the moment one

@@ -1,45 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Icons } from '@/components/icons'
-import { MenuItem, MenuSeparator } from '@/components/primitives'
-import { writeDraft } from '@/features/chat/composer/drafts'
+import { writeQuote } from '@/features/chat/composer/drafts'
 import { copyText, readClipboardText } from '@/lib/clipboard'
 import { fieldAt } from '@/lib/field'
-import { useNavigation } from '@/stores/navigation'
+import { cn } from '@/lib/cn'
 
 /**
- * The app's action lists, written once.
+ * The app's one contextual surface: a small horizontal toolbar.
  *
- * Two menus offer these actions - the right-click menu and the selection
- * menu - and they must never drift apart, because they are not two
- * features: they are the same verbs, summoned two ways.
+ * It holds only what can be done to the thing under the pointer, and there are
+ * two such things:
  *
- * Which list depends on what was under the pointer, and each list is only
- * about that thing:
+ *   field      the caret is in a text field, and it was right-clicked. Cut, Copy
+ *              and Paste, because the webview's own menu is suppressed and these
+ *              are the only way to do them with a mouse.
+ *   selection  text is selected. Copy, and Reply when the text is in a
+ *              transcript. In a transcript it appears as the pointer rises;
+ *              anywhere else, only when asked for with a right-click.
  *
- *   field      the caret is in a text field. Cut, Copy, Paste, Select all -
- *              what a text field does, and nothing that is not. The
- *              webview's own menu also offered the spell-checker's
- *              corrections; this one cannot. WebView2 hands the host the
- *              rows of the menu it would have shown, and the spelling rows
- *              arrive with their labels empty, so the words are not there
- *              to draw. A "Fix wording" row that sent the selection to the
- *              model stood in for a while and was removed: seconds of model
- *              time for what a checker does in none is a different feature
- *              wearing the checker's name. The red underline is still the
- *              webview's; a misspelt word is retyped.
- *   selection  text is selected on the page. Copy it, widen it, or ask
- *              about it in a new conversation.
- *   page       nothing in particular. The app's verbs: a new conversation,
- *              reload, search, settings.
+ * Everywhere else a right-click does nothing. It used to open a menu of app
+ * verbs, but each of those has a home of its own: the header and Ctrl K. Select
+ * all is Ctrl A in a field and on the page, so it is not repeated here.
  *
- * The app verbs used to follow the selection verbs under a separator, so a
- * menu about three words also offered to reload the interface. That was the
- * menu hedging against the selection vanishing before it was read, and it
- * made every list the same long list. A menu is about the thing that
- * summoned it; the page verbs are one right-click on the page away.
+ * Spelling corrections cannot join it: the webview hands the host the rows of
+ * the menu it would have shown, and the spelling rows arrive with their labels
+ * empty. The red underline is still the webview's; a misspelt word is retyped.
  */
 
-export type ActionKind = 'field' | 'selection' | 'page'
+export type ActionKind = 'field' | 'selection'
+
+/** The conversation whose transcript holds this element, if one does. */
+export function transcriptOf(target: HTMLElement | null): string | null {
+  return target?.closest<HTMLElement>('[data-transcript]')?.dataset.transcript ?? null
+}
 
 export function ActionItems({
   kind,
@@ -48,118 +41,69 @@ export function ActionItems({
   close,
 }: {
   readonly kind: ActionKind
-  /** The selected text, captured when the menu opened. */
+  /** The selected text, captured when the toolbar opened. */
   readonly selection: string
-  /** Where the menu opened, so "Select all" widens within its own block. */
+  /** What summoned it: the field, or the element the selection started in. */
   readonly target: HTMLElement | null
   readonly close: () => void
 }) {
-  const { goHome, setPaletteOpen, openSettings } = useNavigation()
-
   if (kind === 'field') return <FieldItems field={fieldAt(target)} close={close} />
 
-  // Widens within the block the selection started in, never the whole
-  // document: "select all" on one reply that quietly grabs four others is a
-  // surprise, and surprises in a destructive-adjacent verb are how text gets
-  // lost. The roots are the selectable surfaces - prose, the field, a page.
-  const selectAll = () => {
-    const root = target?.closest('.studio-prose, .studio-selectable, .studio-scroll-inset')
-    const active = window.getSelection()
-    if (!active || !root) return
-    const range = document.createRange()
-    range.selectNodeContents(root)
-    active.removeAllRanges()
-    active.addRange(range)
-  }
-
-  if (kind === 'selection') {
-    return (
-      <>
-        <MenuItem
-          icon={<Icons.copy />}
-          onSelect={() => {
-            void copyText(selection)
-            close()
-          }}
-        >
-          Copy
-        </MenuItem>
-        {/* Deliberately does not close: selecting all is usually the first
-            half of copy, and dismissing the menu between the two halves
-            forces the right-click (or the drag) all over again. */}
-        <MenuItem icon={<Icons.check />} onSelect={selectAll}>
-          Select all
-        </MenuItem>
-        <MenuItem
-          icon={<Icons.askAbout />}
-          onSelect={() => {
-            // The selection goes with you: quoted into the home composer's
-            // draft, which the composer reads when it mounts, with the
-            // caret left after it for the question. Before this it went
-            // home empty and the person retyped what they had just pointed
-            // at.
-            writeDraft(null, `${quote(selection)}\n\n`)
-            goHome()
-            close()
-          }}
-        >
-          Ask about this
-        </MenuItem>
-      </>
-    )
-  }
-
+  const conversation = transcriptOf(target)
   return (
     <>
-      <MenuItem
-        icon={<Icons.newChat />}
+      <Action
+        icon={<Icons.copy />}
         onSelect={() => {
-          goHome()
+          void copyText(selection)
           close()
         }}
       >
-        New conversation
-      </MenuItem>
-      <MenuItem
-        icon={<Icons.reload />}
-        onSelect={() => {
-          close()
-          window.location.reload()
-        }}
-      >
-        Reload interface
-      </MenuItem>
-      <MenuItem
-        icon={<Icons.command />}
-        hint="Ctrl K"
-        onSelect={() => {
-          setPaletteOpen(true)
-          close()
-        }}
-      >
-        Search
-      </MenuItem>
-
-      <MenuSeparator />
-      <MenuItem
-        icon={<Icons.settings />}
-        onSelect={() => {
-          openSettings()
-          close()
-        }}
-      >
-        Settings
-      </MenuItem>
+        Copy
+      </Action>
+      {conversation !== null ? (
+        <Action
+          accent
+          icon={<Icons.quote />}
+          onSelect={() => {
+            writeQuote(conversation, selection)
+            close()
+          }}
+        >
+          Reply
+        </Action>
+      ) : null}
     </>
   )
 }
 
-/** Markdown's quotation, line by line, so a multi-line selection stays one quote. */
-function quote(text: string): string {
-  return text
-    .split('\n')
-    .map((line) => `> ${line}`)
-    .join('\n')
+function Action({
+  icon,
+  accent = false,
+  disabled = false,
+  onSelect,
+  children,
+}: {
+  icon: ReactNode
+  accent?: boolean
+  disabled?: boolean
+  onSelect: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      // The selection is what is being acted on; the press must not end it
+      // before the click reads it.
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onSelect}
+      className={cn('studio-action text-ui font-medium', accent && 'studio-action-accent')}
+    >
+      {icon}
+      {children}
+    </button>
+  )
 }
 
 /**
@@ -168,11 +112,9 @@ function quote(text: string): string {
  * event a controlled React field listens for, where setting `.value` would
  * change the screen behind React's back.
  *
- * The rows follow the field's selection while the menu is open, because
- * "Select all" changes it without closing the menu, and Cut and Copy read
- * once at mount stayed greyed over the text that had just been selected for
- * them. `selectionchange` fires for a field's selection as well as the
- * page's, so one listener covers the menu's own verb and the keyboard.
+ * The buttons follow the field's selection while the toolbar is open, so Cut and
+ * Copy wake for text selected from the keyboard. `selectionchange` fires for a
+ * field's selection as well as the page's, so one listener covers it.
  */
 function FieldItems({
   field,
@@ -198,7 +140,7 @@ function FieldItems({
 
   return (
     <>
-      <MenuItem
+      <Action
         icon={<Icons.cut />}
         disabled={!hasSelection}
         onSelect={() => {
@@ -208,22 +150,21 @@ function FieldItems({
         }}
       >
         Cut
-      </MenuItem>
-      <MenuItem
+      </Action>
+      <Action
         icon={<Icons.copy />}
         disabled={!hasSelection}
         onSelect={() => {
           void copyText(selected)
-          // The caret goes back where it was. The menu's row had the focus,
-          // and a row that unmounts leaves it on the page, where the next
-          // Ctrl+A selects the whole window instead of the field's text.
+          // The caret goes back where it was, or the next Ctrl+A would select
+          // the whole window instead of the field's text.
           field?.focus()
           close()
         }}
       >
         Copy
-      </MenuItem>
-      <MenuItem
+      </Action>
+      <Action
         icon={<Icons.paste />}
         onSelect={() => {
           close()
@@ -233,19 +174,7 @@ function FieldItems({
         }}
       >
         Paste
-      </MenuItem>
-      {/* Stays open, like the selection menu's: selecting all is the first
-          half of Cut or Copy, and the rows above wake up to the new selection. */}
-      <MenuItem
-        icon={<Icons.check />}
-        disabled={!field || field.value.length === 0}
-        onSelect={() => {
-          field?.focus()
-          field?.select()
-        }}
-      >
-        Select all
-      </MenuItem>
+      </Action>
     </>
   )
 }

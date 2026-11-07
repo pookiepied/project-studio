@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { VoiceFailure } from './VoiceFailure'
-import { DictationBar } from './DictationBar'
+import { DictationPrompt } from './DictationBar'
 
 afterEach(cleanup)
 
@@ -22,7 +22,7 @@ describe('bounded voice failure details', () => {
   })
 
   it('uses the same compact details control for dictation failures', () => {
-    render(<DictationBar stage="blocked" elapsedMs={0} denied={false} note="Detailed transcription refusal" onFrame={() => () => {}} />)
+    render(<DictationPrompt stage="blocked" denied={false} note="Detailed transcription refusal" />)
     expect(screen.queryByText('Detailed transcription refusal')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Dictation failed details' }))
     expect(screen.getByText('Detailed transcription refusal')).toBeTruthy()

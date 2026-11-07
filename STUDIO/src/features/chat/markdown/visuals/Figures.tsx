@@ -64,7 +64,7 @@ export function Progress({ progress }: { progress: ProgressVisual }) {
                 aria-valuemin={0}
                 aria-valuemax={item.max}
                 aria-valuenow={item.value}
-                className="h-1.5 w-full overflow-hidden rounded-full bg-selected"
+                className="h-1.5 w-full overflow-hidden rounded-full bg-soft"
               >
                 <div className="h-full rounded-full bg-foreground" style={{ width: `${share}%` }} />
               </div>
@@ -138,7 +138,7 @@ export function Cards({ cards }: { cards: CardsVisual }) {
               {card.detail !== undefined ? <div className="mt-1 line-clamp-3 text-caption text-muted-foreground">{card.detail}</div> : null}
               {card.tags.length > 0 ? (
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {card.tags.map((tag) => <span key={tag} className="rounded-full bg-selected px-2 py-px text-micro text-muted-foreground">{tag}</span>)}
+                  {card.tags.map((tag) => <span key={tag} className="rounded-full bg-soft px-2 py-px text-micro text-muted-foreground">{tag}</span>)}
                 </div>
               ) : null}
               {card.price !== undefined || card.rating !== undefined ? (

@@ -7,16 +7,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { NavigationProvider, useNavigation } from './NavigationProvider'
 
 /**
- * The Settings visit: what entering and leaving does to the route and to the
- * sidebar column.
- *
- * While Settings is the route the sidebar column holds the settings tree, so
- * the column is the only settings navigation there is and the store has to own
- * its behaviour around the visit: entering opens a closed column, leaving puts
- * it back the way the user had it, and moving it deliberately during the visit
- * outranks the restoration. Every way in and out -- Ctrl , the palette, the
- * footer, the back control -- funnels through the three functions below, so
- * holding the contract here holds it everywhere.
+ * The Settings visit. Settings carries its own section list, so the visit owns
+ * one fact: where Back returns to. The sidebar stays as the user left it, except
+ * that a drawer does not stay open over the page it just opened. Every way in
+ * and out funnels through the functions below, so holding the contract here
+ * holds it everywhere.
  */
 
 function Probe() {
@@ -62,37 +57,31 @@ function mount() {
 
 afterEach(cleanup)
 
-function routeLabel(): string {
-  const node = screen.getByText(/^route:/)
-  return node.textContent ?? ''
-}
-
-function sidebarOpen(): boolean {
-  const node = screen.getByText(/^sidebar:/)
-  return (node.textContent ?? '').endsWith('true')
-}
-
 function click(label: string): void {
   fireEvent.click(screen.getByRole('button', { name: label }))
 }
 
 describe('entering Settings', () => {
-  it('opens the closed column, because the tree inside it is the only navigation there is', () => {
+  it('leaves a closed column closed and an open column open', () => {
     mount()
-    click('open chat')
-    expect(routeLabel()).toBe('route:chat')
-    expect(sidebarOpen()).toBe(false)
-
     click('open settings')
-    expect(routeLabel()).toBe('route:settings:general')
-    expect(sidebarOpen()).toBe(true)
-  })
+    expect(screen.getByText('sidebar:false')).toBeTruthy()
 
-  it('leaves a column the user had open exactly alone', () => {
-    mount()
+    click('leave settings')
     click('toggle sidebar')
     click('open settings')
-    expect(sidebarOpen()).toBe(true)
+    expect(screen.getByText('sidebar:true')).toBeTruthy()
+  })
+
+  it('dismisses the drawer on a narrow window', () => {
+    mount()
+    click('go compact')
+    click('toggle sidebar')
+    expect(screen.getByText('sidebar:true')).toBeTruthy()
+
+    click('open settings')
+    expect(screen.getByText('route:settings:general')).toBeTruthy()
+    expect(screen.getByText('sidebar:false')).toBeTruthy()
   })
 })
 
@@ -101,135 +90,27 @@ describe('inside the visit', () => {
     mount()
     click('open chat')
     click('open settings')
-
     click('open appearance')
-    expect(routeLabel()).toBe('route:settings:appearance')
+    expect(screen.getByText('route:settings:appearance')).toBeTruthy()
 
     click('leave settings')
-    expect(routeLabel()).toBe('route:chat')
+    expect(screen.getByText('route:chat')).toBeTruthy()
   })
 })
 
 describe('leaving Settings', () => {
-  it('back returns to the conversation and puts the closed column away again', () => {
-    mount()
-    click('open chat')
-    click('open settings')
-    expect(sidebarOpen()).toBe(true)
-
-    click('leave settings')
-    expect(routeLabel()).toBe('route:chat')
-    expect(sidebarOpen()).toBe(false)
-  })
-
-  it('back from a visit entered at home lands on home, every time', () => {
+  it('back from a visit entered at home lands on home', () => {
     mount()
     click('open settings')
     click('leave settings')
-    expect(routeLabel()).toBe('route:home')
-    expect(sidebarOpen()).toBe(false)
+    expect(screen.getByText('route:home')).toBeTruthy()
   })
 
-  it('restores the column on any way out, including opening a conversation from the palette', () => {
+  it('leaves the column as the user set it during the visit', () => {
     mount()
     click('open settings')
-    expect(sidebarOpen()).toBe(true)
-
-    click('open chat')
-    expect(routeLabel()).toBe('route:chat')
-    expect(sidebarOpen()).toBe(false)
-  })
-
-  it('keeps the column as the user left it when they moved it during the visit', () => {
-    mount()
-    click('open chat')
-    click('open settings')
-    expect(sidebarOpen()).toBe(true)
-
-    // Deliberately closed while in Settings: leaving must not force it open
-    // again -- the last deliberate act wins over the stored entry state.
     click('toggle sidebar')
     click('leave settings')
-    expect(routeLabel()).toBe('route:chat')
-    expect(sidebarOpen()).toBe(false)
-  })
-
-  it('keeps a column open that the user reopened during the visit', () => {
-    mount()
-    click('open chat')
-    click('open settings')
-    click('toggle sidebar')
-    click('toggle sidebar')
-    expect(sidebarOpen()).toBe(true)
-
-    click('leave settings')
-    expect(sidebarOpen()).toBe(true)
-  })
-
-  it('forgets the visit once it is over, so the next entry starts fresh', () => {
-    mount()
-    click('open settings')
-    click('leave settings')
-    expect(sidebarOpen()).toBe(false)
-
-    // The column was restored to closed; a second visit must capture that
-    // state again rather than inherit anything from the first one.
-    click('toggle sidebar')
-    click('open settings')
-    expect(sidebarOpen()).toBe(true)
-    click('leave settings')
-    expect(sidebarOpen()).toBe(true)
-  })
-})
-
-describe('leaving Settings on a narrow window', () => {
-  // On a narrow window the column is a drawer over the page. Restoring the
-  // entry state there leaves the drawer open over the surface being returned
-  // to - the route changes underneath a panel that covers it, which is the
-  // reported "back does nothing". A drawer is dismissed on the way out,
-  // whatever the visit began with and whatever the user did with it inside.
-  it('dismisses the drawer even when the column was open at entry', () => {
-    mount()
-    click('toggle sidebar')
-    // The column was open when Settings was entered; restoring the entry
-    // state on a narrow window would leave the drawer over the page the
-    // user is returning to.
-    click('go compact')
-    click('open settings')
-    expect(sidebarOpen()).toBe(true)
-
-    click('leave settings')
-    expect(routeLabel()).toBe('route:home')
-    expect(sidebarOpen()).toBe(false)
-  })
-
-  it('dismisses the drawer even when the user moved it during the visit', () => {
-    mount()
-    click('go compact')
-    click('open chat')
-    click('open settings')
-    // Closed and reopened mid-visit: on a resident column that would restore.
-    click('toggle sidebar')
-    click('toggle sidebar')
-    expect(sidebarOpen()).toBe(true)
-
-    click('leave settings')
-    expect(sidebarOpen()).toBe(false)
-  })
-
-  it('returns to the desktop restore rule when the window is wide again', () => {
-    mount()
-    click('go compact')
-    click('open chat')
-    click('open settings')
-    click('leave settings')
-    expect(sidebarOpen()).toBe(false)
-
-    // Narrow again is not stated back; the desktop reading returns because
-    // the store defaults to it and nothing re-published compact.
-    click('open settings')
-    click('leave settings')
-    expect(routeLabel()).toBe('route:chat')
-    expect(sidebarOpen()).toBe(false)
+    expect(screen.getByText('sidebar:true')).toBeTruthy()
   })
 })

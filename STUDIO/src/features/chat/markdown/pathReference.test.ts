@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePathReference, resolvePathReference, type PathReference } from './pathReference'
+import { namesFolder, parsePathReference, resolvePathReference, type PathReference } from './pathReference'
 
 /** A reference the test asserts on; a null would be a broken fixture. */
 function reference(text: string): PathReference {
@@ -140,6 +140,28 @@ describe('parsePathReference', () => {
  * Resolution joins a relative reference onto the conversation's workspace -
  * and onto nothing else. There is no process directory to fall back to.
  */
+describe('namesFolder', () => {
+  const folder = (text: string) => {
+    const reference = parsePathReference(text)
+    if (reference === null) throw new Error('not a reference')
+    return namesFolder(reference)
+  }
+
+  it('reads a trailing separator and an extensionless path as a folder', () => {
+    expect(folder('src/features/')).toBe(true)
+    expect(folder('C:\\Apps\\Studio')).toBe(true)
+    expect(folder('src/features')).toBe(true)
+  })
+
+  it('leaves files alone, including the ones with no extension', () => {
+    expect(folder('src/App.tsx')).toBe(false)
+    expect(folder('README.md')).toBe(false)
+    expect(folder('tools/Makefile')).toBe(false)
+    expect(folder('src/.gitignore')).toBe(false)
+    expect(folder('src/main:12')).toBe(false)
+  })
+})
+
 describe('resolvePathReference', () => {
   it('joins a relative reference onto the workspace it belongs to', () => {
     const docs = reference('docs/readme.md')

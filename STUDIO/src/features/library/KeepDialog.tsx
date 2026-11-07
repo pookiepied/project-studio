@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Icons } from '@/components/icons'
+import { FileTypeMark } from '@/components/icons/fileTypes'
 import { Button, Dialog, TextArea, TextField } from '@/components/primitives'
 import {
   useHarnessClient,
@@ -188,7 +188,7 @@ export function KeepDialog({
             />
           ) : (
             <span className="flex size-16 shrink-0 items-center justify-center rounded-md bg-tint text-muted-foreground">
-              {isImage ? <Icons.image /> : <Icons.file />}
+              <FileTypeMark path={fileName} />
             </span>
           )}
           <div className="min-w-0">

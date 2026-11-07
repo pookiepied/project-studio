@@ -5,6 +5,7 @@ import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
 import { uploadDocuments } from '@/features/chat/connection/documents'
 import { Composer } from '@/features/chat/composer'
+import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { QueuedMessages } from '@/features/chat/composer/QueuedMessages'
 import { useQueuedMessages } from '@/features/chat/connection/useQueuedMessages'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
@@ -250,7 +251,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // nothing in it.
   const hasWords = items.length > 0 || (!gallery && live.pending !== null)
 
-  const { viewport, pinned, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
+  const { viewport, pinned, distant, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(items, conversation.id, revealed)
 
   // Nothing is shown while the replay is still coming. It arrives a
@@ -454,6 +455,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           {!revealed && !hasWords ? null : (
             <motion.div
               key={conversation.id}
+              data-transcript={gallery ? undefined : conversation.id}
               initial={arriving ? false : { opacity: 0, y: 12 }}
               animate={revealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
               transition={{ duration: DURATION.slow, ease: EASE_OUT }}
@@ -562,7 +564,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           {/* Only offered once the reader has scrolled away. Shown permanently
               it is a button that does nothing most of the time. */}
           <AnimatePresence>
-            {!pinned ? (
+            {!pinned && distant ? (
               <motion.button
                 type="button"
                 initial={{ opacity: 0, y: 8, scale: 0.9 }}
@@ -664,6 +666,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             <div ref={arrival.composer}>
               <Composer
                 conversationId={conversation.id}
+                turnControl={<TurnMenu conversationId={conversation.id} />}
                 queueFull={queue.messages.length >= 3}
                 restoredMessage={queue.restoredMessage}
                 // A queued follow-up does not answer the tool's question. Keep

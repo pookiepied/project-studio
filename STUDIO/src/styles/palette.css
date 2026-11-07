@@ -1,5 +1,16 @@
-/* Neutral surfaces and primary actions, with colour reserved for state. */
+/* Family A: white and neutral grey surfaces, one blue accent, colour for state. */
 :root {
+  /* File-kind tones: a few shared values, so colour tells kinds apart without
+     each kind bringing its own brand. See `fileTypes`. */
+  --tone-accent: #1f8fe6;
+  --tone-blue: #3b73d9;
+  --tone-teal: #128c99;
+  --tone-green: #2a9456;
+  --tone-yellow: #b58a00;
+  --tone-orange: #d9652b;
+  --tone-red: #d84848;
+  --tone-purple: #8257d8;
+
   --surface: oklch(1 0 0);
   --surface-sunken: oklch(0.979 0 0);
   --surface-raised: oklch(1 0 0);
@@ -26,10 +37,31 @@
      component; the whisper bloom that once confirmed the edge is gone on the
      person's word, because two greys stacked on one edge read as thickness,
      not as focus. */
-  --ring: oklch(0.145 0 0 / 45%);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --brand-ink: color-mix(in oklab, var(--muted-foreground) 65%, var(--primary));
+  --ring: #3aa8fe;
+  --primary: #3aa8fe;
+  --primary-foreground: #ffffff;
+  --tooltip: oklch(0.205 0 0);
+  --tooltip-foreground: oklch(0.985 0 0);
+  --selection: rgb(58 168 254 / 22%);
+  --selection-foreground: #1878c4;
+
+  /* The accent, sampled from the reference's send button, Reply and toggle. The
+     wash is the ground of its quote strip. */
+  --accent: #3aa8fe;
+  --accent-foreground: #ffffff;
+  --accent-wash: #e8f4fe;
+  --accent-wash-foreground: #1878c4;
+
+  /* The composer, sampled from the reference: its ground, the fine edge the
+     caret brings, the halo around that edge, and the model chip. */
+  --composer-surface: var(--surface);
+  --composer-edge: #adbfd0;
+  --composer-halo: #d9ecf8;
+  --window-close: #f0f0f0;
+  --switch-off: #dedede;
+  --model-chip: #ecfff4;
+  --model-chip-foreground: #0e4a1e;
+  --brand-ink: color-mix(in oklab, var(--muted-foreground) 65%, oklch(0.205 0 0));
   --danger-confirm: #b72740;
 
   /* -- The one hue -------------------------------------------------------
@@ -135,8 +167,10 @@
      without looking at it, which is what makes an interface feel quick rather
      than busy.
      -------------------------------------------------------------------- */
-  --tint: oklch(0.145 0 0 / 5%);
-  --selected: oklch(0.145 0 0 / 8%);
+  --tint: oklch(0.145 0 0 / 3%);
+  --selected: rgb(58 168 254 / 9%);
+  --soft: oklch(0.145 0 0 / 8%);
+  --user-bubble: oklch(0.145 0 0 / 5%);
 
   /* What the elevation scale is tinted with. Light mode casts a soft grey; the
      dark override below casts something much closer to black, because a shadow
@@ -148,22 +182,41 @@
 }
 
 .dark {
-  --surface: oklch(0.205 0 0);
-  --surface-sunken: oklch(0.164 0 0);
-  --surface-raised: oklch(0.235 0 0);
+  --tone-accent: #3aa8fe;
+  --tone-blue: #6b9df0;
+  --tone-teal: #4cc2cd;
+  --tone-green: #5cc585;
+  --tone-yellow: #e3c04f;
+  --tone-orange: #f0935a;
+  --tone-red: #f07a7a;
+  --tone-purple: #ab8df0;
+
+  /* The reference's window (#242424) and menu (#2f2f2f) greys. */
+  --surface: oklch(0.26 0 0);
+  --surface-sunken: oklch(0.225 0 0);
+  --surface-raised: oklch(0.305 0 0);
   --hairline: oklch(1 0 0 / 8%);
 
-  --overlay: oklch(0.235 0 0 / 93%);
+  --overlay: oklch(0.305 0 0 / 93%);
   --scrim: oklch(0 0 0 / 40%);
 
   --background: var(--surface);
   --foreground: oklch(0.985 0 0);
-  --muted: oklch(0.271 0 0);
+  --muted: oklch(0.33 0 0);
   --muted-foreground: oklch(0.706 0 0);
   --border: var(--hairline);
-  --ring: oklch(1 0 0 / 45%);
-  --primary: oklch(0.94 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --tooltip: #4a4a4a;
+  --tooltip-foreground: oklch(0.985 0 0);
+  --accent-wash: #334e60;
+  --accent-wash-foreground: #d3e9f9;
+  --selection-foreground: #7cc4fb;
+  --composer-surface: #363636;
+  --composer-edge: #3e6e97;
+  --composer-halo: #3d5161;
+  --window-close: #454545;
+  --switch-off: #373737;
+  --model-chip: #4e4e4e;
+  --model-chip-foreground: var(--foreground);
   --brand-ink: var(--foreground);
 
   /* Lifted, like every other colour here: the same lightness that reads as
@@ -208,8 +261,10 @@
 
   /* Slightly stronger than light: a white tint over a dark surface lifts less
      per percent than a black tint darkens a light one. */
-  --tint: oklch(1 0 0 / 6.5%);
-  --selected: oklch(1 0 0 / 11%);
+  --tint: oklch(1 0 0 / 8.7%);
+  --selected: rgb(58 168 254 / 10%);
+  --soft: oklch(1 0 0 / 11%);
+  --user-bubble: oklch(1 0 0 / 17%);
 
   /* Deeper, and the hairline inverts: on a dark surface the thing that
      separates a raised object from its background is a faint *light* edge, not

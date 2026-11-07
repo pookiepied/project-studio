@@ -316,12 +316,12 @@ export function defineIcon(glyph: Glyph, name: string) {
         viewBox="0 0 16 16"
         fill="none"
         stroke="currentColor"
-        // The painted stroke stays ~1.2px at every size on its own: with
+        // The painted stroke stays 1.5px at every size on its own: with
         // `non-scaling-stroke` the width is read in device pixels rather than
         // viewBox units, so it no longer has to be recomputed per step. That
         // matters more now that a mark can be any size its text happens to be,
         // and a per-step table could not have covered that.
-        strokeWidth={1.2}
+        strokeWidth={1.5}
         vectorEffect="non-scaling-stroke"
         strokeLinecap="round"
         strokeLinejoin="round"

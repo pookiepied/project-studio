@@ -317,7 +317,7 @@ export function AddModelDialog({
                     className={`studio-control-flat rounded-full px-2.5 text-caption transition-colors duration-fast [--control-size:var(--button-xs)] ${
                       selected
                         ? 'bg-selected text-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-selected'
+                        : 'bg-muted text-muted-foreground hover:bg-soft'
                     }`}
                   >
                     {level}

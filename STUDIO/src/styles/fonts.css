@@ -22,8 +22,8 @@
    machine, so code reads identically here and on a Mac rather than
    inheriting whatever the OS happened to install.
 
-   Instrument Serif is the display face, drawn only for headings the app
-   writes itself, so Latin alone is enough.
+   Instrument Serif is no longer used: `--font-display` is Inter under Family
+   A (ADR 0060). An unused face is never fetched; removing it is a cleanup.
 
    The ranges are fontsource's own for the two subsets, copied verbatim. */
 

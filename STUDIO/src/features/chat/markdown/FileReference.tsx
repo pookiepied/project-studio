@@ -1,12 +1,13 @@
 import { useContext, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { IconButton, Popover } from '@/components/primitives'
-import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
+import { FileTypeMark, fileToneClass, splitFilePath } from '@/components/icons/fileTypes'
+import { cn } from '@/lib/cn'
 import { copyText } from '@/lib/clipboard'
 import { isTauri } from '@/platform/tauri/window'
 import { revealPath } from '@/platform/tauri/reveal'
 import { useConversationWorkspaceRoot } from './useWorkspaceRoot'
-import { resolvePathReference, type PathReference } from './pathReference'
+import { namesFolder, resolvePathReference, type PathReference } from './pathReference'
 import { ReplyConversation } from './ReplyImage'
 
 /**
@@ -38,11 +39,12 @@ export function FileReference({ reference, variant = 'chip', streaming = false }
   streaming?: boolean
 }) {
   const conversationId = useContext(ReplyConversation)
+  const folder = namesFolder(reference)
   if (streaming) return variant === 'caption'
     ? <FilePathLabel path={reference.raw} />
-    : <code className="studio-file-reference">
+    : <code className={cn('studio-file-reference', fileToneClass(reference.target, folder))}>
         <span className="inline-flex min-w-0 max-w-full items-baseline">
-          <FileTypeMark path={reference.target} className="mr-1.5 self-center" />
+          <FileTypeMark path={reference.target} folder={folder} className="mr-1.5 self-center" />
           <span className="min-w-0 truncate">{reference.raw}</span>
         </span>
       </code>
@@ -113,8 +115,9 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
   // chip inside the frame would be a box in a box. One component, two
   // surfaces, the same two verbs.
   const Wrapper = variant === 'caption' ? 'span' : 'code'
+  const folder = namesFolder(reference)
   return (
-    <Wrapper className={variant === 'caption' ? 'inline-flex min-w-0 max-w-full' : 'studio-file-reference'}>
+    <Wrapper className={variant === 'caption' ? 'inline-flex min-w-0 max-w-full' : cn('studio-file-reference', fileToneClass(reference.target, folder))}>
       <Popover inline open={open} onOpenChange={setOpen}
         maxWidth="18rem"
         trigger={
@@ -129,7 +132,7 @@ function InteractiveFileReference({ reference, variant }: { reference: PathRefer
                 </>
               ) : (
                 <>
-                  <FileTypeMark path={reference.target} className="mr-1.5 self-center" />
+                  <FileTypeMark path={reference.target} folder={folder} className="mr-1.5 self-center" />
                   {head !== null ? <span className="min-w-0 truncate font-normal text-muted-foreground">{head}</span> : null}
                   <span className="min-w-0 truncate">{tail}</span>
                 </>

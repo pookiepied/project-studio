@@ -120,6 +120,8 @@ interface MicNodes {
   startedAt: number
   /** When the current segment's recorder started; the take's start until the first cut. */
   segmentStartedAt: number
+  /** When a pause began, while one holds the take; `null` while it runs. */
+  pausedAt: number | null
   /** The smoothed level the loop last computed, readable between frames. */
   level: number
   /** Decides the cuts, when segments were asked for. */
@@ -273,7 +275,9 @@ export function useMicInput() {
         const rms = Math.sqrt(sum / timeDomain.length)
 
         const gated = Math.max(0, rms - NOISE_FLOOR) / (LEVEL_CEILING - NOISE_FLOOR)
-        const target = Math.pow(Math.min(1, gated), GAMMA)
+        // A paused take reads as silence, so the meter settles rather than
+        // showing a room nobody is recording.
+        const target = active.pausedAt === null ? Math.pow(Math.min(1, gated), GAMMA) : 0
 
         // Frame-rate independent: the fractions are authored against one
         // 60fps frame, then scaled by how much frame this actually was.
@@ -283,7 +287,9 @@ export function useMicInput() {
         analyser.getFloatFrequencyData(spectrum)
         const voiced = voicedFrame(spectrum, context.sampleRate)
         for (const listener of listeners.current) listener(active.level, dtMs, voiced)
-        if (active.cutter?.observe(active.level, dtMs) === true) cut(active)
+        // Not while paused: the quiet would read as a pause in the speech, and
+        // the cut would start a new recorder that is not paused.
+        if (active.pausedAt === null && active.cutter?.observe(active.level, dtMs) === true) cut(active)
         active.frame = requestAnimationFrame(step)
       }
 
@@ -298,6 +304,7 @@ export function useMicInput() {
         chunks,
         startedAt: performance.now(),
         segmentStartedAt: performance.now(),
+        pausedAt: null,
         level: 0,
         cutter: recording && options?.onSegment ? new SegmentCutter() : null,
         onSegment: recording ? (options?.onSegment ?? null) : null,
@@ -361,7 +368,7 @@ export function useMicInput() {
 
     // The note is the last segment: the whole take when nothing was cut,
     // what remains after the last cut when something was.
-    const durationMs = performance.now() - active.segmentStartedAt
+    const durationMs = (active.pausedAt ?? performance.now()) - active.segmentStartedAt
     const last = active.recorder
     const lastChunks = active.chunks
     if (!last || last.state === 'inactive') {
@@ -403,7 +410,25 @@ export function useMicInput() {
   const setMuted = useCallback((muted: boolean) => {
     for (const track of nodes.current?.stream.getAudioTracks() ?? []) track.enabled = !muted
   }, [])
+  /**
+   * Holds a recording and lets it go on. The recorder keeps its one file across
+   * the gap and the stream stays open, so resuming has no permission to ask for
+   * and nothing to reassemble. The paused time is taken off the segment's length.
+   */
+  const setPaused = useCallback((paused: boolean) => {
+    const active = nodes.current
+    if (!active || paused === (active.pausedAt !== null)) return
+    const now = performance.now()
+    if (paused) {
+      active.pausedAt = now
+      if (active.recorder?.state === 'recording') active.recorder.pause()
+      return
+    }
+    active.segmentStartedAt += now - (active.pausedAt ?? now)
+    active.pausedAt = null
+    if (active.recorder?.state === 'paused') active.recorder.resume()
+  }, [])
   /** Where Studio's voice goes to be cancelled, while a `cancelEcho` microphone is live. */
   const playback = useCallback((): AudioNode | null => nodes.current?.echo?.playback ?? null, [])
-  return { status, start, stop, take, onFrame, setMuted, playback }
+  return { status, start, stop, take, onFrame, setMuted, setPaused, playback }
 }

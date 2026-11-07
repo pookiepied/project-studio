@@ -25,23 +25,122 @@
  * arrive from the control that owns the mark, so a 28px button drives the 14px
  * glyph inside it rather than the glyph having its own small hitbox.
  */
+import type { IconSvgElement } from '@hugeicons/react'
 import {
-  Archive, ArrowDown, ArrowLeft, ArrowUp, ArrowUpRight, Ban, BookOpen, Box, Cable, Check, ChevronDown, ChevronRight,
-  CircleUser, Code, CodeXml, Command, Copy, CornerDownRight, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
-  GalleryVerticalEnd, GitBranch, GitFork, Globe, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor, MonitorSmartphone,
-  MoreHorizontal, Moon, MessageCircleDashed, MessageCircleQuestionMark, MousePointerClick, Paperclip, Palette, Pause, Pencil, Pin, Plus,
-  RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Split,
-  SquareTerminal, Sun, SquareCheckBig, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
-  FastForward, CircleAlert, Clapperboard, FileText, FolderInput,
-  Link2, Maximize2, MicOff, PictureInPicture2, Headphones, HeadphoneOff, Sparkles, Undo2, MessageSquareQuote, MessageSquarePlus, Scissors, ClipboardPaste,
-  Cpu, Eye, Hammer, LayoutGrid, Wrench, FoldVertical, BookmarkPlus, Bot,
+  Add01Icon,
+  AlertCircleIcon,
+  Archive02Icon,
+  ArrowDown01Icon,
+  ArrowDown02Icon,
+  ArrowExpand01Icon,
+  ArrowLeft02Icon,
+  ArrowRight01Icon,
+  ArrowUp02Icon,
+  ArrowUpRight01Icon,
+  Attachment01Icon,
+  BookOpen01Icon,
+  BookmarkAdd01Icon,
+  BubbleChatAddIcon,
+  BubbleChatIcon,
+  BubbleChatQuestionIcon,
+  BubbleChatTemporaryIcon,
+  BulbIcon,
+  Cancel01Icon,
+  CheckListIcon,
+  CheckmarkSquare02Icon,
+  ClipboardIcon,
+  CodeIcon,
+  CommandIcon,
+  ComputerIcon,
+  ComputerTerminal01Icon,
+  ComputerTerminal02Icon,
+  Copy01Icon,
+  CpuIcon,
+  Cursor01Icon,
+  DashboardSpeed01Icon,
+  Database01Icon,
+  Delete02Icon,
+  EraserIcon,
+  File01Icon,
+  FileAddIcon,
+  FileScriptIcon,
+  Folder01Icon,
+  Folder02Icon,
+  FolderAddIcon,
+  FolderExportIcon,
+  GitBranchIcon,
+  GitCompareIcon,
+  GitForkIcon,
+  Globe02Icon,
+  GridViewIcon,
+  Hammer01Icon,
+  HeadphoneMuteIcon,
+  HeadphonesIcon,
+  KeyboardIcon,
+  Link01Icon,
+  LinkSquare02Icon,
+  MagicWand01Icon,
+  Mic01Icon,
+  MicOff01Icon,
+  Moon02Icon,
+  MoreHorizontalIcon,
+  PaintBoardIcon,
+  PencilEdit01Icon,
+  PinIcon,
+  PlugSocketIcon,
+  Refresh01Icon,
+  Robot01Icon,
+  ScissorIcon,
+  Search01Icon,
+  SecurityCheckIcon,
+  Settings02Icon,
+  SlidersHorizontalIcon,
+  SmartPhone01Icon,
+  SourceCodeIcon,
+  SparklesIcon,
+  Sun01Icon,
+  Target01Icon,
+  Tick02Icon,
+  UnavailableIcon,
+  Undo02Icon,
+  UserCircleIcon,
+  UserSettings01Icon,
+  Video01Icon,
+  ViewIcon,
+  VolumeHighIcon,
+  WebhookIcon,
+  Wrench01Icon,
+  AppWindowIcon,
+  MinusSignIcon,
+  Doc01Icon,
+  FileAudioIcon,
+  FileLockedIcon,
+  FileVideoIcon,
+  FileZipIcon,
+  Pdf01Icon,
+  Txt01Icon,
+  Xls01Icon,
+} from '@hugeicons/core-free-icons'
+import { CaptureMark, ComposeMark, ExpandMark, HistoryMark, PanelMark, QuoteMark, ReplyMark } from '@/components/icons/familyMarks'
+import {
+  AudioLines,
+} from 'lucide-react'
+import { fromHugeicons } from '@/components/icons/fromHugeicons'
+import {
+  Box,
+  CornerDownRight,
+  GalleryVerticalEnd,
+  Pause,
+  FastForward,
+  PictureInPicture2,
+  FoldVertical,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
 import { McpMark } from '@/components/icons/McpMark'
 import { PhotoMark } from '@/components/icons/PhotoMark'
-import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave, WorkspaceOverviewMark } from '@/components/icons/drawn'
+import { PauseBars, PlayTriangle, StopSquare, VoiceWave, WorkspaceOverviewMark } from '@/components/icons/drawn'
 import { DoneMark, EraserMark, HighlighterMark, PenMark, ShareScreenMark, ShowMeMark, UndoMark } from '@/components/icons/screen'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
@@ -92,47 +191,46 @@ const LIFT_LID: Variants = {
 }
 
 interface Entry {
-  readonly mark: LucideIcon
+  /** Hugeicons data, or a Lucide mark where the free set has no match. */
+  readonly mark: LucideIcon | IconSvgElement
   readonly motion?: Variants
 }
 
 const REGISTRY = {
   // — Window and shell ----------------------------------------------------
-  close: { mark: X },
-  // `sidebar` is not here: it is drawn, because its motion lives inside the
-  // glyph rather than on it. See `drawn.tsx`, and `Icons` below.
-  search: { mark: Search },
-  command: { mark: Command },
-  reload: { mark: RefreshCw, motion: WIND },
-  settings: { mark: Settings2, motion: TURN_SLIGHT },
+  close: { mark: Cancel01Icon },
+  // `sidebar` is not here: it is a Family A mark. See `Icons` below.
+  search: { mark: Search01Icon },
+  command: { mark: CommandIcon },
+  reload: { mark: Refresh01Icon, motion: WIND },
+  settings: { mark: Settings02Icon, motion: TURN_SLIGHT },
 
   // — Conversation --------------------------------------------------------
   // A new bubble, in the bubble family the other conversation marks use.
   // It was a pen on a square, and the square's corners were the sharpest
   // shape on the strip; a conversation here is a bubble everywhere else, so
   // a new one is a bubble with a plus.
-  newChat: { mark: MessageSquarePlus },
-  chat: { mark: MessageSquare },
-  temporaryChat: { mark: MessageCircleDashed },
+  newChat: { mark: BubbleChatAddIcon },
+  chat: { mark: BubbleChatIcon },
+  temporaryChat: { mark: BubbleChatTemporaryIcon },
   // The stopped-run question: a permission the kernel wants or a question the
   // model asked. A speech bubble carrying a question mark -- a conversation
   // that has turned and is waiting on you -- and deliberately not the mode
   // marks, which say how far ahead the app may run rather than that it has
   // stopped.
-  ask: { mark: MessageCircleQuestionMark },
+  ask: { mark: BubbleChatQuestionIcon },
   // Asking about text you selected: a bubble carrying a quotation, because
   // the selection goes into the message as one. Not `newChat`, which it used
   // to share - that mark means an empty conversation, and this one starts
   // full.
-  askAbout: { mark: MessageSquareQuote },
-  more: { mark: MoreHorizontal },
-  openExternal: { mark: ExternalLink },
+  more: { mark: MoreHorizontalIcon },
+  openExternal: { mark: LinkSquare02Icon },
   // A link's own way out: the bare arrow, lighter than the boxed mark,
   // for the one-button pill a plain link opens.
-  openLink: { mark: ArrowUpRight },
-  jumpToLatest: { mark: ArrowDown, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
+  openLink: { mark: ArrowUpRight01Icon },
+  jumpToLatest: { mark: ArrowDown02Icon, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
   // Leaving the one surface whose navigation lives in the sidebar column.
-  back: { mark: ArrowLeft },
+  back: { mark: ArrowLeft02Icon },
 
   // — There is more here --------------------------------------------------
   //
@@ -144,8 +242,8 @@ const REGISTRY = {
   // does not turn, because nothing below it moved and the trigger is still
   // where it was. A reader can tell them apart by whether the page got
   // longer; the marks should agree with the page.
-  dropdown: { mark: ChevronDown },
-  disclosure: { mark: ChevronRight, motion: TURN },
+  dropdown: { mark: ArrowDown01Icon },
+  disclosure: { mark: ArrowRight01Icon, motion: TURN },
 
   // — Model and permission ------------------------------------------------
   //
@@ -162,12 +260,12 @@ const REGISTRY = {
   // is a level picked in settings, and the two must never swap jobs — a mark
   // that meant both "reasoning is happening now" and "how hard to reason"
   // would leave neither reading safe.
-  thinking: { mark: Lightbulb },
+  thinking: { mark: BulbIcon },
   // The dial, and only the dial. Settings' Providers section used to carry it
   // too, which put the app's one picture of "how hard to think" on a row about
   // which vendors are connected — the exact collision the note at the top of
   // this file forbids.
-  reasoning: { mark: Gauge },
+  reasoning: { mark: DashboardSpeed01Icon },
   // Where replies come from: the machine that answers. It was a stack of
   // boxes - a set of things to draw on - which read as storage or shipping
   // and never as a model; a brain was tried and is too intricate for the
@@ -175,50 +273,50 @@ const REGISTRY = {
   // MCP carries its own published mark, so `Plug` is free -- but it
   // describes reach rather than supply, which is why it is not the answer
   // here either.
-  providers: { mark: Cpu },
+  providers: { mark: CpuIcon },
   // The full catalog, one step behind the picker: a grid of tiles, a place
   // to browse rather than a thing to find. It was the palette's search
   // glass, which promised a search box and opened a page; a bookshelf was
   // tried and is too fine a drawing for a menu row.
-  library: { mark: LayoutGrid },
+  library: { mark: GridViewIcon },
   // What a model can do, as a row states it. Two of the three are new marks
   // here: a hammer for tool calling, an eye for vision. Reasoning is the
   // bulb the transcript already uses for a reasoning run - the same idea at
   // rest - and not the gauge, which means how hard to reason, a setting.
-  toolCalling: { mark: Hammer },
-  vision: { mark: Eye },
+  toolCalling: { mark: Hammer01Icon },
+  vision: { mark: ViewIcon },
   permissionAsk: { mark: Pause },
   permissionAuto: { mark: FastForward },
 
   // — Projects and source control -----------------------------------------
-  project: { mark: Folder },
-  projectOpen: { mark: FolderOpen },
-  projectNew: { mark: FolderPlus },
-  branch: { mark: GitBranch },
-  worktree: { mark: GitFork },
+  project: { mark: Folder01Icon },
+  projectOpen: { mark: Folder02Icon },
+  projectNew: { mark: FolderAddIcon },
+  branch: { mark: GitBranchIcon },
+  worktree: { mark: GitForkIcon },
   // Where a conversation was compacted: two arrows closing on a line, the
   // transcript folding to its summary. Plain enough to sit in a transcript
   // row at caption size.
   compaction: { mark: FoldVertical },
   // "Keep in the library": a bookmark with a plus, on a thumbnail and on
   // a generated picture, for the one act the library begins with.
-  keep: { mark: BookmarkPlus },
+  keep: { mark: BookmarkAdd01Icon },
 
   // — Message actions -----------------------------------------------------
-  copy: { mark: Copy },
+  copy: { mark: Copy01Icon },
   // The text field's own verbs, for its right-click menu. Cut and paste are
   // the pair copy completes; nothing else in the app cuts or pastes.
-  cut: { mark: Scissors },
-  paste: { mark: ClipboardPaste },
+  cut: { mark: ScissorIcon },
+  paste: { mark: ClipboardIcon },
   // Putting back what Improve did to the field. One arrow curling back -
   // not `reload`, which spins forward and means the interface starting over.
-  undo: { mark: Undo2 },
+  undo: { mark: Undo02Icon },
   // The pencil is the edit verb wherever it is performed. The message action
   // here and the transcript's file-editing tool chip are the same concept --
   // an edit -- so they share the mark rather than splitting it by surface.
-  edit: { mark: Pencil },
-  fork: { mark: Split },
-  readAloud: { mark: Volume2 },
+  edit: { mark: PencilEdit01Icon },
+  fork: { mark: GitCompareIcon },
+  readAloud: { mark: VolumeHighIcon },
 
   // — Tool actions ----------------------------------------------------------
   // What a tool call does: one mark per action the transcript's tool chips
@@ -228,33 +326,34 @@ const REGISTRY = {
   // this file on purpose: the palette's `search` is a search, and a directory
   // listing is `projectOpen`'s open folder -- the shape's concept, "the
   // contents of a directory", is the same in both places.
-  fileRead: { mark: BookOpen },
-  fileWrite: { mark: FilePlus },
-  run: { mark: Terminal },
+  fileRead: { mark: BookOpen01Icon },
+  fileWrite: { mark: FileAddIcon },
+  run: { mark: ComputerTerminal01Icon },
   // A file going into a folder: the move tool, whose whole act is a file
   // gaining a new place. Not the pencil, which is an edit to a file's
   // contents; nothing here changes what is inside the file.
-  move: { mark: FolderInput },
+  move: { mark: FolderExportIcon },
 
   // — File formats ---------------------------------------------------------
   // Three formats no brand speaks for: SQL, XML and YAML are standards, not
   // companies, so the brand-mark set has nothing to borrow for them. The
   // concept's own mark stands in, by the same one-mark-one-concept rule as
   // everything in this file.
-  database: { mark: Database },
-  codeXml: { mark: CodeXml },
-  fileCog: { mark: FileCog },
+  database: { mark: Database01Icon },
+  codeXml: { mark: SourceCodeIcon },
+  fileCog: { mark: FileScriptIcon },
 
   // — Composer ------------------------------------------------------------
-  add: { mark: Plus, motion: CROSS },
-  attach: { mark: Paperclip },
-  dictate: { mark: Mic },
+  add: { mark: Add01Icon, motion: CROSS },
+  subtract: { mark: MinusSignIcon },
+  attach: { mark: Attachment01Icon },
+  dictate: { mark: Mic01Icon },
   // The microphone held closed in voice mode: nothing is recorded or sent.
-  muted: { mark: MicOff },
+  muted: { mark: MicOff01Icon },
   // Hearing the voice, and not: deafen silences Studio's speech on a call.
-  listen: { mark: Headphones },
-  deafened: { mark: HeadphoneOff },
-  send: { mark: ArrowUp, motion: LIFT },
+  listen: { mark: HeadphonesIcon },
+  deafened: { mark: HeadphoneMuteIcon },
+  send: { mark: ArrowUp02Icon, motion: LIFT },
   steer: { mark: CornerDownRight },
   queue: { mark: GalleryVerticalEnd },
   // `stop`, `play` and `pause` are not here either: they are the drawn
@@ -262,54 +361,54 @@ const REGISTRY = {
   // of any kind to take them from. See `drawn.tsx`, and `Icons` below.
 
   // — Capabilities --------------------------------------------------------
-  goal: { mark: Target },
-  plan: { mark: ListChecks },
+  goal: { mark: Target01Icon },
+  plan: { mark: CheckListIcon },
   // `mcp` is not here: MCP publishes its own mark, so it is merged in with
   // the other drawn marks at the bottom of this file. See `McpMark`.
-  connector: { mark: Cable },
-  skill: { mark: WandSparkles },
-  hook: { mark: Webhook },
+  connector: { mark: PlugSocketIcon },
+  skill: { mark: MagicWand01Icon },
+  hook: { mark: WebhookIcon },
   // The agent roster's section mark: the delegate itself. Not `sparkles`
   // (generation) and not `skill` (a skill's wand) — the agents pane is the
   // one place that names the agents rather than one of their surfaces.
-  agents: { mark: Bot },
-  browserUse: { mark: Globe },
+  agents: { mark: Robot01Icon },
+  browserUse: { mark: Globe02Icon },
   // The desktop, driven: a pointer mid-click. Not `themeSystem`'s monitor,
   // which means "follow the OS", and not `devices`, which is the same Studio
   // on two screens. This is Studio acting on the screen.
-  computerUse: { mark: MousePointerClick },
+  computerUse: { mark: Cursor01Icon },
   // Commands the model left running. `run` is already a terminal and means the
   // act of running something; this means the things that are still running, so
   // it is the same idea in the plural and takes a different mark rather than a
   // second copy of that one.
-  backgroundJobs: { mark: SquareTerminal },
+  backgroundJobs: { mark: ComputerTerminal02Icon },
 
   // — Settings sections ---------------------------------------------------
-  general: { mark: SlidersHorizontal },
-  appearance: { mark: Palette },
+  general: { mark: SlidersHorizontalIcon },
+  appearance: { mark: PaintBoardIcon },
   // The same Studio on a phone beside the PC: two screens, one state. Not
   // `themeSystem`, which is one monitor and means "follow the OS".
-  devices: { mark: MonitorSmartphone },
-  personalization: { mark: UserCog },
-  shortcuts: { mark: Keyboard },
-  account: { mark: CircleUser },
-  coding: { mark: Code },
-  archive: { mark: Archive },
+  devices: { mark: SmartPhone01Icon },
+  personalization: { mark: UserSettings01Icon },
+  shortcuts: { mark: KeyboardIcon },
+  account: { mark: UserCircleIcon },
+  coding: { mark: CodeIcon },
+  archive: { mark: Archive02Icon },
   // Permissions: the standing rules themselves. A shield here is right —
   // the chat's ask/auto pair deliberately is not one (choosing "ask" is a
   // request, not a wall) — because this page is the wall, seen from the
   // side that owns it.
-  permissions: { mark: ShieldCheck },
+  permissions: { mark: SecurityCheckIcon },
   // The retrieval vendors a run can call on - web search and page fetch.
   // A wrench, because the page is named Tools and the mark should agree
   // with the name; it was the search glass, which said "a search box" about
   // a page of keys.
-  tools: { mark: Wrench },
+  tools: { mark: Wrench01Icon },
 
   // — Appearance ----------------------------------------------------------
-  themeSystem: { mark: Monitor },
-  themeLight: { mark: Sun },
-  themeDark: { mark: Moon },
+  themeSystem: { mark: ComputerIcon },
+  themeLight: { mark: Sun01Icon },
+  themeDark: { mark: Moon02Icon },
   image: { mark: PhotoMark },
 
   // — Artifacts -----------------------------------------------------------
@@ -323,10 +422,20 @@ const REGISTRY = {
   // produced object in three others. A plain container is the fallback because
   // the fallback's whole claim is that it does not know what is inside.
   artifact: { mark: Box },
-  video: { mark: Clapperboard },
-  file: { mark: FileText },
-  link: { mark: Link2 },
-  generate: { mark: Sparkles },
+  video: { mark: Video01Icon },
+  file: { mark: File01Icon },
+  // A file's kind, where no language's mark applies. See `fileTypes`.
+  fileExecutable: { mark: AppWindowIcon },
+  fileZip: { mark: FileZipIcon },
+  filePdf: { mark: Pdf01Icon },
+  fileAudio: { mark: FileAudioIcon },
+  fileVideo: { mark: FileVideoIcon },
+  fileText: { mark: Txt01Icon },
+  fileSheet: { mark: Xls01Icon },
+  fileDocument: { mark: Doc01Icon },
+  fileSecret: { mark: FileLockedIcon },
+  link: { mark: Link01Icon },
+  generate: { mark: SparklesIcon },
 
   /* — Opening something larger ------------------------------------------
      `PanelRight` is the sidebar family: a container with an edge, meaning "a
@@ -336,26 +445,26 @@ const REGISTRY = {
      toggle furniture rather than show you an object. Two arrows pushing
      outward says the thing you are pointing at gets bigger, which is what
      happens. */
-  openLarger: { mark: Maximize2 },
+  openLarger: { mark: ArrowExpand01Icon },
   // Folding a surface into the corner player it keeps running in. The mark is
   // that picture - a small window in a large one - rather than arrows, so it
   // sits beside a "Leave" label without the two pointing different ways.
   minimize: { mark: PictureInPicture2 },
 
   // — Confirmation and destructive ----------------------------------------
-  check: { mark: Check },
+  check: { mark: Tick02Icon },
   // Selecting several at once — the library's select mode. A box with the
   // mark inside it, because what the mode does is put exactly that beside
   // every card.
-  select: { mark: SquareCheckBig },
+  select: { mark: CheckmarkSquare02Icon },
   // Turning something off that stays installed. Not `permissionAsk`, which
   // is a Pause and belongs to the execution modes: a provider you switched off
   // is not a provider waiting to be asked about.
-  disable: { mark: Ban },
-  failed: { mark: CircleAlert },
-  pin: { mark: Pin },
-  delete: { mark: Trash2, motion: LIFT_LID },
-  clear: { mark: Eraser },
+  disable: { mark: UnavailableIcon },
+  failed: { mark: AlertCircleIcon },
+  pin: { mark: PinIcon },
+  delete: { mark: Delete02Icon, motion: LIFT_LID },
+  clear: { mark: EraserIcon },
 } satisfies Record<string, Entry>
 
 /**
@@ -366,7 +475,7 @@ const REGISTRY = {
  * the mistake that matters — two ideas quietly sharing one shape.
  */
 function assertUnique(registry: Record<string, Entry>): void {
-  const seen = new Map<LucideIcon, string>()
+  const seen = new Map<Entry['mark'], string>()
   for (const [concept, entry] of Object.entries(registry)) {
     const previous = seen.get(entry.mark)
     if (previous) {
@@ -396,10 +505,27 @@ export const Icons = {
   ...(Object.fromEntries(
     Object.entries(REGISTRY).map(([concept, entry]) => [
       concept,
-      fromLucide(entry.mark, concept, (entry as Entry).motion),
+      Array.isArray(entry.mark)
+        ? fromHugeicons(entry.mark, concept, (entry as Entry).motion)
+        : fromLucide(entry.mark as LucideIcon, concept, (entry as Entry).motion),
     ]),
   ) as Record<keyof typeof REGISTRY, ReturnType<typeof fromLucide>>),
-  sidebar: SidebarToggle,
+  // The composer's marks, as Family A draws them (see `fromHugeicons.tsx`).
+  paperclip: fromHugeicons(Attachment01Icon, 'paperclip'),
+  web: fromHugeicons(Globe02Icon, 'web'),
+  dots: fromHugeicons(MoreHorizontalIcon, 'dots'),
+  // Lucide's, because the free Hugeicons waveforms are too dense at this size.
+  waveform: fromLucide(AudioLines, 'waveform'),
+  sendUp: fromHugeicons(ArrowUp02Icon, 'sendUp', LIFT),
+  reply: fromHugeicons(ReplyMark, 'reply'),
+  quote: fromHugeicons(QuoteMark, 'quote'),
+  // The header's marks.
+  history: fromHugeicons(HistoryMark, 'history'),
+  compose: fromHugeicons(ComposeMark, 'compose'),
+  capture: fromHugeicons(CaptureMark, 'capture'),
+  expand: fromHugeicons(ExpandMark, 'expand'),
+  windowClose: fromHugeicons(Cancel01Icon, 'windowClose'),
+  sidebar: fromHugeicons(PanelMark, 'sidebar'),
   workspace: WorkspaceOverviewMark,
   mcp: McpMark,
   voice: VoiceWave,

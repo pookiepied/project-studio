@@ -387,8 +387,8 @@ async fn open_diagnostic_window(app: AppHandle) -> Result<(), String> {
   .title("Harness diagnostic")
   // Wider than it is tall: these are log lines, and the thing that makes them
   // readable is not having to wrap.
-  .inner_size(860.0, 620.0)
-  .min_inner_size(480.0, 320.0)
+  .inner_size(916.0, 676.0)
+  .min_inner_size(536.0, 376.0)
   .decorations(false)
   .transparent(true)
   .shadow(false)
@@ -397,7 +397,7 @@ async fn open_diagnostic_window(app: AppHandle) -> Result<(), String> {
   .build()
   .map_err(|error| error.to_string())?;
 
-  window::apply_rounded_corners(&window);
+  window::clear_native_edge(&window);
   Ok(())
 }
 
@@ -434,8 +434,8 @@ async fn open_conversation_window(
     // Match the main window: Windows file drops must reach the HTML composer.
     .disable_drag_drop_handler()
     .title(title)
-    .inner_size(720.0, 760.0)
-    .min_inner_size(420.0, 420.0)
+    .inner_size(776.0, 816.0)
+    .min_inner_size(476.0, 476.0)
     .decorations(false)
     .transparent(true)
     .shadow(false)
@@ -444,7 +444,7 @@ async fn open_conversation_window(
     .build()
     .map_err(|error| error.to_string())?;
 
-  window::apply_rounded_corners(&window);
+  window::clear_native_edge(&window);
   Ok(())
 }
 
@@ -462,8 +462,8 @@ async fn open_browser_window(app: AppHandle, conversation_id: String) -> Result<
     let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
       .disable_drag_drop_handler()
       .title("Studio Browser")
-      .inner_size(1120.0, 800.0)
-      .min_inner_size(640.0, 480.0)
+      .inner_size(1176.0, 856.0)
+      .min_inner_size(696.0, 536.0)
       .decorations(false)
       .transparent(true)
       .shadow(false)
@@ -471,7 +471,7 @@ async fn open_browser_window(app: AppHandle, conversation_id: String) -> Result<
       .resizable(true)
       .build()
       .map_err(|error| error.to_string())?;
-    window::apply_rounded_corners(&window);
+    window::clear_native_edge(&window);
     Ok(())
   })
 }
@@ -830,7 +830,9 @@ pub fn run() {
     // Remembers size and position across launches. A desktop app that reopens
     // at a fixed size every time is one the user has to re-arrange every time,
     // and on a second monitor that is the difference between usable and not.
-    // `resetWindowSize` in the frontend is the way back to the default.
+    // `applyWindowSize` in the frontend is the way back to a known size.
+    // The plugin writes only on a clean exit: `window::remember_placement` is
+    // what keeps the file current between launches.
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_store::Builder::default().build())
     // The directory picker (`pickDirectory` in the frontend's window boundary):
@@ -857,6 +859,7 @@ pub fn run() {
       Some(vec![tray::HIDDEN_FLAG]),
     ))
     .setup(move |app| {
+      app.manage(window::remember_placement(app.handle()));
       let indicator_app = app.handle().clone();
       tauri::async_runtime::spawn(async move {
         let queued = std::sync::Arc::new(AtomicBool::new(false));
@@ -893,7 +896,7 @@ pub fn run() {
         start_remote_access_at_launch(app.handle().clone());
       }
       if let Some(main_window) = app.get_webview_window("main") {
-        window::apply_rounded_corners(&main_window);
+        window::clear_native_edge(&main_window);
       }
       Ok(())
     })
@@ -907,6 +910,11 @@ pub fn run() {
     // user closes one, and they share this Harness — reacting to their label
     // would kill it out from under the window the user is still working in.
     .on_window_event(|window, event| {
+      if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+        if let Some(writer) = window.try_state::<window::PlacementWriter>() {
+          writer.changed(window);
+        }
+      }
       // Close-to-tray, when the person has asked for it. The window is kept
       // and hidden rather than destroyed, so reopening it from the tray is
       // instant and the Harness child and every running turn survive -- which

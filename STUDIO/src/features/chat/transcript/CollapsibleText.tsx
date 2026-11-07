@@ -73,7 +73,7 @@ export function CollapsibleText({ text }: { text: string }) {
           It used to be an absolutely-positioned gradient whose `from` colour
           tried to reproduce the bubble's fill: `color-mix(in oklch,
           var(--surface), var(--foreground) 8%)`. That can never be right. The
-          bubble is `bg-selected`, which is `--foreground` at 8% *alpha*,
+          bubble is `bg-user-bubble`, which is `--foreground` at 5% *alpha*,
           composited by the browser in sRGB — while `color-mix(in oklch, ...)`
           interpolates in a different space entirely. Two different
           computations of "the same" colour, so the band was always a shade

@@ -388,3 +388,73 @@ describe('the jump to latest', () => {
     expect(latest?.pinned).toBe(true)
   })
 })
+
+describe('a press that goes nowhere', () => {
+  const landAtBottom = () => {
+    mountTranscript()
+    measure(4000, 500)
+    act(() => flushFrames(OPEN_FRAMES))
+    expect(latest?.pinned).toBe(true)
+  }
+  const press = () => fireEvent.pointerDown(viewportElement())
+  const lift = () => {
+    act(() => {
+      document.dispatchEvent(new Event('pointerup'))
+    })
+  }
+  const selection = (collapsed: boolean) =>
+    vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: collapsed } as Selection)
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('holds the follow still during the press, then gives it back', () => {
+    landAtBottom()
+    press()
+    expect(latest?.pinned).toBe(false)
+    lift()
+    expect(latest?.pinned).toBe(true)
+  })
+
+  it('does not call a selection at the bottom being away', () => {
+    landAtBottom()
+    selection(false)
+    press()
+    lift()
+    expect(latest?.pinned).toBe(false)
+    expect(latest?.distant).toBe(false)
+  })
+
+  it('resumes when the selection is cleared, without a press', () => {
+    landAtBottom()
+    const active = selection(false)
+    press()
+    lift()
+    active.mockReturnValue({ isCollapsed: true } as Selection)
+    act(() => {
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    expect(latest?.pinned).toBe(true)
+  })
+
+  it('stays released for a reader who scrolled away during the press', () => {
+    landAtBottom()
+    press()
+    act(() => {
+      viewportElement().scrollTop = 1000
+    })
+    lift()
+    expect(latest?.pinned).toBe(false)
+    expect(latest?.distant).toBe(true)
+  })
+
+  it('does not take back a reader who pressed while already away', () => {
+    landAtBottom()
+    act(() => {
+      fireEvent.wheel(viewportElement(), { deltaY: -100 })
+      viewportElement().scrollTop = 3480
+    })
+    press()
+    lift()
+    expect(latest?.pinned).toBe(false)
+  })
+})

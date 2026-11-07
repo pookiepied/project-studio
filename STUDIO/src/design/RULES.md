@@ -8,6 +8,10 @@ if the two ever disagree, this file is what they were both trying to say.
 Studio is a calm app for a person having a conversation. It is not a developer
 tool, and almost every rule below is downstream of that one sentence.
 
+Its look is Family A (ADR 0060): one compact rounded window, white and neutral
+grey surfaces, one blue accent, and a composer that holds its tools. When a
+choice here and the reference disagree, the reference wins and this file changes.
+
 ---
 
 ## 1. Interaction
@@ -27,16 +31,12 @@ A selected menu row keeps its fill through hover. An expanded submenu trigger
 uses an inset stroke, and keyboard focus stays within the row's edge.
 
 **Focus is answered by register, not by one treatment.** A control answers
-with an edge — its border deepens, and that is all. A bloom behind the edge
-was tried at two weights and the person using the forms read both as a thick,
-old-fashioned grey outline; monochrome cannot borrow hue to say "focus rather
-than warning", so a second grey on the same edge says thickness instead of
-attention. A surface answers with elevation: the composer lifts one step of the
-shadow scale and draws nothing. The keyboard outline is the third and loudest
-register (`--ring`, 45%) and is keyboard-only — `:focus-visible` is what makes
-an assertive ring polite. One token never serves two registers; when the
-fields consumed `--ring` they inherited the outline's 45% and every click read
-as an error state.
+with an edge: its border deepens, and that is all. A surface answers with
+elevation. The composer is the exception: the caret brings its fine blue edge
+and halo. The keyboard outline is the loudest register (`--ring`, the accent)
+and is keyboard-only, because `:focus-visible` is what makes an assertive ring
+polite. One token never serves two registers; when the fields consumed `--ring`
+every click read as an error state.
 
 **An interface mark is always `--muted-foreground`.** In every state, in every row, on
 every surface. `.studio-icon` enforces it; nothing inherits `currentColor` from
@@ -98,15 +98,8 @@ purpose: a CSS transition and a Framer animation on the same element must not
 disagree. They did — fourteen files had reached for `duration-150`, which was
 not a step in either system.
 
-**The composer has two curves outside this set.** Its widen eases in, because
-the house ease-out covers half of any distance in two frames, which reads as a
-snap across a few hundred pixels. And a gooey neck only
-exists for the last few pixels of an edge's travel, and the house ease-out
-crosses those in about 35ms, so the effect was over before it could be seen.
-`PINCH_MOTION` holds the 300ms ceiling and slows through that stretch. It moves
-only the painted surface, never text or a control, which is what makes it safe
-to run off the reshape clock. A filter layer holds shapes alone: nothing a
-person reads or presses goes through it.
+**The composer does not reshape.** It is one rounded box with the field above
+its tools, whatever it holds. Only the field's height moves.
 
 **A handover between surfaces moves along the hierarchy, not the vertical.**
 Home sits under nothing, a project under home, a conversation under its
@@ -159,8 +152,8 @@ Reduced motion is handled twice, globally, and never in a component:
 
 ## 3. Shape
 
-Radius descends from the window. The window is 20; everything else agrees with
-it or looks pasted on.
+Radius descends from the window. The window is 40, the reference's corner at
+Studio's scale; everything else agrees with it or looks pasted on.
 
 **The concentric rule:** a container of radius R with padding P holds children
 of radius R − P. Break it and the inner arc bulges past the outer one.
@@ -168,6 +161,8 @@ of radius R − P. Break it and the inner arc bulges past the outer one.
 Softer than is typical, deliberately — at this size the difference between
 "corners taken off a rectangle" and "a soft object" is the difference between
 an interface that feels calm and one that feels administrative.
+
+Menus take the reference's 20px corner and 6px padding, and their rows take 12.
 
 **Icon-only controls are circles, always.** There is no second answer and no
 `round` prop. Four corners at 28px are four things asking to be noticed; the
@@ -196,25 +191,38 @@ condition on it and silently disabled the composer's focus lift in dark mode.
 
 ## 5. Colour
 
-The chrome is monochrome, including the window controls. Primary actions use
-the theme's foreground as a solid fill, with the surface color for the label.
-Secondary actions use a muted fill. Hover and selection use graphite tints,
-and capsules have no resting border.
-Red identifies destructive actions, with a solid fill reserved for the final
-confirmation.
+The chrome is neutral grey plus one accent, `--accent` (#3AA8FE), sampled from
+the reference. Blue means act or chosen: send, primary buttons, switches,
+selection, focus, the caret and the Reply pill. `--primary` is the same blue, so anything filled
+as the primary action follows it. Secondary actions use a muted fill, and
+capsules have no resting border. The model chip takes the reference's pale green
+in light and grey in dark. Red identifies destructive actions, with a solid fill
+reserved for the final confirmation. White on the accent is about 2.5:1, which
+is the reference's choice and is low for small text.
 
-Hover and selection are **translucent tints of the foreground**, not opaque
-swatches. A tint composites, so the same two values work on the sidebar, inside
-a popover, and over a raised card, each staying a shade of what is already
-there. An opaque grey reads as a separate object dropped behind the text.
+Four state tokens, kept apart because they say different things:
+
+- `--tint` is hover, a faint neutral.
+- `--selected` is chosen, a faint blue: a menu row, a palette row, an active
+  control.
+- `--soft` is a neutral resting fill: skeletons, tags, a mark's backing. It is
+  not selection, so it never uses `--selected`.
+- `--user-bubble` is the person's own message.
+
+All four are translucent, not opaque swatches. A tint composites, so the same
+value works on the page, inside a popover and over a raised card, each staying a
+shade of what is already there. Tooltips keep their own dark `--tooltip`: they
+are information, and blue would read as an action.
+
+An on/off choice is a `Switch`. `Segmented` is for three or more options, or two
+that are not on and off.
 
 ---
 
 ## 6. Type
 
-Two families. Inter for everything read; Instrument Serif for the one statement
-a page makes — a greeting, a page title. Anywhere else the serif stops being a
-voice and becomes a second UI font.
+One family for the interface: Inter, at a 15px default. `--font-display` stays
+as a role for the one statement a page makes, and it is Inter too.
 
 **Roles, never sizes.** Components name `text-body`, `text-ui`, `text-caption`,
 `text-micro`, `text-title`. Nothing writes `text-sm`. Every role derives from
@@ -260,8 +268,8 @@ height as a rem utility or a literal; it names a control step.
 because it held 32px controls with 10px of padding, and the text inside had no
 say at all — 11px text in a 52px box, 4.7× where every other control in the app
 was 2.2–2.4×. Setting the font to anything at all left the field exactly 52
-tall, which is why no amount of type tuning ever fixed it. `COMPOSER` now
-computes its height and its radius from the control step and the padding.
+tall, which is why no amount of type tuning ever fixed it. Its height now comes
+from the field and the control step inside it.
 
 **Overridable, never overridden.** Roles live in `@layer components`, so a
 deliberate utility at a call site still wins. That is the balance the system is
@@ -327,11 +335,11 @@ Project marks are **abstract, not pictorial**. A flask says the project is an
 experiment; the user picking a mark to tell two projects apart should not end
 up making a claim about the work. They differ by silhouette, not subject.
 
-Two renderers, and the seam is invisible by design. `fromLucide` wraps a
-finished library component and animates it as a whole — that is every mark in
-the app but one. `defineIcon` draws the glyph here, and exists only for marks
-whose meaning lives in a part that moves independently. Today that is the
-sidebar toggle. Both accept `size` and `state`; a call site cannot tell which
+Marks are Hugeicons, at one 1.5px stroke everywhere. Each `REGISTRY` entry names
+Hugeicons data or, where the free set has no good match, a Lucide mark drawn at
+the same weight. `familyMarks.ts` traces the header marks the free set lacks, in
+the same data shape. `defineIcon` draws the few that must be solid, such as the
+transport controls. All accept `size` and `state`; a call site cannot tell which
 it is holding.
 
 ---
@@ -354,24 +362,42 @@ prop, where it combines with that viewport bound. Focus, dismissal and keyboard
 selection stay with each widget. Measure layout dimensions, not an animated
 transform's bounding box.
 
-The window is frameless and transparent; a rounded panel inside paints the
-visible surface. The 20px corner is a **DWM attribute set in Rust**, not CSS —
-CSS cannot round the OS window, and looking at the DOM will not tell you
-whether it is working.
+The window is frameless and transparent. The visible window is a CSS panel
+inset 28px inside the OS window, with a 40px corner, a soft shadow and no
+border; `installWindowFrame` drops the inset and corner when maximized and owns
+the resize band around the panel. Layers that fill the window use
+`studio-window-fill`, never `fixed inset-0`. DWM rounding stays off, because on
+a transparent window it paints the margin as a pale box. The margin still
+belongs to the OS window, so it blocks clicks to whatever is behind it.
 
-The top strip is transparent: no fill, no hairline. Content scrolls under it
-and is masked by a gradient rather than hidden behind a bar. The band directly
-under the traffic lights is solid so the title never collides with text sliding
-past; only below that does it fade.
+The header is transparent: no fill, no hairline. Content scrolls under it and
+is masked by a gradient rather than hidden behind a bar. It is 66px tall, with
+its marks at 20px in 29px circles on a 35px pitch. Left is the conversation
+selector. Right runs Personalize, a divider, then new conversation, capture,
+sidebar, maximize, more and close, in that order. There is no minimize, because
+the reference has none. Close sits in a grey circle in every window. Anything
+Studio needs beyond those lives in the three dots. A control drawn ahead of its
+feature is disabled and says it is coming.
 
 Drag uses `startDragging()`, not `data-tauri-drag-region`. The attribute also
-binds double-click-to-maximize, and Windows squares a maximized window — so a
-drag region on the brand band silently cost us the rounded corner.
+binds double-click-to-maximize, and a maximized window loses the panel's corner
+and margin — so a drag region on the brand band would cost us the shape.
 
 Below 900px the sidebar stops being part of the layout and floats over it. The
 page always keeps the whole window; the sidebar is summoned rather than
 resident. The same switch covers touch and mobile, so there is no second,
 disagreeing rule for small screens.
+
+The sidebar is 256px, and its rows share one height. A row carries one mark at
+rest. A project's is the one the person chose, its disclosure stays at the far end
+until hover or until it is closed, and its conversations sit under its name.
+Section labels are sentence case in the caption role, here and across the app. A
+project shows five conversations before it offers the rest, and never hides the
+open one.
+
+Window sizes are presets, not modes. Compact and Standard only resize the window;
+layout follows the width as it does at any size a person drags it to, so there is
+no second layout to keep working.
 
 ---
 

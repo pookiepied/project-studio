@@ -64,7 +64,7 @@ describe('DiagnosticWindow', () => {
     expect(screen.queryByText('The harness exited during startup.')).toBeNull()
     expect(screen.queryByText(/exit status and its output/)).toBeNull()
 
-    // And no Close button in the content: the traffic lights in the corner
+    // And no Close button in the content: the window controls in the corner
     // are the close button, and shipping both asks the same question twice.
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
   })

@@ -21,8 +21,9 @@ export {
   onComputerStopResult,
   openDiagnosticWindow,
   startWindowDrag,
-  resetWindowSize,
+  applyWindowSize,
   signalAppReady,
+  installWindowFrame,
 } from './window'
 export {
   overlayKind,

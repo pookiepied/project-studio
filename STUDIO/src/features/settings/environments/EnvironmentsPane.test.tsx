@@ -239,7 +239,7 @@ describe('the sandbox fence', () => {
     ready({})
     render(<EnvironmentsPane />)
 
-    expect(screen.queryByRole('radiogroup', { name: 'Sandbox fence' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Sandbox fence' })).toBeNull()
     expect(screen.getByText(/no sandbox fence for this platform/)).toBeTruthy()
   })
 
@@ -248,7 +248,7 @@ describe('the sandbox fence', () => {
     render(<EnvironmentsPane />)
 
     expect(screen.getByText(/^Off\. Commands run under the permission gate alone/)).toBeTruthy()
-    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Sandbox fence' })).getByRole('radio', { name: 'On' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Sandbox fence' }))
     expect(environments.setIsolation).toHaveBeenCalledWith(true)
   })
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Dialog, Segmented, TextArea, TextField } from '@/components/primitives'
+import { Button, Dialog, Segmented, Switch, TextArea, TextField } from '@/components/primitives'
 import { StateNote } from '@/components/state/StateNote'
 import {
   EMPTY_FORM,
@@ -333,15 +333,10 @@ function FormView({
                 : 'The server is contained with no network at all.'
             }
           >
-            <Segmented
-              layoutId="mcp-network"
-              ariaLabel="Network"
-              value={form.needsNetwork ? 'on' : 'off'}
-              onChange={(value) => onChange({ needsNetwork: value === 'on' })}
-              options={[
-                { id: 'off', label: 'Off' },
-                { id: 'on', label: 'On' },
-              ]}
+            <Switch
+              label="Network"
+              checked={form.needsNetwork}
+              onChange={(value) => onChange({ needsNetwork: value })}
             />
           </Field>
         </>

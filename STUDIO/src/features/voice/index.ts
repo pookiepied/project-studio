@@ -1,5 +1,5 @@
-export { DictationBar } from './DictationBar'
-export { useDictation } from './useDictation'
+export { DictationControls, DictationPrompt } from './DictationBar'
+export { appendTake, useDictation } from './useDictation'
 export { VoiceModeProvider, useVoiceModeContext } from './VoiceModeProvider'
 export { voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from './availability'
 export { TextLanding, landingDuration } from './TextLanding'

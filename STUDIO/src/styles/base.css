@@ -14,6 +14,11 @@
     background: transparent;
   }
 
+  #root {
+    box-sizing: border-box;
+    padding: var(--window-inset);
+  }
+
   body {
     margin: 0;
     overflow: hidden;
@@ -75,6 +80,11 @@
   }
 
   /* Menu rows touch, so the focus outline stays inside the focused row. */
+  ::selection {
+    background: var(--selection);
+    color: var(--selection-foreground);
+  }
+
   .studio-menu-row:focus-visible {
     outline-offset: -2px;
   }

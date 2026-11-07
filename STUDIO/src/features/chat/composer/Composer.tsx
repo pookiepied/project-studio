@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
+import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import {
@@ -18,181 +18,39 @@ import { DUPLICATE_ATTACHMENT_NOTE, matchingDocument } from '@/domain/attachment
 import { base64OfBytes } from '@/lib/base64'
 import { KeepDialog } from '@/features/library/KeepDialog'
 import type { KeepCandidate } from '@/features/library/client'
-import { PermissionControl } from '@/features/chat/composer/PermissionControl'
+import { ComposerMenu } from '@/features/chat/composer/ComposerMenu'
 import type { PermissionMode } from '@/domain/permissions/modes'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
-import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
+import {
+  clearDraft,
+  clearQuote,
+  readDraft,
+  readQuote,
+  subscribeQuotes,
+  withQuotation,
+  writeDraft,
+} from '@/features/chat/composer/drafts'
+import { QuoteStrip } from '@/features/chat/composer/QuoteStrip'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { useFileDrop } from '@/features/chat/composer/useFileDrop'
 import { ImproveButton } from '@/features/chat/composer/ImproveButton'
 import { useImproveOffer } from '@/features/chat/composer/useImproveOffer'
 import { SlashSuggestions } from '@/features/chat/composer/SlashSuggestions'
 import { useSlashCommands } from '@/features/chat/composer/useSlashCommands'
-import { DictationBar, TextLanding, landingDuration, useDictation } from '@/features/voice'
+import { DictationControls, DictationPrompt, TextLanding, appendTake, landingDuration, useDictation } from '@/features/voice'
 import { useVoiceModeContext, voiceInputAvailable, VOICE_UNAVAILABLE_REASON } from '@/features/voice'
 import type { TurnImageWire } from '@/platform/harness'
 import { cn } from '@/lib/cn'
 
-/*
- * One clock for the whole reshape.
- *
- * The capsule becoming a box is four motions at once: the field's height, the
- * footer track growing in, the controls relocating and the frame's radius
- * relaxing. All four share `DURATION.slow` and the house ease-out — the
- * vocabulary's "a whole surface changing" — because when they run on
- * different clocks the parts read as separate events happening near each
- * other, which is what an unanimated instant change degenerates into the
- * moment only some of it is animated.
- *
- * The shared curve is also what makes the relocation *compose* rather than
- * add: Framer animates the controls' offset from where the grid just placed
- * them, and the grid's own track grows under them by the same amount on the
- * same curve — the offset shrinks exactly as the track rises, so the two
- * read as one continuous glide.
- */
-const SHAPE_MOTION = { duration: DURATION.slow, ease: EASE_OUT }
-const TRACK_TRANSITION = `grid-template-rows ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
-/**
- * The field's side insets, on the same clock. The field spans the whole
- * frame in both arrangements; what changes is how much of each side it
- * leaves to the clusters beside it - their widths on one line, nothing once
- * they have dropped to the footer. Padding is a length CSS interpolates, so
- * the text's left edge and its wrapping width glide from one to the other
- * as the clusters descend, instead of the field jumping columns and its
- * text re-wrapping on the first frame while the rest of the frame was
- * still moving. A grid column is not a length, and that jump was the
- * moment that read as the composer distorting before it animated.
- */
-const INSET_TRANSITION = `padding ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
-/** The grid's column gap (`gap-x-2`), which the insets have to include. */
-const CLUSTER_GAP = 8
-/**
- * The footer track: the air above the controls plus the control row itself,
- * as one number. Carrying the air *in the track* — rather than as a row gap —
- * is what lets the track transition its height: a gap between rows appears at
- * full size the moment a second row exists, which is a step in the frame's
- * bottom edge no matter how smoothly everything else moves.
- */
-const FOOTER_TRACK = 'auto calc(var(--button-md) + 0.5rem)'
-/**
- * How much further in the text sits once the dock stands beside it: past the air
- * between the two, and by the body's own padding, so the text clears the edge
- * the body has just drawn there.
- */
-const ACTIVE_INSET = COMPOSER.dockGap + COMPOSER.paddingInline
-/**
- * The pinch, the one curve here off the reshape clock.
- *
- * The body and the dock only look like one liquid for the last few pixels of the
- * edge's travel, and the house ease-out spends about 35ms there: the neck was
- * over before it could be seen. This keeps the ease-out's fast start, then
- * slows through that stretch so the neck visibly thins and lets go. It only
- * moves the painted surface, so being off the clock cannot shift any text.
- */
-const PINCH_MOTION = '0.3s linear(0, 0.5 14%, 0.72 28%, 0.82 42%, 0.88 58%, 0.94 76%, 0.98 90%, 1)'
-const SURFACE_TRANSITION = `right ${PINCH_MOTION}, border-radius ${PINCH_MOTION}`
-const SHAPE_CURVE = `${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
-/**
- * The frame widening, also off the reshape clock. The house ease-out covers half
- * of any distance in its first two frames, which suits something small arriving
- * and reads as a snap across a few hundred pixels. This eases in, then glides.
- */
-const WIDEN_MOTION = '0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-const FRAME_TRANSITION = `border-radius ${SHAPE_CURVE}, padding ${SHAPE_CURVE}, max-width ${WIDEN_MOTION}`
-
-/** A cluster's measured room includes the grid's gap; a dock has the frame's padding both sides. */
-const dockWidth = (room: number) => room - CLUSTER_GAP + COMPOSER.paddingInline * 2
-/** What the dock and the air beside it take from the body. */
-const dockReach = (room: number) => dockWidth(room) + COMPOSER.dockGap
-
-/**
- * The composer's painted surface: a body, and a dock behind the right-hand
- * controls.
- *
- * Both are plain shapes in one layer, and the filter is what makes them liquid:
- * blur them together, then cut the blur's alpha back to a hard edge. Anything
- * close enough to share blur fuses, with a neck that thins as the shapes part.
- * The controls and the text are not in this layer, so nothing a person reads or
- * presses is ever blurred.
- *
- * The dock is the capsule's height and sits on the frame's bottom right, so at
- * rest it lies wholly inside the body and the two shapes are simply the capsule.
- * Going active on one line the body draws its right side in and pinches off it,
- * and past one line it fuses back, because a capsule left alone beside a tall box
- * reads as stranded and costs the draft its width. The dock itself never moves,
- * so neither does a control riding it.
- *
- * `sRGB` because filters default to linear light, which would repaint the
- * surface a different shade from the one the theme chose. The elevation is on
- * the parent because it has to be drawn from the fused silhouette; a box-shadow
- * on any one shape would be cut away by the threshold.
- */
-function ComposerSurface({
-  bubble,
-  stacked,
-  focused,
-  inset,
-}: {
-  bubble: boolean
-  stacked: boolean
-  focused: boolean
-  inset: { readonly left: number; readonly right: number }
-}) {
-  const filterId = useId()
-  return (
-    <div
-      aria-hidden
-      data-composer-surface
-      className="pointer-events-none absolute inset-0 -z-10"
-      style={{
-        filter: focused ? 'var(--silhouette-lifted)' : 'var(--silhouette-raised)',
-        transition: `filter ${SHAPE_CURVE}`,
-      }}
-    >
-      <svg className="absolute size-0">
-        <filter id={filterId} colorInterpolationFilters="sRGB">
-          <feGaussianBlur stdDeviation={COMPOSER.gooBlur} />
-          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" />
-        </filter>
-      </svg>
-      <div className="absolute inset-0" style={{ filter: `url("#${filterId}")` }}>
-        <div
-          data-composer-body
-          className="absolute inset-y-0 left-0 bg-surface-raised"
-          style={{
-            right: bubble ? dockReach(inset.right) : 0,
-            borderRadius: stacked ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
-            transition: SURFACE_TRANSITION,
-          }}
-        />
-        <div
-          data-composer-dock
-          className="absolute bottom-0 right-0 bg-surface-raised"
-          style={{
-            width: dockWidth(inset.right),
-            height: COMPOSER.dockHeight,
-            borderRadius: COMPOSER.restingRadius,
-            transition: `width ${SHAPE_CURVE}`,
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
 /**
  * The composer.
  *
- * ---- What it is not ------------------------------------------------------
+ * ---- What it holds ---------------------------------------------------------
  *
- * It carries no model picker, no permission control and no context meter. All
- * three moved to the top strip, because they are session facts — who you are
- * talking to and what it may do — rather than properties of the sentence you
- * are writing. Kept here they turned the field into a toolbar, which is the
- * single loudest way a text box stops looking calm.
- *
- * What is left is what genuinely belongs to this message: what to add to it,
- * and whether to send it.
+ * Family A's box: the field on top and one row of tools under it. On the left,
+ * what to add, the model, the web and everything else; on the right, voice and
+ * send. The model arrives as `turnControl`, because which menu it opens is the
+ * shell's concern and not this field's.
  *
  * ---- Where a send goes -----------------------------------------------------
  *
@@ -217,24 +75,19 @@ function ComposerSurface({
  *
  * ---- The shape ------------------------------------------------------------
  *
- * A capsule while it holds one line, a rounded box once it holds more. Both are
- * correct and neither is correct for the other case: a capsule with four lines
- * of text has enormous dead corners, and a 16px box on a single line reads as a
- * form input. The radius animates between them, so growing feels like one
- * object changing rather than two components swapping.
+ * One shape, always. It does not change when the caret arrives or a draft grows
+ * past a line, apart from the field's own height. The caret brings the fine blue
+ * edge and halo (`.studio-composer` in styles/layout.css), which cost no layout.
  *
- * At rest it is a short capsule, centred. Going active - the caret, a draft, the
- * microphone - it widens to the column, the voice controls pinch off as a capsule
- * of their own, and both undo when it goes idle. Going active never adds height:
- * a composer that grows taller when the caret arrives reflows the page on every
- * click into it. See `ComposerSurface`.
+ * ---- The quote -------------------------------------------------------------
  *
- * Separation is a shadow, not a border. A hairline around a white field on a
- * white surface reads as an input; a soft shadow reads as an object resting on
- * the page, which is what the reference does.
+ * The Reply pill docks the passage in a strip above the field. It stays out of
+ * the words until the send, where it leaves ahead of them as a Markdown
+ * quotation, so the harness sees an ordinary message and nothing new.
  */
 export function Composer({
   conversationId,
+  turnControl,
   placeholder,
   onSend,
   busy: turnRunning = false,
@@ -247,6 +100,8 @@ export function Composer({
   keepSentDraftForExit = false,
 }: {
   conversationId: string | null
+  /** The model chip, among the tools. */
+  turnControl?: ReactNode
   draftPermission?: { value: PermissionMode; onChange: (value: PermissionMode) => void }
   /** Opens voice on a chat that does not exist yet; its first utterance creates it. */
   onStartVoice?: () => void
@@ -339,42 +194,20 @@ export function Composer({
   /** Pick-time rejections, held until the next pick or a successful send. */
   const [refusals, setRefusals] = useState<readonly ImageRejection[]>([])
   const picker = useRef<HTMLInputElement>(null)
-  const [focused, setFocused] = useState(false)
-  // The caret specifically, which is what widens the frame. Any focus in the
-  // frame would be wrong: pressing + on an idle composer would slide the button
-  // out from under the pointer and leave its menu anchored to where it was.
   const [fieldFocused, setFieldFocused] = useState(false)
-  const [multiline, setMultiline] = useState(false)
-  // How much room each cluster takes beside the field on one line. Measured
-  // from the clusters themselves rather than summed from tokens, because the
-  // right one changes width - Improve arrives, the voice reason stands in.
-  const leftCluster = useRef<HTMLDivElement>(null)
-  const rightCluster = useRef<HTMLDivElement>(null)
-  const [inset, setInset] = useState({ left: 0, right: 0 })
-  useLayoutEffect(() => {
-    const left = leftCluster.current
-    const right = rightCluster.current
-    if (!left || !right) return
-    const read = () => {
-      const next = {
-        left: left.getBoundingClientRect().width + CLUSTER_GAP,
-        right: right.getBoundingClientRect().width + CLUSTER_GAP,
-      }
-      setInset((current) =>
-        current.left === next.left && current.right === next.right ? current : next,
-      )
-    }
-    read()
-    const observer = new ResizeObserver(read)
-    observer.observe(left)
-    observer.observe(right)
-    return () => observer.disconnect()
-  }, [])
   // True from send to receipt. Without it a refused send left `busy` false
   // for the whole round trip, so a second click could start a second POST
   // while the first was still being judged.
   const [sending, setSending] = useState(false)
   const field = useRef<ComposerFieldHandle>(null)
+  const quote = useSyncExternalStore(subscribeQuotes, () => readQuote(conversationId))
+  // A passage arriving is the start of a reply, so the caret goes to it. One
+  // that was already here when the composer mounted takes nothing.
+  const lastQuote = useRef(quote)
+  useEffect(() => {
+    if (quote !== '' && quote !== lastQuote.current) field.current?.focus()
+    lastQuote.current = quote
+  }, [quote])
   const restoredId = useRef<string | null>(null)
   useEffect(() => {
     if (!restoredMessage || restoredId.current === restoredMessage.submissionId) return
@@ -422,17 +255,24 @@ export function Composer({
   // the whole field, and its rewrite lands the way the take did.
   const improveOffer = useImproveOffer({ text, setText, onImproved: land })
 
+  // Words already on screen from a take need no second arrival when it ends.
+  const takeShown = useRef(false)
+
   const dictation = useDictation({
     // Appended, not assigned: dictation is one input among several, and a
     // sentence typed before speaking is not made wrong by being spoken after.
-    // The whole take arrives at once, when it ends; nothing lands mid-take.
+    // The draft is written once, when the take ends, so Cancel has nothing to
+    // undo; until then the field only shows the words.
     onTake: (spoken) => {
-      const next = textRef.current.trim().length > 0 ? `${textRef.current.trimEnd()} ${spoken}` : spoken
+      const next = appendTake(textRef.current, spoken)
       setText(next)
-      land(next)
+      if (!takeShown.current) land(next)
       improveOffer.open()
     },
   })
+  useEffect(() => {
+    takeShown.current = dictation.transcript !== ''
+  }, [dictation.transcript])
 
   // A take starting withdraws the last offer until this one lands. The
   // caret returns with the field, after the landing - see below.
@@ -469,7 +309,6 @@ export function Composer({
     setCommandNote(null)
     setText('')
     clearDraft(conversationId)
-    setMultiline(false)
     void slash.resolve(message).then(
       (outcome) => {
         if (outcome.kind === 'done') setCommandNote(outcome.note)
@@ -523,16 +362,15 @@ export function Composer({
   const canSend = (text.trim().length > 0 || images.length > 0 || documents.length > 0) &&
     !sending && pendingAttachments === 0 && (!turnRunning || onQueue !== undefined)
   const dictating = dictation.stage !== 'idle'
-  const fieldAside = dictating || landing !== null
-  // Anything riding above the field needs the frame's full width, which only
-  // the box gives it; between the docks it would hang past the body's sides.
-  const stacked = multiline || images.length > 0 || documents.length > 0 ||
-    refusals.length > 0 || commandNote !== null || Boolean(improveOffer.offer?.note)
-  // Idle is a composer with nothing in it and nobody at it.
-  const active = fieldFocused || fieldAside || stacked || text.length > 0
-  const bubble = active && !stacked
-  const besideDock = { left: inset.left, right: inset.right + ACTIVE_INSET }
-  const room = bubble ? besideDock : inset
+  // A take in hand, as against the mic being asked for or having refused: only
+  // then do the tools give way to the take's own controls.
+  const takeLive = dictation.stage === 'recording' || dictation.stage === 'paused' || dictation.stage === 'processing'
+  // During a take the real field shows the words, so they wrap and grow the box
+  // as typed text does. The prompt has the slot only when there are none.
+  const takeWords = takeLive && dictation.transcript !== ''
+  const fieldWords = takeWords ? appendTake(text, dictation.transcript) : text
+  const promptShown = dictating && !(takeLive && fieldWords.trim() !== '')
+  const fieldAside = promptShown || landing !== null
 
   /**
    * Reads the picker's haul into the strip: rules first, then bytes. The
@@ -647,6 +485,7 @@ export function Composer({
     const outgoing = text
     const carried = images
     const papers = documents
+    const quoted = quote
     setSending(true)
     setCommandNote(null)
     // Words go straight out. A command is resolved first: an action runs
@@ -654,7 +493,7 @@ export function Composer({
     // place of the words.
     const deliver = turnRunning && onQueue !== undefined ? onQueue : onSend
     const dispatched = !slash.isCommand(outgoing)
-      ? deliver(outgoing, carried, papers)
+      ? deliver(withQuotation(quoted, outgoing), carried, papers)
       : slash.resolve(outgoing).then((outcome) => {
           if (outcome.kind === 'done') {
             setSending(false)
@@ -662,11 +501,10 @@ export function Composer({
             if (textRef.current === outgoing) {
               setText('')
               clearDraft(conversationId)
-              setMultiline(false)
             }
             return null
           }
-          return deliver(outcome.kind === 'prompt' ? outcome.text : outgoing, carried, papers)
+          return deliver(withQuotation(quoted, outcome.kind === 'prompt' ? outcome.text : outgoing), carried, papers)
         })
     void dispatched.then(
       (receipt) => {
@@ -689,8 +527,8 @@ export function Composer({
         // that window would otherwise restore words the harness already
         // took, which reads as the app duplicating the message.
         clearDraft(conversationId)
+        if (readQuote(conversationId) === quoted) clearQuote(conversationId)
         if (keepSentDraftForExit) return
-        setMultiline(false)
         setImages([])
         setDocuments([])
         setRefusals([])
@@ -709,78 +547,19 @@ export function Composer({
     <div
       ref={frame}
       data-composer-frame
-      data-active={active}
-      data-stacked={stacked}
+      data-focused={fieldFocused}
       onFocusCapture={(event) => {
-        setFocused(true)
         if (event.target instanceof HTMLTextAreaElement) setFieldFocused(true)
       }}
       onBlurCapture={(event) => {
-        if (event.currentTarget.contains(event.relatedTarget)) return
-        setFocused(false)
-        setFieldFocused(false)
+        if (event.target instanceof HTMLTextAreaElement) setFieldFocused(false)
       }}
-      // The radius is a real style with a CSS transition, not a Framer
-      // `animate`. A Framer value is only applied once the animation loop
-      // runs, so the resting shape of the most important control in the app
-      // would depend on frames being scheduled — and it renders as a square
-      // box in any situation where they are not. CSS interpolates one property
-      // just as well and always paints the correct shape on the first frame.
-      // The duration is the reshape clock (`SHAPE_MOTION`): the height and
-      // the footer track below animate on it too, and a radius on a shorter
-      // one would finish early and leave a box still wearing capsule corners
-      // — the same "changes shape and corrects itself" read this whole block
-      // exists to prevent. The shadow is what gives the lift, and it does not
-      // fight the textarea's own height.
-      style={{
-        paddingInline: COMPOSER.paddingInline,
-        // Block padding is a token here rather than a `py-*` utility because
-        // it is one of the two inputs the resting height is computed from —
-        // see `COMPOSER_RESTING_HEIGHT`. As a class it was a third number that
-        // had to be kept in step with the other two by hand, and it was the
-        // one that silently disagreed: the field measured 52 while the token
-        // said what it should be.
-        paddingBlock: COMPOSER.paddingBlock,
-        borderRadius: stacked ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
-        // `max-width`, not `width`: a percentage and a length interpolate, and
-        // the frame still fills a window narrower than its idle width.
-        maxWidth: active ? '100%' : COMPOSER.idleWidth,
-        transition: FRAME_TRANSITION,
-      }}
-      className={cn(
-        // `isolate` so the surface's negative z-index stays inside this frame.
-        'relative isolate mx-auto w-full',
-        // The field breathes on focus: a little taller, lifted a little further
-        // off the page. Both are small enough to register without being watched
-        // — the point is that the surface acknowledges the caret arriving, not
-        // that it performs. A control this central looking identical whether or
-        // not it is ready for typing is the specific thing that made the page
-        // read as a picture of an app rather than one you are using.
-        // One height, always the taller one.
-        //
-        // The field used to grow on focus. It was the right instinct and the
-        // wrong mechanism: the control at the centre of the page changing size
-        // when the caret arrives means the page reflows every time you click
-        // into it, and on paste the height and the radius resolved a frame
-        // apart, which is what read as the composer changing shape and
-        // correcting itself. The roomier size was better in both states, so it
-        // is simply the size now. Focus is still acknowledged — by the shadow,
-        // which costs no layout.
-        // Both properties, or the radius does not animate at all: naming only
-        // `box-shadow` sets `transition-property` to exactly that, so the
-        // capsule-to-box change snapped a frame after the field had already
-        // grown. That mismatch — height first, shape a frame later — is what
-        // read as the composer changing shape and correcting itself on paste.
-      )}
+      className="studio-composer"
     >
-      {/* Two steps of the shared elevation scale, as a silhouette: the lift is
-          this surface's whole focus treatment, on purpose. Fields elsewhere
-          answer focus with a darkened border; the composer is a surface, not a
-          control among controls, so an edge for a field, elevation for this. */}
-      <ComposerSurface bubble={bubble} stacked={stacked} focused={focused} inset={inset} />
       {draggingFiles ? <div role="status" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2 rounded-[inherit] border border-dashed border-foreground/30 bg-surface-raised/95 text-caption text-foreground">
-        <Icons.add />Drop files to attach
+        <Icons.paperclip />Drop files to attach
       </div> : null}
+      <QuoteStrip quote={quote} onRemove={() => clearQuote(conversationId)} />
       {/* The images this message carries, above the words: content of the
           message, in the message's frame. The rejections under them are the
           pick's honest remainder — a file the rules refused, named where the
@@ -857,192 +636,101 @@ export function Composer({
         </div>
       ) : null}
 
-      {/* One grid, two arrangements, the same three columns — and always two
-          rows, so nothing has to appear or vanish. On one line the second
-          track is zeroed and the clusters sit in the side columns with the
-          field between them: the capsule, exactly the height its tokens say,
-          everything on a single row. Past the first line the field takes the
-          first row across all three columns and both clusters drop into the
-          second track, a footer along the bottom of the frame — the text then
-          wraps the full width of the field, and no line of it reaches the row
-          the controls are on. While the buttons stayed beside the text, every
-          wrapped line was squeezed into the width four controls left between
-          them, and the buttons rode beside whichever line the caret was on.
-
-          A grid rather than the row re-rendered two ways: the controls never
-          move in the DOM, so nothing remounts and an open menu stays open, and
-          the relocation hangs off the same `stacked` signal that reshapes
-          the frame — the capsule-to-box radius and the footer cannot
-          disagree about which state the field is in.
-
-          The field itself spans all three columns in both arrangements and
-          sits in the first row with the clusters; on one line it leaves them
-          their room through its side insets (`INSET_TRANSITION`), which go
-          to nothing as they drop. So the field never changes column: its
-          text edge and wrapping width move as lengths, on the clock.
-
-          The reshape is animated on the one clock, in two halves that meet.
-          The track, the insets and the field's own height are CSS
-          transitions, so the frame grows continuously. The controls are
-          `layout="position"`: Framer glides them from where they were to
-          where the grid has just slotted them, and — on the same curve —
-          that glide cancels the instant re-slotting underneath it. Position
-          only, never a full `layout`: size changes would be scale, and a
-          scaled control stretches its mark while it moves. Reduced motion
-          collapses both halves to the end state, one via MotionConfig and
-          one via the global media query. */}
-      <div
-        style={{
-          gridTemplateRows: stacked ? FOOTER_TRACK : 'auto 0px',
-          transition: TRACK_TRANSITION,
-        }}
-        className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0"
-      >
-        <motion.div
-          ref={leftCluster}
-          layout="position"
-          transition={SHAPE_MOTION}
+      {/* The field stays mounted under whatever stands in for it, hidden and
+          inert, so a draft keeps its height while the microphone has the slot,
+          and a passage landing reshapes the box as it arrives. */}
+      <div data-composer-slot className="relative flex min-h-[var(--button-md)] min-w-0 flex-col justify-center">
+        <div
+          inert={fieldAside || dictating}
           className={cn(
-            'col-start-1 flex items-center gap-1',
-            stacked ? 'row-start-2 self-end' : 'row-start-1',
+            'transition-opacity duration-fast',
+            fieldAside ? 'opacity-0' : takeLive && !takeWords && 'opacity-60',
           )}
         >
+          <ComposerField
+            handleRef={field}
+            value={fieldWords}
+            followEnd={takeWords}
+            onChange={setText}
+            onSubmit={submit}
+            onKeyDownCapture={slashKey}
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData.files)
+              if (files.length === 0) return
+              // The paste becomes the strip, not text in the field: a
+              // screenshot on the clipboard has no words to insert.
+              event.preventDefault()
+              ingestFiles(files)
+            }}
+            placeholder={placeholder}
+          />
+        </div>
+        <AnimatePresence initial={false}>
+          {promptShown ? (
+            <motion.div
+              key="dictation"
+              className="absolute inset-0 overflow-hidden px-2 py-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+            >
+              <DictationPrompt stage={dictation.stage} denied={dictation.denied} note={dictation.note} />
+            </motion.div>
+          ) : landing !== null ? (
+            // The passage arriving, set exactly where the field sets it, so
+            // when the field takes over nothing on screen moves. A passage
+            // past the field's height clips with it rather than pushing
+            // the box past its ceiling.
+            <motion.div
+              key="landing"
+              className="absolute inset-0 flex flex-col justify-start overflow-hidden px-2 py-2"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: DURATION.fast }}
+            >
+              <TextLanding text={landing} />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      {/* The tools stay mounted under a take's controls, so the row keeps its
+          height and nothing in it loses its state. */}
+      <div className="relative mt-1">
+      <div
+        inert={dictating}
+        className={cn(
+          'flex min-w-0 items-center justify-between gap-2 transition-opacity duration-fast',
+          takeLive ? 'opacity-0' : dictating && 'opacity-50',
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-1">
           {/* The image picker is this menu's one live item: the dialog it
               opens is the webview's own file input, no plugin. */}
           <AddMenu onAttach={() => picker.current?.click()} />
-
-          {/* What Studio may do, next to the thing that will make it do it.
-              The mode is the one setting whose consequence lands on the user's
-              machine, and it is the one you reconsider while looking at what
-              you are about to send — so it sits by the send button rather
-              than three clicks deep in a menu in the window chrome. Mark only
-              at rest; the name is a hover and a click away. With a live
-              conversation it shows and settles that conversation's own stored
-              mode; on home there is nothing stored, so it is the window's
-              setting. */}
-          <PermissionControl conversationId={conversationId} draftPermission={draftPermission} />
-        </motion.div>
-
-        <div
-          data-composer-slot
-          className="col-start-1 col-span-3 row-start-1 min-w-0"
-          style={{
-            paddingLeft: stacked ? COMPOSER.textInset : room.left,
-            paddingRight: stacked ? 0 : room.right,
-            transition: INSET_TRANSITION,
-          }}
-        >
-          {/* The row's height even while the field is one shorter line. The
-              clusters hold it on one line; the instant they drop, this has to,
-              or the frame dips by the difference before it starts to grow.
-
-              The field stays mounted under whatever stands in for it, hidden
-              and inert. It is what gives this slot its height, so a multiline
-              draft keeps its size while the microphone has the slot, and a
-              passage landing is measured and reshapes the frame as it arrives
-              rather than once it has finished. */}
-          <div className="relative flex min-h-[var(--button-md)] flex-col justify-center">
-            <div
-              inert={fieldAside}
-              className={cn('transition-opacity duration-fast', fieldAside && 'opacity-0')}
-            >
-              <ComposerField
-                handleRef={field}
-                value={text}
-                onChange={setText}
-                onSubmit={submit}
-                onKeyDownCapture={slashKey}
-                onMultilineChange={setMultiline}
-                onPaste={(event) => {
-                  const files = Array.from(event.clipboardData.files)
-                  if (files.length === 0) return
-                  // The paste becomes the strip, not text in the field: a
-                  // screenshot on the clipboard has no words to insert.
-                  event.preventDefault()
-                  ingestFiles(files)
-                }}
-                multiline={multiline}
-                stacked={stacked}
-                // Always this width, never `room`, which widens once the box
-                // has merged the dock back. Judged at both, a line that wraps
-                // on one and fits on the other flips between the arrangements
-                // without end, and React takes the app down with it.
-                inset={besideDock}
-                placeholder={placeholder}
-              />
-            </div>
-            <AnimatePresence initial={false}>
-              {dictating ? (
-                <motion.div
-                  key="dictation"
-                  className="absolute inset-0 flex flex-col justify-center"
-                  initial={{ opacity: 0, x: 6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -6 }}
-                  transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-                >
-                  <DictationBar
-                    stage={dictation.stage}
-                    elapsedMs={dictation.elapsedMs}
-                    denied={dictation.denied}
-                    note={dictation.note}
-                    onFrame={dictation.mic.onFrame}
-                  />
-                </motion.div>
-              ) : landing !== null ? (
-                // The passage arriving, set exactly where the field sets it, so
-                // when the field takes over nothing on screen moves. A passage
-                // past the field's height clips with it rather than pushing
-                // the frame past its ceiling.
-                <motion.div
-                  key="landing"
-                  className={cn(
-                    'absolute inset-0 flex flex-col overflow-hidden px-1',
-                    stacked ? 'justify-start py-2' : 'justify-center',
-                  )}
-                  initial={{ opacity: 1 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: DURATION.fast }}
-                >
-                  <TextLanding text={landing} />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
+          {turnControl}
+          {/* Studio has no per-message web switch yet. It keeps the reference's
+              place and full colour, and says so rather than pretending. */}
+          <IconButton label="Web search is coming soon" size="xs" disabled className="disabled:opacity-100">
+            <Icons.web size="md" />
+          </IconButton>
+          <ComposerMenu
+            conversationId={conversationId}
+            draftPermission={draftPermission}
+            dictate={{
+              label: voiceAvailable ? 'Dictate' : VOICE_UNAVAILABLE_REASON,
+              disabled: !voiceAvailable || dictating,
+              onSelect: () => void dictation.start(),
+            }}
+          />
         </div>
 
-        <motion.div
-          ref={rightCluster}
-          layout="position"
-          transition={SHAPE_MOTION}
-          className={cn(
-            'relative flex items-center gap-1',
-            stacked ? 'col-start-3 row-start-2 self-end' : 'col-start-3 row-start-1',
-          )}
-        >
-          {/* Dictation sits in the field, not in the plus menu.
-              It acts on this field — it fills it with what you say — so it
-              belongs beside the field the way send does. Buried in a menu it
-              was two clicks from the thing it modifies, and it was the only
-              item in that menu that was not "attach something".
-
-              The mark becomes the transport while recording: the mic gathers,
-              the square stops. Same control, two states, one meaning — the
-              way send becomes stop while a reply streams.
-
-              On an insecure origin the mic is not ours to ask for —
-              `getUserMedia` is a secure-context capability — but the controls
-              keep their places and answer as disabled. Buttons that vanish
-              and return as the origin changes reshaped the whole cluster, and
-              a phone reading Studio over the LAN was left with a paragraph
-              where its controls had been; a greyed control with the reason as
-              its label says the same thing in the space the control already
-              owns. */}
-          {/* Improve, once a take has landed: it acts on the field, so it
-              sits with the controls that do, and it is the size they are.
-              It leaves with the message - a send, an emptied field or another
-              take takes it away - and the row does not move either way. */}
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Improve, once a take has landed. It acts on the field and it is
+              brief, so it stands with the controls that do, rather than behind
+              the menu. It leaves with the message. */}
           <AnimatePresence initial={false}>
             {improveOffer.offer !== null && !dictating ? (
               <motion.div
@@ -1061,107 +749,53 @@ export function Composer({
             ) : null}
           </AnimatePresence>
 
-          <IconButton
-            label={
-              voiceAvailable
-                ? dictation.stage === 'recording'
-                  ? 'Stop and transcribe'
-                  : 'Dictate'
-                : VOICE_UNAVAILABLE_REASON
-            }
-            size="md"
-            active={dictation.stage === 'recording'}
-            disabled={!voiceAvailable || dictation.stage === 'requesting' || dictation.stage === 'processing'}
-            onClick={() =>
-              dictation.stage === 'recording' ? void dictation.stop() : void dictation.start()
-            }
+              {/* Voice mode, not dictation: this starts a spoken conversation
+                  and replaces the field. On an insecure origin it stays where
+                  it belongs and answers as disabled, its label the reason. */}
+              <IconButton
+                label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
+                size="xs"
+                disabled={!voiceAvailable || (conversationId === null && onStartVoice === undefined) || busy}
+                onClick={() => (conversationId === null ? onStartVoice?.() : voice.enter(conversationId))}
+              >
+                <Icons.waveform size="md" />
+              </IconButton>
+              {/* Always present and always the accent, as in the reference.
+                  With nothing to send it is inert, not dimmed. */}
+              <IconButton
+                label={canSend ? (turnRunning ? 'Queue message' : 'Send') : busy ? 'Stop' : 'Send'}
+                size="xs"
+                tone="accent"
+                disabled={(!canSend && !busy) || (pendingAttachments > 0 && !busy) || (canSend && turnRunning && queueFull)}
+                className={!canSend && !busy ? 'disabled:opacity-100' : undefined}
+                onClick={canSend ? () => submit() : halt}
+              >
+                {busy && !canSend ? <Icons.stop size="md" /> : <Icons.sendUp size="md" />}
+              </IconButton>
+        </div>
+      </div>
+      <AnimatePresence initial={false}>
+        {takeLive ? (
+          <motion.div
+            key="take"
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: DURATION.fast, ease: EASE_OUT }}
           >
-            {dictation.stage === 'recording' ? (
-              <Icons.stop size="md" />
-            ) : (
-              <Icons.dictate size="md" />
-            )}
-          </IconButton>
-
-          {/* While the microphone owns the field there is nothing to send and
-              no voice mode to offer — the strip is the message in progress,
-              and the mic beside it is its only control.
-
-              `popLayout`, because the last slot is one button that changes
-              face: voice mode until there are words, send once there are.
-              Without it the leaving face and the arriving one were both in
-              the row for the length of the crossfade, and the cluster was a
-              button wider for that long - the mic slid left on the first
-              keystroke and back right when the old face had gone. Off the
-              flow, the leaving face fades where it stood and the row never
-              changes width. */}
-          {!dictating && (
-          <AnimatePresence initial={false} mode="popLayout">
-            {canSend || busy || pendingAttachments > 0 ? (
-              <motion.div
-                key="send"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-              >
-                <IconButton
-                  label={canSend ? (turnRunning ? 'Queue message' : 'Send') : busy ? 'Stop' : 'Send'}
-                  size="md"
-                  tone="solid"
-                  disabled={(pendingAttachments > 0 && !busy) || (canSend && turnRunning && queueFull)}
-                  onClick={canSend ? () => submit() : halt}
-                >
-                  {busy && !canSend ? (
-                    <>
-                      {/* `size="md"`, like every other mark in this row. It
-                          was written without one, so it fell back to the
-                          text-relative step and painted 10.4px inside a 22px
-                          circle while its own siblings painted 14.8px — the
-                          mark was centred to the pixel and still looked
-                          wrong, because it was two thirds the size of the
-                          arrow it replaced. It is a solid square now rather
-                          than Lucide's outlined one, which is what the rest
-                          of that complaint turned out to be about; see the
-                          note above `TRANSPORT` in `drawn.tsx`. */}
-                      <Icons.stop size="md" />
-                    </>
-                  ) : (
-                    <Icons.send size="md" />
-                  )}
-                </IconButton>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="voice"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-              >
-                {/* Voice mode, not dictation. Dictation turns speech into text
-                    in this field and lives beside it; this starts a
-                    spoken conversation and replaces the field entirely. Two
-                    features, so two marks — the previous build gave them
-                    adjacent glyphs and they read as one control with a
-                    duplicate.
-
-                    On an insecure origin the control stays where it belongs
-                    and answers as disabled, its label carrying the reason —
-                    the same treatment the dictate control beside it gets. */}
-                <IconButton
-                  label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
-                  size="md"
-                  disabled={!voiceAvailable || (conversationId === null && onStartVoice === undefined) || busy}
-                  onClick={() => (conversationId === null ? onStartVoice?.() : voice.enter(conversationId))}
-                >
-                  <Icons.voice size="md" />
-                </IconButton>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          )}
-        </motion.div>
+            <DictationControls
+              stage={dictation.stage}
+              elapsedMs={dictation.elapsedMs}
+              onFrame={dictation.mic.onFrame}
+              onCancel={dictation.cancel}
+              onPause={dictation.pause}
+              onResume={dictation.resume}
+              onFinish={() => void dictation.stop()}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       </div>
 
       {/* Off-flow and invisible: only its click handler matters, opened by

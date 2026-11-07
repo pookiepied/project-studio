@@ -23,6 +23,7 @@ import type { VoiceNote } from './useMicInput'
 let onSegment: ((note: VoiceNote) => void) | null = null
 let lastNote: VoiceNote | null = null
 const micStop = vi.fn(() => Promise.resolve(lastNote))
+const setPaused = vi.fn()
 
 vi.mock('@/features/voice/useMicInput', () => ({
   useMicInput: () => ({
@@ -32,6 +33,7 @@ vi.mock('@/features/voice/useMicInput', () => ({
       return Promise.resolve(true)
     },
     stop: micStop,
+    setPaused,
     onFrame: () => () => {},
   }),
 }))
@@ -59,6 +61,59 @@ afterEach(() => {
   onSegment = null
   lastNote = null
   micStop.mockClear()
+  setPaused.mockClear()
+})
+
+describe('a pause', () => {
+  it('holds the clock and the microphone, and carries on from the same second', async () => {
+    const { result } = renderHook(() => useDictation({ onTake: vi.fn() }))
+
+    await act(() => result.current.start())
+    await act(() => vi.advanceTimersByTimeAsync(3_000))
+    act(() => result.current.pause())
+    expect(result.current.stage).toBe('paused')
+    expect(setPaused).toHaveBeenLastCalledWith(true)
+    const held = result.current.elapsedMs
+
+    await act(() => vi.advanceTimersByTimeAsync(5_000))
+    expect(result.current.elapsedMs).toBe(held)
+
+    act(() => result.current.resume())
+    expect(result.current.stage).toBe('recording')
+    expect(setPaused).toHaveBeenLastCalledWith(false)
+    await act(() => vi.advanceTimersByTimeAsync(1_000))
+    expect(result.current.elapsedMs).toBeGreaterThanOrEqual(held + 800)
+    expect(result.current.elapsedMs).toBeLessThan(held + 2_000)
+  })
+
+  it('can be finished from, and keeps the take', async () => {
+    answers.set('last', { kind: 'ok', text: 'Said before the pause.' })
+    const onTake = vi.fn()
+    const { result } = renderHook(() => useDictation({ onTake }))
+
+    await act(() => result.current.start())
+    act(() => result.current.pause())
+    lastNote = note('last')
+    await act(() => result.current.stop())
+    await settle()
+
+    expect(onTake).toHaveBeenCalledWith('Said before the pause.')
+    expect(result.current.stage).toBe('idle')
+  })
+
+  it('can be cancelled from, by Escape, and nothing reaches the field', async () => {
+    const onTake = vi.fn()
+    const { result } = renderHook(() => useDictation({ onTake }))
+
+    await act(() => result.current.start())
+    act(() => result.current.pause())
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+
+    expect(result.current.stage).toBe('idle')
+    expect(onTake).not.toHaveBeenCalled()
+  })
 })
 
 describe('the last segment', () => {

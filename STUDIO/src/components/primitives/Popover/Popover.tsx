@@ -74,6 +74,7 @@ export function Popover({
   maxHeight,
   children,
   className,
+  anchorClassName,
   inline = false,
   companion,
   initialFocus,
@@ -96,6 +97,8 @@ export function Popover({
   maxHeight?: string
   children: ReactNode
   className?: string
+  /** On the box around the trigger: a trigger that truncates needs that box to shrink. */
+  anchorClassName?: string
   inline?: boolean
   companion?: { label: string; anchor: string; content: ReactNode } | null
   initialFocus?: string
@@ -267,7 +270,7 @@ export function Popover({
   // from the anchor's display.
   const Anchor = inline ? 'span' : 'div'
   return (
-    <Anchor ref={(element) => { anchor.current = element }} className={inline ? 'relative' : 'relative inline-flex'}>
+    <Anchor ref={(element) => { anchor.current = element }} className={cn(inline ? 'relative' : 'relative inline-flex', anchorClassName)}>
       {trigger}
       {createPortal(
         <AnimatePresence>
@@ -295,7 +298,7 @@ export function Popover({
                 // panel's. The max-width is the same hard clamp the placement
                 // math applies, said in CSS as well, so a panel can never be
                 // the thing that gives the page a horizontal scrollbar.
-                'studio-floating-surface studio-blur fixed z-50 min-w-48 rounded-lg border p-1',
+                'studio-floating-surface studio-blur fixed z-50 min-w-48 rounded-[20px] p-1.5',
                 'shadow-overlay',
                 className,
               )}
@@ -323,7 +326,7 @@ export function Popover({
                 visibility: position?.companion ? 'visible' : 'hidden',
               }}
               className={cn(
-                'studio-floating-surface studio-blur studio-scroll-bounded fixed z-50 w-64 rounded-xl border p-1 shadow-overlay',
+                'studio-floating-surface studio-blur studio-scroll-bounded fixed z-50 w-64 rounded-[20px] p-1.5 shadow-overlay',
                 'max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain',
               )}
             >

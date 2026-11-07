@@ -18,11 +18,12 @@ import { cn } from '@/lib/cn'
  * withdrawn theirs; MATLAB and Objective-C have none and share `.m` besides,
  * so both fall to the generic file.)
  *
- * They render filled in `currentColor`, like every other glyph in the app:
- * the palette stays monochrome and the SHAPE carries the language, not a
- * brand colour. A wall of coloured logos down the transcript's left edge
- * would be the loudest thing in the reading column, and none of it would be
- * information the row did not already carry.
+ * They render filled in `currentColor`, and that colour is one of a few tones
+ * from the palette (`--tone-*`), not the brand's own. The tone is what lets a
+ * reader find the Rust file in a list by colour before reading it; holding it
+ * to a few shared values, tuned per theme, is what keeps a row of them one
+ * family rather than a wall of logos. Kinds with no colour of their own, like
+ * plain text and the generic file, stay neutral.
  *
  * ---- The fallback ---------------------------------------------------------
  *
@@ -103,6 +104,64 @@ const MARKS = {
 } as const
 
 type MarkName = keyof typeof MARKS
+
+/** A palette tone, or `neutral` for the muted default. See `--tone-*`. */
+export type FileTone = 'accent' | 'blue' | 'teal' | 'green' | 'yellow' | 'orange' | 'red' | 'purple' | 'neutral'
+
+const MARK_TONES: Readonly<Record<MarkName, FileTone>> = {
+  typescript: 'blue',
+  javascript: 'yellow',
+  react: 'teal',
+  python: 'blue',
+  rust: 'orange',
+  html: 'orange',
+  css: 'blue',
+  markdown: 'accent',
+  json: 'yellow',
+  c: 'blue',
+  clojure: 'green',
+  cplusplus: 'blue',
+  csharp: 'purple',
+  dart: 'teal',
+  docker: 'blue',
+  elixir: 'purple',
+  fsharp: 'teal',
+  gnubash: 'green',
+  go: 'teal',
+  graphql: 'purple',
+  haskell: 'purple',
+  julia: 'purple',
+  kotlin: 'purple',
+  lua: 'blue',
+  java: 'orange',
+  perl: 'teal',
+  php: 'purple',
+  powershell: 'blue',
+  r: 'blue',
+  ruby: 'red',
+  scala: 'red',
+  solidity: 'neutral',
+  swift: 'orange',
+  toml: 'neutral',
+  zig: 'orange',
+}
+
+/** The class that carries a tone; `.studio-file-mark` and the chip both read it. */
+function toneClass(tone: FileTone): string | undefined {
+  return tone === 'neutral' ? undefined : `studio-tone-${tone}`
+}
+
+/**
+ * The tone class for a path, for a surface that wears the same colour as the
+ * mark inside it: the inline chip's wash.
+ */
+export function fileToneClass(path: string, folder = false): string | undefined {
+  if (folder) return toneClass(FORMAT_TONES.folder)
+  const mark = fileTypeOf(path)
+  if (mark !== null) return toneClass(MARK_TONES[mark])
+  const format = formatOfPath(path)
+  return format === null ? undefined : toneClass(FORMAT_TONES[format])
+}
 
 /**
  * Extension to mark. One entry per spelling the wild actually uses.
@@ -253,7 +312,7 @@ export function Mark({
   return (
     <span
       aria-hidden
-      className={cn('studio-icon inline-flex shrink-0 items-center justify-center', className)}
+      className={cn('studio-icon studio-file-mark inline-flex shrink-0 items-center justify-center', toneClass(MARK_TONES[mark]), className)}
       style={{ width: box, height: box }}
     >
       <svg viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" aria-hidden>
@@ -269,20 +328,25 @@ export function Mark({
  * when it is not. The fallback goes through the registry like every other
  * consumer -- `Icons.file` also owns its own sizing span, so the unknown case
  * is returned as the mark itself rather than wrapped twice.
+ *
+ * `folder` is the caller's knowledge, not this function's: only a reference
+ * can say it names a directory, and a tool row's path never does.
  */
 export function FileTypeMark({
   path,
+  folder = false,
   size = 'text',
   className,
 }: {
   path: string
+  folder?: boolean
   size?: IconSize
   className?: string
 }) {
+  if (folder) return <FormatGlyph format="folder" size={size} className={className} />
   const mark = fileTypeOf(path)
   if (mark !== null) return <Mark mark={mark} size={size} className={className} />
-  const extension = extensionOf(splitFilePath(path).name)
-  const format = extension === null ? null : formatOfExtension(extension)
+  const format = formatOfPath(path)
   if (format !== null) return <FormatGlyph format={format} size={size} className={className} />
   return <Icons.file size={size} className={className} />
 }
@@ -361,19 +425,60 @@ export function markOfName(name: string): MarkName | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * SQL, XML and YAML are standards, not companies: Simple Icons publishes
- * brand marks, and no brand owns these, so the mark set is silent where the
- * files are common. The concept's registry icon stands in -- the same Lucide
- * marks every other surface uses, monochrome like the brand fills, so a chip
- * row still reads as one family rather than two icon systems.
+ * SQL, XML, a program, an archive: standards and kinds, not companies. Simple
+ * Icons publishes brand marks and no brand owns these, so the mark set is
+ * silent where the files are common. The concept's registry icon stands in,
+ * toned like the brand fills, so a chip row reads as one family rather than
+ * two icon systems.
  */
-type FormatMark = 'database' | 'codeXml' | 'fileCog' | 'image'
+type FormatMark =
+  | 'database'
+  | 'codeXml'
+  | 'fileCog'
+  | 'image'
+  | 'folder'
+  | 'executable'
+  | 'zip'
+  | 'pdf'
+  | 'audio'
+  | 'fileVideo'
+  | 'text'
+  | 'sheet'
+  | 'document'
+  | 'secret'
 
 const FORMAT_ICONS: Readonly<Record<FormatMark, (typeof Icons)[keyof typeof Icons]>> = {
   database: Icons.database,
   codeXml: Icons.codeXml,
   fileCog: Icons.fileCog,
   image: Icons.image,
+  folder: Icons.projectOpen,
+  executable: Icons.fileExecutable,
+  zip: Icons.fileZip,
+  pdf: Icons.filePdf,
+  audio: Icons.fileAudio,
+  fileVideo: Icons.fileVideo,
+  text: Icons.fileText,
+  sheet: Icons.fileSheet,
+  document: Icons.fileDocument,
+  secret: Icons.fileSecret,
+}
+
+const FORMAT_TONES: Readonly<Record<FormatMark, FileTone>> = {
+  database: 'teal',
+  codeXml: 'orange',
+  fileCog: 'neutral',
+  image: 'purple',
+  folder: 'accent',
+  executable: 'orange',
+  zip: 'yellow',
+  pdf: 'red',
+  audio: 'purple',
+  fileVideo: 'purple',
+  text: 'neutral',
+  sheet: 'green',
+  document: 'blue',
+  secret: 'yellow',
 }
 
 const BY_EXTENSION_FORMAT: Readonly<Record<string, FormatMark>> = {
@@ -394,6 +499,57 @@ const BY_EXTENSION_FORMAT: Readonly<Record<string, FormatMark>> = {
   heic: 'image',
   heif: 'image',
   svg: 'image',
+  exe: 'executable',
+  msi: 'executable',
+  com: 'executable',
+  bat: 'executable',
+  cmd: 'executable',
+  dll: 'executable',
+  appimage: 'executable',
+  deb: 'executable',
+  rpm: 'executable',
+  dmg: 'executable',
+  zip: 'zip',
+  rar: 'zip',
+  '7z': 'zip',
+  tar: 'zip',
+  gz: 'zip',
+  tgz: 'zip',
+  bz2: 'zip',
+  xz: 'zip',
+  pdf: 'pdf',
+  mp3: 'audio',
+  wav: 'audio',
+  flac: 'audio',
+  ogg: 'audio',
+  m4a: 'audio',
+  aac: 'audio',
+  mp4: 'fileVideo',
+  mov: 'fileVideo',
+  mkv: 'fileVideo',
+  webm: 'fileVideo',
+  avi: 'fileVideo',
+  txt: 'text',
+  log: 'text',
+  csv: 'sheet',
+  tsv: 'sheet',
+  xls: 'sheet',
+  xlsx: 'sheet',
+  doc: 'document',
+  docx: 'document',
+  rtf: 'document',
+  pem: 'secret',
+  key: 'secret',
+  crt: 'secret',
+}
+
+/** Dotfiles have no extension to read, so these are matched by whole name. */
+const FORMAT_BY_NAME: Readonly<Record<string, FormatMark>> = {
+  '.env': 'secret',
+  '.gitignore': 'fileCog',
+  '.gitattributes': 'fileCog',
+  '.editorconfig': 'fileCog',
+  '.npmrc': 'fileCog',
 }
 
 const BY_LANGUAGE_FORMAT: Readonly<Record<string, FormatMark>> = {
@@ -404,8 +560,12 @@ const BY_LANGUAGE_FORMAT: Readonly<Record<string, FormatMark>> = {
   yml: 'fileCog',
 }
 
-function formatOfExtension(extension: string): FormatMark | null {
-  return BY_EXTENSION_FORMAT[extension.toLowerCase()] ?? null
+function formatOfPath(path: string): FormatMark | null {
+  const name = splitFilePath(path).name.toLowerCase()
+  const byName = FORMAT_BY_NAME[name] ?? (name.startsWith('.env.') ? 'secret' : undefined)
+  if (byName !== undefined) return byName
+  const extension = extensionOf(name)
+  return extension === null ? null : (BY_EXTENSION_FORMAT[extension] ?? null)
 }
 
 /** The stand-in icon for a format language -- a fence's word, not a suffix. */
@@ -424,5 +584,5 @@ export function FormatGlyph({
   className?: string
 }) {
   const Icon = FORMAT_ICONS[format]
-  return <Icon size={size} className={className} />
+  return <Icon size={size} className={cn('studio-file-mark', toneClass(FORMAT_TONES[format]), className)} />
 }

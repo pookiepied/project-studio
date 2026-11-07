@@ -59,7 +59,20 @@
  * survives it. Offering absolute sizes would let someone set UI text below its
  * paired icon and break the one rule this file exists to keep.
  */
-export const UI_SIZE_CHOICES = [11, 12, 13, 14] as const
+export const UI_SIZE_CHOICES = [11, 12, 13, 14, 15, 16, 17, 18] as const
+
+/**
+ * The whole window's scale, in percent. Separate from text size: text size moves
+ * type, this multiplies everything. See `setInterfaceZoom`.
+ */
+export const UI_SCALE_CHOICES = [90, 100, 110, 125, 150, 175, 200] as const
+export type UiScale = (typeof UI_SCALE_CHOICES)[number]
+export const DEFAULT_UI_SCALE: UiScale = 100
+
+/** What replies are set in. The interface itself always stays in Inter. */
+export const TYPEFACE_CHOICES = ['sans', 'serif', 'mono'] as const
+export type Typeface = (typeof TYPEFACE_CHOICES)[number]
+export const DEFAULT_TYPEFACE: Typeface = 'sans'
 
 /**
  * Code size, as an offset from the interface text — not an absolute px.
@@ -88,7 +101,7 @@ export type CodeOffset = (typeof CODE_OFFSET_CHOICES)[number]
  * `assertScaleDefaults` below fails loudly in development if the two ever
  * disagree — the CSS is a safety net, these are the authority.
  */
-export const DEFAULT_UI_SIZE: UiSize = 13
+export const DEFAULT_UI_SIZE: UiSize = 15
 export const DEFAULT_CODE_OFFSET: CodeOffset = -1
 
 /** What the code text actually resolves to, for labelling a settings row. */
@@ -150,6 +163,7 @@ export const ICON_STEP = {
      the mark it holds can track `--ui-size` like every other mark. */
   md: 'var(--icon-md)',
   lg: 'var(--icon-lg)',
+  header: 'var(--header-mark)',
 } as const
 
 export type IconSize = 'text' | keyof typeof ICON_STEP

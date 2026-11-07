@@ -6,7 +6,7 @@ import { DURATION, EASE_OUT, ENTER, SHELL } from '@/design/tokens'
 import type { BrowserCommand, LiveBrowserState } from '@/domain/browser/live'
 import { cn } from '@/lib/cn'
 import { startWindowDrag } from '@/platform/tauri'
-import { TrafficLights } from '@/shell/chrome/TrafficLights'
+import { WindowControls } from '@/shell/chrome/WindowControls'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { useLiveBrowser } from './useLiveBrowser'
 import { StudioCursor } from './StudioCursor'
@@ -28,7 +28,6 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
         onPointerDown={(event) => {
           if (event.button === 0 && event.target === event.currentTarget) void startWindowDrag()
         }}>
-        <TrafficLights />
         <span className="pointer-events-none text-caption text-muted-foreground">Studio Browser</span>
         <span className="ml-auto text-micro text-muted-foreground" role="status">
           {reconnecting ? 'Reconnecting' : error ? 'Disconnected' : !state ? 'Connecting' : !state.running ? 'Session ended' : manual ? 'You have control' : state.control === 'other' ? 'Controlled in another window' : 'Studio has control'}
@@ -38,6 +37,7 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
           className="rounded-full bg-tint px-3 py-1 text-caption text-muted-foreground transition-colors duration-base hover:bg-muted disabled:opacity-40">
           {manual ? 'Resume Studio' : 'Take control'}
         </button>
+        <WindowControls />
       </header>
 
       <div className="flex shrink-0 items-center gap-1 overflow-x-auto px-3 pb-1" aria-label="Browser tabs">

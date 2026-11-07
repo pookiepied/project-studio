@@ -35,7 +35,13 @@ export function StreamedMarkdown({ text, streaming }: { text: string; streaming:
   return (
     <>
       {blocks.map((block, index) => (
-        <Block key={index} text={block} sources={sources} streaming={streaming && index === blocks.length - 1 && tail !== ''} />
+        <Block
+          key={index}
+          text={block}
+          sources={sources}
+          streaming={streaming && index === blocks.length - 1 && tail !== ''}
+          caret={streaming && index === blocks.length - 1}
+        />
       ))}
     </>
   )
@@ -50,6 +56,6 @@ export function StreamedMarkdown({ text, streaming }: { text: string; streaming:
  * grows with the length of the reply, and a long answer stutters worse the
  * further it gets.
  */
-const Block = memo(function Block({ text, streaming, sources }: { text: string; streaming: boolean; sources: Sources }) {
-  return <Markdown text={text} streaming={streaming} sources={sources} />
+const Block = memo(function Block({ text, streaming, sources, caret }: { text: string; streaming: boolean; sources: Sources; caret: boolean }) {
+  return <Markdown text={text} streaming={streaming} sources={sources} caret={caret} />
 })

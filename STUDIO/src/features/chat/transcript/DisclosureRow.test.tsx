@@ -96,7 +96,7 @@ describe('the disclosure', () => {
     // the row at rest, and its turn when it opens is motion's business, not
     // the class list's.
     const { container } = render(<Controlled />)
-    const classes = container.querySelector('button svg.lucide-chevron-right')?.parentElement?.getAttribute('class') ?? ''
+    const classes = container.querySelector('button svg.studio-mark-disclosure')?.parentElement?.getAttribute('class') ?? ''
     expect(classes).not.toContain('opacity-0')
     expect(classes).not.toContain('opacity-100')
   })
@@ -129,7 +129,7 @@ describe('the body', () => {
 describe('the quiet disclosure', () => {
   it('is hidden at rest and shown over the row, on focus, and while open', () => {
     const { container } = render(<Controlled chevron="hover" />)
-    const mark = container.querySelector('button svg.lucide-chevron-right')?.parentElement
+    const mark = container.querySelector('button svg.studio-mark-disclosure')?.parentElement
     const classes = mark?.getAttribute('class') ?? ''
     expect(classes).toContain('opacity-0')
     expect(classes).toContain('group-hover/disclosure:opacity-100')
@@ -145,7 +145,7 @@ describe('the quiet disclosure', () => {
     // later without moving the mark or the words to its left, and a row that
     // is a statement carries no promise of an opening.
     const { container } = render(<Controlled disabled chevron="hover" />)
-    expect(container.querySelector('button svg.lucide-chevron-right')).toBeNull()
+    expect(container.querySelector('button svg.studio-mark-disclosure')).toBeNull()
   })
 })
 

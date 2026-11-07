@@ -9,10 +9,10 @@ type Size = 'xs' | 'sm' | 'md' | 'lg'
 /** A solid destructive fill belongs to the final confirmation. */
 const VARIANT: Record<Variant, string> = {
   primary:
-    'bg-foreground text-surface hover:bg-foreground/90 active:bg-foreground [&_.studio-icon]:text-surface',
+    'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary [&_.studio-icon]:text-primary-foreground',
   secondary:
-    'bg-muted text-foreground hover:bg-selected active:bg-foreground/15',
-  ghost: 'text-muted-foreground hover:bg-tint hover:text-foreground active:bg-selected',
+    'bg-muted text-foreground hover:bg-soft active:bg-foreground/15',
+  ghost: 'text-muted-foreground hover:bg-tint hover:text-foreground active:bg-soft',
   danger: 'bg-danger/10 text-danger hover:bg-danger/15 active:bg-danger/20',
   'danger-confirm': 'bg-danger-confirm text-white hover:bg-danger-confirm/90 active:bg-danger-confirm [&_.studio-icon]:text-white',
 }

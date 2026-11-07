@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { Button, IconButton, Segmented } from '@/components/primitives'
+import { Button, IconButton, Segmented, Switch } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
 import { useEnvironments } from '@/features/settings/environments/useEnvironments'
@@ -196,15 +196,10 @@ function Body({
 
       <Row label="Sandbox fence" hint={fenceHint()}>
         {isolation.offered ? (
-          <Segmented
-            layoutId="settings-sandbox-fence"
-            ariaLabel="Sandbox fence"
-            value={isolation.enabled ? 'on' : 'off'}
-            onChange={(value) => onSetIsolation(value === 'on')}
-            options={[
-              { id: 'off', label: 'Off' },
-              { id: 'on', label: 'On' },
-            ]}
+          <Switch
+            label="Sandbox fence"
+            checked={isolation.enabled}
+            onChange={(value) => onSetIsolation(value)}
           />
         ) : null}
       </Row>

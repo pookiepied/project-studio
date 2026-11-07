@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { IconButton, Segmented } from '@/components/primitives'
+import { IconButton, Switch } from '@/components/primitives'
 import { Loading, StateNote } from '@/components/state'
 import { Pane } from '@/features/settings/panes/Pane'
 import { useSkills, type SkillsView } from '@/features/settings/skills/useSkills'
@@ -128,19 +128,14 @@ function SkillRow({ skill, onToggle }: { skill: SkillRecord; onToggle: (enabled:
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Segmented
-          layoutId={`skill-${skill.id}`}
-          ariaLabel={`${skill.title} default`}
-          value={enabled ? 'on' : 'off'}
+        <Switch
+          label={`${skill.title} default`}
+          checked={enabled}
           onChange={(value) => {
-            const next = value === 'on'
+            const next = value
             setEnabled(next)
             onToggle(next)
           }}
-          options={[
-            { id: 'off', label: 'Off' },
-            { id: 'on', label: 'On' },
-          ]}
         />
       </div>
     </div>

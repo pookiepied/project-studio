@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_IN, SHELL } from '@/design/tokens'
+import { DURATION, EASE_IN } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 import { useFocusTrap } from './useFocusTrap'
 
@@ -87,12 +87,11 @@ export function Overlay({
           exit={{ opacity: 0 }}
           transition={{ duration: DURATION.base, ease: EASE_IN }}
           className={cn(
-            'studio-blur-scrim fixed inset-0 flex justify-center overflow-hidden bg-scrim',
+            'studio-blur-scrim studio-window-fill flex justify-center overflow-hidden bg-scrim',
             anchor === 'top' ? 'items-start' : 'items-center',
             raised ? 'z-[60]' : 'z-50',
             className,
           )}
-          style={{ borderRadius: SHELL.windowRadius }}
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) onClose()
           }}

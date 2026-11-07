@@ -32,11 +32,28 @@ function themeColor(): string | null {
   return document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.content ?? null
 }
 
+describe('size and typeface preferences', () => {
+  it('sets replies in the chosen typeface and scales through the root in a browser', () => {
+    applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark', typeface: 'mono', uiScale: 150 })
+    const root = document.documentElement
+    expect(root.style.getPropertyValue('--font-reading')).toBe('var(--font-mono)')
+    expect(root.style.getPropertyValue('zoom')).toBe('1.5')
+
+    applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
+    expect(root.style.getPropertyValue('zoom')).toBe('')
+  })
+
+  it('keeps UI scale and text size independent', () => {
+    applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark', uiScale: 200 })
+    expect(document.documentElement.style.getPropertyValue('--ui-size')).toContain(`${DEFAULT_APPEARANCE.uiSize}px`)
+  })
+})
+
 describe('publishBrowserTheme', () => {
   it('narrows color-scheme to the resolved theme and wears its ground', () => {
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
     expect(document.documentElement.style.colorScheme).toBe('dark')
-    expect(themeColor()).toBe('#171717')
+    expect(themeColor()).toBe('#242424')
 
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'light' })
     expect(document.documentElement.style.colorScheme).toBe('light')
@@ -58,14 +75,14 @@ describe('publishBrowserTheme', () => {
 
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'system' })
     expect(document.documentElement.style.colorScheme).toBe('dark')
-    expect(themeColor()).toBe('#171717')
+    expect(themeColor()).toBe('#242424')
   })
 
   it('updates the one meta in place instead of adding another', () => {
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'light' })
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
     expect(document.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1)
-    expect(themeColor()).toBe('#171717')
+    expect(themeColor()).toBe('#242424')
   })
 
   it('keeps an existing meta rather than adding a twin beside it', () => {
@@ -76,12 +93,12 @@ describe('publishBrowserTheme', () => {
 
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
     expect(document.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1)
-    expect(themeColor()).toBe('#171717')
+    expect(themeColor()).toBe('#242424')
   })
 
   it('paints the canvas in a plain browser, where nothing else holds the ground', () => {
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })
-    expect(document.documentElement.style.backgroundColor).toBe('rgb(23, 23, 23)')
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(36, 36, 36)')
 
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'light' })
     expect(document.documentElement.style.backgroundColor).toBe('rgb(255, 255, 255)')

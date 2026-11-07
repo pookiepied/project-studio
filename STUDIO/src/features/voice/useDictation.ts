@@ -9,6 +9,7 @@ import { transcribeRecording } from '@/features/voice/transcribe'
  *   idle        the field is a field.
  *   requesting  permission is being asked for; the button waits.
  *   recording   the mic is live, the strip shows the real level and the clock.
+ *   paused      the take is held: nothing is recorded and the clock stands still.
  *   processing  the recording has been handed to the transcriber.
  *   blocked     the mic was refused or is missing; the strip says which, then
  *               lets the field return on its own.
@@ -16,9 +17,10 @@ import { transcribeRecording } from '@/features/voice/transcribe'
  * The words arrive while the person is still speaking. The microphone cuts
  * the take into segments at its pauses (`segments.ts`), each is transcribed
  * as it is cut, and the pipeline (`segmentPipeline.ts`) delivers the text in
- * speaking order. What lands during `recording` is `transcript` - the strip
- * shows its tail, so the person can see the transcriber keeping up - and
- * nothing else: the field is not written to until the take ends. Then the
+ * speaking order. What lands during `recording` is `transcript`, which the
+ * composer shows in the field itself, read-only, so the words wrap and grow the
+ * box exactly as typed text does. The draft is not written to until the take
+ * ends, so Cancel has nothing to undo. Then the
  * whole passage goes to `onTake` once, and `processing` is only the last
  * segment's wait before that.
  *
@@ -35,7 +37,12 @@ import { transcribeRecording } from '@/features/voice/transcribe'
  * whole take.
  */
 
-export type DictationStage = 'idle' | 'requesting' | 'recording' | 'processing' | 'blocked'
+export type DictationStage = 'idle' | 'requesting' | 'recording' | 'paused' | 'processing' | 'blocked'
+
+/** A take following what is already in the field. */
+export function appendTake(draft: string, take: string): string {
+  return draft.trim().length > 0 ? `${draft.trimEnd()} ${take}` : take
+}
 
 /** How long the blocked message holds the field before restoring it. */
 const BLOCKED_DISMISS_MS = 2800
@@ -68,6 +75,8 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
 
   const clock = useRef<number | null>(null)
   const startedAt = useRef(0)
+  /** What the clock read when the take was paused. */
+  const heldMs = useRef(0)
   const dismissing = useRef<number | null>(null)
 
   const clearTimers = useCallback(() => {
@@ -75,6 +84,14 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
     if (dismissing.current !== null) window.clearTimeout(dismissing.current)
     clock.current = null
     dismissing.current = null
+  }, [])
+
+  const runClock = useCallback((fromMs: number) => {
+    startedAt.current = performance.now() - fromMs
+    setElapsedMs(fromMs)
+    clock.current = window.setInterval(() => {
+      setElapsedMs(performance.now() - startedAt.current)
+    }, 200)
   }, [])
 
   /**
@@ -127,17 +144,29 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
       dismissing.current = window.setTimeout(() => setStage('idle'), BLOCKED_DISMISS_MS)
       return
     }
-    startedAt.current = performance.now()
-    setElapsedMs(0)
     setStage('recording')
-    clock.current = window.setInterval(() => {
-      setElapsedMs(performance.now() - startedAt.current)
-    }, 200)
-  }, [clearTimers, fail, mic, onTake, stage])
+    runClock(0)
+  }, [clearTimers, fail, mic, onTake, runClock, stage])
+
+  const pause = useCallback(() => {
+    if (stage !== 'recording') return
+    clearTimers()
+    heldMs.current = performance.now() - startedAt.current
+    setElapsedMs(heldMs.current)
+    mic.setPaused(true)
+    setStage('paused')
+  }, [clearTimers, mic, stage])
+
+  const resume = useCallback(() => {
+    if (stage !== 'paused') return
+    mic.setPaused(false)
+    setStage('recording')
+    runClock(heldMs.current)
+  }, [mic, runClock, stage])
 
   /** Stop and keep: the last segment joins the others, and the whole take goes to the field. */
   const stop = useCallback(async () => {
-    if (stage !== 'recording') return
+    if (stage !== 'recording' && stage !== 'paused') return
     clearTimers()
     const line = pipeline.current
     setStage('processing')
@@ -165,7 +194,7 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
 
   /** Stop and discard the take; nothing of it reached the field. */
   const cancel = useCallback(() => {
-    if (stage !== 'recording') return
+    if (stage !== 'recording' && stage !== 'paused') return
     clearTimers()
     pipeline.current?.abandon()
     pipeline.current = null
@@ -177,7 +206,7 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
   // because the field is hidden while recording, so focus is nowhere useful
   // to bind it to — the same reasoning as the Dialog's Escape.
   useEffect(() => {
-    if (stage !== 'recording') return
+    if (stage !== 'recording' && stage !== 'paused') return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') cancel()
     }
@@ -187,5 +216,5 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
 
   useEffect(() => clearTimers, [clearTimers])
 
-  return { stage, elapsedMs, denied, note, transcript, start, stop, cancel, mic }
+  return { stage, elapsedMs, denied, note, transcript, start, pause, resume, stop, cancel, mic }
 }

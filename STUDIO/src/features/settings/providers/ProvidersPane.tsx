@@ -184,7 +184,7 @@ function ProviderList({ providers, kind }: { providers: Providers; kind: Provide
 function Section({ caption, children }: { caption: string; children: ReactNode }) {
   return (
     <section className="pt-5 first:pt-0">
-      <p className="mb-1 text-micro uppercase text-muted-foreground/80">{caption}</p>
+      <p className="mb-1 text-caption text-muted-foreground">{caption}</p>
       <div className="flex flex-col divide-y">{children}</div>
     </section>
   )

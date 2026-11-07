@@ -44,7 +44,7 @@ export function ProjectPage({ project }: { project: Project }) {
         }}
       >
         <header className="mb-6 flex items-start gap-3">
-          <span className="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-selected text-foreground">
+          <span className="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-soft text-foreground">
             <ProjectIconMark icon={project.icon} />
           </span>
           <div className="min-w-0 flex-1">
@@ -134,7 +134,7 @@ export function ProjectPage({ project }: { project: Project }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-micro text-muted-foreground/80 uppercase">{title}</h2>
+      <h2 className="mb-2 text-caption text-muted-foreground">{title}</h2>
       {children}
     </section>
   )

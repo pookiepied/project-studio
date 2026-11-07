@@ -68,7 +68,7 @@ function OperationPath({ label, path }: { label: string; path: string }) {
   return (
     <div className="flex min-w-0 items-start gap-3">
       <span className="w-8 shrink-0 pt-0.5 text-caption text-muted-foreground">{label}</span>
-      <FileTypeMark path={path} className="mt-0.5 shrink-0 text-muted-foreground" />
+      <FileTypeMark path={path} className="mt-0.5 shrink-0" />
       <div className="studio-selectable min-w-0 [overflow-wrap:anywhere]">
         <p className="text-ui font-medium">{name}</p>
         {path !== name ? <p className="text-caption text-muted-foreground">{path}</p> : null}

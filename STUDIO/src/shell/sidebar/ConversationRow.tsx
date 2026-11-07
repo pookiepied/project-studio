@@ -29,7 +29,7 @@ import { cn } from '@/lib/cn'
  *
  * ---- The selection is a sliding chip ---------------------------------------
  *
- * The same device `SettingsTree` uses: the selection is one element with a
+ * The same device `SettingsNav` uses: the selection is one element with a
  * `layoutId`, so switching conversations reads as the selection travelling
  * down the column while the page crossfades beside it -- a lateral move in the
  * hierarchy, carried by the list it happened in (`SURFACE_SIBLING` is a pure
@@ -103,7 +103,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
           // role class in `@layer components` — so it silently won and this row
           // rendered at a tighter leading than every other 13px row in the
           // column. Same size, different rhythm, which reads as a size mismatch.
-          'relative flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left text-ui',
+          'studio-control-flat relative flex min-w-0 flex-1 items-center gap-1.5 pl-2 text-left text-ui',
           active ? 'text-foreground' : 'text-muted-foreground group-hover/row:text-foreground',
         )}
       >

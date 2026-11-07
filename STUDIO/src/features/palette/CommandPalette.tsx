@@ -52,6 +52,7 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
       { id: 'cmd-new', label: 'New conversation', icon: Icons.newChat, run: goHome },
       { id: 'cmd-project', label: 'New project', icon: Icons.projectNew, run: onNewProject },
       { id: 'cmd-sidebar', label: 'Toggle sidebar', icon: Icons.sidebar, run: toggleSidebar },
+      { id: 'cmd-reload', label: 'Reload interface', icon: Icons.reload, run: () => window.location.reload() },
     ]
 
     const chats: Entry[] = conversations

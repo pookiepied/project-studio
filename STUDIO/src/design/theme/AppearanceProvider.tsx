@@ -56,7 +56,8 @@ export function AppearanceProvider({
     void watchAppearance((next) => {
       if (disposed || locallyChanged.current) return
       setAppearance((current) => current.theme === next.theme && current.uiSize === next.uiSize
-        && current.codeOffset === next.codeOffset && current.pointerCursor === next.pointerCursor ? current : next)
+        && current.codeOffset === next.codeOffset && current.pointerCursor === next.pointerCursor
+        && current.uiScale === next.uiScale && current.typeface === next.typeface ? current : next)
     }).then((unsubscribe) => { if (disposed) unsubscribe(); else off = unsubscribe }).catch(() => undefined)
     return () => { disposed = true; off?.() }
   }, [])

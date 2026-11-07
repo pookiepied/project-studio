@@ -10,7 +10,7 @@ import { harnessFailureReason } from '@/platform/harness'
 import { isTauri, openDiagnosticWindow, quitApp } from '@/platform/tauri'
 import { describeHarnessFailure } from '@/shell/harness-failure'
 import { useWorkspace } from '@/stores/workspace'
-import { TrafficLights } from '@/shell/chrome/TrafficLights'
+import { WindowControls } from '@/shell/chrome/WindowControls'
 
 /**
  * The page that is the whole window while the harness is down.
@@ -108,7 +108,7 @@ export function HarnessDownPage() {
         className="absolute inset-x-0 top-0 z-10 flex items-center"
         style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
       >
-        <TrafficLights />
+        <WindowControls className="ml-auto" />
       </header>
 
       <div

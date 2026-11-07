@@ -28,7 +28,21 @@ import { createFollower } from '@/features/chat/transcript/scroll/followEngine'
  *   2. Gestures are intent, and they outrank everything. A wheel, a press, or a
  *      navigation key releases the pin directly — before the position they
  *      will cause has even been applied. That is what makes interrupting
+ *      navigation key releases the pin directly — before the position they
+ *      will cause has even been applied. That is what makes interrupting
  *      reliable rather than a race against the follow.
+ *
+ * ---- A press is not a departure -------------------------------------------
+ *
+ * A press stops the follow at once, because it may be the start of a scrollbar
+ * drag or of a selection that must not slide away under the pointer. But most
+ * presses go nowhere: a click, or a selection in text that has not moved. So the
+ * pin the press took is given back once the press is over, no selection is
+ * left, and the view is still at the bottom.
+ *
+ * `distant` is the separate question of whether the reader is away from the
+ * end, and it is what Jump to latest answers to. "Not following" alone also
+ * covers a selection sitting at the bottom, where there is nothing to jump to.
  */
 
 /** How close to the bottom still counts as at the bottom. */
@@ -108,6 +122,12 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
   /** The flight's `scrollend` listener, kept so a gesture can revoke it. */
   const settleRef = useRef<((event: Event) => void) | null>(null)
   const lastTop = useRef(0)
+  /** The view is away from the end. Only meaningful while not pinned. */
+  const [distant, setDistant] = useState(false)
+  /** The pointer is down in the transcript. */
+  const pressing = useRef(false)
+  /** A press took the pin, and has not yet turned out to be a departure. */
+  const pressHeld = useRef(false)
 
   /**
    * `pinned` for callbacks installed once and read later.
@@ -214,6 +234,9 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
       return
     }
 
+    // The reader moved, so whatever a press was holding is theirs now.
+    pressHeld.current = false
+
     // Direction beats distance. On a trackpad a slow scroll up moves a few
     // pixels at a time, and if only distance counted the next chunk would
     // re-pin before the reader had left the slack zone — they could not
@@ -227,6 +250,7 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     // has already said so through a gesture, which released the pin before
     // this event arrived; a pin that is still held here is one nobody asked
     // to drop, and dropping it left the follow dead after every collapse.
+    setDistant(!atBottom())
     if (upward && atBottom()) return
     setPinned(!upward && atBottom())
   }, [atBottom])
@@ -259,8 +283,10 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
       cancelAnimationFrame(frame.current)
       frame.current = 0
     }
+    pressHeld.current = false
+    setDistant(!atBottom())
     setPinned(false)
-  }, [])
+  }, [atBottom])
 
   const onWheel = useCallback(
     (event: { deltaY: number }) => {
@@ -269,7 +295,35 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     [release],
   )
 
-  const onPointerDown = useCallback(() => release(), [release])
+  const onPointerDown = useCallback(() => {
+    const held = pinnedRef.current || pressHeld.current
+    release()
+    pressHeld.current = held
+    pressing.current = true
+  }, [release])
+
+  /** Gives back the pin a press took, once the press has come to nothing. */
+  useEffect(() => {
+    const resume = () => {
+      if (pressing.current || !pressHeld.current) return
+      const selection = window.getSelection()
+      if (selection !== null && !selection.isCollapsed) return
+      pressHeld.current = false
+      if (atBottom()) setPinned(true)
+    }
+    const lift = () => {
+      pressing.current = false
+      resume()
+    }
+    document.addEventListener('pointerup', lift)
+    document.addEventListener('pointercancel', lift)
+    document.addEventListener('selectionchange', resume)
+    return () => {
+      document.removeEventListener('pointerup', lift)
+      document.removeEventListener('pointercancel', lift)
+      document.removeEventListener('selectionchange', resume)
+    }
+  }, [atBottom])
 
   const onKeyDown = useCallback(
     (event: { key: string }) => {
@@ -361,10 +415,13 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
 
     const observer = new ResizeObserver(() => {
       if (pinnedRef.current) drive()
+      else setDistant(!atBottom())
     })
     observer.observe(content)
+    // The viewport too: the composer growing shortens it from below.
+    if (element) observer.observe(element)
     return () => observer.disconnect()
-  }, [drive])
+  }, [drive, atBottom])
 
   /**
    * A change of conversation is the open again, even if a shell reuses this
@@ -392,6 +449,8 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     }
     follower.current.stop()
     lastTop.current = 0
+    pressHeld.current = false
+    setDistant(false)
     setPinned(true)
   }, [navigation])
 
@@ -421,5 +480,5 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     [],
   )
 
-  return { viewport, pinned, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom }
+  return { viewport, pinned, distant, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom }
 }

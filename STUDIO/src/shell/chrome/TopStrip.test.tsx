@@ -11,14 +11,9 @@ import { KNOWN_VENDOR, modelFor } from '@/features/settings/providers/harness.fi
 import { TopStrip } from './TopStrip'
 
 /**
- * What the floating sidebar does to the strip.
- *
- * On a narrow window the sidebar is a drawer over the page, and the strip is
- * page furniture: its toggle would sit under the drawer's brand band, and its
- * centred title would paint on top of the drawer's rows - the two reported
- * overlaps. While the drawer is out, the toggle rides to the drawer's right
- * edge and the title stands down. A resident column (the desktop reading)
- * takes space instead of covering anything, so there it must change nothing.
+ * The header. On a narrow window the sidebar is a drawer over the page: its left
+ * end and Personalize stand down while the drawer is out, and the right end stays
+ * live so the panel button can close it.
  */
 
 const BASE_URL = 'http://127.0.0.1:4319'
@@ -85,7 +80,7 @@ function ChatOpener({ conversationId }: { conversationId: string }) {
   )
 }
 
-function mountStrip(props: { compact?: boolean; sidebarShown?: boolean }) {
+function mountStrip(props: { compact?: boolean; sidebarShown?: boolean; onOpenWorkspace?: () => void }) {
   return render(
     <NavigationProvider>
       <WorkspaceProvider>
@@ -101,47 +96,85 @@ function openChatRoute(): void {
 }
 
 describe('the strip under a floating sidebar', () => {
-  it('hides the centred title while the drawer covers the strip', async () => {
+  it('stands its left end and Personalize down while the drawer covers them', async () => {
     mountStrip({ compact: true, sidebarShown: true })
     openChatRoute()
-    await screen.findByRole('button', { name: 'Turn settings' })
+    await screen.findByRole('button', { name: 'Show sidebar' })
     expect(screen.queryByText(CONVERSATION.title)).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Personalize' })).toBeNull()
   })
 
-  it('rides the toggle to the drawer\'s right edge, out from under its brand band', async () => {
-    mountStrip({ compact: true, sidebarShown: true })
-    openChatRoute()
-    await screen.findByRole('button', { name: 'Turn settings' })
-
-    const toggle = screen.getByRole('button', { name: 'Show sidebar' })
-    // Framer carries the shift on the cluster as a transform; jsdom has no
-    // animation clock, so the value is read off the first settled frame.
-    const cluster = toggle.closest('div') ?? toggle
-    const shifted = await vi.waitFor(() => {
-      const transform = cluster.style.transform
-      expect(transform).toContain('236')
-      return transform
-    })
-    expect(shifted).toBeTruthy()
-  })
-
-  it('changes nothing while the drawer is away, whatever the width', async () => {
+  it('shows them again while the drawer is away', async () => {
     mountStrip({ compact: true, sidebarShown: false })
     openChatRoute()
-    await screen.findByRole('button', { name: 'Turn settings' })
-    expect(screen.getByText(CONVERSATION.title)).toBeTruthy()
+    await screen.findByText(CONVERSATION.title)
+    expect(screen.getByRole('switch', { name: 'Personalize' })).toBeTruthy()
   })
 
-  it('keeps the resident reading on the desktop: title shown, toggle where it was', async () => {
+  it('keeps them beside a resident column, which covers nothing', async () => {
     mountStrip({ compact: false, sidebarShown: true })
     openChatRoute()
-    await screen.findByRole('button', { name: 'Turn settings' })
-    expect(screen.getByText(CONVERSATION.title)).toBeTruthy()
+    await screen.findByText(CONVERSATION.title)
+    expect(screen.getByRole('switch', { name: 'Personalize' })).toBeTruthy()
+  })
+})
 
-    // The store's own column is closed here, so the toggle reads "show"; the
-    // assertion is about its position, not its label.
-    const toggle = screen.getByRole('button', { name: 'Show sidebar' })
-    const cluster = toggle.closest('div') ?? toggle
-    expect(cluster.style.transform).not.toContain('236')
+describe('the selector', () => {
+  it('lets a long title shrink rather than run under Personalize', () => {
+    mountStrip({})
+    const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
+    expect(selector.parentElement?.className).toContain('min-w-0')
+  })
+
+  it('names a new conversation on home', () => {
+    mountStrip({})
+    expect(screen.getByText('New conversation')).toBeTruthy()
+  })
+
+  it('finds a conversation and opens it', async () => {
+    mountStrip({})
+    fireEvent.click(screen.getByRole('button', { name: /^Conversations\. Current:/ }))
+    fireEvent.change(await screen.findByRole('searchbox', { name: 'Search conversations' }), { target: { value: 'long enough' } })
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: CONVERSATION.title }))
+    expect(await screen.findByRole('button', { name: `Conversations. Current: ${CONVERSATION.title}` })).toBeTruthy()
+  })
+
+  it('says so when nothing matches', async () => {
+    mountStrip({})
+    fireEvent.click(screen.getByRole('button', { name: /^Conversations\. Current:/ }))
+    fireEvent.change(await screen.findByRole('searchbox', { name: 'Search conversations' }), { target: { value: 'zzz' } })
+    expect((await screen.findByRole('status')).textContent).toContain('zzz')
+  })
+})
+
+describe('the controls', () => {
+  it('shows Personalize and capture as not yet working', () => {
+    mountStrip({})
+    expect(screen.getByRole('switch', { name: 'Personalize' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Screen capture is coming soon' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('offers no conversation actions before there is a conversation', async () => {
+    mountStrip({})
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(await screen.findByRole('menuitem', { name: /Settings/ })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull()
+  })
+
+  it('opens the workspace from the menu while it is folded', async () => {
+    const onOpenWorkspace = vi.fn()
+    mountStrip({ onOpenWorkspace })
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Workspace' }))
+    expect(onOpenWorkspace).toHaveBeenCalledOnce()
+  })
+
+  it('renames the open conversation where its title stood', async () => {
+    mountStrip({})
+    openChatRoute()
+    await screen.findByText(CONVERSATION.title)
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
+    expect((await screen.findByDisplayValue(CONVERSATION.title))).toBeTruthy()
   })
 })

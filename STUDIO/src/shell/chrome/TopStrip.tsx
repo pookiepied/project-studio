@@ -1,57 +1,34 @@
-import { SHELL, SPRING_PANEL } from '@/design/tokens'
-import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { IconButton } from '@/components/primitives'
-import { IdentityLine } from '@/shell/chrome/IdentityLine'
-import { TrafficLights } from '@/shell/chrome/TrafficLights'
-import { TurnMenu } from '@/shell/chrome/TurnMenu'
-import { WorkspaceAccess } from '@/shell/chrome/WorkspaceAccess'
+import { IconButton, Switch, Tooltip } from '@/components/primitives'
+import { ConversationMenu, ConversationRename } from '@/shell/chrome/ConversationMenu'
+import { ConversationSelector } from '@/shell/chrome/ConversationSelector'
+import { CloseControl, MaximizeControl } from '@/shell/chrome/WindowControls'
 import { cn } from '@/lib/cn'
+import { startWindowDrag } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
+import type { Route } from '@/stores/navigation/NavigationProvider'
 import { useLiveWork, useWorkspace } from '@/stores/workspace'
 
+const NEW_CONVERSATION = 'New conversation'
+
 /**
- * The top strip.
+ * The header, as Family A lays it out.
  *
- * Not a title bar: no fill, no hairline, no height that content must dodge. It
- * is a transparent layer over the one surface, and the page scrolls underneath
- * it behind a gradient.
+ * Left is where you are: the selector. Right runs Personalize, a divider, then
+ * new conversation, screen capture, sidebar, maximize, more and close at one
+ * pitch. Personalize and capture are drawn from the reference ahead of their
+ * features, so both say they are coming rather than pretending to work.
  *
- * Left is the window: controls and the sidebar toggle, and nothing else.
- * Centre is what you are looking at — and it gets the room, because the
- * identity line (project, title, branch) is the thing worth reading here.
- * Right is the turn control and, while the conversation workspace is folded,
- * its restore button immediately before the model selector. The selector
- * keeps its right anchor while workspace access stays clear of the scroll edge.
+ * It is a transparent layer over the page, which scrolls underneath behind a
+ * gradient. Dragging belongs to the empty header, never to a child of it, and
+ * goes through `startWindowDrag` for the reason given in `DetachedShell`.
  *
- * The context meter used to be a ring of its own, first beside the sidebar
- * toggle and then beside the model pill. Neither place was right: it read as
- * a window control in the first and as a second small circle next to the
- * provider's mark in the second, and in both it was a fraction shown apart
- * from its own denominator. It lives inside the model's menu now. What is
- * left on the strip is a percentage in the pill's own words, once it is news.
- *
- * ---- How the strip shares its width ---------------------------------------
- *
- * The header is a container, and the two ends answer to it rather than to
- * fixed widths. The centred identity box caps itself at a width that leaves
- * the ends their room (the turn pill may carry a long model name, so its
- * worst case is what the centre reserves against), and below the breakpoint
- * where that worst case no longer fits, the turn pill folds to its mark
- * alone - the menu behind it is unchanged. The breakpoint is derived, not
- * chosen: it is the width where centred title + worst-case pill + window
- * controls stop fitting with air between them, which on phones and small
- * tablets is most widths.
- *
- * ---- What the floating sidebar does to it ---------------------------------
- *
- * On a narrow window the sidebar is a drawer over the page, and the strip is
- * page furniture: its toggle would sit under the drawer's brand band and its
- * centred title would paint on top of the drawer's rows. While the drawer is
- * out, the left cluster rides the drawer's own spring to its right edge -
- * the same place the toggle occupies when the column is resident - and the
- * title stands down until the drawer leaves. Desktop, where the column takes
- * space instead of covering it, never sees either motion.
+ * On a narrow window the sidebar is a drawer over the page. While it is out the
+ * left end would paint over the drawer's rows and Personalize would run under
+ * it, so both stand down and the header stops taking clicks between its
+ * controls. The right end stays live: its panel button closes the drawer.
  */
 export function TopStrip({
   compact = false,
@@ -65,124 +42,105 @@ export function TopStrip({
   /** Present while the right workspace is folded. Opens it through the shell handover. */
   onOpenWorkspace?: () => void
 }) {
-  const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations } = useWorkspace()
+  const { route, sidebarOpen, toggleSidebar, goHome } = useNavigation()
+  const { conversations, projects } = useWorkspace()
   const { running } = useLiveWork()
+  const [renaming, setRenaming] = useState(false)
 
   const conversation =
     route.kind === 'chat'
       ? conversations.find((item) => item.id === route.conversationId) ?? null
       : null
+  const conversationId = conversation?.id ?? null
+  useEffect(() => setRenaming(false), [conversationId])
 
-  /** Every surface that carries a composer, which is every surface but one. */
-  const turnSettings = route.kind !== 'settings'
-
-  const turnRunning = conversation !== null && running.has(conversation.id)
-
-  // The drawer covers the strip's own left end, so the toggle rides with it.
-  // The strip itself stands down as a click surface while the drawer is out:
-  // it spans the window and would otherwise intercept presses meant for the
-  // drawer's brand band - the Settings route's back control lives exactly
-  // there. Its two end clusters stay live; everything between yields.
   const drawerOut = compact && sidebarShown
 
   return (
     <header
-      data-tauri-drag-region
+      onPointerDown={(event) => {
+        if (event.button !== 0 || event.target !== event.currentTarget) return
+        void startWindowDrag()
+      }}
       className={cn(
-        '@container absolute inset-x-0 top-0 z-30 flex items-center gap-1',
+        '@container absolute inset-x-0 top-0 z-30 flex items-center gap-4',
         drawerOut && 'pointer-events-none',
       )}
       style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
     >
-      <TrafficLights />
-
-      <motion.div
-        animate={{ x: drawerOut ? SHELL.sidebar.expandedWidth : 0 }}
-        transition={SPRING_PANEL}
-        className={cn('ml-1 flex shrink-0 items-center gap-0.5', drawerOut && 'pointer-events-auto')}
-      >
-        <IconButton
-          label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-          tooltipSide="bottom"
-          onClick={toggleSidebar}
-          active={sidebarOpen}
-        >
-          <Icons.sidebar size="md" />
-        </IconButton>
-      </motion.div>
-
-      {/* Centred on the page, not on the window. The identity names the
-          conversation, and the conversation lives in the page — so when the
-          sidebar or the rail changes the column's bounds, the title moves with
-          the column, exactly as the transcript under it does. A window-centred
-          title would hold still while everything beneath it slid sideways,
-          which reads as disconnected rather than as anchored.
-
-          Absolutely positioned so the strip's two ends cannot push it: a
-          flex-centred middle child drifts every time either end changes width,
-          and both ends here change width with state.
-
-          ---- `w-full` on the clamping box is load-bearing ------------------
-
-          That box carries `@container`, and a container with
-          `container-type: inline-size` is sized *as if it had no contents*.
-          As a plain flex child that computes to zero width, and the identity
-          then overflows from the centre point to the right — the title sits
-          half a column right of centre no matter what the surrounding rule
-          says. `w-full` gives the box a definite width for the container
-          queries to resolve against; the max-width caps it, and the two
-          `justify-center`s do the centring. Remove the `w-full` and the
-          shrink-to-fit comes back as zero, silently.
-
-          ---- The cap is arithmetic, not taste ------------------------------
-
-          `62%` alone let the box reach under the turn pill: the pill's worst
-          case (a long model name, truncation at its cap) plus the window
-          controls is a fixed cost the centre has to leave, and 62% of a narrow
-          strip does not leave it. The cap is the smaller of the old share and
-          the whole strip minus that cost; under the fold-to-mark breakpoint
-          the cost collapses to the icon pill's, and the centre gets the room
-          back. The drawer being out hides the line entirely - a title
-          painting over the drawer's rows is overlap by another name. */}
-      <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-        <div className={cn('@container pointer-events-auto flex w-full min-w-0 overflow-hidden justify-center',
-          onOpenWorkspace
-            ? 'max-w-[min(62%,max(0px,calc(100%-26rem)))] @max-[48rem]:max-w-[min(62%,max(0px,calc(100%-16rem)))]'
-            : 'max-w-[min(62%,calc(100%-22rem))] @max-[48rem]:max-w-[min(62%,calc(100%-12rem))]',
-        )}>
-          {conversation !== null && !drawerOut ? (
-            <IdentityLine conversation={conversation} running={turnRunning} />
-          ) : null}
+      {drawerOut ? null : (
+        <div className="flex min-w-0 items-center">
+          {renaming && conversation !== null ? (
+            <ConversationRename conversation={conversation} onDone={() => setRenaming(false)} />
+          ) : (
+            <ConversationSelector
+              title={headerTitle(route, conversation?.title ?? null, projects)}
+              currentId={conversationId}
+              running={conversationId !== null && running.has(conversationId)}
+            />
+          )}
         </div>
-      </div>
+      )}
 
-      <div
-        className={cn(
-          'ml-auto flex shrink-0 items-center gap-0.5',
-          drawerOut && 'pointer-events-auto',
+      <div className={cn('ml-auto flex shrink-0 items-center', drawerOut && 'pointer-events-auto')}>
+        {drawerOut ? null : (
+          <>
+            {/* The first thing to go when the header runs out of room, as it
+                does at high UI scales: the title and the working controls stay. */}
+            <div className="flex items-center @max-[34rem]:hidden">
+              <Tooltip label="Personalization is coming soon" side="bottom" explainOnTap>
+                <span className="flex items-center gap-2.5">
+                  <span aria-hidden className="text-body font-medium text-foreground">Personalize</span>
+                  <Switch checked disabled resting label="Personalize" />
+                </span>
+              </Tooltip>
+              <span aria-hidden className="ml-[22px] mr-[17px] h-5 w-px bg-border" />
+            </div>
+          </>
         )}
-      >
-        {/* Wherever there is a turn to configure, and nowhere else.
-
-            These are the settings for the *next message*, so the rule is
-            simply: is there a composer on this surface? On a conversation, on
-            home, and in a project there is, and the control belongs there --
-            including before the first message, because which model and which
-            permission mode are about to be used is worth knowing before you
-            type, not after.
-
-            On Settings there is no message to send. A model picker sitting
-            over a preferences page is a control with nothing to act on, and it
-            invites the reading that it is *part of* those preferences — that
-            changing it here is changing a default. It is not; it is a
-            per-turn choice. Showing it where it cannot mean that is the fix. */}
-        <WorkspaceAccess onOpen={onOpenWorkspace} />
-        {/* The portaled picker can finish leaving after its trigger is hidden. */}
-        <div hidden={!turnSettings} className={turnSettings ? 'contents' : undefined}>
-          <TurnMenu available={turnSettings} />
+        <div className="flex items-center gap-1.5">
+          <IconButton label="New conversation" size="header" tooltipSide="bottom" onClick={goHome}>
+            <Icons.compose size="header" />
+          </IconButton>
+          <IconButton
+            label="Screen capture is coming soon"
+            size="header"
+            tooltipSide="bottom"
+            disabled
+            className="disabled:opacity-100"
+          >
+            <Icons.capture size="header" />
+          </IconButton>
+          <IconButton
+            label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            size="header"
+            tooltipSide="bottom"
+            onClick={toggleSidebar}
+            active={sidebarOpen}
+          >
+            <Icons.sidebar size="header" />
+          </IconButton>
+          <MaximizeControl />
+          <ConversationMenu
+            general
+            conversation={conversation}
+            onRename={() => setRenaming(true)}
+            onOpenWorkspace={onOpenWorkspace}
+          />
+          <CloseControl />
         </div>
       </div>
     </header>
   )
+}
+
+/** What the selector names: the page you are on, or the conversation about to start. */
+function headerTitle(
+  route: Route,
+  conversationTitle: string | null,
+  projects: ReadonlyArray<{ id: string; name: string }>,
+): string {
+  if (route.kind === 'settings') return 'Settings'
+  if (route.kind === 'project') return projects.find((item) => item.id === route.projectId)?.name ?? NEW_CONVERSATION
+  return conversationTitle ?? NEW_CONVERSATION
 }

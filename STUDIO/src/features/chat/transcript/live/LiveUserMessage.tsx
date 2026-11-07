@@ -1,6 +1,6 @@
 import { memo, useState, type Ref } from 'react'
 import { motion } from 'framer-motion'
-import { Icons } from '@/components/icons'
+import { FileTypeMark } from '@/components/icons/fileTypes'
 import { ENTER } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
@@ -34,7 +34,7 @@ export const LiveUserMessage = memo(function LiveUserMessage({
       onPointerLeave={() => setHovered(false)}
       className="flex flex-col items-end"
     >
-      <div ref={bubbleRef} className="min-w-0 max-w-[90%] rounded-2xl rounded-br-md bg-selected px-4 py-3 text-foreground">
+      <div ref={bubbleRef} className="min-w-0 max-w-[90%] rounded-2xl rounded-br-md bg-user-bubble px-4 py-3 text-foreground">
         <CollapsibleText text={item.text} />
         {item.attachments.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap justify-end gap-1">
@@ -68,7 +68,7 @@ export const LiveUserMessage = memo(function LiveUserMessage({
                 title={`${document.fileName} - ${formatPages(document)}, ${formatBytes(document.byteLength)}`}
                 className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-caption text-muted-foreground"
               >
-                <Icons.file size="sm" />
+                <FileTypeMark path={document.fileName} size="sm" />
                 <span className="max-w-48 truncate">{document.fileName}</span>
                 <span className="text-muted-foreground/70">{formatPages(document)}</span>
               </span>

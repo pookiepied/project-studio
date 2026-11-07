@@ -17,9 +17,8 @@
  * The steps were drawn tight enough that a row, a menu and a chip all read as
  * rectangles with the corners taken off rather than as soft objects, and at
  * this size that is the difference between an interface that feels calm and one
- * that feels administrative. The window's own 20 is unchanged — it was already
- * the softest thing on screen, and everything else was failing to agree with
- * it.
+ * that feels administrative. The window's own corner is `--window-radius` in
+ * styles/layout.css, because the CSS is the only thing that paints it.
  */
 export const RADIUS = {
   xs: 8,
@@ -27,8 +26,6 @@ export const RADIUS = {
   md: 12,
   lg: 14,
   xl: 18,
-  /** The window itself. Every other radius is derived from this one. */
-  window: 20,
   /** A capsule. The one radius that is concentric with anything. */
   pill: 9999,
 } as const
@@ -52,26 +49,23 @@ export const SHELL = {
   /** Page budget before the workspace becomes an overlay. */
   minPageWidth: 520,
   railGutter: SPACE.xl,
-  /** Corner radius of the window, matched by the DWM preference in Rust. */
-  windowRadius: RADIUS.window,
 
   /**
    * The top strip. Transparent: no fill, no hairline. Content scrolls under it
    * and is masked by a gradient rather than hidden behind a bar.
    */
   topStrip: {
-    height: 40,
-    paddingInline: SPACE.lg,
+    height: 66,
+    paddingInline: 18,
   },
 
   /** Window controls. Monochrome — see `TrafficLights`. */
-  trafficLight: { size: 11, gap: SPACE.md },
 
   sidebar: {
     /** Icon-only rail. Project marks, no labels; the name is a tooltip. */
     railWidth: 52,
     /** Expanded, showing conversation titles. */
-    expandedWidth: 236,
+    expandedWidth: 256,
   },
 
   /**
@@ -95,53 +89,20 @@ export const SHELL = {
    * Mirrored by `--scroll-inset-top` / `--scroll-inset-bottom` in `styles/tokens.css`,
    * which is what `.studio-scroll-inset` actually reads.
    */
-  scrollbarInset: { top: 40 + 20, bottom: 40 },
+  scrollbarInset: { top: 66 + 20, bottom: 40 },
 } as const
 
-/** The live control height comes from CSS so stored text preferences remain authoritative. */
-const COMPOSER_PADDING_BLOCK = SPACE.sm
-
-/** One row of controls and the padding around it: the capsule, and each dock. */
-const COMPOSER_DOCK_HEIGHT = `calc(var(--button-md) + ${COMPOSER_PADDING_BLOCK * 2}px)`
-
-/** The composer, which is a capsule when single-line and a rounded box when not. */
+/** The composer: one rounded box, with the field above its row of tools. */
 export const COMPOSER = {
-  /** Above and below the control row. The resting height derives from it. */
-  paddingBlock: COMPOSER_PADDING_BLOCK,
-  /**
-   * How wide it rests while nobody is at it. In control steps, so it keeps its
-   * proportions at every text size; a window narrower than this just fills.
-   */
-  idleWidth: 'calc(var(--control-md) * 14)',
-  dockHeight: COMPOSER_DOCK_HEIGHT,
-  /** Clear air between the body and the dock once it has pinched off. */
-  dockGap: 10,
-  /**
-   * The gooey filter's blur. Two edges read as joined while they are closer
-   * than about 1.35 of this, so `dockGap` has to stay clear of that or the
-   * dock never fully lets go.
-   */
-  gooBlur: 5,
-  /** Extra room left of a multiline draft, so it clears the body's corner. */
-  textInset: 4,
+  /** The air between the box and a menu opening off it. */
+  menuOffset: SPACE.lg,
   /**
    * How far from the field's ends text dissolves while there is more of it to
    * scroll to, and how far the scrollbar's thumb is held back from them.
    */
   edgeFade: 14,
-  /**
-   * The single-line radius: half the field's own height, so it is a capsule.
-   *
-   * Resolving against the live control avoids a default-size mirror. A finite
-   * radius also avoids the delayed visual collapse of animating 9999px to 18px.
-   */
-  restingRadius: `calc(${COMPOSER_DOCK_HEIGHT} / 2)`,
-
-  /** Past this the field is a box, not a capsule. */
-  multilineRadius: RADIUS.xl,
   /** Grow to about eight lines, then scroll inside. */
   maxHeight: 184,
-  paddingInline: SPACE.sm,
 } as const
 
 /**

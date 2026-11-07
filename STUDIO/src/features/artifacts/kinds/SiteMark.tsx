@@ -31,7 +31,7 @@ export function SiteMark({ href }: { href: string }) {
     // keeps its own size on the inside — it is a shape, not a glyph, and it
     // should not resize with the line it happens to sit on.
     <span aria-hidden className="flex h-[1lh] shrink-0 items-center text-ui">
-      <span className="relative flex size-5 items-center justify-center overflow-hidden rounded-full bg-selected text-micro font-semibold text-muted-foreground">
+      <span className="relative flex size-5 items-center justify-center overflow-hidden rounded-full bg-soft text-micro font-semibold text-muted-foreground">
         {host.charAt(0).toUpperCase()}
         {shown ? (
           <motion.img

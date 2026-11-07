@@ -24,10 +24,10 @@ const HighlightedCode = lazyNamed(
  */
 function Glyph({ fence }: { fence: string }) {
   const mark = markOfName(fence)
-  if (mark !== null) return <Mark mark={mark} className="shrink-0 text-muted-foreground" />
+  if (mark !== null) return <Mark mark={mark} size="sm" />
   const format = formatOfName(fence)
   if (format !== null) {
-    return <FormatGlyph format={format} size="sm" className="shrink-0 text-muted-foreground" />
+    return <FormatGlyph format={format} size="sm" className="shrink-0" />
   }
   return <Icons.coding size="sm" className="shrink-0 text-muted-foreground" />
 }
