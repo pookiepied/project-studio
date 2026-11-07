@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ProjectStore } from "../../src/projects/store.js";
 import { ConversationStore } from "../../src/conversations/store.js";
 import type { ConversationTitlingPort } from "../../src/conversations/titling.js";
+import { connectionModelReference } from "../../src/gateway/language/connection-reference.js";
 import { createTurnSettingsMiddleware } from "../../src/transport/http/middleware/turn-settings.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
@@ -121,6 +122,21 @@ describe("voice admission", () => {
 });
 
 describe("the turn settings a submission carries", () => {
+  it("admits a model selected from a specific connection and preserves its reference", async () => {
+    const modelId = connectionModelReference("openrouter-work", "anthropic/claude-sonnet-4.5");
+    served.add(modelId);
+
+    const response = await submit("cnv_connection", {
+      kind: "user", body: "Hello",
+      modelId,
+      reasoningLevel: "high",
+      permissionMode: "ask",
+    });
+
+    expect(response.status).toBe(202);
+    expect(store.get("cnv_connection")?.modelId).toBe(modelId);
+  });
+
   it("creates a first conversation's row at admission, carrying the settings", async () => {
     const response = await submit("cnv_first", {
       kind: "user", body: "What files can you see?",
@@ -225,7 +241,8 @@ describe("the turn settings a submission carries", () => {
 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
-    expect(body.error).toContain("do not match the contract");
+    expect(body.error).toContain("The reasoning level is invalid");
+    expect(body.error).not.toContain("colossal");
     // Refused before anything was created or patched.
     expect(store.count()).toBe(0);
   });

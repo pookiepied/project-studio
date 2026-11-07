@@ -155,21 +155,21 @@ export function reasoningChoiceOr(
 
 /**
  * A conversation's model reference, in the local runtime's own vocabulary:
- * `<pi-provider>/<model-id>`, e.g. `openrouter/anthropic/claude-sonnet-4.5`.
+ * `<pi-provider>/<model-id>` or `connection:<connection-id>/<model-id>`.
  *
  * The same shape the local model source's default selection already uses, so
  * one string has three consumers that agree: the conversation index stores it,
  * the run initializer turns it into the `project-studio/<reference>` specifier
  * Flue resolves, and the local adapter parses it back out to route the request.
- * Connection ids are deliberately not part of it - they name a keychain entry
- * and a settings row, not a model the runtime can resolve.
+ * The connection namespace preserves which connection serves the model when
+ * multiple connections offer the same provider model ID.
  */
 export const modelIdSchema = v.pipe(
   v.string(),
   v.minLength(1),
   v.regex(
-    /^[a-z0-9][a-z0-9-]*\/\S+$/,
-    "A model reference is <provider>/<model>, with a provider id Pi can resolve.",
+    /^(?:[a-z0-9][a-z0-9-]*|connection:[a-z0-9]+(?:-[a-z0-9]+)*)\/\S+$/,
+    "A model reference is <provider>/<model> or connection:<connection-id>/<model>.",
   ),
 );
 

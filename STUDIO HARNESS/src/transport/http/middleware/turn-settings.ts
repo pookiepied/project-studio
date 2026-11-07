@@ -120,6 +120,13 @@ export interface TurnSettingsMiddlewareOptions {
 
 const AGENT_SUBMISSION_PATH = /^\/agents\/studio\/([^/]+)$/;
 
+const SETTINGS_REFUSALS: ReadonlyMap<string, string> = new Map([
+  ["modelId", "The selected model reference is invalid. Choose the model again from the picker."],
+  ["reasoningLevel", "The reasoning level is invalid. Choose a reasoning level supported by the model."],
+  ["permissionMode", "The permission mode is invalid. Choose Ask or Auto in the composer."],
+  ["projectId", "The project reference is invalid. Reopen the project before sending."],
+]);
+
 export function createTurnSettingsMiddleware(
   options: TurnSettingsMiddlewareOptions,
 ): (context: Context, next: Next) => Promise<Response | void> {
@@ -151,7 +158,9 @@ export function createTurnSettingsMiddleware(
 
     const parsed = v.safeParse(submissionTurnSettingsSchema, body);
     if (!parsed.success) {
-      return refusal(context, "The turn settings on this submission do not match the contract.");
+      const field = v.getDotPath(parsed.issues[0]);
+      const message = field === null ? undefined : SETTINGS_REFUSALS.get(field);
+      return refusal(context, message ?? "The turn settings on this submission do not match the contract.");
     }
     const settings = readSettings(parsed.output);
     if (settings.modelId !== undefined && settings.modelId !== null) {
