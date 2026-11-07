@@ -371,6 +371,9 @@ pub(crate) async fn harness_stream(
     // the first keep-alive a full period away, so a stream's opening is
     // narrated by its frames rather than by a keep-alive racing them.
     heartbeat.tick().await;
+    // When this loop last ran on time. A gap here means the machine slept or the
+    // process was frozen, and then silence says nothing about the harness.
+    let mut last_tick = tokio::time::Instant::now();
 
     let outcome = 'consume: loop {
         tokio::select! {
@@ -410,6 +413,12 @@ pub(crate) async fn harness_stream(
                 }
             }
             _ = heartbeat.tick() => {
+                // Either arm can wake first after a pause, so both check for one.
+                let now = tokio::time::Instant::now();
+                if now.duration_since(last_tick) > heartbeat_every * 2 {
+                    last_byte = now;
+                }
+                last_tick = now;
                 if channel
                     .send(StreamEvent::KeepAlive {
                         offset: current_offset.clone(),
@@ -423,6 +432,11 @@ pub(crate) async fn harness_stream(
                 break 'consume Outcome::Cancelled;
             }
             _ = tokio::time::sleep_until(last_byte + READ_IDLE_TIMEOUT) => {
+                if last_tick.elapsed() > heartbeat_every * 2 {
+                    last_byte = tokio::time::Instant::now();
+                    last_tick = last_byte;
+                    continue 'consume;
+                }
                 break 'consume Outcome::Broken(format!(
                     "no bytes for {}s; the harness heartbeats every 15s, so the server is dead or frozen",
                     READ_IDLE_TIMEOUT.as_secs()

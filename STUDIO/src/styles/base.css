@@ -28,7 +28,8 @@
   }
 
   html {
-    @apply font-sans;
+    /* The Typeface setting. Everything inherits it, so this is its one reader. */
+    font-family: var(--font-interface, var(--font-sans));
     /* The root font-size is 16px and stays there. It was once set to the UI
        text size, and that single line put two unit systems at war: every
        Tailwind spacing utility is rem-based, so every control height, padding

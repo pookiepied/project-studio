@@ -71,7 +71,7 @@ function wrapper({ children }: { children: ReactNode }) {
 describe('deriving the browser report from the transcript', () => {
   /** The hook under test, alongside the rail state it feeds. */
   function usePreview(list: readonly TranscriptItem[]) {
-    useBrowserPreview('cnv_1', 'A conversation', list)
+    useBrowserPreview('cnv_1', list)
     return useRail()
   }
 
@@ -92,8 +92,8 @@ describe('deriving the browser report from the transcript', () => {
     ]
     const { result } = renderHook(({ list }) => usePreview(list), { wrapper, initialProps: { list: items } })
 
-    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (browser?.kind !== 'browser') throw new Error('no browser entry')
+    const browser = result.current.browser
+    if (browser === null) throw new Error('no browser entry')
     expect(browser.steps.map((step) => step.id)).toEqual(['call_1', 'call_2'])
     expect(browser.steps.map((step) => step.verb)).toEqual(['Opened', 'Clicked'])
     // The header reads newest-first per fact: the click carried a newer place
@@ -116,8 +116,8 @@ describe('deriving the browser report from the transcript', () => {
     ]
     const { result } = renderHook(({ list }) => usePreview(list), { wrapper, initialProps: { list: items } })
 
-    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (browser?.kind !== 'browser') throw new Error('no browser entry')
+    const browser = result.current.browser
+    if (browser === null) throw new Error('no browser entry')
     expect(browser.steps.map((step) => step.verb)).toEqual(['Opened', 'Opening'])
     expect(browser.steps[1]?.url).toBeNull()
     // The place on top is the one the log has actually reported reaching.
@@ -127,7 +127,7 @@ describe('deriving the browser report from the transcript', () => {
   it('is silent for a transcript with no browser work at all', () => {
     const items = [assistantWithTools('msg_1', [])]
     const { result } = renderHook(({ list }) => usePreview(list), { wrapper, initialProps: { list: items } })
-    expect(result.current.entries).toHaveLength(0)
+    expect(result.current.browser).toBeNull()
   })
 
   it('does not re-report when a chunk touches no browser call', () => {
@@ -140,14 +140,14 @@ describe('deriving the browser report from the transcript', () => {
       initialProps: { list: items },
     })
 
-    const first = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (first?.kind !== 'browser') throw new Error('no browser entry')
+    const first = result.current.browser
+    if (first === null) throw new Error('no browser entry')
 
     // A new array, same content: exactly what a projection pass produces when
     // the change was somewhere else.
     rerender({ list: [...items] })
-    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (browser?.kind !== 'browser') throw new Error('no browser entry')
+    const browser = result.current.browser
+    if (browser === null) throw new Error('no browser entry')
     expect(browser.steps).toHaveLength(1)
     // The same object, not a fresh replacement of it: the entry was not
     // re-reported at all, so the rail's strip did not re-render for nothing.
@@ -161,8 +161,8 @@ describe('deriving the browser report from the transcript', () => {
       ]),
     ]
     rerender({ list: grown })
-    const after = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (after?.kind !== 'browser') throw new Error('no browser entry')
+    const after = result.current.browser
+    if (after === null) throw new Error('no browser entry')
     expect(after.steps).toHaveLength(2)
   })
 
@@ -179,14 +179,14 @@ describe('deriving the browser report from the transcript', () => {
       initialProps: { list: running },
     })
 
-    const before = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (before?.kind !== 'browser') throw new Error('no browser entry')
+    const before = result.current.browser
+    if (before === null) throw new Error('no browser entry')
     expect(before.steps[0]?.verb).toBe('Opening')
     expect(before.frame).toBeNull()
 
     rerender({ list: answered })
-    const after = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (after?.kind !== 'browser') throw new Error('no browser entry')
+    const after = result.current.browser
+    if (after === null) throw new Error('no browser entry')
     expect(after.steps[0]?.verb).toBe('Opened')
     expect(after.frame).not.toBeNull()
   })
@@ -224,13 +224,13 @@ describe('deriving the browser report from the transcript', () => {
       initialProps: { list: running },
     })
 
-    const before = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (before?.kind !== 'browser') throw new Error('no browser entry')
+    const before = result.current.browser
+    if (before === null) throw new Error('no browser entry')
     expect(before.steps[0]?.verb).toBe('Reading')
 
     rerender({ list: answered })
-    const after = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (after?.kind !== 'browser') throw new Error('no browser entry')
+    const after = result.current.browser
+    if (after === null) throw new Error('no browser entry')
     expect(after.steps[0]?.verb).toBe('Read')
     // The place it read at is the report's place now, picture or no picture.
     expect(after.url).toBe('https://first.example')

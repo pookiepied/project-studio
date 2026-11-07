@@ -1,12 +1,7 @@
 import type { ReactNode } from 'react'
 import { Arrive } from '@/components/motion/Arrive'
-import { Icons } from '@/components/icons'
-import { IconButton } from '@/components/primitives'
 import { WorkingDots } from '@/components/state'
 import { WorkingHalo } from '@/features/artifacts/ArtifactMotion'
-import { useRail } from '@/stores/rail'
-import { useNavigation } from '@/stores/navigation'
-import { useWorkspace } from '@/stores/workspace'
 import { isWorking, type Artifact } from '@/domain/artifacts/types'
 import { cn } from '@/lib/cn'
 
@@ -22,7 +17,7 @@ import { cn } from '@/lib/cn'
  * slightly different and the transcript stops looking designed.
  *
  * So a kind supplies a mark, a status line and a body. Everything else —
- * layout, spacing, the working state, the rail button, the provenance footer —
+ * layout, spacing, the working state, the provenance footer —
  * is here and is not negotiable per kind.
  *
  * ---- Why it is not a card ------------------------------------------------
@@ -39,7 +34,6 @@ export function ArtifactShell({
   status,
   children,
   footer,
-  rail = true,
 }: {
   artifact: Artifact
   /** The kind's own mark, drawn inside the shared bubble. */
@@ -48,28 +42,10 @@ export function ArtifactShell({
   status: ReactNode
   children?: ReactNode
   footer?: ReactNode
-  /**
-   * Whether the artifact can be opened in the rail. On by default; a kind
-   * whose body is already the thing at full size - a picture with its own
-   * lightbox, a clip with its own player - turns it off, because a second
-   * "larger" that is the same size is a control that does nothing.
-   */
-  rail?: boolean
 }) {
   const working = isWorking(artifact.status)
   const failed = artifact.status === 'failed'
 
-  // The rail is offered by the shell rather than passed in by each kind. Every
-  // artifact can be read larger, and making that a per-kind decision would mean
-  // half of them silently lacking it for no reason anyone could state.
-  const { openArtifact } = useRail()
-  const { route } = useNavigation()
-  const { conversations } = useWorkspace()
-
-  const conversation =
-    route.kind === 'chat'
-      ? conversations.find((item) => item.id === route.conversationId) ?? null
-      : null
 
   return (
     <Arrive className="group/artifact my-4 w-full min-w-0 overflow-hidden rounded-xl bg-surface-sunken p-3">
@@ -90,22 +66,6 @@ export function ArtifactShell({
           </p>
         </div>
 
-        {/* Reserved space, revealed on hover — the same rule the code block's
-            controls follow, so a reply full of blocks does not twitch as the
-            pointer crosses it. */}
-        {rail && conversation && !working ? (
-          <span className="shrink-0 opacity-0 transition-opacity duration-fast group-hover/artifact:opacity-100">
-            <IconButton
-              label="Open larger"
-              size="sm"
-              onClick={() =>
-                openArtifact(artifact, conversation.id, conversation.title ?? 'Conversation')
-              }
-            >
-              <Icons.openLarger size="sm" />
-            </IconButton>
-          </span>
-        ) : null}
       </div>
 
       {/* The summary belongs to the shell, not to the kind. It was drawn by

@@ -3,19 +3,21 @@ import { useEffect } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RailProvider, useRail } from '@/stores/rail'
+import type { PlanSnapshot } from '@/platform/harness'
 import { SideRail } from './SideRail'
 
-vi.mock('./WorkspaceOverview', () => ({
-  WorkspaceOverview: () => <p>Task overview</p>,
-  WorkspaceTaskDetail: () => <p>Task transcript</p>,
-  entryTitle: () => 'Resource',
-}))
-vi.mock('./AgentInspector', () => ({ AgentInspector: () => null }))
-vi.mock('@/features/artifacts', () => ({ renderArtifact: () => null }))
-vi.mock('@/features/jobs', () => ({ BackgroundWorkPanel: () => null }))
-vi.mock('@/features/plans', () => ({ PlanPanel: () => null }))
+vi.mock('@/features/plans/PlanPanel', () => ({ PlanPanel: () => <p>The plan, in full</p> }))
+vi.mock('@/features/jobs/JobsPanel', () => ({ JobsPanel: () => null }))
 vi.mock('./BrowserPanel', () => ({ BrowserPanel: () => null }))
-vi.mock('@/features/changes/ChangesPanel', () => ({ ChangesPanel: () => null }))
+vi.mock('./AgentActivity', () => ({ AgentActivity: () => null }))
+
+const plan: PlanSnapshot = {
+  conversationId: 'a', damaged: false,
+  items: [
+    { id: 'one', text: 'Read', status: 'done', position: 1 },
+    { id: 'two', text: 'Write', status: 'pending', position: 2 },
+  ] as unknown as PlanSnapshot['items'],
+}
 
 beforeEach(() => {
   localStorage.clear()
@@ -25,22 +27,34 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 function Workspace() {
-  const { open, publishTasks, focus, expand } = useRail()
-  useEffect(() => { publishTasks('a', [{ id: 'task', conversationId: 'a', title: 'Checking the project', status: 'completed', messages: [], calls: [], timestamp: null }]) }, [publishTasks])
-  return <div><button onClick={() => focus('task')}>Inspect task</button><button onClick={expand}>Reopen</button><SideRail open={open} /></div>
+  const { open, publishActivity, expand } = useRail()
+  useEffect(() => { publishActivity('a', { plan, agents: [], jobs: [], turns: [] }) }, [publishActivity])
+  return <div><button onClick={expand}>Reopen</button><SideRail open={open} /></div>
 }
 
-describe('workspace surface', () => {
-  it('returns from a focused task with Escape before collapsing and can reopen', async () => {
+describe('the docked workspace', () => {
+  it('lists activity, opens one thing, and steps back with Escape before collapsing', async () => {
     render(<RailProvider conversationId="a"><Workspace /></RailProvider>)
-    await screen.findByText('Task overview')
-    fireEvent.click(screen.getByText('Inspect task'))
-    expect(screen.getByText('Task transcript')).toBeTruthy()
+    const row = await screen.findByRole('button', { name: /Plan/ })
+    expect(screen.getByText('1 of 2 done')).toBeTruthy()
+    fireEvent.click(row)
+    expect(screen.getByText('The plan, in full')).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('complementary'), { key: 'Escape' })
-    expect(screen.getByText('Task overview')).toBeTruthy()
+    expect(screen.getByText('1 of 2 done')).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('complementary'), { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull())
     fireEvent.click(screen.getByText('Reopen'))
-    await screen.findByText('Task overview')
+    await screen.findByText('1 of 2 done')
+  })
+
+  it('keeps no history: a conversation with nothing going on has no column', async () => {
+    function Idle() {
+      const { open, publishActivity } = useRail()
+      useEffect(() => { publishActivity('a', { plan: null, agents: [], jobs: [], turns: [] }) }, [publishActivity])
+      return <SideRail open={open} />
+    }
+    render(<RailProvider conversationId="a"><Idle /></RailProvider>)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByRole('complementary')).toBeNull()
   })
 })

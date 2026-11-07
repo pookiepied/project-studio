@@ -48,10 +48,9 @@ export function AppShell() {
   const { conversations, projects, storePhase } = useWorkspace()
   const {
     open: railOpen,
-    collapsed: railCollapsed,
+    openOverview: openWorkspace,
     width: railWidth,
     collapse: collapseRail,
-    expand: expandRail,
   } = useRail()
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
@@ -224,7 +223,7 @@ export function AppShell() {
             facts from the shell: whether the sidebar is the floating drawer
             (narrow window) and whether that drawer is on screen decide both
             the toggle's place and the centred title's. */}
-        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' && railCollapsed ? expandRail : undefined} />
+        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' ? openWorkspace : undefined} />
 
         <PageTransition view={routeKey(route)} move={move} main>
           {Surface({ route, conversations, projects })}

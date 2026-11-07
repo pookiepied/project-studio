@@ -15,6 +15,7 @@ import { finalTextStart, workSummary } from './workSummary'
 import { WorkHistory } from './WorkHistory'
 import { WorkResults } from './WorkResults'
 import { ToolArtifact } from './ToolArtifact'
+import { toolPresentation } from './toolPresentation'
 import { callsIn } from './taskEvidence'
 import type {
   AssistantSegment,
@@ -115,15 +116,19 @@ export const AssistantTurn = memo(function AssistantTurn({
         {summary !== null && workHistory.length > 0 ? <WorkHistory title={summary.title}>
           {workHistory.map((segment, index) => segment.kind === 'activity'
             ? <ActivityBlock key={segment.id} segments={segment.segments} active={false} conversationId={conversationId}
-                textBefore={workHistory[index - 1]?.kind === 'text'} textAfter={workHistory[index + 1]?.kind === 'text'} />
+                textBefore={workHistory[index - 1]?.kind === 'text'} textAfter={workHistory[index + 1]?.kind === 'text'}
+                rowBefore={isRow(workHistory[index - 1])} />
             : <TextSegment key={segment.id} segment={segment} growing={false} observeDelivery={false} identity={{ conversationId, messageId: item.id, ...(item.submissionId === null ? {} : { submissionId: item.submissionId }) }} />)}
         </WorkHistory> : null}
         {visible.map((segment, index) => segment.kind === 'artifact' ? (
-          <ToolArtifact key={segment.id} call={segment.call} conversationId={conversationId} />
+          <ToolArtifact key={segment.id} call={segment.call} conversationId={conversationId} live={live}
+            textBefore={visible[index - 1]?.kind === 'text'} textAfter={visible[index + 1]?.kind === 'text'}
+            rowBefore={isRow(visible[index - 1])} />
         ) : segment.kind === 'activity' ? (
           <ActivityBlock key={segment.id} segments={segment.segments}
             active={activityLive && (index === lastIndex || callsIn(segment.segments).some((call) => call.errorText === null && !call.output?.present))} conversationId={conversationId}
-            textBefore={visible[index - 1]?.kind === 'text'} textAfter={visible[index + 1]?.kind === 'text'} />
+            textBefore={visible[index - 1]?.kind === 'text'} textAfter={visible[index + 1]?.kind === 'text'}
+            rowBefore={isRow(visible[index - 1])} />
         ) : (
           <TextSegment
             key={segment.id}
@@ -262,4 +267,15 @@ function EndLine({ end }: { end: MessageEnd }) {
       ) : null}
     </div>
   )
+}
+
+/**
+ * Whether a section draws as a row - a thought, a tool row, the person's
+ * answers - so the section after it takes the one row gap (`rowGap.ts`). Words
+ * are not a row, and neither is a media card, which brings its own frame.
+ */
+function isRow(section: ReturnType<typeof activitySections>[number] | undefined): boolean {
+  if (section === undefined || section.kind === 'text') return false
+  if (section.kind === 'artifact') return toolPresentation(section.call.toolName).artifact === 'answers'
+  return true
 }

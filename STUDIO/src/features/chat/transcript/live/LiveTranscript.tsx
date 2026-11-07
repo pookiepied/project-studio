@@ -7,6 +7,7 @@ import { RetryWait } from '@/features/chat/transcript/live/RetryWait'
 import { SubmissionFailed } from '@/features/chat/transcript/live/SubmissionFailed'
 import { CompactionMarker } from '@/features/chat/transcript/live/CompactionMarker'
 import { CompactingRow } from '@/features/chat/transcript/live/CompactingRow'
+import { useCompactionHandover } from '@/features/chat/transcript/live/useCompactionHandover'
 import { isTurnRunning, type ConversationPhase } from '@/features/chat/connection/useConversation'
 import {
   isMessageBeingWritten,
@@ -97,6 +98,10 @@ export function LiveTranscript({
   const turnRunning = isTurnRunning(phase)
   const generating = phase.status === 'streaming'
   const retrying = phase.status === 'streaming' ? phase.retrying : null
+  const compaction = useCompactionHandover(
+    compacting,
+    items.reduce((count, item) => (item.kind === 'compaction' ? count + 1 : count), 0),
+  )
   // The submission a run in flight still owes its ending. Messages that carry
   // this id keep their action row down — see `AssistantTurn` — while
   // everything said before the run keeps its verbs.
@@ -166,11 +171,16 @@ export function LiveTranscript({
 
       {/* A compaction in flight, at the very tail — the cut it is working on
           lands after everything the log holds, so the wait stands where the
-          record will. The collapse in its exit is what hands this slot to the
-          marker: one line settling from the wait into the fact. */}
-      <AnimatePresence initial={false}>
-        {compacting ? <CompactingRow key="compacting" /> : null}
-      </AnimatePresence>
+          record will, and holds there until the record arrives to take the
+          slot (see `useCompactionHandover`): one line changing its words. In
+          the handover render the presence itself is left out, so the wait
+          line goes without an exit and never shares a frame with the record;
+          a refused compaction's line still folds away through the presence. */}
+      {compaction.handedOver ? null : (
+        <AnimatePresence initial={false}>
+          {compaction.waiting ? <CompactingRow key="compacting" /> : null}
+        </AnimatePresence>
+      )}
 
       {/* A scheduled retry, and nothing else. It is named in words because
           "nothing is moving" and "the provider said no" look identical

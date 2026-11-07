@@ -73,7 +73,6 @@
   }
 
   .studio-prose {
-    font-family: var(--font-reading, inherit);
     font-size: var(--text-body);
     line-height: var(--leading-body);
     color: var(--foreground);

@@ -25,7 +25,7 @@
   --media-primary-color: oklch(1 0 0);
   --media-secondary-color: oklch(1 0 0 / 26%);
   --media-text-color: oklch(1 0 0);
-  --media-font-family: var(--font-sans);
+  --media-font-family: var(--font-interface, var(--font-sans));
   --media-font-size: var(--text-micro);
 
   /* Controls are round and transparent until touched. A default control paints

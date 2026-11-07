@@ -457,6 +457,7 @@ export class PermissionKernel {
       source: "grant",
       reason: "You approved this.",
       grantId: grant?.id,
+      asked: true,
     };
   }
 

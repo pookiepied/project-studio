@@ -44,9 +44,8 @@ const SHELL_NAMES: Record<ShellKind, string> = {
  * page below runs through it. The choice is the person's (ADR 0057): the
  * harness orders what the machine has, and this is where that order is
  * overruled. The fence is beside it for the same reason: machine-wide, off
- * until turned on, and only offered where this build has one - Linux. On
- * Windows the row says so and offers nothing, because a switch that does
- * nothing is worse than a sentence that says why.
+ * until turned on, and only offered where this build has one - Linux. Elsewhere
+ * the row is absent, because there is nothing to decide.
  *
  * Trust comes next because it is the precondition the other three sit
  * behind. An unvouched folder refuses every write and every command in every
@@ -162,14 +161,10 @@ function Body({
     return active
   }
 
-  // What the fence row says. Three states the harness reports, and the
-  // page must not blur them: not offered on this platform (nothing to turn
-  // on), on and working (the backend named), on and not working (the
+  // What the fence row says, where a build offers one. The page must not blur
+  // these: off, on and working (the backend named), on and not working (the
   // machine's own reason, so the person can fix it or leave it).
   const fenceHint = (): string => {
-    if (!isolation.offered) {
-      return 'This build has no sandbox fence for this platform. Commands run under the permission gate, which asks before anything runs; that is the boundary here.'
-    }
     if (!isolation.enabled) {
       return 'Off. Commands run under the permission gate alone. Turn the fence on to also wall each command into the project and what is granted below.'
     }
@@ -194,15 +189,15 @@ function Body({
         />
       </Row>
 
-      <Row label="Sandbox fence" hint={fenceHint()}>
-        {isolation.offered ? (
+      {isolation.offered ? (
+        <Row label="Sandbox fence" hint={fenceHint()}>
           <Switch
             label="Sandbox fence"
             checked={isolation.enabled}
             onChange={(value) => onSetIsolation(value)}
           />
-        ) : null}
-      </Row>
+        </Row>
+      ) : null}
 
       <div className="flex items-center justify-between py-3.5">
         <p className="text-ui text-muted-foreground">

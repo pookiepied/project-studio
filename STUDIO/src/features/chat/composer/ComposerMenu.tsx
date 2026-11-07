@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { COMPOSER } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
+import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
 import { PERMISSION_MODES, findPermissionMode, type PermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
 
@@ -16,11 +16,21 @@ import { useWorkspace } from '@/stores/workspace'
  * The mode is the one setting whose consequence lands on the person's machine,
  * so the dots carry an accent marker whenever it is anything but Ask: hidden in
  * a menu, it must still be visible from the row.
+ *
+ * Dictate is always "Dictate". Where the microphone cannot be asked for (an
+ * insecure origin), the row greys and says "Not available" at its end, with
+ * the reason on hover: the reason is a sentence and the menu is a list of
+ * words, so it used to wrap the row into a paragraph.
  */
 export function ComposerMenu({ conversationId, draftPermission, dictate }: {
   conversationId: string | null
   draftPermission?: { value: PermissionMode; onChange: (value: PermissionMode) => void } | undefined
-  dictate: { label: string; disabled: boolean; onSelect: () => void }
+  dictate: {
+    disabled: boolean
+    /** Why dictation cannot be used here at all, or null where it can. */
+    unavailable: string | null
+    onSelect: () => void
+  }
 }) {
   const { conversations, settings, setConversationPermission } = useWorkspace()
   const [open, setOpen] = useState(false)
@@ -72,16 +82,30 @@ export function ComposerMenu({ conversationId, draftPermission, dictate }: {
         </MenuItem>
       ))}
       <MenuSeparator />
-      <MenuItem
-        icon={<Icons.dictate />}
-        disabled={dictate.disabled}
-        onSelect={() => {
-          setOpen(false)
-          dictate.onSelect()
-        }}
-      >
-        {dictate.label}
-      </MenuItem>
+      {dictate.unavailable !== null ? (
+        <Tooltip label={dictate.unavailable} explainOnTap className="block">
+          <MenuItem
+            icon={<Icons.dictate />}
+            hint="Not available"
+            label={`Dictate. ${dictate.unavailable}`}
+            disabled
+            onSelect={() => {}}
+          >
+            Dictate
+          </MenuItem>
+        </Tooltip>
+      ) : (
+        <MenuItem
+          icon={<Icons.dictate />}
+          disabled={dictate.disabled}
+          onSelect={() => {
+            setOpen(false)
+            dictate.onSelect()
+          }}
+        >
+          Dictate
+        </MenuItem>
+      )}
     </Popover>
   )
 }

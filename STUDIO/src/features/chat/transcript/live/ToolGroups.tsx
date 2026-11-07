@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
-import { ShowMoreButton, ShowMoreContent } from '@/components/primitives'
+import { ShowMoreButton, ShowMoreContent, Tooltip } from '@/components/primitives'
 import { SiteMark } from '@/features/artifacts/kinds/SiteMark'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
@@ -60,7 +60,7 @@ export function ToolGroups({
     else rows.push({ kind: 'images', id: call.toolCallId, images: [...images] })
   }
   return (
-    <div className="my-1 flex min-w-0 flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-2">
       {rows.map((row) => row.kind === 'images'
         ? <ImageReads key={row.id} images={row.images} live={live} conversationId={conversationId} />
         : <CallRow key={row.id} call={row.call} live={live} conversationId={conversationId} />)}
@@ -98,6 +98,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
   const label = !searching && state === 'success' && step.title
     ? step.title
     : `${verb} ${subject}`.trimEnd()
+  const rowLabel = state === 'pending' ? `${label} pending` : label
   const sources = searching ? step.hits : /^https?:\/\//i.test(step.url)
     ? [{ title: step.url, url: step.url }]
     : []
@@ -105,7 +106,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
   return <DisclosureRow leading={searching ? <Icons.search /> : <Icons.browserUse />} entering={live} open={open}
     onToggle={() => setOpen((value) => !value)} chevron="hover" flush
     label={<>
-      <span title={label} className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{label}{state === 'pending' ? ' pending' : null}</span>
+      <Tooltip label={rowLabel} overflowOnly className="min-w-0"><span className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{rowLabel}</span></Tooltip>
       {searching && state === 'success' && sources.length > 0
         ? <span className="shrink-0">· {sources.length} {sources.length === 1 ? 'source' : 'sources'}</span>
         : null}
@@ -127,20 +128,20 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
               <tr key={`${source.url}:${String(index)}`}>
                 <td className="py-1.5">
                   {searching ? (
-                    <a href={source.url} target="_blank" rel="noreferrer noopener"
-                      className="block truncate hover:underline" title={source.title}>{source.title}</a>
+                    <Tooltip label={source.title} overflowOnly className="flex min-w-0"><a href={source.url} target="_blank" rel="noreferrer noopener"
+                      className="block min-w-0 truncate hover:underline">{source.title}</a></Tooltip>
                   ) : (
-                    <button type="button" className="block max-w-full truncate text-left hover:underline"
+                    <Tooltip label={source.url} overflowOnly className="flex min-w-0"><button type="button" className="block min-w-0 truncate text-left hover:underline"
                       onClick={() => {
                         setLinkError(false)
                         void openExternalUrl(source.url).catch(() => setLinkError(true))
-                      }}>{source.url}</button>
+                      }}>{source.url}</button></Tooltip>
                   )}
                 </td>
                 <td className="py-1.5 pl-3 text-muted-foreground">
                   <span className="flex min-w-0 items-center gap-2">
                     <SiteMark href={source.url} />
-                    <span className="min-w-0 truncate" title={hostOf(source.url)}>{hostOf(source.url)}</span>
+                    <Tooltip label={hostOf(source.url)} overflowOnly className="min-w-0"><span className="min-w-0 truncate">{hostOf(source.url)}</span></Tooltip>
                   </span>
                 </td>
               </tr>
@@ -327,7 +328,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
           {file !== null ? (
             <FileSubject path={file} />
           ) : subject !== null ? (
-            <span className="truncate">{subject}</span>
+            <Tooltip label={subject} overflowOnly className="min-w-0"><span className="truncate">{subject}</span></Tooltip>
           ) : null}
           {diff !== null ? (
             <span className="shrink-0 font-mono">
@@ -375,8 +376,8 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
 /**
  * What opens under a chip: the call's working-out, in the shape its own kind
  * names. A file-writing call shows the diff it described and the harness's
- * own sentence; a question call shows each question and the exact answer
- * it was given; a search shows its answer as a result list -- the files,
+ * own sentence (a question call has no row here: its answers stand in the
+ * transcript, see `QuestionAnswers`); a search shows its answer as a result list -- the files,
  * the lines, the matched words -- and its aim as one line while the answer
  * is still out; other tools use dedicated reports or readable field lists.
  * A read lands here only when it failed -- the error
@@ -401,7 +402,7 @@ function CallWorkingOut({
   live: boolean
 }) {
   const diffed = diff !== null && file !== null
-  if (!diffed && searched === null && call.toolName !== 'ask_user_question') {
+  if (!diffed && searched === null) {
     if (call.toolName === 'shell' || call.toolName === 'git') return <ShellDetails call={call} live={live} />
     if (call.toolName === 'plan') return <PlanDetails call={call} live={live} />
     if (call.toolName === 'discover') return <DiscoveryDetails call={call} live={live} />
@@ -418,8 +419,6 @@ function CallWorkingOut({
         <SearchResults outcome={searched} />
       ) : diffed ? (
         <FileDiff path={file} diff={diff} />
-      ) : call.toolName === 'ask_user_question' ? (
-        <AskWorkingOut call={call} />
       ) : null}
       {call.errorText !== null ? (
         <pre className="studio-selectable whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-code text-danger">
@@ -439,7 +438,7 @@ function CallWorkingOut({
           // facts the card does not; the echo is the card, whose gutters now
           // carry the echo's own numbers.
           <OutcomeSentence outcome={outcome} />
-        ) : call.toolName !== 'ask_user_question' ? <StructuredValue value={call.output.value} /> : null
+        ) : <StructuredValue value={call.output.value} />
       ) : null}
     </div>
   )
@@ -460,126 +459,11 @@ function OutcomeSentence({ outcome }: { outcome: FileToolOutcome }) {
 function FileSubject({ path }: { path: string }) {
   const { name, dir } = splitFilePath(path)
   return (
-    <>
-      <span className="shrink-0 font-medium text-foreground">{name}</span>
-      {dir !== null ? <span className="truncate text-muted-foreground">{dir}</span> : null}
-    </>
+    <Tooltip label={path} overflowOnly className="min-w-0 items-center gap-1.5">
+      <span className="min-w-0 truncate font-medium text-foreground">{name}</span>
+      {dir !== null ? <span className="min-w-0 truncate text-muted-foreground">{dir}</span> : null}
+    </Tooltip>
   )
-}
-
-/* -------------------------------------------------------------------------- */
-/* The question and its answer                                                 */
-/* -------------------------------------------------------------------------- */
-
-interface AskedQuestion {
-  readonly question: string
-}
-
-interface QuestionAnswerReport {
-  readonly outcome: string
-  readonly labels: readonly string[]
-  readonly text: string | null
-}
-
-/** The questions as the model asked them, defensively read. */
-function questionsOf(input: { readonly present: boolean; readonly value: unknown } | null): readonly AskedQuestion[] {
-  if (input === null || !input.present) return []
-  const value: unknown = input.value
-  if (!isRecord(value)) return []
-  const raw = value['questions']
-  if (!Array.isArray(raw)) return []
-  const asked: AskedQuestion[] = []
-  for (const entry of raw) {
-    if (!isRecord(entry)) continue
-    const question = entry['question']
-    if (typeof question === 'string' && question.length > 0) asked.push({ question })
-  }
-  return asked
-}
-
-/** How each question came out, from the call's answer, defensively read. */
-function reportsOf(
-  output: { readonly present: boolean; readonly value: unknown } | null,
-): readonly QuestionAnswerReport[] | null {
-  if (output === null || !output.present) return null
-  const value: unknown = output.value
-  if (!isRecord(value)) return null
-  const raw = value['questions']
-  if (!Array.isArray(raw)) return null
-  const reports: QuestionAnswerReport[] = []
-  for (const entry of raw) {
-    if (!isRecord(entry) || typeof entry['outcome'] !== 'string') continue
-    const labels = Array.isArray(entry['labels'])
-      ? entry['labels'].filter((label): label is string => typeof label === 'string')
-      : []
-    reports.push({
-      outcome: entry['outcome'],
-      labels,
-      text: typeof entry['text'] === 'string' ? entry['text'] : null,
-    })
-  }
-  return reports
-}
-
-/** The run's closing sentence, when the person's stop carried one. */
-function closingOf(
-  output: { readonly present: boolean; readonly value: unknown } | null,
-): string | null {
-  if (output === null || !output.present) return null
-  const value: unknown = output.value
-  if (!isRecord(value)) return null
-  const closing = value['closing']
-  return typeof closing === 'string' && closing.length > 0 ? closing : null
-}
-
-/**
- * The record of a question call: what was asked, and -- once the person has
- * spoken -- the exact words or options they answered with, read from the
- * call's own answer. This is the part the transcript used to lose: the live
- * card takes the answers and the run moves on, and nothing on screen said
- * which shoe size was chosen. The answer is the fact this expansion exists
- * to hold, so it is the one line set in the foreground.
- */
-function AskWorkingOut({ call }: { call: ToolCallView }) {
-  const asked = questionsOf(call.input)
-  const reports = reportsOf(call.output)
-  const closing = closingOf(call.output)
-  return (
-    <div className="flex flex-col gap-2 text-ui">
-      {asked.map((question, index) => (
-        <div key={index} className="flex flex-col gap-0.5">
-          <span className="text-caption text-muted-foreground">
-            {question.question}
-          </span>
-          <AnswerView report={reports?.[index]} />
-        </div>
-      ))}
-      {closing !== null ? (
-        <span className="text-caption text-muted-foreground">{closing}</span>
-      ) : null}
-    </div>
-  )
-}
-
-/** The answer line: what was chosen, or what happened instead of a choice. */
-function AnswerView({ report }: { report: QuestionAnswerReport | undefined }) {
-  if (report === undefined) return null
-  if (report.outcome === 'answered') {
-    const answer = report.text ?? (report.labels.length > 0 ? report.labels.join(' · ') : null)
-    if (answer === null) return null
-    return <span className="font-medium text-foreground">{answer}</span>
-  }
-  // The harness names what happened instead; these are its words, mapped
-  // where the interface already had a name for them.
-  const said =
-    report.outcome === 'deferred'
-      ? 'You decide'
-      : report.outcome === 'stopped'
-        ? 'Stopped'
-        : report.outcome === 'timed_out'
-          ? 'Timed out'
-          : report.outcome
-  return <span className="text-muted-foreground">{said}</span>
 }
 
 /* -------------------------------------------------------------------------- */

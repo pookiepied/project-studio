@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   deleteFlueJournalForConversation,
+  activeFlueConversations,
   hasActiveFlueSubmissions,
   sessionKeyBelongsTo,
   streamPathBelongsTo,
@@ -378,6 +379,18 @@ describe("deleting one conversation from the journal", () => {
     } finally {
       check.close();
     }
+  });
+
+  it("lists every conversation with a turn in flight, once each", () => {
+    const path = journalPath();
+    const setup = createJournal(path);
+    addSubmission(setup, "sub_a", "studio", "cnv_live", "running");
+    addSubmission(setup, "sub_b", "studio", "cnv_live", "queued");
+    addSubmission(setup, "sub_c", "studio", "cnv_idle", "settled");
+    setup.close();
+
+    expect(activeFlueConversations(path)).toEqual(["cnv_live"]);
+    expect(activeFlueConversations(join(workspace, "absent.db"))).toEqual([]);
   });
 
   it("refuses a conversation with a turn in flight and destroys nothing", () => {

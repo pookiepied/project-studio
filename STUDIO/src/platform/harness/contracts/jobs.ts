@@ -17,6 +17,8 @@ export interface BackgroundJob {
   readonly id: string
   /** The command line as the person would read it. */
   readonly command: string
+  /** What it is for, in the model's words. Null for an untitled job. */
+  readonly title: string | null
   readonly state: 'running' | 'stopping' | 'exited' | 'stopped' | 'failed'
   /** Null while it runs. */
   readonly exitCode: number | null
@@ -164,6 +166,7 @@ export function parseBackgroundJob(value: unknown): BackgroundJob | null {
   return {
     id,
     command,
+    title: typeof row['title'] === 'string' && row['title'].trim() !== '' ? row['title'] : null,
     state: state as BackgroundJob['state'],
     exitCode: number('exitCode'),
     startedAt: number('startedAt') ?? 0,

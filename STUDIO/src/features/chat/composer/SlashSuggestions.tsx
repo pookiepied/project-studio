@@ -6,6 +6,7 @@ import { Icons } from '@/components/icons'
 import type { CommandRecord } from '@/platform/harness'
 import { cn } from '@/lib/cn'
 import { floatingViewport, observeFloating, placeFloating } from '@/design/layout/floating'
+import { KeyHints } from '@/features/chat/questions/CardShell'
 
 /** Breathing room between the panel and the composer's top edge, and from the window's. */
 const GAP = 6
@@ -44,10 +45,17 @@ const GAP = 6
  * move, Enter or Tab to take, Escape to dismiss — the hands never leave the
  * words.
  *
- * A list, not a menu: each row is the mark for the command's kind, the name
- * in the field's own monospace, the hint for what follows it, and the one
- * line that says what it does. The picked row is marked the way a menu marks
- * its selection — the chip, and nothing else.
+ * A list, not a menu: each row is the mark for the command's kind, the name,
+ * the hint for what follows it, and the one line that says what it does.
+ *
+ * ---- Family A -------------------------------------------------------------
+ *
+ * It wears the question card's glass (`studio-slash-panel`) and opens with the
+ * card's key hints, plus Escape, so the two things that rise out of the
+ * composer are one family. The name is set in the body face, not monospace: a
+ * command is a word the person reads, and the field's monospace made a list
+ * of three short words look like a terminal. The picked row takes the card's
+ * neutral wash.
  */
 export function SlashSuggestions({
   anchor,
@@ -134,23 +142,22 @@ export function SlashSuggestions({
             // be seen at (0, 0).
             visibility: position ? 'visible' : 'hidden',
           }}
-          className={cn(
-            // The popover recipe: translucent, blurred, one hairline, the
-            // overlay step of the shadow scale. `p-1` puts rows on `sm`,
-            // the concentric rule.
-            'studio-floating-surface studio-blur fixed z-50 rounded-lg border p-1 shadow-overlay',
-          )}
+          className="studio-slash-panel fixed z-50 px-1.5 pt-2.5 pb-1.5 text-foreground"
         >
           {commands.length === 0 ? (
-            <div className="px-2 py-1.5 text-caption text-muted-foreground" role="note">
+            <div className="px-2.5 pb-1 text-caption text-muted-foreground" role="note">
               No command by that name. Sent as written.
             </div>
           ) : (
+            <>
+            <div className="flex min-h-5 items-center px-2.5 pb-1.5">
+              <KeyHints dismiss />
+            </div>
             <ul
               ref={list}
               role="listbox"
               aria-label="Commands"
-              className="studio-scroll-bounded max-h-64 overflow-y-auto"
+              className="studio-scroll-menu max-h-64 overflow-y-auto"
             >
               {commands.map((command, index) => (
                 <li
@@ -165,18 +172,16 @@ export function SlashSuggestions({
                     onPick(command)
                   }}
                   className={cn(
-                    'flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5',
-                    index === selected ? 'bg-selected' : '',
+                    'flex cursor-default items-center gap-3 rounded-[12px] px-2.5 py-1.5 text-body transition-colors duration-fast',
+                    index === selected && 'bg-soft',
                   )}
                 >
-                  <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+                  <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center text-muted-foreground">
                     {command.kind === 'action' ? <Icons.compaction /> : <Icons.command />}
                   </span>
-                  <span className="shrink-0 font-mono text-ui text-foreground">/{command.id}</span>
+                  <span className="shrink-0 font-medium">/{command.id}</span>
                   {command.argumentHint !== '' ? (
-                    <span className="shrink-0 font-mono text-caption text-muted-foreground/80">
-                      {command.argumentHint}
-                    </span>
+                    <span className="shrink-0 text-caption text-muted-foreground/80">{command.argumentHint}</span>
                   ) : null}
                   <span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">
                     {command.description}
@@ -184,6 +189,7 @@ export function SlashSuggestions({
                 </li>
               ))}
             </ul>
+            </>
           )}
         </motion.div>
       ) : null}

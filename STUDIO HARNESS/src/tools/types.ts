@@ -28,6 +28,14 @@ export interface ToolContext {
    * up front would get: it resolves only when allowed, and a refusal throws.
    */
   readonly authorize?: (resource: string, limits?: { readonly maxDuration?: GrantDuration }) => Promise<void>;
+  /**
+   * Whether the person answered a permission prompt for this call so far -
+   * up front or through `authorize`. Answering means they just clicked in
+   * Studio's own window, which a tool that drives the desktop needs to know:
+   * that click moved the keyboard to Studio and is not a change to the
+   * screen the tool was working in. Never a permission.
+   */
+  readonly personAsked?: () => boolean;
 }
 
 export interface ToolDefinition<Input, Output> {

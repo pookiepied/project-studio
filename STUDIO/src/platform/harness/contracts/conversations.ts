@@ -101,6 +101,48 @@ export function parseConversationRecords(value: unknown): readonly ConversationR
   return listOf(parseConversationRecord, value)
 }
 
+/** The conversations with a turn in flight, by id. */
+export function parseRunningConversations(value: unknown): readonly string[] | null {
+  if (!isRecord(value)) return null
+  const ids = value['conversationIds']
+  return Array.isArray(ids) && ids.every((id) => typeof id === 'string') ? ids : null
+}
+
+/** Where the harness found a file a reply named. */
+export interface FileLocation {
+  readonly path: string
+  readonly kind: 'file' | 'folder'
+  /** Other files that fit the same reference; `path` is the newest. */
+  readonly others: number
+}
+
+/** A file's text for the viewer: its start, when the whole would be too long. */
+export interface FileText {
+  readonly text: string
+  readonly truncated: boolean
+}
+
+/** Null is an answer: nothing in this conversation's folders fits. */
+export function parseFileLocation(value: unknown): { readonly location: FileLocation | null } | null {
+  if (!isRecord(value)) return null
+  const location = value['location']
+  if (location === null) return { location: null }
+  if (!isRecord(location)) return null
+  const { path, kind, others } = location
+  if (typeof path !== 'string' || (kind !== 'file' && kind !== 'folder') || typeof others !== 'number') return null
+  return { location: { path, kind, others } }
+}
+
+/** Null is an answer too: this file has no text to show. */
+export function parseFileText(value: unknown): { readonly file: FileText | null } | null {
+  if (!isRecord(value)) return null
+  const file = value['file']
+  if (file === null) return { file: null }
+  if (!isRecord(file)) return null
+  const { text, truncated } = file
+  return typeof text === 'string' && typeof truncated === 'boolean' ? { file: { text, truncated } } : null
+}
+
 /** What creating an index row sends: identity plus the words the title comes from. */
 export interface ConversationCreateDraft {
   readonly id: string

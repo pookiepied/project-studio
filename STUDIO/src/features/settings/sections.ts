@@ -29,10 +29,8 @@ import type { IconComponent } from '@/components/icons'
  * agent's actions -- neither knows a repository exists. Each of those moves is
  * a section filed under what it was near instead of what it is.
  *
- * Three groups carry a single section on purpose. A one-row group that says
- * "Models" answers "where do I change what answers me?" in one glance; folding
- * Providers under a wider heading to avoid the orphan is the filing instinct
- * that produced the old tree in the first place.
+ * The side panel lists the groups and opens one at a time, so seven rows and
+ * the pages of one group are all it ever shows, and it does not need to scroll.
  */
 
 export interface SettingsSection {
@@ -44,6 +42,7 @@ export interface SettingsSection {
 export interface SettingsGroup {
   readonly id: string
   readonly name: string
+  readonly icon: IconComponent
   readonly sections: readonly SettingsSection[]
 }
 
@@ -51,6 +50,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'application',
     name: 'Application',
+    icon: Icons.general,
     sections: [
       { id: 'general', name: 'General', icon: Icons.general },
       { id: 'appearance', name: 'Appearance', icon: Icons.appearance },
@@ -64,6 +64,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'account',
     name: 'Account',
+    icon: Icons.account,
     sections: [
       { id: 'account', name: 'Account', icon: Icons.account },
       // The library sits with the person, not the agent: it is what they
@@ -79,6 +80,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     // with that page's models.
     id: 'providers',
     name: 'Providers',
+    icon: Icons.providers,
     sections: [
       { id: 'models', name: 'Models', icon: Icons.providers },
       { id: 'media', name: 'Media', icon: Icons.generate },
@@ -88,6 +90,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'extensions',
     name: 'Extensions',
+    icon: Icons.mcp,
     sections: [
       { id: 'mcp', name: 'MCP servers', icon: Icons.mcp },
       { id: 'connectors', name: 'Connectors', icon: Icons.connector },
@@ -97,6 +100,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'agent',
     name: 'Agent',
+    icon: Icons.agents,
     sections: [
       // First: it answers the group's own question before anything else in
       // it. What the agent may do was decided by an approval, and the
@@ -115,6 +119,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'coding',
     name: 'Coding',
+    icon: Icons.coding,
     sections: [
       { id: 'git', name: 'Git', icon: Icons.branch },
       { id: 'worktrees', name: 'Worktrees', icon: Icons.worktree },
@@ -124,6 +129,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'archived',
     name: 'Archived',
+    icon: Icons.archive,
     sections: [{ id: 'archive', name: 'Archived chats', icon: Icons.archive }],
   },
 ]
@@ -134,4 +140,9 @@ export const ALL_SECTIONS: readonly SettingsSection[] = SETTINGS_GROUPS.flatMap(
 
 export function findSection(id: string): SettingsSection | undefined {
   return ALL_SECTIONS.find((section) => section.id === id)
+}
+
+/** The group holding a page. */
+export function groupOf(sectionId: string): SettingsGroup | undefined {
+  return SETTINGS_GROUPS.find((group) => group.sections.some((section) => section.id === sectionId))
 }

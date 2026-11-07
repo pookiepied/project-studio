@@ -10,7 +10,6 @@ import {
   imageMimeOf,
   type ImageRejection,
 } from '@/domain/attachments/images'
-import { AddMenu } from '@/features/chat/composer/AddMenu'
 import { PendingImages } from '@/features/chat/composer/PendingImages'
 import { PendingDocuments } from '@/features/chat/composer/PendingDocuments'
 import { DOCUMENT_ACCEPT, documentMimeOf, pickDocumentFiles } from '@/domain/attachments/documents'
@@ -675,7 +674,7 @@ export function Composer({
               exit={{ opacity: 0 }}
               transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             >
-              <DictationPrompt stage={dictation.stage} denied={dictation.denied} note={dictation.note} />
+              <DictationPrompt stage={dictation.stage} denied={dictation.denied} note={dictation.note} quiet={dictation.quiet} />
             </motion.div>
           ) : landing !== null ? (
             // The passage arriving, set exactly where the field sets it, so
@@ -707,9 +706,12 @@ export function Composer({
         )}
       >
         <div className="flex min-w-0 items-center gap-1">
-          {/* The image picker is this menu's one live item: the dialog it
-              opens is the webview's own file input, no plugin. */}
-          <AddMenu onAttach={() => picker.current?.click()} />
+          {/* Files are the one thing a turn can carry beyond its words, so the
+              paperclip opens the picker itself - the webview's own file input,
+              no plugin - rather than a menu with one live row in it. */}
+          <IconButton label="Attach files" size="xs" onClick={() => picker.current?.click()}>
+            <Icons.paperclip size="md" />
+          </IconButton>
           {turnControl}
           {/* Studio has no per-message web switch yet. It keeps the reference's
               place and full colour, and says so rather than pretending. */}
@@ -720,8 +722,8 @@ export function Composer({
             conversationId={conversationId}
             draftPermission={draftPermission}
             dictate={{
-              label: voiceAvailable ? 'Dictate' : VOICE_UNAVAILABLE_REASON,
-              disabled: !voiceAvailable || dictating,
+              unavailable: voiceAvailable ? null : VOICE_UNAVAILABLE_REASON,
+              disabled: dictating,
               onSelect: () => void dictation.start(),
             }}
           />
@@ -799,7 +801,7 @@ export function Composer({
       </div>
 
       {/* Off-flow and invisible: only its click handler matters, opened by
-          the plus menu. `accept` narrows the dialog to the four picture
+          the paperclip. `accept` narrows the dialog to the four picture
           formats and the document kinds the harness reads, and `multiple`
           matches the strips' counts; the value is reset after each read so
           picking the same file twice still fires. */}

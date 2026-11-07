@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fieldAt } from '@/lib/field'
+import { spellingTargetOf } from '@/lib/spelling'
 import { transcriptOf } from '@/shell/menus/ActionItems'
 import { FloatingMenu, type FloatingPlacement } from '@/shell/menus/FloatingMenu'
 
@@ -32,7 +33,8 @@ export function ActionsMenu() {
       event.preventDefault()
       const selection = window.getSelection()?.toString().trim() ?? ''
       const target = event.target instanceof HTMLElement ? event.target : null
-      const kind = fieldAt(event.target) ? 'field' : selection ? 'selection' : null
+      const field = fieldAt(event.target)
+      const kind = field ? 'field' : selection ? 'selection' : null
       if (kind === null || (kind === 'selection' && transcriptOf(target) !== null)) {
         setPosition(null)
         return
@@ -44,6 +46,7 @@ export function ActionsMenu() {
         origin: 'top left',
         selection,
         target,
+        spellingTarget: field ? spellingTargetOf(field) : null,
       })
     }
 

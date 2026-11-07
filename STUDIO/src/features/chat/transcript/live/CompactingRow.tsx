@@ -17,16 +17,19 @@ import { WorkingDots } from '@/components/state'
  * appears beneath where it stood, the wait becoming the fact it was waiting
  * for.
  *
- * The height is part of every pose (the house collapse) rather than only the
- * opacity, because the row lives at the end of a `gap-6` column: a row that
- * only faded would leave its slot and its gap behind while the record took
- * its place, and the list would jump twice for one event.
+ * The handover is a swap, not a collapse: the row holds its slot until the
+ * record is in the log, then goes in the same render the record appears, at
+ * the record's own height - the two lines share their box exactly, so there
+ * is no padding here the record does not have (see `useCompactionHandover`).
+ * Any other leaving - a refused compaction - folds away with the house
+ * collapse, height and all, because the row lives in a `gap-6` column and a
+ * fade alone would leave its gap behind.
  */
 export function CompactingRow() {
   return (
     <motion.div {...COLLAPSE} className="overflow-hidden">
       <div
-        className="studio-message flex items-center gap-1.5 py-0.5 text-caption text-muted-foreground"
+        className="studio-message flex items-center gap-1.5 text-caption text-muted-foreground"
         role="status"
       >
         <Icons.compaction size="sm" />

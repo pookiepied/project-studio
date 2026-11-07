@@ -286,6 +286,10 @@ function createTool(
                 ...actorMeta(context.scope),
                 "studio/conversation": context.scope.conversationId,
                 ...(approval === undefined ? {} : { "studio/approval": approval }),
+                // The person just answered a prompt in Studio's window for
+                // this call. Read at send time, so the retry after an
+                // in-component ask carries it too.
+                ...(context.personAsked?.() === true ? { "studio/asked": "1" } : {}),
               } }
               : {}),
           },

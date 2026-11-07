@@ -59,7 +59,9 @@ const remove = vi.fn()
 const togglePin = vi.fn()
 const rename = vi.fn()
 const running = new Set<string>()
+const statuses = new Map<string, string>()
 
+vi.mock('@/stores/status', () => ({ useConversationStatuses: () => statuses }))
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({ rename, togglePin, setArchived, remove }),
   useLiveWork: () => ({ running }),
@@ -84,6 +86,15 @@ describe('the trailing slot', () => {
   it('offers archive while the conversation is idle', () => {
     render(<ConversationRow conversation={CONVERSATION} />)
     expect(screen.getByRole('button', { name: ARCHIVE })).toBeTruthy()
+  })
+
+  it('gives the slot to a status reported from elsewhere', () => {
+    statuses.set(CONVERSATION.id, 'input')
+    render(<ConversationRow conversation={CONVERSATION} />)
+
+    expect(screen.getByRole('img', { name: 'Needs your answer' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: ARCHIVE })).toBeNull()
+    statuses.clear()
   })
 
   it('withholds archive while the conversation is working', () => {

@@ -179,14 +179,36 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
       tokensBefore: compaction.tokensBefore,
       timestamp: compaction.timestamp,
     }
-    const anchor =
-      compaction.afterMessageId === null
-        ? -1
-        : items.findIndex((item) => item.id === compaction.afterMessageId)
-    items.splice(anchor + 1, 0, marker)
+    items.splice(compactionSlot(items, snapshot.messages, compaction.afterMessageId), 0, marker)
   }
 
   return items
+}
+
+/**
+ * Where a compaction's marker goes. It names the message it followed, and that
+ * message may be one that is never drawn: a compaction after a stopped turn
+ * follows the abort advisory, a system message. Looking only for that id sent the
+ * marker to the top of the transcript, out of sight in a long conversation. So the
+ * search walks back to the nearest message that is drawn, then past the failure
+ * rows and earlier markers that stand behind it.
+ */
+function compactionSlot(
+  items: readonly TranscriptItem[],
+  messages: ConversationSnapshotFacts['messages'],
+  afterMessageId: string | null,
+): number {
+  if (afterMessageId === null) return 0
+  const named = messages.findIndex((message) => message.id === afterMessageId)
+  // A name the record does not hold still happened after everything it does.
+  if (named === -1) return items.length
+  let slot = 0
+  for (let index = named; index >= 0; index -= 1) {
+    const found = items.findIndex((item) => item.id === messages[index]?.id)
+    if (found !== -1) { slot = found + 1; break }
+  }
+  while (items[slot]?.kind === 'submission-failed' || items[slot]?.kind === 'compaction') slot += 1
+  return slot
 }
 
 /** The tag the harness gives the signal that names a message's documents. */

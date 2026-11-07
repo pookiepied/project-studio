@@ -29,7 +29,6 @@ function ResearchArtifacts({ groups }: {
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({ mediaJobs: { list: async () => ({ ok: true, value: [] }) }, conversations: [] }),
 }))
-vi.mock('@/stores/rail', () => ({ useRail: () => ({ openArtifact: () => {} }) }))
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ route: { kind: 'home' } }) }))
 
 afterEach(cleanup)

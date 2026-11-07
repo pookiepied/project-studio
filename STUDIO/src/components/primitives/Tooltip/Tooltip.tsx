@@ -47,6 +47,8 @@ export function Tooltip({
   label,
   side = 'top',
   explainOnTap = false,
+  overflowOnly = false,
+  className,
   children,
 }: {
   label: string
@@ -58,6 +60,14 @@ export function Tooltip({
    * where voice input is greyed out.
    */
   explainOnTap?: boolean
+  /**
+   * Only speak when something inside is cut off. For a label that is truncated
+   * to one line: the tooltip is the way to read the rest, and a label that fits
+   * has nothing more to say, so it stays quiet rather than repeating itself.
+   */
+  overflowOnly?: boolean
+  /** Layout for the wrapper, so a truncating child can still shrink inside a row. */
+  className?: string
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -92,8 +102,15 @@ export function Tooltip({
     timer.current = null
   }
 
+  const cutOff = () => {
+    const root = anchor.current
+    if (!root) return false
+    return [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))].some((element) => element.scrollWidth > element.clientWidth + 1)
+  }
+
   const schedule = () => {
     clear()
+    if (overflowOnly && !cutOff()) return
     timer.current = window.setTimeout(() => setOpen(true), DELAY_MS)
   }
 
@@ -107,7 +124,7 @@ export function Tooltip({
   return (
     <span
       ref={anchor}
-      className="relative inline-flex"
+      className={cn('relative inline-flex', className)}
       onPointerEnter={(event) => {
         if (event.pointerType === 'mouse' || !explainOnTap) schedule()
       }}
@@ -149,13 +166,7 @@ export function Tooltip({
                 visibility: position ? 'visible' : 'hidden',
               }}
               className={cn(
-              // Inverted, and solid. A translucent panel tinted from the same
-              // surface it floats over is the one thing a tooltip must not be:
-              // it borrows the colour of whatever is behind it, so the label
-              // half-dissolves into the row it is explaining. `--primary` is
-              // near-black in light and near-white in dark, so the capsule
-              // flips with the theme and always reads as a separate object
-              // rather than a lighter patch of the same one.
+                // The solid, inverted palette keeps the label legible over any surface.
                 'studio-floating-surface pointer-events-none fixed z-50 max-w-80 whitespace-normal break-words rounded-lg px-2 py-1',
                 'bg-tooltip text-tooltip-foreground',
                 'text-caption shadow-overlay',

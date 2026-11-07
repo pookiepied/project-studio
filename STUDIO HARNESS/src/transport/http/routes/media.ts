@@ -1,6 +1,5 @@
-import { readFile, readdir, realpath, stat } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
 
 import { Hono } from "hono";
 import * as v from "valibot";
@@ -15,13 +14,8 @@ import { StudioError } from "../../../contracts/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { MediaAdministration } from "../../../gateway/media/service.js";
 import { ImproveError, type TextImproverPort } from "../../../application/text-improver.js";
-import {
-  conversationArtifactsDirectory,
-  conversationAttachmentsDirectory,
-  conversationDirectory,
-  conversationScratchDirectory,
-  conversationWorkspaceDirectory,
-} from "../../../platform/paths.js";
+import { containedPaths, conversationFolders } from "../../../conversations/files.js";
+import { conversationArtifactsDirectory } from "../../../platform/paths.js";
 import type { VoiceSettings } from "../../../gateway/language/voice-settings.js";
 import { observeOperation } from "../../../observability/operation.js";
 
@@ -80,12 +74,6 @@ const PICTURE_BY_EXTENSION: Readonly<Record<string, string>> = {
 
 const PICTURE_MAX_BYTES = 25 * 1024 * 1024;
 
-/** `child` is `root` or lies beneath it. Both are already real paths. */
-function within(root: string, child: string): boolean {
-  const offset = relative(root, child);
-  return offset === "" || (!offset.startsWith("..") && !isAbsolute(offset));
-}
-
 /**
  * The file a reply's picture names, if it is one this conversation may show.
  *
@@ -104,26 +92,8 @@ async function conversationPicture(
 ): Promise<{ path: string; mimeType: string } | null> {
   const mimeType = PICTURE_BY_EXTENSION[requested.slice(requested.lastIndexOf(".") + 1).toLowerCase()];
   if (mimeType === undefined) return null;
-  const home = conversationDirectory(conversationId);
-  const stand = projectFolders[0] ?? conversationWorkspaceDirectory(conversationId);
-  const roots = [
-    ...projectFolders,
-    conversationWorkspaceDirectory(conversationId),
-    conversationScratchDirectory(conversationId),
-    conversationArtifactsDirectory(conversationId),
-    conversationAttachmentsDirectory(conversationId),
-  ];
-  // A `file:` address is the same path spelled as a URL: `file:///C:/x` on
-  // Windows, `file:///home/x` elsewhere.
-  const named = /^file:\/\//i.test(requested)
-    ? fileURLToPath(requested)
-    : requested;
-  const candidates = isAbsolute(named) ? [named] : [resolve(stand, named), resolve(home, named)];
-  const realRoots = (await Promise.all(roots.map((root) => realpath(root).catch(() => null))))
-    .filter((root): root is string => root !== null);
-  for (const candidate of candidates) {
-    const real = await realpath(candidate).catch(() => null);
-    if (real === null || !realRoots.some((root) => within(root, real))) continue;
+  const folders = conversationFolders(conversationId, projectFolders);
+  for (const real of await containedPaths(folders, requested)) {
     const info = await stat(real).catch(() => null);
     if (info === null || !info.isFile() || info.size > PICTURE_MAX_BYTES) continue;
     return { path: real, mimeType };

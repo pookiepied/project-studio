@@ -1,328 +1,117 @@
-/**
- * @vitest-environment jsdom
- */
-import { act, cleanup, renderHook } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+/** @vitest-environment jsdom */
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
+import { RailProvider, useRail, type Activity } from './RailProvider'
 
-import { RailProvider, planEntryId, useRail } from './RailProvider'
-import type { Artifact } from '@/domain/artifacts/types'
-import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
+let wide = true
+beforeEach(() => {
+  localStorage.clear()
+  wide = true
+  vi.stubGlobal('matchMedia', () => ({ matches: wide, addEventListener() {}, removeEventListener() {} }))
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-/**
- * The rail's rules, as the plan entry meets them.
- *
- * Artifacts accumulate and the cap drops the oldest; a conversation has one
- * plan, so the plan entry is keyed by the conversation - opening it twice
- * focuses it - and is exempt from that cap. Evicting the plan to make room
- * for a search result is the bug that only shows up in long sessions, which
- * is exactly why it is pinned here.
- */
+const agent = (id: string, status: AgentTask['status'] = 'running'): AgentTask => ({
+  id, agentName: 'reviewer', parentConversationId: 'a', title: `Agent ${id}`, status, createdAt: 0, settledAt: null, resultSummary: null,
+})
+const job: BackgroundJob = { id: 'job', title: 'Client tests', command: 'pnpm test', state: 'running', exitCode: null, startedAt: 0, endedAt: null, output: '', dropped: 0 }
+const plan = (count: number): PlanSnapshot => ({
+  conversationId: 'a', damaged: false,
+  items: Array.from({ length: count }, (_, index) => ({ id: String(index), text: `Item ${String(index)}`, status: 'pending', position: index })) as unknown as PlanSnapshot['items'],
+})
+const activity = (overrides: Partial<Activity> = {}): Activity => ({ plan: null, agents: [], jobs: [], turns: [], ...overrides })
 
-afterEach(cleanup)
-
-function artifact(id: string): Artifact {
-  return { kind: 'search_results', title: `Artifact ${id}`, status: 'done', id }
+function mount(scope: { current: string | null }) {
+  const wrapper = ({ children }: { children: ReactNode }) => <RailProvider conversationId={scope.current}>{children}</RailProvider>
+  return renderHook(() => useRail(), { wrapper })
 }
 
-function wrapper({ children }: { children: ReactNode }) {
-  return <RailProvider>{children}</RailProvider>
-}
+describe('the workspace holds activity, per conversation', () => {
+  it('keeps each conversation its own activity, browser and open view', async () => {
+    const scope = { current: 'a' as string | null }
+    const { result, rerender } = mount(scope)
+    act(() => {
+      result.current.publishActivity('a', activity({ agents: [agent('one')] }))
+      result.current.showBrowser('a', { family: 'browser', url: 'https://a.test', title: 'A', frame: null, steps: [] })
+    })
+    await waitFor(() => expect(result.current.open).toBe(true))
+    act(() => result.current.show({ kind: 'agent', agentId: 'one' }))
+    expect(result.current.view).toEqual({ kind: 'agent', agentId: 'one' })
 
-describe('the rail holding a plan', () => {
-  it('retains the newly opened result when all twelve standing entries are exempt', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-    for (let at = 0; at < 12; at += 1) {
-      act(() => result.current.openPlan(`standing-${at}`, `Plan ${at}`))
-    }
-    act(() => result.current.openChanges('conversation', 'turn', []))
-    expect(result.current.entries.find((entry) => entry.id === result.current.activeId)?.kind).toBe('changes')
-    act(() => result.current.openBrowserResult('conversation', 'turn', {
-      url: 'https://example.com/', title: 'Example', frame: null, steps: [],
-    }))
-    expect(result.current.entries.find((entry) => entry.id === result.current.activeId)?.kind).toBe('browser')
-    expect(result.current.entries.filter((entry) => entry.kind === 'plan')).toHaveLength(12)
-    expect(result.current.entries.some((entry) => entry.kind === 'changes')).toBe(true)
-    expect(result.current.entries).toHaveLength(14)
+    scope.current = 'b'; rerender()
+    expect(result.current.activity.agents).toEqual([])
+    expect(result.current.browser).toBeNull()
+    expect(result.current.view).toBeNull()
+    expect(result.current.open).toBe(false)
+
+    scope.current = 'a'; rerender()
+    expect(result.current.browser?.url).toBe('https://a.test')
+    expect(result.current.view).toEqual({ kind: 'agent', agentId: 'one' })
+
+    scope.current = null; rerender()
+    expect(result.current.open).toBe(false)
   })
 
-  it('opens the conversation plan once and focuses it on a second open', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.openPlan('cnv_1', 'First conversation')
-    })
-    act(() => {
-      result.current.openPlan('cnv_1', 'First conversation')
-    })
-
-    const plans = result.current.entries.filter((entry) => entry.kind === 'plan')
-    expect(plans).toHaveLength(1)
-    expect(plans[0]?.id).toBe(planEntryId('cnv_1'))
-    expect(result.current.activeId).toBe(planEntryId('cnv_1'))
-
-    // And a second conversation gets its own, not the first one's.
-    act(() => {
-      result.current.openPlan('cnv_2', 'Second conversation')
-    })
-    expect(result.current.entries.filter((entry) => entry.kind === 'plan')).toHaveLength(2)
-    expect(result.current.activeId).toBe(planEntryId('cnv_2'))
+  it('falls back to the list when what was open is no longer reported', async () => {
+    const { result } = mount({ current: 'a' })
+    act(() => result.current.publishActivity('a', activity({ agents: [agent('one')], jobs: [job] })))
+    act(() => result.current.show({ kind: 'agent', agentId: 'one' }))
+    act(() => result.current.publishActivity('a', activity({ jobs: [job] })))
+    expect(result.current.view).toBeNull()
   })
 
-  it('retains plans and artifacts beyond the former twelve-tab limit', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.openPlan('cnv_1', 'Conversation')
-    })
-    for (let at = 0; at < 13; at += 1) {
-      act(() => {
-        result.current.openArtifact(artifact(`art_${at}`), 'cnv_1', 'Conversation')
-      })
-    }
-
-    // Pagination bounds the overview, while the complete history stays available.
-    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(13)
-    expect(
-      result.current.entries.find((entry) => entry.id === planEntryId('cnv_1')),
-    ).toBeDefined()
-
-    // Opening another result must not discard either the plan or an older artifact.
-    act(() => {
-      result.current.openArtifact(artifact('art_13'), 'cnv_1', 'Conversation')
-    })
-    expect(
-      result.current.entries.find((entry) => entry.id === planEntryId('cnv_1')),
-    ).toBeDefined()
-    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(14)
+  it('counts an empty plan as no plan', () => {
+    const { result } = mount({ current: 'a' })
+    act(() => result.current.publishActivity('a', activity({ plan: plan(0) })))
+    expect(result.current.collapsed).toBe(false)
+    expect(result.current.open).toBe(false)
+    act(() => result.current.publishActivity('a', activity({ plan: plan(2) })))
+    act(() => result.current.show({ kind: 'plan' }))
+    expect(result.current.view).toEqual({ kind: 'plan' })
   })
 
-  it('retains all artifacts when the plan arrives last', () => {
-    // The other filling order. Twelve artifacts first, then the plan: if the
-    // cap is applied only where artifacts are opened, the strip quietly sits
-    // at thirteen and the rule the exemption is written against stops being
-    // true in half the cases.
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    for (let at = 0; at < 12; at += 1) {
-      act(() => {
-        result.current.openArtifact(artifact(`art_${at}`), 'cnv_1', 'Conversation')
-      })
-    }
-    expect(result.current.entries).toHaveLength(12)
-
-    act(() => {
-      result.current.openPlan('cnv_1', 'Conversation')
-    })
-
-    expect(result.current.entries).toHaveLength(13)
-    expect(result.current.entries.filter((entry) => entry.kind === 'artifact')).toHaveLength(12)
-    expect(
-      result.current.entries.find((entry) => entry.id === planEntryId('cnv_1')),
-    ).toBeDefined()
-    // A plan no longer needs to evict an artifact to make room in a tab strip.
-    expect(result.current.entries.find((entry) => entry.id === 'art_0')).toBeDefined()
-  })
-
-  it('closes like any entry: closing the plan empties the rail when it is all there was', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.openPlan('cnv_1', 'Conversation')
-    })
-    act(() => {
-      result.current.close(planEntryId('cnv_1'))
-    })
-
-    expect(result.current.entries).toHaveLength(0)
-    expect(result.current.activeId).toBeNull()
+  it('does not notify consumers when the same activity is published again', async () => {
+    let renders = 0
+    const wrapper = ({ children }: { children: ReactNode }) => <RailProvider conversationId="a">{children}</RailProvider>
+    const { result } = renderHook(() => { renders += 1; return useRail() }, { wrapper })
+    const agents = [agent('one')]
+    act(() => result.current.publishActivity('a', activity({ agents })))
+    await waitFor(() => expect(result.current.open).toBe(true))
+    const before = renders
+    act(() => result.current.publishActivity('a', activity({ agents })))
+    expect(renders).toBe(before)
   })
 })
 
-/**
- * The background-commands entry, which is keyed the way the plan is.
- *
- * Jobs arrive and end on their own schedule, so a tab per job would open and
- * close the rail under somebody reading something else in it. One entry per
- * conversation stays put.
- */
-describe('the background commands entry', () => {
-  it('opens once per conversation however often it is asked for', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => result.current.openJobs('cnv_1', 'A conversation'))
-    act(() => result.current.openJobs('cnv_1', 'A renamed conversation'))
-
-    const jobs = result.current.entries.filter((entry) => entry.kind === 'jobs')
-    expect(jobs).toHaveLength(1)
-    // Re-titled in place rather than duplicated - the same rule the plan keeps.
-    expect(jobs[0]?.conversationTitle).toBe('A renamed conversation')
+describe('where the workspace draws', () => {
+  it('has no docked column in a window too narrow for one', async () => {
+    wide = false
+    const { result } = mount({ current: 'a' })
+    act(() => result.current.publishActivity('a', activity({ jobs: [job] })))
+    await waitFor(() => expect(result.current.activity.jobs).toHaveLength(1))
+    expect(result.current.docked).toBe(false)
+    expect(result.current.open).toBe(false)
   })
 
-  it('gives each conversation its own', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
+  it('keeps a manual collapse through updates, switches and reload', async () => {
+    const scope = { current: 'a' as string | null }
+    const first = mount(scope)
+    act(() => first.result.current.publishActivity('a', activity({ jobs: [job] })))
+    await waitFor(() => expect(first.result.current.open).toBe(true))
+    act(() => first.result.current.closeAll())
+    act(() => first.result.current.publishActivity('a', activity({ jobs: [job], agents: [agent('two')] })))
+    expect(first.result.current.open).toBe(false)
+    await waitFor(() => expect(localStorage.getItem('studio.sideWorkspace.collapsed')).toBe('true'))
+    first.unmount()
 
-    act(() => result.current.openJobs('cnv_1', 'One'))
-    act(() => result.current.openJobs('cnv_2', 'Two'))
-
-    expect(result.current.entries.filter((entry) => entry.kind === 'jobs')).toHaveLength(2)
-  })
-})
-
-/**
- * The browser entry: a report of one, replaced wholesale.
- *
- * The caller derives the whole report from the transcript - every step, the
- * latest place and picture - so what `showBrowser` receives is the complete
- * truth for the conversation, and the provider's only judgements are where
- * the entry sits and whether the rail may focus itself. A model browsing in
- * the background must not seize a panel somebody is reading.
- */
-
-function stepOf(id: string, overrides: Partial<BrowserStep> = {}): BrowserStep {
-  return {
-    id,
-    action: 'click',
-    verb: 'Clicked',
-    subject: 'ref_1',
-    url: 'https://example.com',
-    title: 'Example',
-    failed: false,
-    frame: { kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' },
-    settled: true,
-    ...overrides,
-  }
-}
-
-describe('the browser entry', () => {
-  it('opens saved previews once per turn and URL without replacing the live report', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-    const preview = { url: 'https://example.com/old', title: 'Old page', frame: stepOf('old').frame, steps: [stepOf('old')] }
-    const live = { family: 'browser' as const, url: 'https://example.com/new', title: 'New page', frame: null, steps: [] }
-    act(() => result.current.showBrowser('conv', 'Conversation', live))
-    act(() => result.current.openBrowserResult('conv', 'turn-one', preview))
-    act(() => result.current.openBrowserResult('conv', 'turn-one', preview))
-    expect(result.current.entries).toHaveLength(2)
-    const savedId = result.current.activeId
-    act(() => result.current.showBrowser('conv', 'Conversation', { ...live, title: 'Latest page' }))
-    expect(result.current.activeId).toBe(savedId)
-    expect(result.current.entries.find((entry) => entry.id === savedId)).toMatchObject({ title: 'Old page', recorded: true, frame: preview.frame })
-    expect(result.current.entries.find((entry) => entry.id === 'browser:conv')).toMatchObject({ title: 'Latest page', url: live.url })
-    act(() => result.current.openBrowserResult('conv', 'turn-two', preview))
-    expect(result.current.entries).toHaveLength(3)
-  })
-  it('opens with the whole report and focuses nothing', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.showBrowser('cnv_1', 'Conversation', {
-        family: 'browser',
-        url: 'https://example.com',
-        title: 'Example',
-        frame: { kind: 'inline', data: 'AAAA', mimeType: 'image/jpeg' },
-        steps: [stepOf('call_1')],
-      })
-    })
-
-    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    expect(browser).toBeDefined()
-    expect(browser?.kind === 'browser' && browser.steps).toHaveLength(1)
-    // The transcript row is where the work announces itself; the preview
-    // opening itself would be the model seizing the rail.
-    expect(result.current.activeId).toBeNull()
-  })
-
-  it('replaces the report in place, and stays where the reader left it', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.openArtifact(artifact('art_early'), 'cnv_1', 'Conversation')
-    })
-    act(() => {
-      result.current.showBrowser('cnv_1', 'Conversation', {
-        family: 'browser',
-        url: null,
-        title: null,
-        frame: null,
-        steps: [stepOf('call_1')],
-      })
-    })
-    const before = result.current.entries.findIndex((entry) => entry.id === 'browser:cnv_1')
-
-    act(() => {
-      result.current.showBrowser('cnv_1', 'Conversation', {
-        family: 'browser',
-        url: 'https://example.com/pricing',
-        title: 'Pricing',
-        frame: { kind: 'attachment', id: 'att_msg_1_0', mimeType: 'image/jpeg' },
-        steps: [stepOf('call_1', { frame: null }), stepOf('call_2', { verb: 'Took a picture' })],
-      })
-    })
-
-    const at = result.current.entries.findIndex((entry) => entry.id === 'browser:cnv_1')
-    expect(at).toBe(before)
-    const browser = result.current.entries.find((entry) => entry.id === 'browser:cnv_1')
-    if (browser?.kind !== 'browser') throw new Error('the browser entry went missing')
-    // Replaced, not merged: the derived report is the whole truth, and a
-    // merged half-derivation is how two readings of one log drift apart.
-    expect(browser.steps.map((step) => step.id)).toEqual(['call_1', 'call_2'])
-    expect(browser.frame).toEqual({ kind: 'attachment', id: 'att_msg_1_0', mimeType: 'image/jpeg' })
-    expect(browser.url).toBe('https://example.com/pricing')
-  })
-
-  it('keeps each conversation a browser of its own', () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.showBrowser('cnv_1', 'One', {
-        family: 'browser',
-        url: 'https://one.example',
-        title: null,
-        frame: null,
-        steps: [],
-      })
-    })
-    act(() => {
-      result.current.showBrowser('cnv_2', 'Two', {
-        family: 'browser',
-        url: 'https://two.example',
-        title: null,
-        frame: null,
-        steps: [],
-      })
-    })
-
-    const browsers = result.current.entries.filter((entry) => entry.kind === 'browser')
-    expect(browsers).toHaveLength(2)
-  })
-
-  it("keeps a conversation's computer report apart from its browser report", () => {
-    const { result } = renderHook(() => useRail(), { wrapper })
-
-    act(() => {
-      result.current.showBrowser('cnv_1', 'One', {
-        family: 'browser',
-        url: 'https://one.example',
-        title: null,
-        frame: null,
-        steps: [],
-      })
-    })
-    act(() => {
-      result.current.showBrowser('cnv_1', 'One', {
-        family: 'computer',
-        url: null,
-        title: 'Calculator',
-        frame: null,
-        steps: [],
-      })
-    })
-
-    const ids = result.current.entries
-      .filter((entry) => entry.kind === 'browser')
-      .map((entry) => entry.id)
-    // Two tabs, one conversation: driving the desktop does not overwrite the
-    // page the same turn is browsing.
-    expect(ids).toEqual(['browser:cnv_1', 'computer:cnv_1'])
+    const next = mount(scope)
+    act(() => next.result.current.publishActivity('a', activity({ jobs: [job] })))
+    await waitFor(() => expect(next.result.current.collapsed).toBe(true))
+    expect(next.result.current.open).toBe(false)
+    act(() => next.result.current.show({ kind: 'jobs' }))
+    expect(next.result.current.open).toBe(true)
+    expect(next.result.current.view).toEqual({ kind: 'jobs' })
   })
 })

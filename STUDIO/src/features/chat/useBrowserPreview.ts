@@ -33,7 +33,6 @@ import { useRail } from '@/stores/rail'
  */
 export function useBrowserPreview(
   conversationId: string,
-  conversationTitle: string,
   items: readonly TranscriptItem[],
 ): void {
   const { showBrowser } = useRail()
@@ -67,9 +66,9 @@ export function useBrowserPreview(
       if (signature === reported.current.get(family)) continue
       reported.current.set(family, signature)
 
-      showBrowser(conversationId, conversationTitle, { family: family.id, ...reportOf(steps), steps })
+      showBrowser(conversationId, { family: family.id, ...reportOf(steps), steps })
     }
-  }, [items, conversationId, conversationTitle, showBrowser])
+  }, [items, conversationId, showBrowser])
 }
 
 /**

@@ -33,10 +33,10 @@ function themeColor(): string | null {
 }
 
 describe('size and typeface preferences', () => {
-  it('sets replies in the chosen typeface and scales through the root in a browser', () => {
+  it('sets the window in the chosen typeface and scales through the root in a browser', () => {
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark', typeface: 'mono', uiScale: 150 })
     const root = document.documentElement
-    expect(root.style.getPropertyValue('--font-reading')).toBe('var(--font-mono)')
+    expect(root.style.getPropertyValue('--font-interface')).toBe('var(--font-mono)')
     expect(root.style.getPropertyValue('zoom')).toBe('1.5')
 
     applyAppearance({ ...DEFAULT_APPEARANCE, theme: 'dark' })

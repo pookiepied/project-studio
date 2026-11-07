@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useArriving } from '@/components/motion/Arrive'
+import { Tooltip } from '@/components/primitives'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
@@ -10,6 +11,7 @@ import { familyOf } from './reportFamily'
 import { webKind } from './webCall'
 import { mediaKind } from './mediaCall'
 import { toolPresentation } from './toolPresentation'
+import { ROW_GAP_CLASS, ROW_GAP_MARGIN } from './rowGap'
 
 type WorkSegment = Exclude<AssistantSegment, { kind: 'text' }>
 
@@ -76,6 +78,7 @@ export function ActivityBlock({
   conversationId,
   textBefore = false,
   textAfter = false,
+  rowBefore = false,
 }: {
   segments: readonly WorkSegment[]
   active: boolean
@@ -83,6 +86,8 @@ export function ActivityBlock({
   /** Only boundaries with visible prose need separation. */
   textBefore?: boolean
   textAfter?: boolean
+  /** Another row stands directly above; see `rowGap.ts`. */
+  rowBefore?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const arriving = useArriving()
@@ -94,14 +99,28 @@ export function ActivityBlock({
     : familyOf(current.toolName) !== null || webKind(current.toolName) !== null || mediaKind(current.toolName) !== null
       ? state.running : activityLabel(current)
 
-  // Pure reasoning still uses its existing disclosure, without an empty tools wrapper.
-  if (calls.length === 0) return <>{segments.map((segment) => segment.kind === 'thinking'
-    ? <ThinkingBlock key={segment.id} text={segment.text} span={{ since: segment.startedAt, until: segment.updatedAt }} live={active} />
-    : null)}</>
+  // Pure reasoning still uses its existing disclosure, without an empty tools
+  // wrapper - and the same margins against words that the tool disclosure
+  // takes, so a thought between two paragraphs is not set flush against the
+  // one above it. It used to be, unseen, because a thought rarely stood alone
+  // between words; once a question call left the activity block for its own
+  // slot, every thought before a question did.
+  //
+  // Between two rows it takes the one row gap and nothing else. It used to
+  // keep a bottom margin of its own, and a question row beside it had none, so
+  // a thought above a question stood apart while a question above a thought
+  // sat tight - the gap depended on which kind came first.
+  if (calls.length === 0) return (
+    <div className={cn('flex min-w-0 flex-col', ROW_GAP_CLASS, textBefore && 'mt-4', textAfter && 'mb-4', rowBefore && ROW_GAP_MARGIN)}>
+      {segments.map((segment) => segment.kind === 'thinking'
+        ? <ThinkingBlock key={segment.id} text={segment.text} span={{ since: segment.startedAt, until: segment.updatedAt }} live={active} />
+        : null)}
+    </div>
+  )
 
   return (
     <DisclosureRow
-      className={cn('min-w-0', textBefore && 'mt-4', textAfter && 'mb-4')}
+      className={cn('min-w-0', textBefore && 'mt-4', textAfter && 'mb-4', rowBefore && ROW_GAP_MARGIN)}
       entering={arriving}
       leading={<state.mark />}
       open={open}
@@ -109,14 +128,21 @@ export function ActivityBlock({
       flush
       chevron="hover"
       label={
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className={cn('min-w-0 [overflow-wrap:anywhere]', active && 'studio-shimmer')}>{label}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {/* One line at any length: a running command is the label here, and a
+              wrapped one pushes the whole list down and back as it changes. */}
+          <Tooltip label={label ?? ''} overflowOnly className="min-w-0"><span className={cn('min-w-0 truncate', active && 'studio-shimmer')}>{label}</span></Tooltip>
           {state.failed > 0 ? <>{' '}<span className="shrink-0 text-danger">Some tools failed</span></> : null}
           {state.unfinished ? <>{' '}<span className="shrink-0">Unfinished</span></> : null}
         </span>
       }
     >
-      <div role="region" aria-label="Tool activity" className="flex min-w-0 flex-col gap-1">
+      {/* One gap between any two rows, whichever kinds they are, and the same from
+          the title to the first row: 8px with the disclosure's own 6px plus this
+          2px. The rows carry no outer margins, because a margin on one kind of
+          row makes the gap depend on which row came first. `ToolGroups` repeats
+          this gap for the rows inside it. */}
+      <div role="region" aria-label="Tool activity" className={cn('flex min-w-0 flex-col pt-0.5', ROW_GAP_CLASS)}>
         {segments.map((segment, index) => segment.kind === 'tools'
           ? <ToolGroups key={segment.id} groups={segment.groups} live={active} conversationId={conversationId} />
           : <ThinkingBlock key={segment.id} text={segment.text} span={{ since: segment.startedAt, until: segment.updatedAt }} live={active && index === segments.length - 1} />)}

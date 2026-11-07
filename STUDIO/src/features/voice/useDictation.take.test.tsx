@@ -21,6 +21,8 @@ import type { VoiceNote } from './useMicInput'
  */
 
 let onSegment: ((note: VoiceNote) => void) | null = null
+/** The microphone's frame listener, so a test can say a voice was heard. */
+let frame: ((level: number, dtMs: number, voiced: boolean) => void) | null = null
 let lastNote: VoiceNote | null = null
 const micStop = vi.fn(() => Promise.resolve(lastNote))
 const setPaused = vi.fn()
@@ -34,7 +36,12 @@ vi.mock('@/features/voice/useMicInput', () => ({
     },
     stop: micStop,
     setPaused,
-    onFrame: () => () => {},
+    onFrame: (listener: (level: number, dtMs: number, voiced: boolean) => void) => {
+      frame = listener
+      return () => {
+        frame = null
+      }
+    },
   }),
 }))
 
@@ -59,6 +66,7 @@ afterEach(() => {
   vi.useRealTimers()
   answers.clear()
   onSegment = null
+  frame = null
   lastNote = null
   micStop.mockClear()
   setPaused.mockClear()
@@ -183,5 +191,68 @@ describe('a segment that fails after words have come back', () => {
     await act(() => vi.advanceTimersByTimeAsync(9_000))
     expect(onTake).toHaveBeenCalledTimes(1)
     expect(result.current.stage).toBe('recording')
+  })
+})
+
+/**
+ * A take with nothing in it is not a failure. The person did not speak, or
+ * nothing they said came back as words; the strip says so plainly and the
+ * field returns, with no "Dictation failed" anywhere.
+ */
+describe('a take with nothing in it', () => {
+  it('says no speech was heard when the microphone never heard a voice', async () => {
+    const onTake = vi.fn()
+    const { result } = renderHook(() => useDictation({ onTake }))
+
+    await act(() => result.current.start())
+    lastNote = note('silence')
+    await act(() => result.current.stop())
+    await settle()
+
+    expect(result.current.stage).toBe('blocked')
+    expect(result.current.quiet).toBe('No speech heard')
+    expect(result.current.note).toBeNull()
+    await act(() => vi.advanceTimersByTimeAsync(2_000))
+    expect(result.current.stage).toBe('idle')
+    expect(onTake).not.toHaveBeenCalled()
+  })
+
+  it('reads a provider refusing a silent clip as silence, not a failure', async () => {
+    answers.set('silence', { kind: 'note', note: 'Dictation failed: audio too short' })
+    const { result } = renderHook(() => useDictation({ onTake: vi.fn() }))
+
+    await act(() => result.current.start())
+    act(() => onSegment?.(note('silence')))
+    await settle()
+
+    expect(result.current.stage).toBe('blocked')
+    expect(result.current.quiet).toBe('No speech heard')
+    expect(result.current.note).toBeNull()
+  })
+
+  it("says it did not catch the words when a voice was heard but nothing came back", async () => {
+    const { result } = renderHook(() => useDictation({ onTake: vi.fn() }))
+
+    await act(() => result.current.start())
+    act(() => frame?.(0.4, 16, true))
+    lastNote = note('mumble')
+    await act(() => result.current.stop())
+    await settle()
+
+    expect(result.current.quiet).toBe("Didn't catch that - try again")
+    expect(result.current.note).toBeNull()
+  })
+
+  it('still reports a real failure once a voice was heard', async () => {
+    answers.set('spoken', { kind: 'note', note: 'Dictation failed: the provider refused' })
+    const { result } = renderHook(() => useDictation({ onTake: vi.fn() }))
+
+    await act(() => result.current.start())
+    act(() => frame?.(0.4, 16, true))
+    act(() => onSegment?.(note('spoken')))
+    await settle()
+
+    expect(result.current.note).toBe('Dictation failed: the provider refused')
+    expect(result.current.quiet).toBeNull()
   })
 })

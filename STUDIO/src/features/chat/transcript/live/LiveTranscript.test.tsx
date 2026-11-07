@@ -447,8 +447,8 @@ describe('a compaction of this conversation', () => {
 
   it('lands the record as one quiet line, with what the window held', () => {
     show([user('u1', 'earlier'), compaction('c1', 172_000)], { status: 'idle' })
-    expect(screen.getByText(/Conversation compacted/)).toBeTruthy()
-    expect(screen.getByText(/172k folded into a summary/)).toBeTruthy()
+    expect(screen.getByText('Context compacted')).toBeTruthy()
+    expect(screen.queryByText(/172k|folded into a summary/)).toBeNull()
   })
 
   it('is a statement, not a control — and keeps the summary to the model', () => {
@@ -461,9 +461,4 @@ describe('a compaction of this conversation', () => {
     expect(screen.queryByText(/folded the earlier turns into a working summary/)).toBeNull()
   })
 
-  it('says nothing about how much moved when nothing was measured', () => {
-    show([compaction('c1', 0)], { status: 'idle' })
-    expect(screen.getByText(/Conversation compacted/)).toBeTruthy()
-    expect(screen.queryByText(/folded into a summary/)).toBeNull()
-  })
 })

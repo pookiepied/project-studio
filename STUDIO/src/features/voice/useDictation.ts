@@ -11,8 +11,16 @@ import { transcribeRecording } from '@/features/voice/transcribe'
  *   recording   the mic is live, the strip shows the real level and the clock.
  *   paused      the take is held: nothing is recorded and the clock stands still.
  *   processing  the recording has been handed to the transcriber.
- *   blocked     the mic was refused or is missing; the strip says which, then
- *               lets the field return on its own.
+ *   blocked     the mic was refused or is missing, the transcriber refused,
+ *               or nothing was said; the strip says which, then lets the
+ *               field return on its own.
+ *
+ * Silence is not a failure. A take in which the microphone never heard a
+ * voice, or whose words did not come back, ends with `quiet` - a plain
+ * "No speech heard" - rather than a failure note: nothing went wrong, the
+ * person just did not say anything the transcriber could use. A provider
+ * that refuses a silent clip is read the same way, because the refusal is
+ * about the silence, and naming it "Dictation failed" blamed the app for it.
  *
  * The words arrive while the person is still speaking. The microphone cuts
  * the take into segments at its pauses (`segments.ts`), each is transcribed
@@ -46,6 +54,10 @@ export function appendTake(draft: string, take: string): string {
 
 /** How long the blocked message holds the field before restoring it. */
 const BLOCKED_DISMISS_MS = 2800
+/** A take with nothing in it says so briefly: it is news, not a problem. */
+const QUIET_DISMISS_MS = 1800
+const NO_SPEECH = 'No speech heard'
+const NOT_CAUGHT = "Didn't catch that - try again"
 
 /**
  * A transcriber's sentence is held long enough to be read. The fixed hold
@@ -66,12 +78,24 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
    * `denied`, because both are one-line facts, not dialogs.
    */
   const [note, setNote] = useState<string | null>(null)
+  /** The plain line for a take that came back with nothing, which is not a failure. */
+  const [quiet, setQuiet] = useState<string | null>(null)
   /** What this take has transcribed so far, for the strip; the field gets it at the end. */
   const [transcript, setTranscript] = useState('')
   /** The same words, readable from `stop` without waiting on a render. */
   const spoken = useRef('')
   const mic = useMicInput()
   const pipeline = useRef<SegmentPipeline | null>(null)
+  /** Whether this take has heard a voice at all, from the mic's own frames. */
+  const heardVoice = useRef(false)
+  const { onFrame } = mic
+  useEffect(
+    () =>
+      onFrame((level, _dtMs, voiced) => {
+        if (voiced && level > 0) heardVoice.current = true
+      }),
+    [onFrame],
+  )
 
   const clock = useRef<number | null>(null)
   const startedAt = useRef(0)
@@ -107,6 +131,13 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
       pipeline.current?.abandon()
       pipeline.current = null
       void mic.stop()
+      // A refusal of a take nobody spoke in is about the silence.
+      if (!heardVoice.current && spoken.current === '') {
+        setQuiet(NO_SPEECH)
+        setStage('blocked')
+        dismissing.current = window.setTimeout(() => setStage('idle'), QUIET_DISMISS_MS)
+        return
+      }
       setNote(sentence)
       setStage('blocked')
       dismissing.current = window.setTimeout(() => {
@@ -125,8 +156,10 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
     clearTimers()
     if (stage === 'blocked' && spoken.current !== '') onTake(spoken.current)
     setNote(null)
+    setQuiet(null)
     setTranscript('')
     spoken.current = ''
+    heardVoice.current = false
     setStage('requesting')
     const line = createSegmentPipeline({
       transcribe: (segment) => transcribeRecording(segment, { segment: true }),
@@ -181,9 +214,9 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
     if (pipeline.current !== line) return // the take was ended by a failure meanwhile
     pipeline.current = null
     if (!delivered) {
-      setNote('Nothing intelligible came back - try again, a little closer to the mic')
+      setQuiet(heardVoice.current ? NOT_CAUGHT : NO_SPEECH)
       setStage('blocked')
-      dismissing.current = window.setTimeout(() => setStage('idle'), BLOCKED_DISMISS_MS)
+      dismissing.current = window.setTimeout(() => setStage('idle'), QUIET_DISMISS_MS)
       return
     }
     // Delivered before the stage turns, so the composer sees the passage
@@ -216,5 +249,5 @@ export function useDictation({ onTake }: { onTake: (text: string) => void }) {
 
   useEffect(() => clearTimers, [clearTimers])
 
-  return { stage, elapsedMs, denied, note, transcript, start, pause, resume, stop, cancel, mic }
+  return { stage, elapsedMs, denied, note, quiet, transcript, start, pause, resume, stop, cancel, mic }
 }

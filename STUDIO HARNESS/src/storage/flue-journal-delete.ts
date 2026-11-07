@@ -147,6 +147,17 @@ export function sessionKeyBelongsTo(sessionKey: string, conversationId: string):
   );
 }
 
+/** The conversation a session key belongs to, or null for a key of another shape. */
+function conversationOfSessionKey(sessionKey: string): string | null {
+  if (!sessionKey.startsWith(SESSION_KEY_PREFIX)) return null;
+  try {
+    const parsed: unknown = JSON.parse(sessionKey.slice(SESSION_KEY_PREFIX.length));
+    return Array.isArray(parsed) && typeof parsed[1] === "string" ? parsed[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 function rejectBadId(conversationId: string): void {
   if (
     conversationId.trim() === "" ||
@@ -426,6 +437,39 @@ export function deleteFlueJournalForConversation(
       if (error instanceof StorageError) throw error;
       throw storageErrorFrom(error, "internal");
     }
+  } finally {
+    handle.close();
+  }
+}
+
+/**
+ * Every conversation with a turn in flight, by the same reading of the journal
+ * as `hasActiveFlueSubmissions`, in one pass rather than one open per conversation.
+ */
+export function activeFlueConversations(flueDatabasePath: string): readonly string[] {
+  if (!existsSync(flueDatabasePath)) return [];
+
+  let handle: DatabaseSync;
+  try {
+    handle = new DatabaseSync(flueDatabasePath, { readOnly: true });
+  } catch (error) {
+    throw storageErrorFrom(error, "unavailable");
+  }
+  try {
+    handle.exec("PRAGMA busy_timeout = 5000");
+    if (!tableNames(handle).has("flue_agent_submissions")) return [];
+    const rows = handle
+      .prepare("SELECT session_key FROM flue_agent_submissions WHERE status IS NOT 'settled'")
+      .all() as unknown as { session_key: unknown }[];
+    const ids = new Set<string>();
+    for (const row of rows) {
+      const id = typeof row.session_key === "string" ? conversationOfSessionKey(row.session_key) : null;
+      if (id !== null) ids.add(id);
+    }
+    return [...ids];
+  } catch (error) {
+    if (error instanceof StorageError) throw error;
+    throw storageErrorFrom(error, "internal");
   } finally {
     handle.close();
   }

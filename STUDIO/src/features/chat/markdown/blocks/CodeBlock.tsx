@@ -5,8 +5,8 @@ import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 import { Deferred, lazyNamed } from '@/components/state'
 import { PlainCode } from '@/features/chat/markdown/blocks/PlainCode'
 import { displayName, resolveLanguage } from '@/features/chat/markdown/languages'
-import { FileReference, FilePathLabel } from '@/features/chat/markdown/FileReference'
-import { parsePathReference } from '@/features/chat/markdown/pathReference'
+import { FileReference, FilePathLabel } from '@/features/files/FileReference'
+import { parsePathReference } from '@/features/files/pathReference'
 
 const HighlightedCode = lazyNamed(
   () => import('@/features/chat/markdown/blocks/HighlightedCode'),
@@ -66,7 +66,7 @@ export function CodeBlock({ code, fence, streaming = false }: { code: string; fe
   // from. A path makes a far better caption than a language name: "TypeScript"
   // is already obvious from the syntax colouring, while *which file* is the one
   // thing the block cannot tell you itself. A caption that reads as a clear
-  // filesystem reference gains the reference's verbs - details, copy, reveal -
+  // filesystem reference gains the reference's menu,
   // while a caption that reads as anything else (a tag, a made-up word after
   // the colon) stays plain text, for the same reason inline code does.
   const [language, ...rest] = fence.split(':')

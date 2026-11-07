@@ -45,6 +45,12 @@ export interface PermissionDecision {
   readonly reason: string;
   /** Set when a stored grant decided this. */
   readonly grantId: string | undefined;
+  /**
+   * True only when this decision is the person's answer to a prompt shown for
+   * this call, not a stored grant or a rule. A fact about the moment - they
+   * just used Studio's own window to answer - never a permission by itself.
+   */
+  readonly asked?: true;
 }
 
 export interface PermissionRequest {

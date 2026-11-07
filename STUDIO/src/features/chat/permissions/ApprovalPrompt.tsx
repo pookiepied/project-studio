@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 
-import { Button, Segmented } from '@/components/primitives'
-import { CardShell } from '@/features/chat/questions/CardShell'
+import { CardShell, OptionRow } from '@/features/chat/questions/CardShell'
+import { StopButton } from '@/features/chat/questions/PromptFoot'
+import { PromptFrame } from '@/features/chat/questions/PromptFrame'
 import type { PermissionQuestion, QuestionTextPart } from '@/domain/permissions/question'
 import { agentAttribution } from '@/domain/permissions/question'
 import type { ApprovalAnswer, GrantDuration } from '@/platform/harness'
@@ -21,18 +22,18 @@ import type { ApprovalAnswer, GrantDuration } from '@/platform/harness'
  * ---- The shape -------------------------------------------------------------
  *
  * The sentence says what is being asked for - the capability and the thing it
- * touches, never the capability id - and the controls below it are the two
- * answers the harness accepts: a verdict and how long an allow lasts. The
- * narrowest duration is selected first, so a hurried Enter answers with the
- * smallest grant on offer. `always` is a real grant that outlives the
+ * touches, never the capability id - and the rows below it are the answers the
+ * harness accepts, each a verdict with how long it lasts, said in one line:
+ * Allow once, Allow for this conversation, Always allow in this project, Deny.
+ * The narrowest is lit first, so a hurried Enter answers with the smallest
+ * grant on offer, and each wider row says what it stores before it is clicked. `always` is a real grant that outlives the
  * conversation - it holds for every conversation of the project - and
  * naming that consequence is what makes it read as the heavier choice
  * rather than a third setting on a dial. With no project it is not offered:
  * there is nothing beyond this conversation for it to mean.
  *
  * A deny is an ordinary outcome, not a refusal to be styled as an error: the
- * model receives the verdict and keeps going, so Deny sits at the same calm
- * weight as every ghost control in the app.
+ * model receives the verdict and keeps going, so Deny is a row like the others.
  *
  * Several questions can wait at once. The harness parks on them in the order
  * the call named its resources - one question per program on a command line -
@@ -55,6 +56,8 @@ export function ApprovalPrompt({
   answeringId,
   onAnswer,
   hasProject = true,
+  onStop = null,
+  fromHeight = null,
 }: {
   /** This conversation's pending questions, oldest first; non-empty by contract. */
   readonly questions: readonly PermissionQuestion[]
@@ -68,6 +71,41 @@ export function ApprovalPrompt({
   /** The question an answer is currently in flight for, if any. */
   readonly answeringId: string | null
   readonly onAnswer: (id: string, answer: ApprovalAnswer) => Promise<void>
+  /** Ends the run, as the composer's stop does; null where the surface has its own. */
+  readonly onStop?: (() => void) | null
+  /** The composer's height as it gave way, so the card opens from it. */
+  readonly fromHeight?: number | null
+}) {
+  const question = questions[0]
+  return (
+    <PromptFrame contentKey={question.id} fromHeight={fromHeight}>
+      <ApprovalCard
+        // Keyed by the active question, so answering one and moving to the
+        // next starts the card afresh: a row lit or in flight for the last
+        // question must never be found holding on this one.
+        key={question.id}
+        questions={questions}
+        answeringId={answeringId}
+        onAnswer={onAnswer}
+        hasProject={hasProject}
+        onStop={onStop}
+      />
+    </PromptFrame>
+  )
+}
+
+function ApprovalCard({
+  questions,
+  answeringId,
+  onAnswer,
+  hasProject,
+  onStop,
+}: {
+  readonly questions: readonly PermissionQuestion[]
+  readonly answeringId: string | null
+  readonly onAnswer: (id: string, answer: ApprovalAnswer) => Promise<void>
+  readonly hasProject: boolean
+  readonly onStop: (() => void) | null
 }) {
   const question = questions[0]
   const waiting = questions.slice(1)
@@ -77,23 +115,61 @@ export function ApprovalPrompt({
   // honest label: nothing here is someone else's name to borrow.
   const attribution = agentAttribution(question.agentId)
 
-  // The narrowest grant first: a person pressing Enter at the default answers
-  // with the smallest thing on offer.
-  const [duration, setDuration] = useState<GrantDuration>('once')
-  const [verdictInFlight, setVerdictInFlight] = useState<ApprovalAnswer['verdict'] | null>(null)
+  const [inFlight, setInFlight] = useState<string | null>(null)
   const answering = answeringId === question.id
 
   // A lasting answer is stored against the folder the kernel offered, not
   // against the one file the run happened to name first - otherwise "this
-  // conversation" asks again about the very next file. "Just once" stores
+  // conversation" asks again about the very next file. "Once" stores
   // nothing, so it stays at the narrowest rung. See `lastingScopeId`.
-  const scopeId = duration === 'once' ? undefined : (question.lastingScopeId ?? undefined)
+  const folder = question.lastingScopeId !== null
+  const scopeFor = (duration: GrantDuration) =>
+    duration === 'once' ? undefined : (question.lastingScopeId ?? undefined)
 
-  const respond = (verdict: ApprovalAnswer['verdict']) => {
-    setVerdictInFlight(verdict)
+  // The answers, narrowest grant first: the first row is lit on arrival, so
+  // a person pressing Enter answers with the smallest thing on offer. Nothing
+  // longer than the kernel accepts is offered: it refuses a longer answer
+  // outright rather than shortening it. A deny is answered once; it is an
+  // ordinary outcome the run carries on from, not a rule to store.
+  const answers: readonly Answer[] = [
+    { id: 'once', verdict: 'allow', duration: 'once', label: 'Allow once', description: 'Studio asks again next time.' },
+    ...(question.maxDuration === 'once'
+      ? []
+      : [{ id: 'conversation', verdict: 'allow', duration: 'conversation', label: 'Allow for this conversation', description: consequence('conversation', folder) } as const]),
+    ...(hasProject && question.maxDuration === 'always'
+      ? [{ id: 'always', verdict: 'allow', duration: 'always', label: 'Always allow in this project', description: consequence('always', folder) } as const]
+      : []),
+    { id: 'deny', verdict: 'deny', duration: 'once', label: 'Deny', description: 'The run is told no and carries on.' },
+  ]
+
+  const waitingLine =
+    waiting.length > 0 ? (
+      <p className="max-w-[60ch] text-caption text-muted-foreground">
+        Also waiting, one at a time:{' '}
+        {groupByAgent(waiting).map((group, at) => (
+          <span key={group.agentId ?? 'conversation'}>
+            {at > 0 ? ', ' : ''}
+            {attribution === null && group.agentId !== null
+              ? `the ${group.label.toLowerCase()} asks to `
+              : ''}
+            {group.items.map((item, itemAt) => (
+              <span key={item.id}>
+                {itemAt > 0 ? ' and ' : ''}
+                {item.sentence.map(renderPart)}
+              </span>
+            ))}
+          </span>
+        ))}
+      </p>
+    ) : null
+
+  const respond = (answer: Answer) => {
+    if (answering) return
+    setInFlight(answer.id)
+    const scopeId = scopeFor(answer.duration)
     void onAnswer(question.id, {
-      verdict,
-      duration,
+      verdict: answer.verdict,
+      duration: answer.duration,
       ...(scopeId === undefined ? {} : { scopeId }),
     })
   }
@@ -107,82 +183,36 @@ export function ApprovalPrompt({
       // The shell draws no countdown without one, and this caller has none
       // to give: a permission question cannot time out and has no default.
       deadline={null}
-      controls={
-        <>
-          <Segmented
-            layoutId="approval-duration"
-            ariaLabel="How long this answer lasts"
-            value={duration}
-            onChange={setDuration}
-            // Nothing longer than the kernel accepts: it refuses a longer
-            // answer outright rather than shortening it.
-            options={[
-              { id: 'once' as const, label: 'Just once' },
-              ...(question.maxDuration === 'once'
-                ? []
-                : [{ id: 'conversation' as const, label: 'This conversation' }]),
-              ...(hasProject && question.maxDuration === 'always'
-                ? [{ id: 'always' as const, label: 'Always' }]
-                : []),
-            ]}
-          />
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="secondary"
-              size="xs"
-              disabled={answering}
-              busy={answering && verdictInFlight === 'deny'}
-              onClick={() => respond('deny')}
-            >
-              Deny
-            </Button>
-            <Button
-              variant="primary"
-              size="xs"
-              disabled={answering}
-              busy={answering && verdictInFlight === 'allow'}
-              onClick={() => respond('allow')}
-            >
-              Allow
-            </Button>
-          </div>
-        </>
-      }
+      bodyLabel="How to answer"
+      initialActive={0}
+      descriptions={answers.map((answer) => answer.description)}
+      body={answers.map((answer, at) => (
+        <OptionRow
+          key={answer.id}
+          index={at}
+          kind="action"
+          label={answer.label}
+          onSelect={() => respond(answer)}
+          disabled={answering}
+          busy={answering && inFlight === answer.id}
+        />
+      ))}
       canSubmit={!answering}
-      // Enter allows, at the preselected narrowest duration: the same answer
-      // the controls' default state is already holding.
-      onSubmit={() => respond('allow')}
+      // Enter on the card allows once: the answer the first row already holds.
+      onSubmit={() => respond(answers[0])}
       answering={answering}
-      footnotes={
-        <>
-          {duration === 'once' ? null : (
-            <p className="max-w-[60ch] text-caption text-muted-foreground">
-              {consequence(duration, scopeId !== undefined)}
-            </p>
-          )}
-          {waiting.length > 0 ? (
-            <p className="max-w-[60ch] text-caption text-muted-foreground">
-              Also waiting, one at a time:{' '}
-              {groupByAgent(waiting).map((group, at) => (
-                <span key={group.agentId ?? 'conversation'}>
-                  {at > 0 ? ', ' : ''}
-                  {attribution === null && group.agentId !== null
-                    ? `the ${group.label.toLowerCase()} asks to `
-                    : ''}
-                  {group.items.map((item, itemAt) => (
-                    <span key={item.id}>
-                      {itemAt > 0 ? ' and ' : ''}
-                      {item.sentence.map(renderPart)}
-                    </span>
-                  ))}
-                </span>
-              ))}
-            </p>
-          ) : null}
-        </>
-      }
+      aside={onStop === null ? null : <StopButton onStop={onStop} disabled={answering} />}
+      foot={waitingLine === null ? null : <div className="px-2">{waitingLine}</div>}
     />
   )
+}
+
+interface Answer {
+  readonly id: string
+  readonly verdict: ApprovalAnswer['verdict']
+  readonly duration: GrantDuration
+  readonly label: string
+  readonly description: string
 }
 
 /**

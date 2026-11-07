@@ -17,7 +17,7 @@ function deferred<T>() {
   const promise = new Promise<T>((resolve) => { finish = resolve })
   return { promise, finish }
 }
-const job: BackgroundJob = { id: 'job', command: 'private command', state: 'running', exitCode: null, startedAt: 1, endedAt: null, output: 'private output', dropped: 0 }
+const job: BackgroundJob = { id: 'job', title: null, command: 'private command', state: 'running', exitCode: null, startedAt: 1, endedAt: null, output: 'private output', dropped: 0 }
 const agent: AgentTask = { id: 'agent', agentName: 'worker', parentConversationId: 'a', title: 'Private task', status: 'running', createdAt: 1, settledAt: null, resultSummary: null }
 
 describe('workspace asynchronous ownership', () => {

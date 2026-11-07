@@ -61,6 +61,11 @@ type JobState = "running" | "stopping" | "exited" | "stopped" | "failed";
 
 export interface JobStatus {
   readonly id: string;
+  /**
+   * What the command is for, in the model's words ("Studio client dev
+   * server"). Null for a job started before titles were asked for.
+   */
+  readonly title: string | null;
   readonly command: string;
   readonly state: JobState;
   /** Present once it has ended. Null while it runs. */
@@ -81,6 +86,7 @@ interface Job {
   readonly confirmClosed: () => void;
   readonly observation: OperationObservation;
   readonly id: string;
+  readonly title: string | null;
   readonly command: string;
   readonly conversationId: string;
   readonly startedAt: number;
@@ -108,6 +114,8 @@ interface Job {
 export interface StartJobOptions extends Omit<RunProcessOptions, "timeoutMs" | "signal" | "stdin"> {
   /** The line as the person would read it, for the listing. */
   readonly command: string;
+  /** What it is for, for the listing; the line says how, this says why. */
+  readonly title?: string;
   readonly conversationId: string;
 }
 
@@ -150,6 +158,7 @@ export class BackgroundJobs {
       confirmClosed,
       observation: new OperationObservation("tool", "background.job", { conversationId: options.conversationId, jobId: id }),
       id,
+      title: options.title ?? null,
       command: options.command,
       conversationId: options.conversationId,
       startedAt: Date.now(),
@@ -341,6 +350,7 @@ function statusOf(job: Job): JobStatus {
   const tail = job.partial === "" ? job.lines : [...job.lines, job.partial];
   return {
     id: job.id,
+    title: job.title,
     command: job.command,
     state: job.state,
     exitCode: job.exitCode,

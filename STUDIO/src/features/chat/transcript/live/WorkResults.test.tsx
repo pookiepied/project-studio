@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { present } from '@/platform/harness/contracts/chunks'
 import type { ToolCallView, TranscriptItem } from '@/features/chat/transcript/projection'
-import { RailProvider, useRail } from '@/stores/rail'
+import { useMemo, useState, type ReactNode } from 'react'
+import { RailProvider } from '@/stores/rail'
+import { SheetHostContext, type SheetSpec } from '@/features/chat/sheet/sheet'
 import { ChangesPanel } from '@/features/changes/ChangesPanel'
 import { AssistantTurn } from './AssistantTurn'
 import { WorkResults } from './WorkResults'
@@ -13,10 +15,12 @@ afterEach(cleanup)
 function edit(index: number): ToolCallView {
   return { toolCallId: `edit-${index}`, toolName: 'edit', input: present({ path: `file-${index}.ts`, oldString: 'old value', newString: 'new value' }), output: present(`Edited file-${index}.ts`), errorText: null }
 }
-function RailProbe() {
-  const { entries, activeId } = useRail()
-  const entry = entries.find((entry) => entry.id === activeId)
-  return entry?.kind === 'changes' ? <aside aria-label="File review"><ChangesPanel changes={entry.changes} conversationId={entry.conversationId} /></aside> : null
+function SheetProbe({ children }: { children: ReactNode }) {
+  const [spec, setSpec] = useState<SheetSpec | null>(null)
+  const host = useMemo(() => ({ open: setSpec }), [])
+  return <SheetHostContext.Provider value={host}>{children}
+    {spec?.kind === 'changes' ? <aside aria-label="File review"><ChangesPanel changes={spec.changes} conversationId={spec.conversationId} /></aside> : null}
+  </SheetHostContext.Provider>
 }
 
 describe('completed work and its results', () => {
@@ -41,8 +45,8 @@ describe('completed work and its results', () => {
     expect(view.container.querySelector('hr')).not.toBeNull()
     expect(screen.getByText(/All checks passed/)).toBeTruthy()
   })
-  it('shows three files, expands the rest, and opens the real rail review without Undo', () => {
-    render(<RailProvider><WorkResults conversationId="conv" resultId="turn" calls={[1, 2, 3, 4].map(edit)} /><RailProbe /></RailProvider>)
+  it('shows three files, expands the rest, and opens the review in the sheet without Undo', () => {
+    render(<SheetProbe><WorkResults conversationId="conv" calls={[1, 2, 3, 4].map(edit)} /></SheetProbe>)
     expect(screen.queryByText('file-4.ts')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show 1 more file' }))
     expect(screen.getByText('file-4.ts')).toBeTruthy()
@@ -93,20 +97,20 @@ describe('completed work and its results', () => {
   it('offers only actual returned web URLs and deduplicates browser results', () => {
     const browser: ToolCallView = { toolCallId: 'browser', toolName: 'mcp__studio_browser_open', input: present({ url: 'http://localhost:3000' }),
       output: present({ content: [{ type: 'text', text: 'Opened.\nTab: tab-1\nURL: http://localhost:3000/\nTitle: Studio preview' }] }), errorText: null }
-    const { rerender } = render(<RailProvider><WorkResults conversationId="conv" resultId="turn" calls={[browser, { ...browser, toolCallId: 'again' }]} /></RailProvider>)
+    const { rerender } = render(<RailProvider><WorkResults conversationId="conv" calls={[browser, { ...browser, toolCallId: 'again' }]} /></RailProvider>)
     expect(screen.getAllByRole('region', { name: 'Web preview' })).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Open web preview: Studio preview' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open in' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull()
-    rerender(<RailProvider><WorkResults conversationId="conv" resultId="turn" calls={[{ ...browser, output: null }]} /></RailProvider>)
+    rerender(<RailProvider><WorkResults conversationId="conv" calls={[{ ...browser, output: null }]} /></RailProvider>)
     expect(screen.queryByRole('region', { name: 'Web preview' })).toBeNull()
-    rerender(<RailProvider><WorkResults conversationId="conv" resultId="turn" calls={[{ ...browser, output: present({ content: [{ type: 'text', text: 'URL: javascript:alert(1)' }] }) }]} /></RailProvider>)
+    rerender(<RailProvider><WorkResults conversationId="conv" calls={[{ ...browser, output: present({ content: [{ type: 'text', text: 'URL: javascript:alert(1)' }] }) }]} /></RailProvider>)
     expect(screen.queryByRole('region', { name: 'Web preview' })).toBeNull()
   })
   it('retains a native computer screenshot outside the collapsed working history', () => {
     const screenshot: ToolCallView = { toolCallId: 'screen', toolName: 'mcp__15_studio-computer__26_studio_computer_screenshot', input: present({}),
       output: present({ content: [{ type: 'text', text: 'Screenshot taken.' }, { type: 'image', data: 'AAAA', mimeType: 'image/png' }] }), errorText: null }
-    render(<WorkResults conversationId="conv" resultId="turn" calls={[screenshot]} />)
+    render(<WorkResults conversationId="conv" calls={[screenshot]} />)
     expect(screen.getByRole('region', { name: 'Computer screenshot' })).toBeTruthy()
     expect(screen.getByRole('img').getAttribute('src')).toBe('data:image/png;base64,AAAA')
   })

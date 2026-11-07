@@ -1,4 +1,5 @@
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
+import { Tooltip } from '@/components/primitives'
 import { cn } from '@/lib/cn'
 import { Deferred, lazyNamed } from '@/components/state'
 import { resolveLanguage } from '@/features/chat/markdown/languages'
@@ -42,10 +43,10 @@ export function FileDiff({ path, diff, syntax = false }: { path: string; diff: L
     <div className="overflow-hidden rounded-md border border-hairline bg-code-surface text-foreground shadow-chip">
       <div className="flex items-center gap-2 border-b border-hairline py-2 pl-3 pr-3">
         <FileTypeMark path={path} />
-        <span className="truncate font-mono text-ui" title={path}>
+        <Tooltip label={path} overflowOnly className="min-w-0"><span className="truncate font-mono text-ui">
           {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
           {name}
-        </span>
+        </span></Tooltip>
         <span className="ml-auto shrink-0 font-mono text-ui">
           <span className="text-diff-add">+{diff.added}</span>{' '}
           <span className="text-diff-del">-{diff.removed}</span>

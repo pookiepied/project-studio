@@ -3,6 +3,7 @@ import { Icons } from '@/components/icons'
 import { writeQuote } from '@/features/chat/composer/drafts'
 import { copyText, readClipboardText } from '@/lib/clipboard'
 import { fieldAt } from '@/lib/field'
+import { suggestionsFor, type SpellingTarget } from '@/lib/spelling'
 import { cn } from '@/lib/cn'
 
 /**
@@ -13,7 +14,8 @@ import { cn } from '@/lib/cn'
  *
  *   field      the caret is in a text field, and it was right-clicked. Cut, Copy
  *              and Paste, because the webview's own menu is suppressed and these
- *              are the only way to do them with a mouse.
+ *              are the only way to do them with a mouse. Spelling suggestions
+ *              come from Studio's dictionary for the word at the right-click.
  *   selection  text is selected. Copy, and Reply when the text is in a
  *              transcript. In a transcript it appears as the pointer rises;
  *              anywhere else, only when asked for with a right-click.
@@ -21,10 +23,6 @@ import { cn } from '@/lib/cn'
  * Everywhere else a right-click does nothing. It used to open a menu of app
  * verbs, but each of those has a home of its own: the header and Ctrl K. Select
  * all is Ctrl A in a field and on the page, so it is not repeated here.
- *
- * Spelling corrections cannot join it: the webview hands the host the rows of
- * the menu it would have shown, and the spelling rows arrive with their labels
- * empty. The red underline is still the webview's; a misspelt word is retyped.
  */
 
 export type ActionKind = 'field' | 'selection'
@@ -38,6 +36,7 @@ export function ActionItems({
   kind,
   selection,
   target,
+  spellingTarget = null,
   close,
 }: {
   readonly kind: ActionKind
@@ -45,9 +44,10 @@ export function ActionItems({
   readonly selection: string
   /** What summoned it: the field, or the element the selection started in. */
   readonly target: HTMLElement | null
+  readonly spellingTarget?: SpellingTarget | null
   readonly close: () => void
 }) {
-  if (kind === 'field') return <FieldItems field={fieldAt(target)} close={close} />
+  if (kind === 'field') return <FieldItems field={fieldAt(target)} spellingTarget={spellingTarget} close={close} />
 
   const conversation = transcriptOf(target)
   return (
@@ -118,9 +118,11 @@ function Action({
  */
 function FieldItems({
   field,
+  spellingTarget,
   close,
 }: {
   field: HTMLTextAreaElement | HTMLInputElement | null
+  spellingTarget: SpellingTarget | null
   close: () => void
 }) {
   const selected = useFieldSelection(field)
@@ -138,8 +140,21 @@ function FieldItems({
     }
   }
 
+  const suggestions = useSpellingSuggestions(spellingTarget)
+
   return (
     <>
+      {spellingTarget !== null ? suggestions.map((text) => (
+        <Action key={text} icon={<Icons.spelling />} onSelect={() => {
+          if (field?.isConnected && !field.readOnly && !field.disabled && field.value === spellingTarget.value) {
+            field.setSelectionRange(spellingTarget.word.start, spellingTarget.word.end)
+            insert(text)
+          }
+          close()
+        }}>
+          {text}
+        </Action>
+      )) : null}
       <Action
         icon={<Icons.cut />}
         disabled={!hasSelection}
@@ -177,6 +192,20 @@ function FieldItems({
       </Action>
     </>
   )
+}
+
+/** A second right-click in the same field can name a different word. */
+function useSpellingSuggestions(target: SpellingTarget | null): readonly string[] {
+  const [found, setFound] = useState<{ target: SpellingTarget; suggestions: string[] } | null>(null)
+  useEffect(() => {
+    if (target === null) return
+    let current = true
+    void suggestionsFor(target.word.word).then((suggestions) => {
+      if (current) setFound({ target, suggestions })
+    })
+    return () => { current = false }
+  }, [target])
+  return found?.target === target ? found.suggestions : []
 }
 
 /** The field's selected text, kept current for as long as the caller is mounted. */

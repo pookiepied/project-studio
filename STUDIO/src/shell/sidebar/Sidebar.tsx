@@ -13,6 +13,18 @@ import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 
 /**
+ * How far `--shadow-panel` (8px 0 28px -12px) reaches past the floating
+ * column's right edge: 8 offset - 12 spread + 28 blur = 24, rounded up.
+ *
+ * The closed floating column is parked off screen, but its shadow is not part
+ * of its box. Parked exactly one width to the left, its right edge sat on the
+ * window's left edge and the shadow it casts onto the page stayed on screen as
+ * a dark smudge down the left side. Parking it this much further hides the
+ * shadow with the column. Keep it in step with `--shadow-panel` in tokens.css.
+ */
+const PANEL_SHADOW_REACH = 32
+
+/**
  * The sidebar.
  *
  * ---- What the column is ---------------------------------------------------
@@ -145,7 +157,7 @@ export function Sidebar({
         // smaller half of its own screen.
         animate={
           compact
-            ? { x: sidebarOpen ? 0 : -SHELL.sidebar.expandedWidth, width: SHELL.sidebar.expandedWidth }
+            ? { x: sidebarOpen ? 0 : -(SHELL.sidebar.expandedWidth + PANEL_SHADOW_REACH), width: SHELL.sidebar.expandedWidth }
             : { x: 0, width: sidebarOpen ? SHELL.sidebar.expandedWidth : 0 }
         }
         transition={changingWhileClosed ? { duration: 0 } : SPRING_PANEL}
@@ -337,7 +349,7 @@ function Action({
       {hint ? (
         // A keychord, drawn as the key itself: a chip, not plain text, so it
         // reads as something you press rather than something you read.
-        <kbd className="shrink-0 rounded-xs border px-1 py-0.5 font-sans text-micro text-muted-foreground/70">
+        <kbd className="shrink-0 rounded-xs border px-1 py-0.5 text-micro text-muted-foreground/70">
           {hint}
         </kbd>
       ) : null}

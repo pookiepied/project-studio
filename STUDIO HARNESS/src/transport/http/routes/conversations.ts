@@ -27,6 +27,7 @@ import type { JobStatus } from "../../../process/background.js";
 import type { StudioDatabase } from "../../../storage/database.js";
 import { StorageError } from "../../../storage/errors.js";
 import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
+import { activeFlueConversations } from "../../../storage/flue-journal-delete.js";
 import type { ConversationSnapshots } from "../../../snapshots/store.js";
 import { TaskStore } from "../../../agents/definitions/task-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
@@ -550,6 +551,16 @@ export function createConversationRoutes(
   // The trees a previous partial delete left behind: no index row addresses
   // them, so the purge cannot target them and this listing is what reaches
   // them instead. Read-only; the sweep below is the part that deletes.
+  // Which conversations have a turn in flight. The window polls this, because a
+  // page can only report on itself and stops when it closes. Read-only, ids only.
+  routes.get("/running", (context) => {
+    try {
+      return context.json({ conversationIds: activeFlueConversations(resolveFlueJournalPath()) });
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
   routes.get("/orphan-trees", async (context) => {
     try {
       return context.json(

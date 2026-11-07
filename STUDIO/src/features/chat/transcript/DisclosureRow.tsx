@@ -36,6 +36,7 @@ export function DisclosureRow({
   chevron = 'always',
   entering = false,
   flush = false,
+  hang = false,
   className,
   children,
 }: {
@@ -77,6 +78,15 @@ export function DisclosureRow({
    * be read as hanging off its row.
    */
   flush?: boolean
+  /**
+   * The body hangs under the row's words, with no rule: indented by exactly
+   * the mark and its gap, so the first letter of the body lines up with the
+   * first letter of the label. The alignment says "this belongs to that row"
+   * without drawing a line, and a small breath below the body, on top of the
+   * one row gap, ends it before the next row starts. For the person's answers and the reasoning trace, where
+   * a rule down the left read as a divider the page did not otherwise have.
+   */
+  hang?: boolean
   /** Margins belong to the context a row sits in, not to the row. */
   className?: string
   /** What opens beneath the row, drawn behind the rule. */
@@ -141,7 +151,16 @@ export function DisclosureRow({
                 same for every row -- the callers this replaced disagreed by
                 two pixels here for no reason either of them could state. A
                 `flush` body keeps the air and drops the edge; see the prop. */}
-            <div className={cn('mt-1.5', !flush && 'ml-1.5 border-l-2 pl-3')}>{children}</div>
+            <div
+              className={cn(
+                'mt-1.5',
+                // The mark is 1.1em of the caption it sits in, then the row's
+                // 6px gap; measured in that caption so the edges meet exactly.
+                hang ? 'mb-1 text-caption pl-[calc(1.1em+0.375rem)]' : !flush && 'ml-1.5 border-l-2 pl-3',
+              )}
+            >
+              {children}
+            </div>
           </motion.div>
         ) : null}
       </AnimatePresence>

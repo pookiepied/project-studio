@@ -280,8 +280,17 @@ const SETTLEMENT_MESSAGES: Record<'failed' | 'aborted', string> = {
  * entirely unwitnessed, which is the silent stop wearing a connection's
  * clothes. On expiry the read is cancelled and the phase says interrupted:
  * visible, holding its retained offset, never silently reattached.
+ *
+ * Expiry proves nothing while this page was not running to hear. A hidden
+ * window's timers and deliveries are held back, and a sleeping machine stops
+ * both, so the keep-alives may be queued behind this very timer. So a hidden
+ * page, or a timer that fired well past its time, gives the read a fresh budget;
+ * if it really is deaf, that budget runs out with the page awake.
  */
 const READ_LIVENESS_BUDGET_MS = 45_000
+
+/** How late a timer must fire to say the page itself was stopped, as a share of its budget. */
+const LATE_TIMER_RATIO = 1.5
 
 /* -------------------------------------------------------------------------- */
 /* The hook                                                                    */
@@ -350,6 +359,7 @@ export function useConversation(
   const livenessBudgetRef = useRef(options.livenessBudgetMs ?? READ_LIVENESS_BUDGET_MS)
   livenessBudgetRef.current = options.livenessBudgetMs ?? READ_LIVENESS_BUDGET_MS
   const livenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const refreshLivenessRef = useRef<() => void>(() => {})
 
   const disarmLiveness = useCallback(() => {
     if (livenessTimerRef.current !== null) {
@@ -360,10 +370,16 @@ export function useConversation(
 
   const refreshLiveness = useCallback(() => {
     disarmLiveness()
+    const budget = livenessBudgetRef.current
+    const armedAt = Date.now()
     livenessTimerRef.current = setTimeout(() => {
       livenessTimerRef.current = null
       const handle = handleRef.current
       if (handle === null || !liveRef.current) return
+      if (document.visibilityState === 'hidden' || Date.now() - armedAt > budget * LATE_TIMER_RATIO) {
+        refreshLivenessRef.current()
+        return
+      }
       handleRef.current = null
       void handle.cancel()
       setPhase({
@@ -371,8 +387,9 @@ export function useConversation(
         reason:
           'The connection to this run went quiet, so Studio stopped reading it. Reattach to continue from where it stopped.',
       })
-    }, livenessBudgetRef.current)
+    }, budget)
   }, [disarmLiveness])
+  refreshLivenessRef.current = refreshLiveness
 
   const attach = useCallback(
     (reattach?: { readonly from?: string; readonly announce?: boolean }) => {

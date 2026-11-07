@@ -4,7 +4,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { PlanPill } from './PlanPill'
 import { PlanPanel } from './PlanPanel'
 import type { PlanItemRecord, PlanSnapshot } from '@/platform/harness'
 
@@ -72,51 +71,6 @@ vi.mock('@/stores/workspace', () => ({
 beforeEach(() => {
   server = snapshot([item()])
   get.mockImplementation(async () => ({ ok: true as const, value: server }))
-})
-
-describe('the plan pill', () => {
-  it('says how many are done and how many there are', () => {
-    const items = [item(), item({ id: 'two', status: 'done' }), item({ id: 'three' })]
-    render(<PlanPill snapshot={snapshot(items)} items={items} open={false} onToggle={() => {}} />)
-    expect(screen.getByText('1 of 3')).toBeTruthy()
-  })
-
-  it('names the running item, because that is the useful thing mid-run', () => {
-    const items = [
-      item({ status: 'done' }),
-      item({ id: 'two', status: 'running', text: 'Write migration 20' }),
-    ]
-    render(<PlanPill snapshot={snapshot(items)} items={items} open={false} onToggle={() => {}} />)
-    expect(screen.getByText('1 of 2')).toBeTruthy()
-    expect(screen.getByText('Write migration 20')).toBeTruthy()
-  })
-
-  it('says plainly when everything is done, and stops competing', () => {
-    const items = [item({ status: 'done' }), item({ id: 'two', status: 'done' })]
-    render(<PlanPill snapshot={snapshot(items)} items={items} open={false} onToggle={() => {}} />)
-    expect(screen.getByText('All done')).toBeTruthy()
-  })
-
-  it('says a damaged plan could not be read, rather than inventing a count', () => {
-    render(
-      <PlanPill snapshot={snapshot([], { damaged: true })} items={[]} open={false} onToggle={() => {}} />,
-    )
-    expect(screen.getByText('Plan could not be read')).toBeTruthy()
-    expect(screen.queryByText(/ of /)).toBeNull()
-  })
-
-  it('is a disclosure control and nothing else', () => {
-    const onToggle = vi.fn()
-    const items = [item()]
-    render(<PlanPill snapshot={snapshot(items)} items={items} open onToggle={onToggle} />)
-
-    const pill = screen.getByRole('button')
-    expect(pill.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.click(pill)
-    expect(onToggle).toHaveBeenCalledOnce()
-    // One verb, one control: no menu, no hover card, nothing else to open.
-    expect(screen.getAllByRole('button')).toHaveLength(1)
-  })
 })
 
 describe('the plan panel', () => {

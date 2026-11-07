@@ -39,6 +39,7 @@ import type { ConversationSnapshots } from "../../snapshots/store.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createDiagnosticRoutes } from "./routes/diagnostics.js";
 import { createObservationRoutes } from "./routes/observations.js";
+import { createFileRoutes } from "./routes/files.js";
 import { createMediaRoutes } from "./routes/media.js";
 import type { TextImproverPort } from "../../application/text-improver.js";
 import type { VoiceSettings } from "../../gateway/language/voice-settings.js";
@@ -279,6 +280,11 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   }
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
+  const projectFolders = (conversationId: string): readonly string[] => {
+    const projectId = options.conversations.get(conversationId)?.projectId;
+    if (projectId === undefined || projectId === null) return [];
+    return (options.projects.get(projectId)?.folders ?? []).map((folder) => folder.path);
+  };
   app.route(
     "/api/media",
     createMediaRoutes(options.media, {
@@ -286,13 +292,10 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
       ...(options.voiceSettings === undefined ? {} : { voiceSettings: options.voiceSettings }),
       isModelServed: options.isModelServed,
       ...(options.voiceTaskRefusal === undefined ? {} : { voiceTaskRefusal: options.voiceTaskRefusal }),
-      projectFolders: (conversationId) => {
-        const projectId = options.conversations.get(conversationId)?.projectId;
-        if (projectId === undefined || projectId === null) return [];
-        return (options.projects.get(projectId)?.folders ?? []).map((folder) => folder.path);
-      },
+      projectFolders,
     }),
   );
+  app.route("/api/files", createFileRoutes({ projectFolders }));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
   app.route("/api/permissions/grants", createGrantsRoutes(options.grants));
   if (options.favicons !== undefined) {

@@ -79,7 +79,7 @@ function summarize(job: JobStatus): string {
         : job.state === "failed"
           ? `failed to start${job.error === undefined ? "" : `: ${job.error}`}`
           : `exited ${job.exitCode ?? "?"}`;
-  return `${job.id}  ${state}  ${job.command}`;
+  return `${job.id}  ${state}  ${job.title === null ? "" : `${job.title}: `}${job.command}`;
 }
 
 /** One command with its output, which is what a caller asking by id wants. */

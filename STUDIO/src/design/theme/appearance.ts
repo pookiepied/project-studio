@@ -285,7 +285,7 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
   // to either one.
   root.style.setProperty('--code-offset', `${appearance.codeOffset}px`)
   root.classList.toggle('pointer-cursor', appearance.pointerCursor)
-  root.style.setProperty('--font-reading', READING_FONT[appearance.typeface])
+  root.style.setProperty('--font-interface', INTERFACE_FONT[appearance.typeface])
   setInterfaceZoom(appearance.uiScale)
 
   publishBrowserTheme(resolved)
@@ -293,8 +293,11 @@ export function applyAppearance(appearance: Appearance): ResolvedTheme {
   return resolved
 }
 
-/** Serif is the system's: a text face for long reading, with nothing to load. */
-const READING_FONT: Readonly<Record<Typeface, string>> = {
+/**
+ * The face of the whole window, set once at the root and inherited. Code keeps
+ * `--font-mono` whatever is chosen here. Serif is the system's, with nothing to load.
+ */
+const INTERFACE_FONT: Readonly<Record<Typeface, string>> = {
   sans: 'var(--font-sans)',
   serif: "Georgia, Cambria, 'Times New Roman', serif",
   mono: 'var(--font-mono)',

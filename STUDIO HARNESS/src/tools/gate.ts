@@ -291,8 +291,11 @@ export class CallGate {
         tool.resources === undefined
           ? [tool.resource(input, context)]
           : tool.resources(input, context);
+      // Whether the person answered a prompt for this call: up front here, or
+      // mid-call through `authorize`. Read by tools that drive the desktop.
+      let asked = false;
       for (const resource of touched) {
-        await observeOperation("tool", "tools.authorize", () => this.#kernel.authorize(
+        const decision = await observeOperation("tool", "tools.authorize", () => this.#kernel.authorize(
           tool.descriptor.id,
           call.scope,
           {
@@ -304,6 +307,7 @@ export class CallGate {
           },
           call.signal,
         ));
+        if (decision.asked === true) asked = true;
       }
       const resource = touched[0];
       // Permission is not containment. Approval says the user agreed; this says
@@ -348,7 +352,7 @@ export class CallGate {
           ...context,
           signal,
           authorize: async (more, limits) => {
-            await observeOperation("tool", "tools.authorize", () => this.#kernel.authorize(
+            const decision = await observeOperation("tool", "tools.authorize", () => this.#kernel.authorize(
               tool.descriptor.id,
               call.scope,
               {
@@ -359,7 +363,9 @@ export class CallGate {
               },
               signal,
             ));
+            if (decision.asked === true) asked = true;
           },
+          personAsked: () => asked,
         }),
       );
     } catch (error) {

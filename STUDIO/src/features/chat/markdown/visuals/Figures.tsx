@@ -18,7 +18,7 @@ export function Stats({ stats }: { stats: StatsVisual }) {
           <div key={stat.label + index} className="min-w-0">
             <div className="truncate text-caption text-muted-foreground">{stat.label}</div>
             {/* The serif at figure size: a number on a page, not a reading on a dial. */}
-            <div className="mt-1 truncate font-display text-[calc(var(--ui-size)+16px)] leading-[1.1] tabular-nums text-foreground">
+            <div className="mt-1 truncate text-[calc(var(--ui-size)+16px)] leading-[1.1] tabular-nums text-foreground">
               {stat.value}
             </div>
             {stat.delta !== undefined ? (

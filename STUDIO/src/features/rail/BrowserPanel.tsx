@@ -4,7 +4,7 @@ import { useWorkspace } from '@/stores/workspace'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
 import { familyById, type ReportFamily } from '@/features/chat/transcript/live/reportFamily'
-import type { RailEntry } from '@/stores/rail'
+import type { BrowserActivity } from '@/stores/rail'
 import { openBrowserWindow } from '@/platform/tauri'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives/IconButton/IconButton'
@@ -43,7 +43,7 @@ import { useComputerPresence } from '@/features/screen/useComputerPresence'
 export function BrowserPanel({
   entry,
 }: {
-  entry: Extract<RailEntry, { kind: 'browser' }>
+  entry: BrowserActivity
 }) {
   // The newest step with something to show, which is where a reader's eye
   // starts: "now" is what they came to see. A list walked backwards once beats
@@ -72,13 +72,13 @@ export function BrowserPanel({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {entry.recorded || family.id !== 'browser' ? null : (
+          {family.id !== 'browser' ? null : (
             <IconButton label="Open browser in new window" onClick={() => {
               setOpenError(null)
               void openBrowserWindow(entry.conversationId).catch(() => setOpenError('The browser window could not open. Try again.'))
             }}><Icons.openExternal /></IconButton>
           )}
-          {entry.recorded ? null : <StopBrowser key={`${entry.conversationId}:${family.id}`} conversationId={entry.conversationId} family={family} />}
+          <StopBrowser key={`${entry.conversationId}:${family.id}`} conversationId={entry.conversationId} family={family} />
         </div>
       </div>
       {openError ? <p role="alert" className="text-caption text-muted-foreground">{openError}</p> : null}
@@ -88,7 +88,6 @@ export function BrowserPanel({
         step={selected}
         title={entry.title}
         family={family}
-        recorded={entry.recorded === true}
       />
 
       {entry.steps.length === 0 ? null : (
@@ -205,19 +204,17 @@ function BrowserFrameView({
   step,
   title,
   family,
-  recorded,
 }: {
   conversationId: string
   step: BrowserStep | null
   title: string | null
   family: ReportFamily
-  recorded: boolean
 }) {
   const frameUrl = useAttachmentFrame(conversationId, step?.frame ?? null)
   if (step === null) {
     return (
       <p className="text-caption text-muted-foreground">
-        {recorded ? 'No screenshot was recorded for this website.' : family.id === 'computer'
+        {family.id === 'computer'
           ? 'No picture of the screen yet.'
           : 'The browser has not sent a picture yet.'}
       </p>

@@ -1,3 +1,4 @@
+import { Tooltip } from '@/components/primitives'
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { MediaLightbox } from '@/features/artifacts/media/MediaLightbox'
@@ -62,11 +63,11 @@ function ReadThumbnail({ image, conversationId }: { image: ReadImage; conversati
     Image preview unavailable: {image.title}
   </span>
   return <>
-    <button type="button" aria-label={`Preview ${image.title}`} title={image.title}
+    <Tooltip label={image.title}><button type="button" aria-label={`Preview ${image.title}`}
       onClick={() => setOpen(true)}
       className="size-20 overflow-hidden rounded-lg border border-border bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <img src={src} alt={image.title} onError={() => setFailed(true)} className="size-full object-cover" />
-    </button>
+    </button></Tooltip>
     <MediaLightbox open={open} onClose={() => setOpen(false)} title={image.title}
       video={false} output={{ url: src, ratio: null }} />
   </>

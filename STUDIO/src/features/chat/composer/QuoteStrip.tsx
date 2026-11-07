@@ -40,7 +40,7 @@ export function QuoteStrip({ quote, onRemove }: { quote: string; onRemove: () =>
         >
           <motion.div variants={STRIP} className="studio-composer-quote">
             <Icons.reply size="md" />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 overflow-hidden">
               {/* A second Reply replaces the passage in place. */}
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
@@ -50,8 +50,11 @@ export function QuoteStrip({ quote, onRemove }: { quote: string; onRemove: () =>
                   exit={{ opacity: 0, transition: { duration: DURATION.fast, ease: EASE_IN } }}
                   transition={{ duration: DURATION.base, ease: EASE_OUT }}
                 >
-                  <Tooltip label={line}>
-                    <p className="truncate text-ui">{line}</p>
+                  {/* The tooltip's wrapper is inline-flex, which sizes to its
+                      text and let a long passage run under the cross. Held to
+                      the column's width, the line truncates where it should. */}
+                  <Tooltip label={line} overflowOnly className="flex w-full min-w-0">
+                    <p className="min-w-0 flex-1 truncate text-ui">{line}</p>
                   </Tooltip>
                 </motion.div>
               </AnimatePresence>

@@ -25,6 +25,7 @@ import { SplashScreen } from '@/shell/SplashScreen'
 import { useFileDropGuard } from '@/shell/useFileDropGuard'
 import { NavigationProvider, useNavigation } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
+import { ConversationStatusProvider } from '@/stores/status'
 import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
 
 /**
@@ -199,7 +200,9 @@ function StudioApp() {
         animate={{ scale: showSplash ? 0.985 : 1 }}
         transition={{ duration: SPLASH.revealDuration, ease: EASE_OUT }}
       >
-        <AppShell />
+        <ConversationStatusProvider>
+          <AppShell />
+        </ConversationStatusProvider>
       </motion.div>
       <AnimatePresence>{showSplash ? <SplashScreen waiting={!settled} /> : null}</AnimatePresence>
     </>

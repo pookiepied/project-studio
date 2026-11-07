@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT, MEDIA_FRAME } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
-import { BobbingDots, Deferred, lazyNamed } from '@/components/state'
+import { Deferred, lazyNamed } from '@/components/state'
 import { useMediaSource } from '@/features/artifacts/media/source'
 import type { MediaOutput } from '@/domain/artifacts/media'
 import { cn } from '@/lib/cn'
@@ -44,11 +44,14 @@ export function MediaFrame({
   title,
   working,
   ratio,
+  radius = MEDIA_FRAME.radius,
   onRatio,
   onOpen,
   onKeep,
   keepLabel = 'Keep in the library',
 }: {
+  /** The frame's corner: a picture alone takes the larger one. */
+  radius?: number
   /** The output, or null for a frame reserved for one still coming. */
   output: MediaOutput | null
   video: boolean
@@ -79,15 +82,14 @@ export function MediaFrame({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-block-inner bg-soft"
+      className="group/frame relative w-full overflow-hidden bg-soft"
       // The aspect ratio is reserved *before* the media exists, so the
       // finished frame drops into a space already the right size. Without it
       // the transcript jumps by the height of an image the moment one
       // resolves, which is the single most visible layout shift in a chat.
-      // The cap wins over the ratio: a tall picture's box is as tall as the
-      // cap and as wide as its row, and the picture stands in the middle of
-      // it over a blurred copy of itself - the box is never empty ground.
-      style={{ aspectRatio: String(ratio), maxHeight: MEDIA_FRAME.maxHeight }}
+      // The grid gives the frame its width at the set's height (`MediaGrid`),
+      // so the box is the picture's own shape.
+      style={{ aspectRatio: String(ratio), borderRadius: radius }}
     >
       {shown === null ? (
         <Waiting active={working || output !== null} />
@@ -151,7 +153,7 @@ export function MediaFrame({
             className={cn(
               'group/open absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-full outline-none',
               'bg-black/45 text-white opacity-0 backdrop-blur-sm transition-opacity duration-base',
-              'hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring',
+              'group-hover/frame:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring',
               '[&_.studio-icon]:text-white',
             )}
           >
@@ -182,10 +184,13 @@ export function MediaFrame({
           </button>
         )
       ) : null}
+      {/* The picture's own actions sit in its top corner and appear with the
+          pointer or keyboard focus, so a finished picture at rest is only the
+          picture. */}
       {onKeep !== undefined && !video && shown !== null ? (
-        <div className="absolute top-2.5 right-2.5 z-10">
+        <div className="absolute top-2.5 right-2.5 z-10 opacity-0 transition-opacity duration-base group-hover/frame:opacity-100 focus-within:opacity-100">
           <IconButton label={keepLabel} onClick={onKeep} tooltipSide="bottom"
-            className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/60 [&_.studio-icon]:text-white">
+            className="rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-black/70 [&_.studio-icon]:text-white">
             <Icons.keep />
           </IconButton>
         </div>
@@ -195,16 +200,17 @@ export function MediaFrame({
 }
 
 /**
- * The frame while there is nothing to show in it: the app's one wait, alone
- * on the neutral field, for as long as something is coming. It used to hold
- * the medium's mark above the dots, and the two together read as a broken
- * picture with a caption; the dots alone read as a wait.
+ * The frame while there is nothing to show in it: a field of faint dots with
+ * a brighter band sweeping across, for as long as something is coming
+ * (`.studio-media-wait`). It used to hold the app's bobbing dots, small in
+ * the middle of a large grey box, which read as a picture that had failed to
+ * load. No percentage: no vendor reports one, and a made-up number is worse
+ * than none. The row above already says "Generating", so the frame carries no
+ * second word. Reduced motion leaves the field still.
  */
 function Waiting({ active }: { active: boolean }) {
   return (
-    <span aria-hidden className="absolute inset-0 flex items-center justify-center">
-      {active ? <BobbingDots size={4} className="text-muted-foreground/60" /> : null}
-    </span>
+    <span aria-hidden className="studio-media-wait" {...(active ? {} : { 'data-still': '' })} />
   )
 }
 

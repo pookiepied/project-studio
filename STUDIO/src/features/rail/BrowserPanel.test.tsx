@@ -72,19 +72,12 @@ describe('BrowserPanel', () => {
     view.rerender(<BrowserPanel entry={entry('computer')} />)
     expect(screen.getByText('Status unavailable')).toBeTruthy()
   })
-  it('opens the live conversation browser and keeps recorded and computer previews read-only', async () => {
+  it('opens the live conversation browser and keeps the computer read-only', async () => {
     const view = render(<BrowserPanel entry={entry()} />)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open browser in new window' })))
     expect(openBrowser).toHaveBeenCalledWith('cnv_1')
-    view.rerender(<BrowserPanel entry={{ ...entry(), recorded: true }} />)
-    expect(screen.queryByRole('button', { name: 'Open browser in new window' })).toBeNull()
     view.rerender(<BrowserPanel entry={entry('computer')} />)
     expect(screen.queryByRole('button', { name: 'Open browser in new window' })).toBeNull()
-  })
-  it('keeps a recorded website preview separate from live browser controls', () => {
-    render(<BrowserPanel entry={{ ...entry(), recorded: true }} />)
-    expect(screen.queryByRole('button', { name: 'Stop browser' })).toBeNull()
-    expect(screen.getByText('No screenshot was recorded for this website.')).toBeTruthy()
   })
   it('offers a Stop for the conversation, and says Stopped when one was running', async () => {
     stop.mockResolvedValue({ ok: true, value: true })

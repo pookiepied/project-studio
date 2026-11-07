@@ -25,6 +25,9 @@ import { VoiceFailure } from '@/features/voice/VoiceFailure'
  *                 the blocked paragraph, so WebView2 never answering the
  *                 permission request looked like "no microphone available".
  *   blocked       what went wrong, in one line. It clears itself (`useDictation`).
+ *                 A take that simply had nothing in it says so plainly
+ *                 ("No speech heard"), with no failure label: silence is news,
+ *                 not an error.
  *
  * `DictationControls` has the tools row: Cancel, then the clock with the live
  * level, then Pause and the accent button that ends the take. On stop the bars
@@ -104,11 +107,14 @@ export function DictationPrompt({
   stage,
   denied,
   note,
+  quiet = null,
 }: {
   stage: DictationStage
   denied: boolean
   /** A sentence from the transcriber, when the words did not come back. */
   note: string | null
+  /** The plain line for a take with nothing in it, which is not a failure. */
+  quiet?: string | null
 }) {
   let content: ReactNode
 
@@ -122,7 +128,9 @@ export function DictationPrompt({
   } else if (stage === 'blocked') {
     content = (
       <span className="block min-w-0 truncate">
-        {note !== null
+        {quiet !== null
+          ? quiet
+          : note !== null
           ? <VoiceFailure label="Dictation failed" note={note} />
           : denied
             ? 'Microphone blocked — allow it in Windows privacy settings, then try again'

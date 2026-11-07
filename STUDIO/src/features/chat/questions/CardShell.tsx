@@ -1,7 +1,15 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 
-import { DURATION, EASE_OUT } from '@/design/tokens'
+import { EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
@@ -10,23 +18,22 @@ import { cn } from '@/lib/cn'
  *
  * ---- One shell, two callers -----------------------------------------------
  *
- * Both kinds of question stop the run and appear in the same place, between
- * the transcript and the composer. This is what they share: the framing, the
- * sentence line, the option rows, the control row, the footnotes beneath it,
- * and the keyboard behaviour. `ApprovalPrompt` renders through it, and the
- * ask-a-question card renders through it, so the person is never looking at
- * two different-looking things that do the same job.
+ * Both kinds of question stop the run and take the composer's place until
+ * they are answered. This is what they share: the hint row, the sentence, the
+ * answer rows, the description slot, the foot, and the keyboard behaviour.
+ * `ApprovalPrompt` renders through it and the ask-a-question card renders
+ * through it, inside one `PromptFrame`, so the person is never looking at two
+ * different-looking things that do the same job.
  *
  * ---- The shape -------------------------------------------------------------
  *
- * The card's own arrangement is borrowed from the approval cards of the
- * agent-UI component library, restated in this theme: a head row that names
- * the kind of question beside the ask mark, the sentence beneath it, the
- * choices as compact keyed rows, and the verdicts as small pills at the foot.
- * The order is the fix that mattered -- the label used to sit *under* the
- * sentence as a muted caption, so the card opened with a sentence whose kind
- * you learned only after reading it. Everything the card wears comes from the
- * theme's own tokens, so dark mode is not a second stylesheet to drift.
+ * Family A's suggestion panel. A quiet hint row: the keys on the left; on the
+ * right what kind of question this is, where it stands in its call ("2 of 3"),
+ * and Skip. Then the sentence, then the answers one line each, an accent arrow
+ * and the words, with a neutral highlight the width of the answer column. What the lit row does
+ * is said once, in a slot of a fixed two lines, so pointing along the rows
+ * never changes the card's height. The foot is the caller's: an answer field
+ * for a question, the stop for a permission.
  *
  * ---- What the shell does not know ------------------------------------------
  *
@@ -38,27 +45,50 @@ import { cn } from '@/lib/cn'
  * never resolves anything on its own, and no prop of this component could
  * hand a permission the one thing a permission must never have.
  *
- * ---- Enter -----------------------------------------------------------------
+ * The suggestion panel this borrows from closes on Escape. This card does not,
+ * and its hint row does not offer it: an Escape that dismissed a permission
+ * would be pressed meaning "not now" and read as "no".
  *
- * Enter submits the card, wherever the focus sits on it - except on a button,
- * where Enter already means the button and a second submission would answer
- * twice. The callers decide what submitting means; the shell only decides
- * that one key does it.
+ * ---- Keys ------------------------------------------------------------------
+ *
+ * Up and down move the highlight and focus the row it lands on, so the next
+ * Enter answers with that row. Enter on a row is the row's own activation.
+ * Enter anywhere else on the card submits it - except on a button, where Enter
+ * already means the button and a second submission would answer twice. The
+ * callers decide what submitting means; the shell only decides that one key
+ * does it.
  */
+
+interface CardRows {
+  readonly active: number | null
+  readonly setActive: (index: number | null) => void
+}
+
+const CardRowsContext = createContext<CardRows>({ active: null, setActive: () => {} })
+
 export function CardShell({
   header,
+  progress = null,
+  onSkip = null,
   sentence,
   detail = null,
   deadline = null,
   body = null,
-  controls,
-  footnotes = null,
+  bodyLabel,
+  descriptions = [],
+  initialActive = null,
+  aside = null,
+  foot = null,
   canSubmit,
   onSubmit,
   answering = false,
 }: {
-  /** The head row's name for what kind of question this is. */
+  /** The hint row's name for what kind of question this is. */
   readonly header: string
+  /** Where this question stands in its call, when the call asks more than one. */
+  readonly progress?: { readonly at: number; readonly of: number } | null
+  /** Leaves this question to the agent, or null where skipping means nothing. */
+  readonly onSkip?: (() => void) | null
   /** The main line: the question being asked of the person. */
   readonly sentence: ReactNode
   /** A secondary line under the sentence: a reason, or nothing. */
@@ -69,12 +99,22 @@ export function CardShell({
    * permission caller always passes.
    */
   readonly deadline?: number | null
-  /** The option rows, for the caller that has options to offer. */
+  /** The answer rows, `OptionRow`s indexed from zero in the order drawn. */
   readonly body?: ReactNode | null
-  /** The control row: the labelled ways out, one per outcome. */
-  readonly controls: ReactNode
-  /** Lines beneath the controls: consequences, and what else is waiting. */
-  readonly footnotes?: ReactNode | null
+  /** What the rows are, for assistive technology. */
+  readonly bodyLabel?: string
+  /**
+   * What each row does, by row index. The lit row's line shows in a slot of a
+   * fixed two lines beneath the rows, so the card keeps its height whichever
+   * row is lit, and the list stays one line per answer.
+   */
+  readonly descriptions?: readonly (ReactNode | null)[]
+  /** The row highlighted on arrival, or null for none. */
+  readonly initialActive?: number | null
+  /** A control at the end of the description line, so it costs no row of its own. */
+  readonly aside?: ReactNode | null
+  /** The card's last row: the answer field, or what else waits. */
+  readonly foot?: ReactNode | null
   /** Whether submitting makes sense right now. */
   readonly canSubmit: boolean
   /** What submitting does. The caller owns the meaning; the shell owns the key. */
@@ -82,8 +122,30 @@ export function CardShell({
   /** An answer is in flight: submit is held and the controls disable themselves. */
   readonly answering?: boolean
 }) {
+  const card = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState<number | null>(initialActive)
+
+  const move = (step: 1 | -1) => {
+    const rows = Array.from(
+      card.current?.querySelectorAll<HTMLElement>('[data-card-row]:not([aria-disabled="true"])') ?? [],
+    )
+    if (rows.length === 0) return
+    const at = rows.findIndex((row) => Number(row.dataset.cardRow) === active)
+    const next = at === -1 ? (step === 1 ? 0 : rows.length - 1) : (at + step + rows.length) % rows.length
+    const row = rows[next]
+    setActive(Number(row.dataset.cardRow))
+    row.focus()
+  }
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Enter') return
+    // A written answer is prose: its arrows move the caret between lines.
+    const writing = event.target instanceof HTMLTextAreaElement
+    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !writing) {
+      event.preventDefault()
+      move(event.key === 'ArrowDown' ? 1 : -1)
+      return
+    }
+    if (event.key !== 'Enter' || writing) return
     // On a button, Enter is the button's own activation; answering again
     // here would record the same answer twice.
     if (event.target instanceof HTMLElement && event.target.tagName === 'BUTTON') return
@@ -92,88 +154,150 @@ export function CardShell({
     onSubmit()
   }
 
+  const described = descriptions.some((line) => line !== null && line !== undefined)
+
   return (
-    <motion.div
-      onKeyDown={onKeyDown}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION.slow, ease: EASE_OUT }}
-      // The block-inner radius: a card that holds inset, inset-radius rows
-      // inside it. It sat at the composer's own radius once, which made it
-      // read as a second composer rather than as the question card it is.
-      //
-      // `text-foreground` is load-bearing, not decoration: nothing in this
-      // app sets a default text colour, so an uncoloured surface inherits
-      // the browser's black -- which in dark mode is a card full of invisible
-      // sentences. The transcript's prose sets its colour the same way.
-      className="rounded-md bg-surface-raised p-3 text-foreground shadow-raised"
-    >
-      <div className="flex items-center gap-2">
-        <span
-          aria-hidden
-          className="flex size-6 shrink-0 items-center justify-center rounded-xs bg-muted"
-        >
-          <Icons.ask size="sm" />
+    // `text-foreground` is load-bearing, not decoration: nothing in this app
+    // sets a default text colour, so an uncoloured surface inherits the
+    // browser's black, which in dark mode is a card of invisible sentences.
+    <div ref={card} data-prompt-card onKeyDown={onKeyDown} className="text-foreground">
+      <div className="flex min-h-5 items-center gap-3 px-2 text-micro text-muted-foreground">
+        {body !== null ? <KeyHints /> : null}
+        <span className="ml-auto flex min-w-0 items-center gap-2">
+          <span className="truncate">{header}</span>
+          {progress !== null && progress.of > 1 ? (
+            <span className="shrink-0 tabular-nums" aria-label={`Question ${progress.at} of ${progress.of}`}>
+              {progress.at} of {progress.of}
+            </span>
+          ) : null}
+          {onSkip !== null ? (
+            // A tag rather than a word, so it reads as the control it is in a
+            // row that is otherwise all hints.
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={answering}
+              className="studio-prompt-tag shrink-0 transition-colors duration-fast disabled:opacity-45"
+            >
+              Skip
+            </button>
+          ) : null}
+          {deadline !== null ? <CardCountdown expiresAt={deadline} /> : null}
         </span>
-        <span className="min-w-0 flex-1 truncate text-ui font-medium">{header}</span>
-        {deadline !== null ? <CardCountdown expiresAt={deadline} /> : null}
       </div>
 
-      <p className="mt-2 max-w-[60ch] text-body font-medium">{sentence}</p>
+      <p className="mt-2 max-w-[60ch] px-2 text-body font-medium">{sentence}</p>
 
       {detail !== null ? (
-        <p className="mt-1 max-w-[60ch] text-caption text-muted-foreground">{detail}</p>
+        <p className="mt-0.5 max-w-[60ch] px-2 text-caption text-muted-foreground">{detail}</p>
       ) : null}
 
-      {body !== null ? <div className="mt-2.5 flex flex-col gap-1.5">{body}</div> : null}
+      {body !== null ? (
+        <CardRowsContext.Provider value={{ active, setActive }}>
+          {/* One column as wide as the longest answer: every highlight is the
+              same width, so the rows read as one block - neither the whole
+              card nor a ragged edge per word. */}
+          <div role="group" aria-label={bodyLabel} className="mt-1.5 flex w-fit max-w-full min-w-48 flex-col items-stretch gap-0.5">
+            {body}
+          </div>
+        </CardRowsContext.Provider>
+      ) : null}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">{controls}</div>
+      {/* Two lines whether the lit row says one, two or nothing, so pointing
+          along the rows never moves the card. Longer lines clamp. */}
+      {body !== null && (described || aside !== null) ? (
+        <div className="mt-1 flex items-end gap-3 pl-2">
+          <p aria-live="polite" className="line-clamp-2 min-h-[2lh] max-w-[60ch] min-w-0 flex-1 text-caption text-muted-foreground">
+            {active === null ? null : (descriptions[active] ?? null)}
+          </p>
+          {aside}
+        </div>
+      ) : null}
 
-      {footnotes !== null ? <div className="mt-1.5">{footnotes}</div> : null}
-    </motion.div>
+      {foot !== null ? <div className="mt-2">{foot}</div> : null}
+    </div>
   )
 }
 
 /**
- * One option row: the thing a question offers, and what it does.
+ * The keys that answer the card, said the way the suggestion panel says them.
+ * Shared with the slash list, which adds Escape: a list a slash opened is
+ * dismissed by Escape, where this card deliberately is not.
+ */
+export function KeyHints({ dismiss = false }: { readonly dismiss?: boolean }) {
+  return (
+    <span aria-hidden className="flex shrink-0 items-center gap-4 text-micro text-muted-foreground">
+      <span className="flex items-center gap-1.5">
+        <span className="flex gap-0.5">
+          <Key>▲</Key>
+          <Key>▼</Key>
+        </span>
+        to navigate
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Key>↩</Key>
+        to select
+      </span>
+      {dismiss ? (
+        <span className="flex items-center gap-1.5">
+          <Key>esc</Key>
+          to dismiss
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function Key({ children }: { readonly children: ReactNode }) {
+  return <kbd className="studio-prompt-key">{children}</kbd>
+}
+
+/**
+ * One answer row: an arrow and the answer, on one line.
  *
- * Single questions render these as a radio group; a multiSelect question
- * renders them with `role="checkbox"`. Either way the row carries the letter
- * the options are keyed by, the label, and the description that says what
- * happens if it is chosen - a choice made without its consequence is a guess
- * the person was tricked into.
+ * Three kinds. A `radio` row is one choice of a single-answer question, a
+ * `checkbox` row one of several, and an `action` row answers on its own click,
+ * as a permission's rows do. What a row does is said by the card's description
+ * slot while the row is lit - a choice made without its consequence is a guess
+ * the person was tricked into, so hover and the arrow keys both light it.
  *
- * The rest state is a hairline-bordered row; the chosen one lifts -- the
- * border drops, the card's own ground shows through, and the key chip fills
- * -- so the selection reads as one object being raised rather than one of
- * several being painted.
+ * The lit row wears a neutral wash across the card's answer column (as wide as
+ * the longest answer, so every row's wash is the same width); so does a chosen one, so the choice stays visible through
+ * the beat before the card moves on. A checkbox row trades the arrow for a
+ * ring that fills when ticked.
  */
 export function OptionRow({
-  letter,
+  index,
   label,
-  description,
-  selected,
+  selected = false,
   onSelect,
-  multi = false,
-  input = null,
+  kind = 'radio',
   disabled = false,
+  busy = false,
 }: {
-  readonly letter: string
+  /** The row's place among the card's rows, from zero. */
+  readonly index: number
   readonly label: ReactNode
-  readonly description: ReactNode
-  readonly selected: boolean
+  readonly selected?: boolean
   readonly onSelect: () => void
-  /** Checkbox semantics when the question allows several answers. */
-  readonly multi?: boolean
-  /** A free-text field inside the row, for the always-present other answer. */
-  readonly input?: ReactNode | null
+  readonly kind?: 'radio' | 'checkbox' | 'action'
   readonly disabled?: boolean
+  /** This row's answer is the one in flight. */
+  readonly busy?: boolean
 }) {
+  const { active, setActive } = useContext(CardRowsContext)
+  const lit = active === index || (selected && kind !== 'checkbox')
+
   return (
     <div
-      role={multi ? 'checkbox' : 'radio'}
-      aria-checked={selected}
+      data-card-row={index}
+      role={kind === 'action' ? 'button' : kind}
+      aria-checked={kind === 'action' ? undefined : selected}
+      aria-disabled={disabled || undefined}
+      aria-busy={busy || undefined}
       tabIndex={disabled ? -1 : 0}
+      onMouseEnter={() => setActive(index)}
+      onFocus={() => setActive(index)}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
         // The row's own activation: Enter or Space selects. Stopped here and
@@ -186,29 +310,31 @@ export function OptionRow({
       }}
       onClick={onSelect}
       className={cn(
-        'flex cursor-pointer items-start gap-2 rounded-xs border p-1.5 text-left transition-colors duration-fast',
-        selected
-          ? 'border-transparent bg-surface-raised shadow-chip'
-          : 'border-border hover:bg-tint',
-        disabled && 'pointer-events-none opacity-45',
+        'flex max-w-full cursor-pointer items-center gap-3 rounded-[12px] py-1.5 pr-3 pl-2 text-left text-body outline-none transition-colors duration-fast',
+        lit && 'bg-soft',
+        disabled && !busy && 'pointer-events-none opacity-45',
+        busy && 'pointer-events-none',
       )}
     >
-      <span
-        className={cn(
-          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-xs text-caption',
-          selected
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-tint text-muted-foreground',
+      <span aria-hidden className="flex shrink-0 items-center">
+        {kind === 'checkbox' ? (
+          <span
+            className={cn(
+              'flex size-[15px] items-center justify-center rounded-full transition-colors duration-fast',
+              selected ? 'bg-accent text-accent-foreground' : 'ring-1 ring-muted-foreground/40 ring-inset',
+            )}
+          >
+            {/* Well inside the ring: a tick that reaches the edge reads as
+                cramped. Sized by `style`, because the mark's own box is an
+                inline width that a size class cannot override - which is why
+                the tick used to paint at 16.5px inside a 15px ring. */}
+            {selected ? <Icons.check className="text-accent-foreground" style={{ width: 9, height: 9 }} /> : null}
+          </span>
+        ) : (
+          <Icons.choose className={cn('text-accent', busy && 'animate-pulse')} />
         )}
-        aria-hidden
-      >
-        {letter}
       </span>
-      <span className="min-w-0">
-        <span className="block text-ui">{label}</span>
-        <span className="block text-caption text-muted-foreground">{description}</span>
-        {input}
-      </span>
+      <span className="min-w-0">{label}</span>
     </div>
   )
 }
@@ -239,7 +365,7 @@ function CardCountdown({ expiresAt }: { readonly expiresAt: number }) {
       data-countdown
       aria-live="polite"
       aria-label={`${minutes} minutes ${seconds} seconds remaining`}
-      className="flex shrink-0 items-center rounded-xs bg-muted px-1.5 py-0.5 text-caption tabular-nums"
+      className="flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-caption tabular-nums"
     >
       {label.split('').map((character, at) =>
         character === ':' ? (

@@ -235,12 +235,12 @@ describe('the shell', () => {
  * has one to offer.
  */
 describe('the sandbox fence', () => {
-  it('offers no switch where the platform has no fence, and says why', () => {
+  it('has no row where the platform has no fence', () => {
     ready({})
     render(<EnvironmentsPane />)
 
     expect(screen.queryByRole('switch', { name: 'Sandbox fence' })).toBeNull()
-    expect(screen.getByText(/no sandbox fence for this platform/)).toBeTruthy()
+    expect(screen.queryByText('Sandbox fence')).toBeNull()
   })
 
   it('offers the switch where a fence exists, and turns it on', () => {

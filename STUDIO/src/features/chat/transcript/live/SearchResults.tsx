@@ -1,4 +1,5 @@
 import { FileTypeMark, splitFilePath } from '@/components/icons/fileTypes'
+import { Tooltip } from '@/components/primitives'
 import { cn } from '@/lib/cn'
 
 import {
@@ -92,7 +93,7 @@ export function SearchQueryLine({ query }: { query: SearchQuery }) {
 /** The pattern the model looked for, then where and how, in muted words. */
 function QueryWords({ query }: { query: SearchQuery }) {
   return (
-    <span className="min-w-0 truncate" title={queryTitle(query)}>
+    <Tooltip label={queryTitle(query)} overflowOnly className="min-w-0"><span className="min-w-0 truncate">
       <span className="font-mono text-ui text-foreground">{query.pattern}</span>
       {query.scope !== null ? (
         <span className="text-muted-foreground"> in {query.scope}</span>
@@ -103,7 +104,7 @@ function QueryWords({ query }: { query: SearchQuery }) {
           · {filter}
         </span>
       ))}
-    </span>
+    </span></Tooltip>
   )
 }
 
@@ -145,10 +146,10 @@ function ContentFileView({ file, query }: { file: SearchContentFile; query: Sear
     <div className="py-1">
       <div className="flex items-baseline gap-1.5">
         <FileTypeMark path={file.path} className="shrink-0 self-center" />
-        <span className="truncate text-ui" title={file.path}>
+        <Tooltip label={file.path} overflowOnly className="min-w-0"><span className="truncate text-ui">
           {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
           <span className="font-medium text-foreground">{name}</span>
-        </span>
+        </span></Tooltip>
         <span className="ml-auto shrink-0 pl-4 tabular-nums text-caption text-muted-foreground">
           {file.matches} {file.matches === 1 ? 'match' : 'matches'}
         </span>
@@ -218,10 +219,10 @@ function PathRow({ path }: { path: string }) {
   return (
     <div className="flex items-baseline gap-1.5 py-px">
       <FileTypeMark path={path} className="shrink-0 self-center" />
-      <span className="studio-selectable truncate" title={path}>
+      <Tooltip label={path} overflowOnly className="min-w-0"><span className="studio-selectable truncate">
         {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
         <span className="text-foreground">{name}</span>
-      </span>
+      </span></Tooltip>
     </div>
   )
 }
@@ -231,10 +232,10 @@ function CountRow({ path, count }: { path: string; count: number }) {
   return (
     <div className="flex items-baseline gap-1.5 py-px">
       <FileTypeMark path={path} className="shrink-0 self-center" />
-      <span className="studio-selectable truncate" title={path}>
+      <Tooltip label={path} overflowOnly className="min-w-0"><span className="studio-selectable truncate">
         {dir !== null ? <span className="text-muted-foreground">{dir}/</span> : null}
         <span className="text-foreground">{name}</span>
-      </span>
+      </span></Tooltip>
       <span className="ml-auto shrink-0 pl-4 tabular-nums text-muted-foreground">{count}</span>
     </div>
   )

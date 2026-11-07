@@ -61,7 +61,8 @@ describe('shared interface typography', () => {
     expect(prose).toContain('font-size: var(--text-body)')
     expect(prose).not.toContain('--code-size:')
     expect(source('styles/type.css')).not.toContain('--text-prose:')
-    expect(source('features/chat/ChatPage.tsx').match(/className="studio-content-column/g)).toHaveLength(2)
+    // The composer's column drops its fill while a viewer covers the page, so it names the class through `cn`.
+    expect(source('features/chat/ChatPage.tsx').match(/className=(?:"|\{cn\(')studio-content-column/g)).toHaveLength(2)
     for (const path of ['features/home/HomePage.tsx', 'features/projects/ProjectPage.tsx']) {
       expect(source(path), path).toContain('className="studio-content-column"')
       expect(source(path), path).not.toMatch(/SHELL\.(measure|gutter)/)

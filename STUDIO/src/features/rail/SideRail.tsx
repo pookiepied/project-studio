@@ -3,16 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { FADE, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton, PageTransition } from '@/components/primitives'
-import { renderArtifact } from '@/features/artifacts'
-import { BackgroundWorkPanel } from '@/features/jobs'
-import { BrowserPanel } from '@/features/rail/BrowserPanel'
-import { PlanPanel } from '@/features/plans'
-import { ChangesPanel } from '@/features/changes/ChangesPanel'
-import { WorkspaceOverview, WorkspaceTaskDetail, entryTitle } from './WorkspaceOverview'
-import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, useWorkspaceTaskHistory } from '@/stores/rail'
-import { cn } from '@/lib/cn'
-import type { AgentTask } from '@/platform/harness'
-import { AgentInspector } from './AgentInspector'
+import { ActivityBody, ActivityList, activityRows, viewTitle } from './Activity'
+import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail } from '@/stores/rail'
 
 /**
  * The narrowest the conversation may become.
@@ -30,11 +22,10 @@ const MIN_PAGE_WIDTH = SHELL.minPageWidth
 /**
  * The side rail.
  *
- * A column beside the conversation holding artifacts opened out of it. The
- * transcript is a reading measure — deliberately narrow — and some things the
- * model produces are simply the wrong shape for it: a table with fifteen
- * columns, a long list of sources, an image worth looking at. Rather than
- * widen the column for everyone, those move here.
+ * The workspace, docked beside the conversation when the window has room
+ * for it (`docked` in the rail store): the activity list, and one thing from
+ * it at a time. Without the room there is no column; the chat page draws the
+ * same list from a pill over the composer and opens a thing in its sheet.
  *
  * ---- The two placements ---------------------------------------------------
  *
@@ -64,16 +55,11 @@ export function SideRail({
   /** The rail has finished leaving. What releases a sidebar waiting on it. */
   onClosed?: () => void
 }) {
-  const { entries, activeId, width, setWidth, closeAll, overview, conversationId } = useRail()
-  const tasks = useWorkspaceTaskHistory()
-  const [agent, setAgent] = useState<AgentTask | null>(null)
-  const inspectedAgent = activeId === null ? agent : null
+  const { activity, browser, view, width, setWidth, closeAll, overview, show, conversationId } = useRail()
   const reducedMotion = useReducedMotion()
   const frame = useRef<HTMLElement>(null)
   const [room, setRoom] = useState(Number.POSITIVE_INFINITY)
-
-  const active = entries.find((entry) => entry.id === activeId)
-  const task = tasks.find((item) => item.id === activeId)
+  const rows = activityRows(activity, browser)
 
   /**
    * The rail may not starve the page.
@@ -100,7 +86,6 @@ export function SideRail({
   }, [open])
 
   const ceiling = Math.max(RAIL_MIN_WIDTH, room - MIN_PAGE_WIDTH)
-  const overlay = room < MIN_PAGE_WIDTH + RAIL_MIN_WIDTH
   const effective = Math.min(width, ceiling, room)
 
   return (
@@ -111,7 +96,7 @@ export function SideRail({
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             event.stopPropagation()
-            if (inspectedAgent || task || active) { setAgent(null); overview() }
+            if (view !== null) overview()
             else closeAll()
           }}
           // Width animates, and nothing else. Sliding the rail in from off
@@ -145,7 +130,7 @@ export function SideRail({
           // No hairline, same as the docked sidebar: the page's corner cuts a
           // notch through this edge, and a border would draw a straight rule
           // across the arc. The sunken surface is the seam.
-          className={cn('flex shrink-0 flex-col overflow-hidden bg-surface-sunken text-foreground', overlay ? 'absolute inset-y-0 right-0 z-30 shadow-panel' : 'relative')}
+          className="relative flex shrink-0 flex-col overflow-hidden bg-surface-sunken text-foreground"
         >
           <ResizeHandle width={effective} ceiling={ceiling} onWidth={setWidth} />
 
@@ -158,9 +143,9 @@ export function SideRail({
               way the sidebar's inner column has always been sized. */}
           <div className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: effective }}>
             <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
-              {active || task || inspectedAgent ? <IconButton label="Back to workspace" size="sm" onClick={() => { setAgent(null); overview() }}><Icons.back size="sm" /></IconButton> : null}
+              {view !== null ? <IconButton label="Back to workspace" size="sm" onClick={overview}><Icons.back size="sm" /></IconButton> : null}
               <h2 className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
-                {inspectedAgent?.title ?? task?.title ?? (active === undefined ? 'Workspace' : entryTitle(active))}
+                {view === null ? 'Workspace' : viewTitle(view, activity, browser)}
               </h2>
 
               <IconButton label="Collapse workspace" size="sm" onClick={closeAll}>
@@ -171,24 +156,12 @@ export function SideRail({
 
             <div className="relative min-h-0 flex-1">
               <PageTransition
-                view={inspectedAgent ? `agent:${inspectedAgent.id}` : task ? `task:${task.id}` : active ? `entry:${active.id}` : 'overview'}
+                view={view === null ? 'overview' : view.kind === 'agent' ? `agent:${view.agentId}` : view.kind}
                 className="studio-scroll-inset overflow-y-auto px-3 pb-4"
               >
-                {inspectedAgent && conversationId ? <AgentInspector task={inspectedAgent} conversationId={conversationId} /> : task ? <WorkspaceTaskDetail task={task} /> : active !== undefined ? (
-                  <div className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
-                    {active.kind === 'artifact' ? (
-                      renderArtifact(active.artifact)
-                    ) : active.kind === 'jobs' ? (
-                      <BackgroundWorkPanel key={active.conversationId} conversationId={active.conversationId} onInspectAgent={(item) => { overview(); setAgent(item) }} />
-                    ) : active.kind === 'browser' ? (
-                      <BrowserPanel entry={active} />
-                    ) : active.kind === 'changes' ? (
-                      <ChangesPanel changes={active.changes} conversationId={active.conversationId} />
-                    ) : (
-                      <PlanPanel conversationId={active.conversationId} />
-                    )}
-                  </div>
-                ) : <WorkspaceOverview onInspectAgent={setAgent} />}
+                {view !== null && conversationId !== null
+                  ? <ActivityBody view={view} conversationId={conversationId} />
+                  : <ActivityList rows={rows} onPick={show} />}
               </PageTransition>
             </div>
           </div>

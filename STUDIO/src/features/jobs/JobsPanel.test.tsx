@@ -4,7 +4,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { JobsPill } from './JobsPill'
 import { JobsPanel } from './JobsPanel'
 import type { BackgroundJob } from '@/platform/harness'
 
@@ -26,6 +25,7 @@ function job(overrides: Partial<BackgroundJob> = {}): BackgroundJob {
   return {
     id: 'job_ab1',
     command: 'npm run dev',
+    title: null,
     state: 'running',
     exitCode: null,
     startedAt: 1,
@@ -61,47 +61,6 @@ vi.mock('@/stores/workspace', () => ({
 beforeEach(() => {
   server = [job()]
   list.mockImplementation(async () => ({ ok: true as const, value: server }))
-})
-
-describe('the background commands pill', () => {
-  it('names the one command when exactly one is running', () => {
-    render(<JobsPill jobs={[job()]} open={false} onToggle={() => {}} />)
-
-    // One running command: the line itself is more use than the number 1.
-    expect(screen.getByRole('button').textContent).toContain('npm run dev')
-  })
-
-  it('counts them once there is more than one', () => {
-    render(
-      <JobsPill
-        jobs={[job(), job({ id: 'job_ab2', command: 'curl model.bin' })]}
-        open={false}
-        onToggle={() => {}}
-      />,
-    )
-
-    expect(screen.getByRole('button').textContent).toContain('2 running')
-    // Two commands do not fit, so neither is named rather than one being
-    // picked arbitrarily.
-    expect(screen.getByRole('button').textContent).not.toContain('curl model.bin')
-  })
-
-  it('leads with a failure once nothing is running', () => {
-    render(
-      <JobsPill
-        jobs={[
-          job({ state: 'exited', exitCode: 0, endedAt: 2 }),
-          job({ id: 'job_ab2', state: 'exited', exitCode: 1, endedAt: 2 }),
-        ]}
-        open={false}
-        onToggle={() => {}}
-      />,
-    )
-
-    // A finished command stops being news quickly; a failed one is the reason
-    // somebody opens the panel at all.
-    expect(screen.getByRole('button').textContent).toContain('1 command failed')
-  })
 })
 
 describe('the background commands panel', () => {

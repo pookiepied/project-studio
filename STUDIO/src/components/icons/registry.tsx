@@ -35,6 +35,7 @@ import {
   ArrowExpand01Icon,
   ArrowLeft02Icon,
   ArrowRight01Icon,
+  ArrowRight02Icon,
   ArrowUp02Icon,
   ArrowUpRight01Icon,
   Attachment01Icon,
@@ -42,7 +43,6 @@ import {
   BookmarkAdd01Icon,
   BubbleChatAddIcon,
   BubbleChatIcon,
-  BubbleChatQuestionIcon,
   BubbleChatTemporaryIcon,
   BulbIcon,
   Cancel01Icon,
@@ -62,7 +62,6 @@ import {
   Delete02Icon,
   EraserIcon,
   File01Icon,
-  FileAddIcon,
   FileScriptIcon,
   Folder01Icon,
   Folder02Icon,
@@ -86,11 +85,13 @@ import {
   MoreHorizontalIcon,
   PaintBoardIcon,
   PencilEdit01Icon,
+  QuillWrite01Icon,
   PinIcon,
   PlugSocketIcon,
   Refresh01Icon,
   Robot01Icon,
   ScissorIcon,
+  SpellCheckIcon,
   Search01Icon,
   SecurityCheckIcon,
   Settings02Icon,
@@ -99,7 +100,6 @@ import {
   SourceCodeIcon,
   SparklesIcon,
   Sun01Icon,
-  Target01Icon,
   Tick02Icon,
   UnavailableIcon,
   Undo02Icon,
@@ -121,7 +121,7 @@ import {
   Txt01Icon,
   Xls01Icon,
 } from '@hugeicons/core-free-icons'
-import { CaptureMark, ComposeMark, ExpandMark, HistoryMark, PanelMark, QuoteMark, ReplyMark } from '@/components/icons/familyMarks'
+import { CaptureMark, ComposeMark, CursorMark, ExpandMark, HistoryMark, PanelMark, QuoteMark, ReplyMark, VsCodeMark } from '@/components/icons/familyMarks'
 import {
   AudioLines,
 } from 'lucide-react'
@@ -140,7 +140,7 @@ import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
 import { McpMark } from '@/components/icons/McpMark'
 import { PhotoMark } from '@/components/icons/PhotoMark'
-import { PauseBars, PlayTriangle, StopSquare, VoiceWave, WorkspaceOverviewMark } from '@/components/icons/drawn'
+import { AskMark, PauseBars, PlayTriangle, StopSquare, VoiceWave, WorkspaceOverviewMark } from '@/components/icons/drawn'
 import { DoneMark, EraserMark, HighlighterMark, PenMark, ShareScreenMark, ShowMeMark, UndoMark } from '@/components/icons/screen'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
@@ -213,12 +213,13 @@ const REGISTRY = {
   newChat: { mark: BubbleChatAddIcon },
   chat: { mark: BubbleChatIcon },
   temporaryChat: { mark: BubbleChatTemporaryIcon },
-  // The stopped-run question: a permission the kernel wants or a question the
-  // model asked. A speech bubble carrying a question mark -- a conversation
-  // that has turned and is waiting on you -- and deliberately not the mode
+  // `ask` is not here: the stopped-run question is a drawn bare question mark
+  // (`AskMark` in `drawn.tsx`), merged in below. Deliberately not the mode
   // marks, which say how far ahead the app may run rather than that it has
   // stopped.
-  ask: { mark: BubbleChatQuestionIcon },
+  // One answer a stopped run offers: the arrow at the start of each row on a
+  // question or permission card, saying "this way" rather than "open".
+  choose: { mark: ArrowRight02Icon },
   // Asking about text you selected: a bubble carrying a quotation, because
   // the selection goes into the message as one. Not `newChat`, which it used
   // to share - that mark means an empty conversation, and this one starts
@@ -308,6 +309,8 @@ const REGISTRY = {
   // the pair copy completes; nothing else in the app cuts or pastes.
   cut: { mark: ScissorIcon },
   paste: { mark: ClipboardIcon },
+  // A suggested correction in the text field's menu.
+  spelling: { mark: SpellCheckIcon },
   // Putting back what Improve did to the field. One arrow curling back -
   // not `reload`, which spins forward and means the interface starting over.
   undo: { mark: Undo02Icon },
@@ -327,7 +330,12 @@ const REGISTRY = {
   // listing is `projectOpen`'s open folder -- the shape's concept, "the
   // contents of a directory", is the same in both places.
   fileRead: { mark: BookOpen01Icon },
-  fileWrite: { mark: FileAddIcon },
+  // A quill, because writing a file is authorship and the pencil is already the
+  // edit. A page with a corner plus reads as an insect at row size.
+  fileWrite: { mark: QuillWrite01Icon },
+  // Editors a file can open in, by their own logos. See `familyMarks.ts`.
+  editorVsCode: { mark: VsCodeMark },
+  editorCursor: { mark: CursorMark },
   run: { mark: ComputerTerminal01Icon },
   // A file going into a folder: the move tool, whose whole act is a file
   // gaining a new place. Not the pencil, which is an edit to a file's
@@ -346,7 +354,6 @@ const REGISTRY = {
   // — Composer ------------------------------------------------------------
   add: { mark: Add01Icon, motion: CROSS },
   subtract: { mark: MinusSignIcon },
-  attach: { mark: Attachment01Icon },
   dictate: { mark: Mic01Icon },
   // The microphone held closed in voice mode: nothing is recorded or sent.
   muted: { mark: MicOff01Icon },
@@ -361,7 +368,6 @@ const REGISTRY = {
   // of any kind to take them from. See `drawn.tsx`, and `Icons` below.
 
   // — Capabilities --------------------------------------------------------
-  goal: { mark: Target01Icon },
   plan: { mark: CheckListIcon },
   // `mcp` is not here: MCP publishes its own mark, so it is merged in with
   // the other drawn marks at the bottom of this file. See `McpMark`.
@@ -529,6 +535,7 @@ export const Icons = {
   workspace: WorkspaceOverviewMark,
   mcp: McpMark,
   voice: VoiceWave,
+  ask: AskMark,
   stop: StopSquare,
   play: PlayTriangle,
   pause: PauseBars,

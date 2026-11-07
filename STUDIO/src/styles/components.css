@@ -138,6 +138,61 @@
     }
   }
 
+  /* A picture on its way: a field of faint dots with a brighter band
+     sweeping across it, the frame's answer to the row's shimmer. It shows
+     that something is happening without claiming how far along - no vendor
+     reports progress, so no percentage is drawn. Reduced motion leaves the
+     still field. */
+  .studio-media-wait {
+    position: absolute;
+    inset: 0;
+    background-color: color-mix(in oklab, var(--foreground) 4%, transparent);
+    background-image: radial-gradient(
+      circle,
+      color-mix(in oklab, var(--foreground) 16%, transparent) 1px,
+      transparent 1.6px
+    );
+    background-size: 12px 12px;
+    background-position: center;
+  }
+  .studio-media-wait::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(
+      circle,
+      color-mix(in oklab, var(--foreground) 60%, transparent) 1.1px,
+      transparent 1.8px
+    );
+    background-size: 12px 12px;
+    background-position: center;
+    -webkit-mask-image: linear-gradient(115deg, transparent 35%, #000 50%, transparent 65%);
+    mask-image: linear-gradient(115deg, transparent 35%, #000 50%, transparent 65%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation: studio-media-sweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .studio-media-wait[data-still]::after {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .studio-media-wait::after {
+      display: none;
+    }
+  }
+  @keyframes studio-media-sweep {
+    from {
+      -webkit-mask-position: 100% 0;
+      mask-position: 100% 0;
+    }
+    to {
+      -webkit-mask-position: 0% 0;
+      mask-position: 0% 0;
+    }
+  }
+
   /* The context bar while a turn is in flight.
 
      The figure it draws is still moving -- a measured turn plus an estimate
@@ -188,22 +243,17 @@
     animation: none;
   }
 
-  /* The editorial serif. Display sizes carry the page's one statement -- the
-     home greeting, a page title. Anywhere else it stops being a voice and
-     becomes a second UI font, so the sans carries everything that is read
-     rather than announced. */
+  /* Display sizes carry the page's one statement -- the home greeting, a page
+     title. The face is the window's own, so the Typeface setting reaches it. */
   .studio-display {
-    @apply font-display;
     font-size: var(--text-display);
     line-height: 1.15;
     font-optical-sizing: auto;
   }
 
-  /* The same serif at heading size, for the short labelled moments: dialog
-     headers and the sidebar wordmark. Same voice as display, one step down,
-     so the family reads as one system rather than two unrelated choices. */
+  /* Display's heading size, for the short labelled moments: dialog headers and
+     the sidebar wordmark. */
   .studio-heading {
-    @apply font-display;
     font-size: var(--text-title);
     line-height: 1.25;
   }

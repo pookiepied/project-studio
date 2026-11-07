@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Tooltip } from './Tooltip'
 
@@ -27,5 +27,30 @@ describe('a tooltip in a constrained viewport', () => {
     fireEvent(window, new Event('resize'))
     expect(tooltip.style.maxWidth).toBe('184px')
     expect(tooltip.style.left).toBe('8px')
+  })
+})
+
+describe('a tooltip for a truncated label', () => {
+  const hover = () => {
+    vi.useFakeTimers()
+    fireEvent.pointerEnter(screen.getByText('A long command').parentElement ?? document.body, { pointerType: 'mouse' })
+    act(() => { vi.advanceTimersByTime(500) })
+    vi.useRealTimers()
+  }
+
+  it('shows the whole label when the text is cut off', () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
+    render(<Tooltip label="The whole command" overflowOnly><span className="truncate">A long command</span></Tooltip>)
+    hover()
+    expect(screen.getByRole('tooltip').textContent).toBe('The whole command')
+  })
+
+  it('stays quiet when the text fits', () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(100)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
+    render(<Tooltip label="The whole command" overflowOnly><span className="truncate">A long command</span></Tooltip>)
+    hover()
+    expect(screen.queryByRole('tooltip')).toBeNull()
   })
 })

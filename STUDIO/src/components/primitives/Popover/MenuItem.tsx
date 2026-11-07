@@ -30,6 +30,7 @@ export function MenuItem({
   note,
   destructive = false,
   disabled = false,
+  label,
   children,
 }: {
   onSelect: () => void
@@ -45,6 +46,8 @@ export function MenuItem({
   destructive?: boolean
   /** A verb that has nothing to act on right now: Cut with no selection. Stays in place, greyed. */
   disabled?: boolean
+  /** The row's name for a screen reader, where the marks beside its text carry meaning. */
+  label?: string
   children: ReactNode
 }) {
   const showCheckColumn = selected !== undefined
@@ -53,6 +56,7 @@ export function MenuItem({
     <button
       type="button"
       role={showCheckColumn ? 'menuitemradio' : 'menuitem'}
+      aria-label={label}
       aria-checked={showCheckColumn ? selected : undefined}
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : 'menu'}
@@ -108,7 +112,9 @@ export function MenuItem({
       ) : null}
       {showCheckColumn || endIcon !== undefined ? (
         <span aria-hidden className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
-          {selected ? <Icons.check className="text-accent" /> : endIcon}
+          {/* The row's own mark comes first: the fill already says which row is
+              chosen, and a check here would hide that a chosen row is working. */}
+          {endIcon ?? (selected ? <Icons.check className="text-accent" /> : null)}
         </span>
       ) : null}
     </button>

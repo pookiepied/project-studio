@@ -44,7 +44,6 @@ const mediaJobs = { list, stop: async () => ({ ok: true as const, value: undefin
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({ mediaJobs, conversations: [] }),
 }))
-vi.mock('@/stores/rail', () => ({ useRail: () => ({ openArtifact: () => {} }) }))
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ route: { kind: 'home' } }) }))
 
 afterEach(() => {
@@ -72,6 +71,11 @@ function call(overrides: Partial<ToolCallView>): ToolCallView {
   }
 }
 
+/** The media row: the one line a generation stands under in the transcript. */
+function mediaRows(): HTMLElement[] {
+  return screen.queryAllByText(/^(Generating image|Image|\d+ images)( · |$)/)
+}
+
 function groups(...calls: ToolCallView[]) {
   return calls.map((one, index) => ({ id: `g-${String(index)}`, calls: [one], file: null }))
 }
@@ -96,7 +100,7 @@ describe('an image call', () => {
     expect(activity.getAttribute('aria-expanded')).toBe('true')
     expect(within(screen.getByRole('region', { name: 'Tool activity' })).getByRole('button', { name: /second/ })).toBe(details)
     expect(details.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('a red bicycle')).toBeTruthy()
+    expect(mediaRows()).toHaveLength(1)
   })
 
   it('has one standalone location while live, completed, expanded and replayed', () => {
@@ -109,18 +113,18 @@ describe('an image call', () => {
       ],
     }
     const view = render(<AssistantTurn item={item} conversationId="conv" live turnInFlight />)
-    const title = screen.getByText('a red bicycle')
-    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+    const [row] = mediaRows()
+    expect(mediaRows()).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Ran commands' }))
-    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
-    expect(view.container.querySelector('[aria-label="Tool activity"]')?.contains(title)).toBe(false)
+    expect(mediaRows()).toHaveLength(1)
+    expect(view.container.querySelector('[aria-label="Tool activity"]')?.contains(row ?? null)).toBe(false)
     view.rerender(<AssistantTurn item={item} conversationId="conv" live={false} />)
-    expect(screen.getByText('a red bicycle')).toBe(title)
+    expect(mediaRows()[0]).toBe(row)
     fireEvent.click(screen.getByRole('button', { name: 'Generated an image' }))
-    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+    expect(mediaRows()).toHaveLength(1)
     view.unmount()
     render(<AssistantTurn item={item} conversationId="conv" live={false} />)
-    expect(screen.getAllByText('a red bicycle')).toHaveLength(1)
+    expect(mediaRows()).toHaveLength(1)
   })
 
   it('does not render media a second time in grouped activity or completion results', () => {
@@ -156,9 +160,13 @@ describe('an image call', () => {
       />,
     )
 
-    expect(screen.getByText('a red bicycle')).toBeTruthy()
-    expect(screen.getByText('Image ready · openai/gpt-image-2')).toBeTruthy()
+    expect(screen.getByText('Image')).toBeTruthy()
+    // The model is not on the row; the viewer names it.
+    expect(screen.queryByText(/openai\/gpt-image-2/)).toBeNull()
+    // The title names the picture, and opens under the row as what was asked.
     const image = await screen.findByAltText('a red bicycle')
+    fireEvent.click(screen.getByRole('button', { name: /^Image/ }))
+    expect(screen.getByText('a red bicycle')).toBeTruthy()
     expect(image.getAttribute('src')).toBe(`data:image/png;base64,${btoa('png-bytes')}`)
     expect(transport).toHaveBeenCalledTimes(1)
   })
@@ -171,7 +179,7 @@ describe('an image call', () => {
         groups={groups(call({ input: present({ prompt: 'a red bicycle', count: 3, aspect_ratio: '16:9' }) }))}
       />,
     )
-    expect(screen.getByText('Generating')).toBeTruthy()
+    expect(screen.getByText(/^Generating image/)).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
     const frames = document.querySelectorAll('[style*="aspect-ratio"]')
     expect(frames).toHaveLength(3)
@@ -181,7 +189,7 @@ describe('an image call', () => {
     }
   })
 
-  it('lays two pictures in one row, each as wide as its ratio', async () => {
+  it('lays two pictures in one row, each the shape of its picture', async () => {
     setAttachmentBytesTransport(async () => bytesOf('png-bytes'))
     render(
       <ArtifactCalls
@@ -200,27 +208,25 @@ describe('an image call', () => {
 
     const images = await screen.findAllByRole('img')
     expect(images).toHaveLength(2)
-    expect(screen.getByText('2 images ready · openai/gpt-image-2')).toBeTruthy()
+    expect(screen.getByText('2 images')).toBeTruthy()
 
-    // The second picture turns out to be portrait: its cell narrows to its
-    // ratio and the row keeps one height and its full width, instead of
-    // cropping it square or leaving ground beside it.
+    // The second picture turns out to be portrait: its frame narrows to its
+    // ratio at the pair's shared height, instead of being cropped square or
+    // stretched to the measure.
     const second = images[1] as HTMLImageElement
     Object.defineProperty(second, 'naturalWidth', { value: 900 })
     Object.defineProperty(second, 'naturalHeight', { value: 1600 })
     await act(async () => {
       fireEvent.load(second)
     })
-    const cells = [...document.querySelectorAll('[style*="flex-grow"]')] as HTMLElement[]
-    expect(cells).toHaveLength(2)
-    // Shares of the row: a square and a 9:16 portrait, summing to one.
-    expect(Number(cells[0]?.style.flexGrow)).toBeCloseTo(1 / (1 + 900 / 1600))
-    expect(Number(cells[1]?.style.flexGrow)).toBeCloseTo(900 / 1600 / (1 + 900 / 1600))
-    expect(cells[1]?.style.maxWidth).toBe('')
-    // Every frame is capped, so a tall box is never a tower.
-    for (const frame of document.querySelectorAll('[style*="aspect-ratio"]')) {
-      expect((frame as HTMLElement).style.maxHeight).toBe('480px')
-    }
+    const frames = [...document.querySelectorAll('[style*="aspect-ratio"]')] as HTMLElement[]
+    expect(frames).toHaveLength(2)
+    expect(frames[1]?.style.aspectRatio.startsWith(String(900 / 1600))).toBe(true)
+    // Each cell's width is its ratio at the pair's height (240px): a square,
+    // then a 9:16 a little over half as wide - never wider than the picture.
+    const cells = frames.map((frame) => frame.parentElement as HTMLElement)
+    expect(cells[0]?.style.flex).toBe('0 1 240px')
+    expect(cells[1]?.style.flex).toBe(`0 1 ${String(Math.round(240 * 900 / 1600))}px`)
   })
 
   it("shows the refusal in the harness's words and no frame", () => {
@@ -270,7 +276,7 @@ describe('a video call', () => {
       await Promise.resolve()
     })
     expect(list).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('Rendering frames · google/veo-3.1')).toBeTruthy()
+    expect(screen.getByText('Rendering frames')).toBeTruthy()
 
     const running = listed[0]
     if (running === undefined) throw new Error('the job was not staged')
@@ -279,7 +285,7 @@ describe('a video call', () => {
       await vi.advanceTimersByTimeAsync(5_000)
     })
     expect(list).toHaveBeenCalledTimes(2)
-    expect(screen.getByText('Video ready · google/veo-3.1')).toBeTruthy()
+    expect(screen.getByText('Video')).toBeTruthy()
 
     // The player arrives on its own chunk; give it a moment to land.
     let video: HTMLVideoElement | null = null
@@ -357,7 +363,7 @@ describe('a video call', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(screen.getByText('Video ready · google/veo-3.1')).toBeTruthy()
+    expect(screen.getByText('Video')).toBeTruthy()
 
     // The player arrives on its own chunk; give it a moment to land.
     let video: HTMLVideoElement | null = null

@@ -161,7 +161,9 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # open a folder view and select an item in it - navigation, never execution -
 # on a COM-initialized thread. Feature sets of the crate already in this tree;
 # no new crate.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_System_Com"] }
+# `Win32_UI_WindowsAndMessaging` gates `ShellExecuteW`, the one association
+# launch in `open_file.rs`, which holds it to a fixed list of inert file types.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
 
 # The permission grant (`permissions.rs`): WebView2's PermissionRequested,
 # answered by Studio instead of by a stall or by Edge's own prompt. The

@@ -1131,4 +1131,54 @@ describe('the silence a read may not outlast', () => {
       vi.useRealTimers()
     }
   })
+
+  it('does not call a read quiet while the window is hidden, or after a stopped timer', async () => {
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get')
+    vi.useFakeTimers()
+    try {
+      const rendered = await mountScripted({
+        invoke: streams.invoke,
+        factory: channels.factory,
+        listen: lifecycle.listen,
+        livenessBudgetMs: 50,
+      }).then(async (hook) => {
+        await act(async () => {
+          await flushAttach()
+        })
+        return hook
+      })
+      act(() => {
+        channels.feeds[0]({ kind: 'up-to-date', offset: '-1' })
+      })
+
+      // Hidden: however long it lasts, the budget proves nothing.
+      visibility.mockReturnValue('hidden')
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(rendered.result.current.phase.status).toBe('live')
+
+      // Back on screen, a timer that fires far past its time was a stopped page.
+      visibility.mockReturnValue('visible')
+      const late = Date.now() + 1_000
+      const now = vi.spyOn(Date, 'now').mockReturnValue(late)
+      act(() => {
+        vi.advanceTimersByTime(50)
+      })
+      now.mockRestore()
+      expect(rendered.result.current.phase.status).toBe('live')
+
+      // Awake and on time, silence is silence.
+      act(() => {
+        vi.advanceTimersByTime(60)
+      })
+      expect(rendered.result.current.phase.status).toBe('interrupted')
+    } finally {
+      visibility.mockRestore()
+      vi.useRealTimers()
+    }
+  })
 })

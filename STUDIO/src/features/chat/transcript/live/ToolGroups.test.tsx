@@ -136,6 +136,20 @@ describe('the chip is the default', () => {
     expect(screen.queryByText('React documentation')).toBeNull()
   })
 
+  it('reveals a clipped tool subject through Studio\'s tooltip', () => {
+    vi.useFakeTimers()
+    const command = 'pnpm exec vitest run src/features/chat/transcript/live/ToolGroups.test.tsx'
+    render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'shell', calls: [call({
+      toolName: 'shell', input: present({ command }),
+    })] })} />)
+    const subject = screen.getByText(command)
+    Object.defineProperties(subject, { scrollWidth: { value: 440 }, clientWidth: { value: 170 } })
+    expect(subject.closest('[title]')).toBeNull()
+    fireEvent.pointerEnter(subject)
+    act(() => { vi.advanceTimersByTime(500) })
+    expect(screen.getByRole('tooltip').textContent).toBe(command)
+  })
+
   it('limits search previews independently and shows fetched pages as links', () => {
     const search = call({
       toolCallId: 'search', toolName: 'native_web_search', input: present({ query: 'framework docs' }),
@@ -465,32 +479,10 @@ describe('the entrance', () => {
 })
 
 /**
- * The record of a question call. The live card takes the answers and the run
- * moves on; the chip is what the transcript keeps, so it names the question
- * and holds the exact words or options the person answered with -- the part
- * the transcript used to lose.
+ * A folder request is a question the run asks too, and its chip names the
+ * folder. (An ask-a-question call has no chip: see QuestionAnswers.test.)
  */
-describe('the question and its answer', () => {
-  const askCall = (overrides: Partial<ToolCallView> = {}): ToolCallView =>
-    call({
-      toolName: 'ask_user_question',
-      input: present({
-        questions: [
-          {
-            header: 'Auth',
-            question: 'Which auth approach should we use?',
-            options: [{ id: 'cookies', label: 'Session cookies', description: 'Keep it server-side.' }],
-          },
-          {
-            header: 'Secrets',
-            question: 'Where should secrets live?',
-            options: [],
-          },
-        ],
-      }),
-      ...overrides,
-    })
-
+describe('the folder question', () => {
   it('names the folder the model asked for on a folder question', () => {
     render(
       <ToolGroups
@@ -503,106 +495,6 @@ describe('the question and its answer', () => {
     )
     expect(screen.getByText('C:/Users/me/Downloads')).toBeTruthy()
     expect(screen.getByText('Asking for')).toBeTruthy()
-  })
-
-  it('names the first question on the chip, with the count beside it', () => {
-    render(
-      <ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'ask_user_question', calls: [askCall()] })} />,
-    )
-    expect(screen.getByText('Auth +1')).toBeTruthy()
-  })
-
-  it('shows each question and the exact answer given, including custom words', () => {
-    render(
-      <ToolGroups conversationId="conv"
-        groups={groupsOf({
-          toolName: 'ask_user_question',
-          calls: [
-            askCall({
-              output: present({
-                questions: [
-                  {
-                    header: 'Auth',
-                    question: 'Which auth approach should we use?',
-                    outcome: 'answered',
-                    optionIds: ['cookies'],
-                    labels: ['Session cookies'],
-                  },
-                  {
-                    header: 'Secrets',
-                    question: 'Where should secrets live?',
-                    outcome: 'answered',
-                    text: 'In the vault, not the repo',
-                  },
-                ],
-              }),
-            }),
-          ],
-        })}
-      />,
-    )
-    fireEvent.click(screen.getByText('Asked'))
-    expect(screen.getByText('Which auth approach should we use?')).toBeTruthy()
-    expect(screen.getByText('Session cookies')).toBeTruthy()
-    expect(screen.getByText('In the vault, not the repo')).toBeTruthy()
-    // The answer is the fact this record exists to hold, and it reads as one.
-    expect(screen.getByText('Session cookies').className).toContain('text-foreground')
-  })
-
-  it('says what happened instead of a choice', () => {
-    render(
-      <ToolGroups conversationId="conv"
-        groups={groupsOf({
-          toolName: 'ask_user_question',
-          calls: [
-            askCall({
-              output: present({
-                questions: [
-                  { header: 'Auth', question: 'Which auth approach?', outcome: 'deferred' },
-                  { header: 'Secrets', question: 'Where should secrets live?', outcome: 'timed_out' },
-                ],
-              }),
-            }),
-          ],
-        })}
-      />,
-    )
-    fireEvent.click(screen.getByText('Asked'))
-    expect(screen.getByText('You decide')).toBeTruthy()
-    expect(screen.getByText('Timed out')).toBeTruthy()
-  })
-
-  it('shows only the questions while the call is still parked', () => {
-    render(
-      <ToolGroups conversationId="conv"
-        groups={groupsOf({ toolName: 'ask_user_question', calls: [askCall()] })}
-      />,
-    )
-    fireEvent.click(screen.getByText('Asking'))
-    expect(screen.getByText('Which auth approach should we use?')).toBeTruthy()
-    expect(screen.queryByText('Session cookies')).toBeNull()
-  })
-
-  it('leaves no raw JSON behind for a question call', () => {
-    render(
-      <ToolGroups conversationId="conv"
-        groups={groupsOf({
-          toolName: 'ask_user_question',
-          calls: [
-            askCall({
-              output: present({
-                questions: [
-                  { header: 'Auth', question: 'Which auth approach?', outcome: 'answered', labels: ['Session cookies'] },
-                ],
-              }),
-            }),
-          ],
-        })}
-      />,
-    )
-    fireEvent.click(screen.getByText('Asked'))
-    expect(screen.queryByText(/in:/)).toBeNull()
-    expect(screen.queryByText(/out:/)).toBeNull()
   })
 })
 
@@ -900,7 +792,6 @@ describe('every Studio and framework tool', () => {
     'jobs',
     'discover',
     'plan',
-    'ask_user_question',
     'request_folder',
     'library_search',
     'library_keep',

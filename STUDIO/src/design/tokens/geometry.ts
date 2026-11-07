@@ -108,11 +108,12 @@ export const COMPOSER = {
 /**
  * A generated picture or clip in the transcript.
  *
- * A frame is as wide as its share of the row and no taller than this,
- * whatever its ratio: a portrait at the full measure would be a tower the
- * reader scrolls past. Under the cap the box is wider than the picture,
- * and the picture stands centred in it over a blurred copy of itself, so
- * the box is never empty ground beside a picture.
+ * Every frame is the shape of its picture, and the whole set stands under
+ * one height: a single picture is at most `maxHeight` tall, and several share
+ * it in rows of two. So a wide picture is wide, a tall one is narrow, and
+ * neither is stretched to the measure - at Family A's 720px window the old
+ * 480px cap and full-width rows let one picture take most of the screen and
+ * a portrait fill the column with blurred bands.
  *
  * The default ratio is the reservation for a frame whose picture has not
  * arrived and whose call named no ratio. 4:3 is the least wrong guess: most
@@ -120,8 +121,14 @@ export const COMPOSER = {
  * moves the transcript less than a 16:9 one would.
  */
 export const MEDIA_FRAME = {
-  maxHeight: 480,
+  maxHeight: 300,
+  /** Two pictures side by side share a shorter row than one alone. */
+  pairHeight: 240,
   defaultRatio: 4 / 3,
   /** Between frames in one artifact, and between rows of them. */
   gap: SPACE.sm,
+  /** A picture alone; the composer's own corner. */
+  radius: 18,
+  /** A picture in a set, a step smaller as the frames are. */
+  setRadius: 14,
 } as const

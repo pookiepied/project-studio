@@ -350,6 +350,23 @@ describe("permissions see what the call touches", () => {
     expect(calls).toEqual(["log"]);
   });
 
+  it("tells the tool whether the person answered a prompt for this call, and only then", async () => {
+    const seen: [string, boolean][] = [];
+    const instance = new CallGate({ kernel: new PermissionKernel({ grants, approver: approver("allow") }), sandbox });
+    for (const [name, effects] of [["run", ["execute"]], ["look", ["read"]]] as const) {
+      instance.register(defineStudioTool({
+        descriptor: capability(name, [...effects]),
+        resourceKind: "command",
+        parse: (input) => input as Record<string, never>,
+        resource: () => undefined,
+        execute: async (_input, context) => { seen.push([name, context.personAsked?.() === true]); return "ok"; },
+      }));
+    }
+    await instance.call({ name: "native/run", input: {}, scope: SCOPE });
+    await instance.call({ name: "native/look", input: {}, scope: SCOPE });
+    expect(seen).toEqual([["run", true], ["look", false]]);
+  });
+
   it("stores an approval narrowed to the scope the user chose", async () => {
     // The user picks "this folder"; the pattern is ours to derive, so no dialog
     // can store something wider than the option it displayed.

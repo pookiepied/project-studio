@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover, SearchField } from '@/components/primitives'
 import { cn } from '@/lib/cn'
+import { STATUS_LABELS, StatusMark } from '@/shell/sidebar/StatusMark'
 import { useNavigation } from '@/stores/navigation'
+import { useConversationStatuses } from '@/stores/status'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
@@ -25,6 +27,7 @@ export function ConversationSelector({
 }) {
   const { conversations, projects } = useWorkspace()
   const { openChat, openProject } = useNavigation()
+  const statuses = useConversationStatuses()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
@@ -38,6 +41,13 @@ export function ConversationSelector({
   )
   const matchingProjects = projects.filter((item) => needle === '' || item.name.toLowerCase().includes(needle))
   const projectName = (id: string | null) => projects.find((item) => item.id === id)?.name
+
+  // The drawer is usually closed, so the button says when another conversation
+  // has something for you. Running does not: it asks for nothing yet.
+  const elsewhere = conversations
+    .filter((item) => !item.archived && item.id !== currentId)
+    .map((item) => statuses.get(item.id))
+  const calling = elsewhere.includes('input') ? 'input' : elsewhere.includes('done') ? 'done' : null
 
   const choose = (go: () => void) => {
     go()
@@ -62,10 +72,22 @@ export function ConversationSelector({
           onClick={() => setOpen((value) => !value)}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Conversations. Current: ${title}`}
+          aria-label={`Conversations. Current: ${title}${calling === null ? '' : `. Another conversation: ${STATUS_LABELS[calling]}`}`}
           className="flex h-[var(--header-control)] min-w-0 items-center rounded-full pl-[11px] pr-2.5 transition-colors duration-fast hover:bg-tint"
         >
-          <Icons.history size="header" />
+          <span className="relative flex shrink-0 items-center">
+            <Icons.history size="header" />
+            {calling !== null ? (
+              <span
+                data-status-dot={calling}
+                aria-hidden
+                className={cn(
+                  'absolute -right-0.5 -top-0.5 size-1.5 rounded-full',
+                  calling === 'input' ? 'bg-accent' : 'bg-muted-foreground',
+                )}
+              />
+            ) : null}
+          </span>
           <span
             className={cn(
               'ml-4 min-w-0 truncate text-body font-medium text-foreground',
@@ -89,23 +111,28 @@ export function ConversationSelector({
         />
       </div>
       <MenuSeparator />
-      <div className="studio-scroll-bounded max-h-[min(22rem,60dvh)] overflow-y-auto overscroll-contain">
+      <div className="studio-scroll-menu max-h-[min(22rem,60dvh)] overflow-x-hidden overflow-y-auto overscroll-contain">
         {rows.length === 0 && matchingProjects.length === 0 ? (
           <p role="status" className="px-2 py-2 text-ui text-muted-foreground">
             {needle === '' ? 'No conversations yet.' : `Nothing matches "${query.trim()}".`}
           </p>
         ) : null}
         {rows.length > 0 ? <MenuLabel>Conversations</MenuLabel> : null}
-        {rows.map((item) => (
-          <MenuItem
-            key={item.id}
-            selected={item.id === currentId}
-            hint={projectName(item.projectId)}
-            onSelect={() => choose(() => openChat(item.id))}
-          >
-            {item.title}
-          </MenuItem>
-        ))}
+        {rows.map((item) => {
+          const status = statuses.get(item.id)
+          return (
+            <MenuItem
+              key={item.id}
+              selected={item.id === currentId}
+              hint={projectName(item.projectId)}
+              endIcon={status !== undefined ? <StatusMark status={status} /> : undefined}
+              label={status !== undefined ? `${item.title}. ${STATUS_LABELS[status]}` : undefined}
+              onSelect={() => choose(() => openChat(item.id))}
+            >
+              {item.title}
+            </MenuItem>
+          )
+        })}
         {matchingProjects.length > 0 ? <MenuLabel>Projects</MenuLabel> : null}
         {matchingProjects.map((item) => (
           <MenuItem key={item.id} icon={<Icons.project />} onSelect={() => choose(() => openProject(item.id))}>

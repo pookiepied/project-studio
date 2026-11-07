@@ -103,7 +103,7 @@ describe('the box', () => {
 
   it('leaves the edge to the field, not to a control in the row', () => {
     const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
-    fireEvent.focus(screen.getByRole('button', { name: 'Add context' }))
+    fireEvent.focus(screen.getByRole('button', { name: 'Attach files' }))
     expect(frame(container)?.getAttribute('data-focused')).toBe('false')
   })
 
@@ -149,7 +149,10 @@ describe('the three dots', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'More options' }))
     expect(await screen.findByText('What Studio may do')).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: VOICE_UNAVAILABLE_REASON })).toBeTruthy()
+    // The test DOM is an insecure origin: the row keeps its one word and
+    // says "Not available" at its end, with the reason as its name.
+    const dictate = screen.getByRole('menuitem', { name: `Dictate. ${VOICE_UNAVAILABLE_REASON}` })
+    expect(dictate.textContent).toBe('DictateNot available')
   })
 })
 
@@ -296,10 +299,9 @@ describe('the field holds its words until the harness takes them', () => {
 describe('the images a turn carries', () => {
   const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4])
 
-  /** Opens the plus menu's Files item, which wakes the hidden file input. */
+  /** The paperclip, which wakes the hidden file input directly. */
   function pickImages(): void {
-    fireEvent.click(screen.getByRole('button', { name: 'Add context' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Files/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Attach files' }))
   }
 
   function pickerInput(): HTMLInputElement {
@@ -592,14 +594,16 @@ describe('voice on an insecure origin', () => {
     expect(voice.hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: 'Voice mode' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More options' }))
-    const dictate = await screen.findByRole('menuitem', { name: VOICE_UNAVAILABLE_REASON })
+    const dictate = await screen.findByRole('menuitem', { name: `Dictate. ${VOICE_UNAVAILABLE_REASON}` })
     expect(dictate.hasAttribute('disabled')).toBe(true)
+    // The reason is a sentence; the row stays one word and a short hint.
+    expect(dictate.textContent).not.toContain(VOICE_UNAVAILABLE_REASON)
     expect(screen.queryByRole('menuitem', { name: 'Dictate' })).toBeNull()
     expect(screen.queryByRole('note')).toBeNull()
     // Everything else still answers: the field and its send control are not
     // part of the degradation.
     expect(screen.getByRole('textbox')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Add context' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Attach files' })).toBeTruthy()
   })
 
   it('shows the reason when a disabled voice control is tapped, since a phone has no hover', async () => {

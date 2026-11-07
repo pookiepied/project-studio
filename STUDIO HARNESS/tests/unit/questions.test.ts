@@ -555,7 +555,7 @@ describe("the closing turn", () => {
   };
   const sandbox = new LocalSandbox(createSandboxPolicy({ workspaceRoot: process.cwd() }));
 
-  async function runWith(outcome: "answered" | "stopped", closing: ClosingTurns): Promise<unknown> {
+  async function runWith(outcome: "answered" | "stopped" | "deferred", closing: ClosingTurns): Promise<unknown> {
     const tool = createAskUserQuestionTool({
       ask: () =>
         Promise.resolve([
@@ -592,6 +592,26 @@ describe("the closing turn", () => {
 
     expect(result.closing).toMatch(/stopped this run/);
     expect(result.closing).toMatch(/one turn/);
+  });
+
+  it("tells the model a skipped question is its to decide, and says nothing when none was skipped", async () => {
+    const skipped = (await runWith("deferred", new ClosingTurns())) as {
+      note?: string;
+      questions: { outcome: string; answer?: string }[];
+    };
+    expect(skipped.note).toMatch(/skipped/);
+    expect(skipped.note).toMatch(/which option you chose/);
+    expect(skipped.note).toMatch(/Do not ask a skipped question again/);
+    // The entry itself is answered, not empty: a model reading only the entry
+    // still sees the person's word for it.
+    expect(skipped.questions[0]).toMatchObject({ outcome: "deferred", answer: "skip" });
+
+    const answered = (await runWith("answered", new ClosingTurns())) as {
+      note?: string;
+      questions: { answer?: string }[];
+    };
+    expect(answered.questions[0]?.answer).toBeUndefined();
+    expect(answered.note).toBeUndefined();
   });
 });
 

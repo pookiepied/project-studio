@@ -1,3 +1,4 @@
+import { Tooltip } from '@/components/primitives'
 import { Icons } from '@/components/icons'
 import { isRecord } from '@/lib/guards'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
@@ -120,7 +121,7 @@ export function DiscoveryDetails({ call, live }: { call: ToolCallView; live: boo
       {entries.map((entry, index) => <li key={index} className="flex items-start gap-2.5">
         <span className="mt-0.5 text-muted-foreground"><Icons.mcp /></span>
         <div className="min-w-0">
-          <p className="font-medium" title={entry.name}>{readableName(entry.name.replace(/^mcp:/, ''))}</p>
+          <Tooltip label={entry.name} className="flex"><p className="font-medium">{readableName(entry.name.replace(/^mcp:/, ''))}</p></Tooltip>
           {entry.description !== '' ? <p className="text-muted-foreground">{entry.description}</p> : null}
         </div>
       </li>)}

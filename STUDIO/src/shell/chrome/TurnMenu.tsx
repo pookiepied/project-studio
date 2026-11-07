@@ -133,7 +133,7 @@ export function TurnMenu({ conversationId }: { conversationId: string | null }) 
       align="start"
       offset={COMPOSER.menuOffset}
       maxHeight="28rem"
-      className="studio-scroll-bounded w-64 overflow-y-auto overscroll-contain rounded-xl"
+      className="studio-scroll-menu w-64 overflow-y-auto overscroll-contain rounded-xl"
       initialFocus='[aria-label="Search models"]'
       companion={view === 'root' && browser !== null && catalog.phase.status === 'ready' && offered.length > 0 ? {
         label: 'More models',

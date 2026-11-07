@@ -4,6 +4,7 @@ import type { ReasoningChoice } from '@/domain/models/types'
 import type { PermissionMode } from '@/domain/permissions/modes'
 import type { Conversation, TurnSettings } from '@/domain/conversation/types'
 import type { Project } from '@/domain/projects/types'
+import type { FileLocation, FileText } from '@/platform/harness/contracts'
 import type {
   ApprovalAnswer,
   DefaultSelection,
@@ -85,6 +86,12 @@ export interface ModelCatalogState {
  * other call answers with.
  */
 export interface BoundClient {
+  /** The conversations with a turn in flight, open here or not. */
+  readonly runningConversations: () => Promise<HarnessResult<readonly string[]>>
+  /** Where a path a reply named really is, among that conversation's folders. */
+  readonly locateFile: (conversationId: string, path: string) => Promise<HarnessResult<FileLocation | null>>
+  /** A located file's text for the viewer, or null when it has none to show. */
+  readonly readFileText: (conversationId: string, path: string) => Promise<HarnessResult<FileText | null>>
   /**
    * The permission questions the harness is holding: every row still waiting,
    * across conversations, each naming the conversation it belongs to.

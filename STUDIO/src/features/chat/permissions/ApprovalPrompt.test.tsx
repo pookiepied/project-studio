@@ -17,6 +17,7 @@ import type { PendingApprovalRecord } from '@/platform/harness'
 
 vi.mock('framer-motion', () => ({
   LayoutGroup: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   motion: new Proxy({}, { get: () => (props: Record<string, unknown>) => <div {...props} /> }),
 }))
 
@@ -99,21 +100,21 @@ describe('ApprovalPrompt attribution', () => {
  * than shortening it, so the card never offers one.
  */
 describe('ApprovalPrompt duration limit', () => {
-  it('offers only "Just once" when that is all the kernel takes', () => {
+  it('offers only "Allow once" when that is all the kernel takes', () => {
     render(<ApprovalPrompt questions={[questionFromRecord(record('studio', 'computer:password_field:app', 'once'))]} hasProject answeringId={null} onAnswer={answer} />)
-    expect(screen.queryByText('This conversation')).toBeNull()
-    expect(screen.queryByText('Always')).toBeNull()
-    expect(screen.getByText('Just once')).not.toBeNull()
+    expect(screen.queryByText('Allow for this conversation')).toBeNull()
+    expect(screen.queryByText('Always allow in this project')).toBeNull()
+    expect(screen.getByText('Allow once')).not.toBeNull()
   })
 
   it('stops at "This conversation" when that is the limit', () => {
     render(<ApprovalPrompt questions={[questionFromRecord(record('studio', 'computer:terminal:wt', 'conversation'))]} hasProject answeringId={null} onAnswer={answer} />)
-    expect(screen.getByText('This conversation')).not.toBeNull()
-    expect(screen.queryByText('Always')).toBeNull()
+    expect(screen.getByText('Allow for this conversation')).not.toBeNull()
+    expect(screen.queryByText('Always allow in this project')).toBeNull()
   })
 
   it('offers every duration with no limit', () => {
     render(<ApprovalPrompt questions={[questionFromRecord(record('studio', 'C:/home/workspace/a.txt'))]} hasProject answeringId={null} onAnswer={answer} />)
-    expect(screen.getByText('Always')).not.toBeNull()
+    expect(screen.getByText('Always allow in this project')).not.toBeNull()
   })
 })

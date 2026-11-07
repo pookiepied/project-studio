@@ -41,6 +41,20 @@ export const EASE_OUT = [0.16, 1, 0.3, 1] as const
  */
 export const EASE_IN = [0.7, 0, 0.84, 0] as const
 
+/**
+ * A floating panel's two curves. `EASE_OUT` is finished by the third frame, which
+ * is right for a control answering but leaves a panel no visible arrival; this
+ * settles across the whole duration, so the growth can be seen.
+ */
+export const EASE_SETTLE = [0.22, 1, 0.36, 1] as const
+
+/**
+ * `EASE_IN` holds a panel near full opacity for two thirds of its exit and then
+ * drops it in the last frames, which reads as a cut. A panel fades across the
+ * whole exit instead, still gathering speed as it goes.
+ */
+export const EASE_AWAY = [0.4, 0, 1, 1] as const
+
 export const DURATION = {
   /** A state change on something already visible — hover, a chip. */
   fast: 0.12,
@@ -85,10 +99,11 @@ export const SPRING_SURFACE = { type: 'spring', stiffness: 380, damping: 30, mas
 /** A compact floating surface settles from the edge that summoned it. */
 export function floatingMotion(x = 0, y = 0) {
   return {
-    initial: { opacity: 0, scale: 0.97, x, y },
+    initial: { opacity: 0, scale: 0.94, x, y },
     animate: { opacity: 1, scale: 1, x: 0, y: 0 },
-    exit: { opacity: 0, scale: 0.97, x, y, transition: { duration: DURATION.base, ease: EASE_IN } },
-    transition: { duration: DURATION.base, ease: EASE_OUT },
+    exit: { opacity: 0, scale: 0.96, x, y, transition: { duration: DURATION.base, ease: EASE_AWAY } },
+    // Opacity lands first, so the panel is readable while it finishes growing.
+    transition: { duration: DURATION.slow, ease: EASE_SETTLE, opacity: { duration: DURATION.base, ease: 'easeOut' } },
   } as const
 }
 

@@ -31,7 +31,7 @@ import { StateNote } from '@/components/state'
 import { ArtifactsSection } from './ArtifactsSection'
 import { Section } from './Section'
 import { WorkspaceSection } from './WorkspaceSection'
-import { ConversationSection } from './ConversationSection'
+import { ConversationSection, PromptCardsSection } from './ConversationSection'
 import { LayoutSection } from './LayoutSection'
 
 /**
@@ -99,6 +99,7 @@ function ShowcasePage() {
         </header>
 
         <ConversationSection />
+        <PromptCardsSection />
         <LayoutSection />
         <ButtonsSection />
         <IconButtonsSection />

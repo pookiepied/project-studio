@@ -40,8 +40,8 @@
   --ring: #3aa8fe;
   --primary: #3aa8fe;
   --primary-foreground: #ffffff;
-  --tooltip: oklch(0.205 0 0);
-  --tooltip-foreground: oklch(0.985 0 0);
+  --tooltip: #000;
+  --tooltip-foreground: #fff;
   --selection: rgb(58 168 254 / 22%);
   --selection-foreground: #1878c4;
 
@@ -57,6 +57,9 @@
   --composer-surface: var(--surface);
   --composer-edge: #adbfd0;
   --composer-halo: #d9ecf8;
+  /* The question card: white, faintly see-through, as the reference's panel is. */
+  --prompt-card-surface: rgb(255 255 255 / 76%);
+  --prompt-card-edge: oklch(0 0 0 / 6%);
   --window-close: #f0f0f0;
   --switch-off: #dedede;
   --model-chip: #ecfff4;
@@ -205,14 +208,17 @@
   --muted: oklch(0.33 0 0);
   --muted-foreground: oklch(0.706 0 0);
   --border: var(--hairline);
-  --tooltip: #4a4a4a;
-  --tooltip-foreground: oklch(0.985 0 0);
+  --tooltip: #fff;
+  --tooltip-foreground: #000;
   --accent-wash: #334e60;
   --accent-wash-foreground: #d3e9f9;
   --selection-foreground: #7cc4fb;
   --composer-surface: #363636;
   --composer-edge: #3e6e97;
   --composer-halo: #3d5161;
+  /* Frosted: the transcript shows faintly through, under a light hairline. */
+  --prompt-card-surface: rgb(56 56 56 / 72%);
+  --prompt-card-edge: oklch(1 0 0 / 10%);
   --window-close: #454545;
   --switch-off: #373737;
   --model-chip: #4e4e4e;

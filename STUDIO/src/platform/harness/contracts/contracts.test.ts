@@ -881,8 +881,9 @@ describe('reading background commands', () => {
     dropped: 0,
   }
 
-  it('reads a listing', () => {
-    expect(parseBackgroundJobs({ jobs: [row] })).toEqual([row])
+  it('reads a listing, with the title the agent gave a command or none for an older row', () => {
+    expect(parseBackgroundJobs({ jobs: [row] })).toEqual([{ ...row, title: null }])
+    expect(parseBackgroundJobs({ jobs: [{ ...row, title: 'Studio dev server' }] })).toEqual([{ ...row, title: 'Studio dev server' }])
   })
 
   it('answers with nothing when the body is not a listing', () => {

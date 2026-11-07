@@ -279,14 +279,15 @@ export function Popover({
               ref={panel}
               role="menu"
               inert={companionAnchor !== undefined && companionOverlays === true}
-              {...floatingMotion(0, (position?.side ?? side) === 'top' ? 4 : -4)}
+              {...floatingMotion(0, (position?.side ?? side) === 'top' ? 6 : -6)}
               style={{
                 top: position?.top ?? 0,
                 left: position?.left ?? 0,
                 maxWidth: position && maxWidth ? `min(${maxWidth}, ${position.maxWidth}px)` : position?.maxWidth ?? maxWidth,
                 maxHeight: position && maxHeight ? `min(${maxHeight}, ${position.maxHeight}px)` : position?.maxHeight,
                 minWidth: position && position.maxWidth < 192 ? 0 : undefined,
-                transformOrigin: (position?.side ?? side) === 'top' ? 'bottom center' : 'top center',
+                // Grows out of the corner nearest its trigger, not the panel's middle.
+                transformOrigin: `${(position?.side ?? side) === 'top' ? 'bottom' : 'top'} ${align === 'start' ? 'left' : align === 'end' ? 'right' : 'center'}`,
                 // Hidden until measured. The panel has to be in the DOM to have
                 // a height worth measuring, so it renders first and is placed
                 // immediately after — one frame in which it must not be seen.
@@ -326,7 +327,7 @@ export function Popover({
                 visibility: position?.companion ? 'visible' : 'hidden',
               }}
               className={cn(
-                'studio-floating-surface studio-blur studio-scroll-bounded fixed z-50 w-64 rounded-[20px] p-1.5 shadow-overlay',
+                'studio-floating-surface studio-blur studio-scroll-menu fixed z-50 w-64 rounded-[20px] p-1.5 shadow-overlay',
                 'max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain',
               )}
             >

@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { Dialog } from '@/components/primitives/Dialog/Dialog'
-import { ENTER } from '@/design/tokens'
 import { cn } from '@/lib/cn'
+import { DisclosureRow } from './DisclosureRow'
 
 /**
  * The reasoning trace.
@@ -19,28 +17,19 @@ import { cn } from '@/lib/cn'
  * without opening it, and while the run is live the same number counts up, so
  * a long silence is legible as work rather than as a stall.
  *
- * ---- Where the trace lives now ---------------------------------------------
+ * ---- Where the trace opens ---------------------------------------------------
  *
- * It used to disclose inline: expanding hung the working-out in the reading
- * column behind a rule, and a long run made that column unbounded — the reply
- * reflowed around a wall of notes, the answer fell below the fold, and reading
- * the trace meant scrolling inside the transcript to reach text nobody is
- * here for. The trace now opens into the sheet instead: the house modal, a
- * bounded surface with its own scroll, drawn over the conversation and closed
- * without moving anything beneath it. The reply keeps its shape; the
- * working-out gets a room of its own, which is also where a trace this long
- * always wanted to be read — top to bottom in one place, not interleaved with
- * the answer it was separate from.
+ * In place, beneath the row, in a window of capped height with its own scroll.
  *
- * The row is therefore no longer a disclosure. A disclosure promises a region
- * beneath the row, and there is none; promising one would rotate a chevron
- * over an expansion that never comes. The row keeps the geometry every
- * secondary row of a reply shares — the mark flush at the content boundary,
- * the same paddings, see `DisclosureRow` — and the chevron rests pointing at
- * the sheet it opens, which is the Apple reading of that mark: it navigates
- * rather than expands. `aria-haspopup` names what the press produces.
+ * It first disclosed inline with no cap: a long run made the column
+ * unbounded, the reply reflowed around a wall of notes and fell below the
+ * fold. It then moved into a modal sheet, which bounded it but took the
+ * reader out of the conversation to read a few lines of it - a dialog over
+ * the page for text that belongs on it. Now it opens where it is, hung under
+ * the row's words with no rule (see `DisclosureRow`'s `hang`), and its window
+ * is a few lines tall: enough to read, short enough to scroll past.
  *
- * Opened while the run is still producing, the sheet follows the stream —
+ * Opened while the run is still producing, the window follows the stream —
  * pinned to the newest line until the reader scrolls up, following again when
  * they return. A trace read after the fact opens at its first line instead.
  *
@@ -85,7 +74,10 @@ export function ThinkingBlock({
   text,
   span,
   live,
+  className,
 }: {
+  /** Margins belong to the context a row sits in, not to the row. */
+  className?: string
   /**
    * The trace so far. Empty between the run opening and its first delta, which
    * is a run with nothing to disclose YET — the row still says the model is
@@ -96,7 +88,7 @@ export function ThinkingBlock({
   live: boolean
 }) {
   const trace = text.trim() === '' ? null : text
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   useTick(live)
   const seconds = spanSeconds(span, live)
 
@@ -114,49 +106,28 @@ export function ThinkingBlock({
   )
 
   return (
-    // The row wrapper carries the house entrance itself: `DisclosureRow` used
-    // to own it, and the row it drew was this row — the entrance moves with
-    // the row, not with the surface the row opens.
-    <motion.div
-      className="mb-2.5"
-      initial={live ? ENTER.initial : false}
-      animate={ENTER.animate}
-      transition={ENTER.transition}
+    <DisclosureRow
+      className={className}
+      entering={live}
+      leading={<Icons.thinking />}
+      label={shown}
+      open={open && trace !== null}
+      onToggle={() => setOpen((value) => !value)}
+      disabled={trace === null}
+      chevron="hover"
+      hang
     >
-      <button
-        type="button"
-        onClick={() => setSheetOpen(true)}
-        disabled={trace === null}
-        {...(trace === null ? {} : { 'aria-haspopup': 'dialog' })}
-        className={cn(
-          // The geometry is DisclosureRow's row: first painted element flush at
-          // the content boundary, padding on the right only extending the press
-          // target. Two shapes of secondary row that disagree by four pixels
-          // read as an indent nobody chose.
-          'group/thinking inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-left',
-          'text-caption text-muted-foreground transition-colors duration-fast',
-          trace === null ? 'cursor-default' : 'hover:text-foreground',
-        )}
-      >
-        <Icons.thinking />
-        {shown}
-        {trace === null ? null : (
-          <Icons.disclosure
-            // `hover` affordance: the row's job at rest is to be read past, so
-            // the mark that promises a surface appears over the row and on
-            // keyboard focus. It never turns — nothing expands beneath it.
-            className="opacity-0 transition-opacity duration-fast group-hover/thinking:opacity-100 group-focus-visible/thinking:opacity-100"
-          />
-        )}
-      </button>
-
-      <TraceSheet open={sheetOpen} onClose={() => setSheetOpen(false)} trace={trace} live={live} />
-    </motion.div>
+      {trace === null ? null : <TraceWindow trace={trace} live={live} />}
+    </DisclosureRow>
   )
 }
 
 /**
- * The trace's own surface, and the two scroll behaviours it owes.
+ * The trace's window, and the two scroll behaviours it owes.
+ *
+ * Its height is capped at a few lines' worth and it scrolls inside, so a long
+ * run opens to a window on the trace rather than a wall the reply has to be
+ * found beneath; scrolling the transcript passes over it in one stride.
  *
  * Opened at the end of a run it opens at the first line, like any document.
  * Opened mid-run it opens at the newest line — the reader pressed it to watch
@@ -167,55 +138,34 @@ export function ThinkingBlock({
  * returns to the bottom gets the live view back. The threshold is a line's
  * height, not zero, so a half-pixel rounding does not read as intent.
  */
-function TraceSheet({
-  open,
-  onClose,
-  trace,
-  live,
-}: {
-  open: boolean
-  onClose: () => void
-  trace: string | null
-  live: boolean
-}) {
+function TraceWindow({ trace, live }: { trace: string; live: boolean }) {
   const scroller = useRef<HTMLDivElement>(null)
-  const pinned = useRef(false)
+  // Opened mid-run, the window starts at the newest line and follows it.
+  const pinned = useRef(live)
 
-  useEffect(() => {
-    if (!open) {
-      pinned.current = false
-      return
-    }
+  useLayoutEffect(() => {
     const el = scroller.current
-    if (live && el !== null) el.scrollTop = el.scrollHeight
-  }, [open, live])
-
-  useEffect(() => {
-    const el = scroller.current
-    if (!open || !pinned.current || el === null) return
+    if (!pinned.current || el === null) return
     el.scrollTop = el.scrollHeight
-  }, [trace, open])
-
-  if (trace === null) return null
+  }, [trace])
 
   return (
-    <Dialog open={open} onClose={onClose} title="Reasoning" width="30rem">
-      <div
-        ref={scroller}
-        onScroll={() => {
-          const el = scroller.current
-          if (el === null) return
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
-        }}
-        className="max-h-[60vh] overflow-y-auto"
-      >
-        {/* The trace is prose-grade plain text at the caption register — the
-            same treatment the inline body wore, moved rather than redrawn. */}
-        <div className="studio-selectable text-caption whitespace-pre-wrap text-muted-foreground">
-          {trace}
-        </div>
-      </div>
-    </Dialog>
+    <div
+      ref={scroller}
+      data-trace-window
+      onScroll={() => {
+        const el = scroller.current
+        if (el === null) return
+        pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+      }}
+      className="max-h-48 overflow-y-auto"
+    >
+      {/* A step quieter than the rows around it. At the rows' own grey the
+          trace read as more rows - the lines of a long thought looked like the
+          tool labels above and below it. Faded and set on looser leading, it
+          reads as a note hanging off its row rather than a row itself. */}
+      <div className="studio-selectable whitespace-pre-wrap leading-relaxed text-muted-foreground opacity-70">{trace}</div>
+    </div>
   )
 }
 

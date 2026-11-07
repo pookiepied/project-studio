@@ -57,7 +57,8 @@ export const ASK_USER_QUESTION_DESCRIPTOR: CapabilityDescriptor = {
     "order. Each question carries a sentence, a short header, and two to four options whose " +
     "descriptions say what happens if that option is chosen. A recommended option goes first " +
     "and says so in its label. The person can always answer in their own words, so do not ask " +
-    "what a single read can settle, and do not ask what you are about to be told anyway.",
+    "what a single read can settle, and do not ask what you are about to be told anyway. A " +
+    "question answered \"skip\" was left to you on purpose: decide it yourself, never ask it again.",
   inputSchema: {
     type: "object",
     properties: {
@@ -113,11 +114,20 @@ export interface AskUserQuestionInput {
   readonly timeoutMs?: number;
 }
 
+/**
+ * The answer a skipped question carries to the model: the person's own word
+ * for it, so the entry is answered rather than empty.
+ */
+export const SKIPPED_ANSWER = "skip";
+
 /** What the tool returns once every question in the call has settled. */
 export interface AskUserQuestionReport {
-  readonly questions: readonly QuestionReport[];
+  /** A skipped question also carries `answer: "skip"`, so it never reads as unanswered. */
+  readonly questions: readonly (QuestionReport & { readonly answer?: typeof SKIPPED_ANSWER })[];
   /** Present only when the person stopped the run. */
   readonly closing?: string;
+  /** Present only when the person skipped a question and left it to the model. */
+  readonly note?: string;
 }
 
 /**
@@ -232,7 +242,24 @@ export function createAskUserQuestionTool(
         };
       }
 
-      return { questions: results };
+      // A skipped question came back as a bare "deferred" with no answer, and
+      // nothing told the model what that meant, so it read as a question that
+      // was never answered. A shared note alone was not enough either: a
+      // small model matched "no answer" on the entry and asked the same
+      // question again. So each skipped entry carries its own answer, the
+      // word a person would have said - skip - and what it means.
+      const skipped = results.some((result) => result.outcome === "deferred");
+      return skipped
+        ? {
+            questions: results.map((result) =>
+              result.outcome === "deferred" ? { ...result, answer: SKIPPED_ANSWER } : result,
+            ),
+            note:
+              "The person skipped every question whose answer is \"skip\" and left it to you. " +
+              "Choose what you judge best for each, say in one line which option you chose, and " +
+              "carry on. Do not ask a skipped question again.",
+          }
+        : { questions: results };
     },
   });
 }

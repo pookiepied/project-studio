@@ -79,7 +79,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
             <ConversationMenu
               conversation={conversation}
               onRename={() => setRenaming(true)}
-              onOpenWorkspace={rail.collapsed ? rail.expand : undefined}
+              onOpenWorkspace={rail.openOverview}
             />
             <WindowControls />
           </div>

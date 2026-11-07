@@ -105,6 +105,16 @@ export const WorkspaceOverviewMark = drawnMark(
 )
 
 /**
+ * A question the run stopped to ask: the bare question mark, one stroke and a
+ * dot, with nothing drawn around it.
+ *
+ * Drawn because the library has no plain one. Its circled mark read as an old
+ * help-desk badge, its bubble-with-a-question drew a second outline around the
+ * glyph, and the mark it names "Question" is a figure with a speech bubble.
+ */
+export const AskMark = drawnMark('M6 6a2 2 0 1 1 2.9 1.8c-.6.3-.9.8-.9 1.4V10 M8 12.6v.1', 'ask')
+
+/**
  * Voice mode.
  *
  * One continuous line that rises and falls — a voice as a waveform, drawn as a

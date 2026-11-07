@@ -24,6 +24,18 @@ export function bindClient(clientRef: RefObject<HarnessClient | null>): BoundCli
   }
 
   return {
+    runningConversations: () =>
+      call('The harness is not running, so nothing is known to be working.', (client) =>
+        client.listRunningConversations(),
+      ),
+    locateFile: (conversationId, path) =>
+      call('The harness is not running, so this file cannot be found.', (client) =>
+        client.locateFile(conversationId, path),
+      ),
+    readFileText: (conversationId, path) =>
+      call('The harness is not running, so this file cannot be read.', (client) =>
+        client.readFileText(conversationId, path),
+      ),
     approvals: {
       list: () =>
         call('The harness is not running, so there is nothing to ask it.', (client) =>

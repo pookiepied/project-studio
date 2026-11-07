@@ -67,13 +67,13 @@ fn validate(path: &str) -> Result<(), &'static str> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RevealKind {
+pub(crate) enum RevealKind {
     Folder,
     Item,
 }
 
 /// Links remain items to select, including broken links and directory junctions.
-fn classify(path: &str) -> Result<RevealKind, &'static str> {
+pub(crate) fn classify(path: &str) -> Result<RevealKind, &'static str> {
     validate(path)?;
     let normalized = path.replace('/', r"\");
     classify_metadata(std::fs::symlink_metadata(&normalized))

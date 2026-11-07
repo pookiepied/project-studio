@@ -447,7 +447,7 @@ export function stream(
         if (started === undefined || (jobId !== undefined && !stopped)) {
           const toolCall = started === undefined
             ? { type: "toolCall" as const, id: "continuity-start", name: "shell",
-                arguments: { command: 'node -e "setTimeout(() => {}, 10000)"', background: true } }
+                arguments: { command: 'node -e "setTimeout(() => {}, 10000)"', background: true, title: "Continuity probe" } }
             : { type: "toolCall" as const, id: "continuity-stop", name: "jobs",
                 arguments: { ...(jobId === undefined ? {} : { id: jobId }), stop: true } };
           const message = createMessage(model, [toolCall]);

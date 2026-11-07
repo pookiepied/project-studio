@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { PILL_MOTION } from '@/design/tokens'
 import { ActionItems, type ActionKind } from '@/shell/menus/ActionItems'
 import { floatingViewport, observeFloating, placeFloating } from '@/design/layout/floating'
+import type { SpellingTarget } from '@/lib/spelling'
 
 /** The least a floating menu keeps between itself and the window's edge. */
 export const EDGE_PADDING = 8
@@ -16,6 +17,7 @@ export interface FloatingPlacement {
   readonly kind: ActionKind
   readonly selection: string
   readonly target: HTMLElement | null
+  readonly spellingTarget?: SpellingTarget | null
   readonly anchor?: DOMRect
 }
 
@@ -68,7 +70,8 @@ export const FloatingMenu = forwardRef<
           }}
           className="studio-action-bar fixed z-[60]"
         >
-          <ActionItems kind={placement.kind} selection={placement.selection} target={placement.target} close={close} />
+          <ActionItems kind={placement.kind} selection={placement.selection} target={placement.target}
+            spellingTarget={placement.spellingTarget} close={close} />
         </motion.div>
       ) : null}
     </AnimatePresence>

@@ -99,6 +99,18 @@
     margin-block: var(--radius-lg);
   }
 
+  /* A floating menu's list. A reserved gutter is empty space on one side only, so
+     a row's pill sat closer to the panel's left edge than its right. No bar at all
+     keeps rows just as still and the pill centred; the wheel and keys still
+     scroll, and a row cut off at the edge says there is more. */
+  .studio-scroll-menu {
+    scrollbar-width: none;
+  }
+
+  .studio-scroll-menu::-webkit-scrollbar {
+    display: none;
+  }
+
   /* A long draft. A textarea's padding scrolls away with its text, so padding
      alone only holds the first and last lines off the edge: everything between
      ran to the clip and was sliced by it. The field writes `--fade-top` and

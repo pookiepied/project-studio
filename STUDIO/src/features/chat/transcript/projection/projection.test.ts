@@ -246,6 +246,34 @@ describe('a compaction in the history', () => {
     })
     expect(items.map((item) => item.kind)).toEqual(['compaction', 'user'])
   })
+
+  it('stays where it happened when the message it followed is never drawn', () => {
+    const advisory = { ...said('s1', 'stopped'), role: 'system' } as ConversationSnapshotFacts['messages'][number]
+    const items = seededFrom({
+      version: 1,
+      conversationId: 'c',
+      offset: '12_3',
+      messages: [said('u1', 'first'), said('u2', 'second'), advisory],
+      settlements: [],
+      compactions: [
+        { id: 'c1', timestamp: null, afterMessageId: 's1', firstKeptEntryId: 'u2', summary: 's', tokensBefore: 96_000 },
+      ],
+    })
+    expect(items.map((item) => item.kind)).toEqual(['user', 'user', 'compaction'])
+  })
+
+  it('keeps later compactions in order after the same message', () => {
+    const marker = (id: string) => ({ id, timestamp: null, afterMessageId: 'u1', firstKeptEntryId: 'u1', summary: 's', tokensBefore: 1 })
+    const items = seededFrom({
+      version: 1,
+      conversationId: 'c',
+      offset: '12_3',
+      messages: [said('u1', 'first')],
+      settlements: [],
+      compactions: [marker('c1'), marker('c2')],
+    })
+    expect(items.map((item) => item.id)).toEqual(['u1', 'c1', 'c2'])
+  })
 })
 
 describe('assembling a live turn from deltas', () => {

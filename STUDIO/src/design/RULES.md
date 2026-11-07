@@ -142,7 +142,9 @@ from the loop's own duration, never from a second number.
 
 Use `PageTransition` for overlapping route and Settings-section handovers.
 The outgoing page stays visible for the exit and leaves the interaction tree
-immediately. Floating menus share `floatingMotion`. Menu pages use
+immediately. Floating menus share `floatingMotion`: they grow from the corner nearest
+their trigger on `EASE_SETTLE`, and fade out across the whole exit on `EASE_AWAY`.
+Menu pages use
 `MenuViews` to resize from their measured content without scaling text.
 
 Reduced motion is handled twice, globally, and never in a component:
@@ -211,8 +213,9 @@ Four state tokens, kept apart because they say different things:
 
 All four are translucent, not opaque swatches. A tint composites, so the same
 value works on the page, inside a popover and over a raised card, each staying a
-shade of what is already there. Tooltips keep their own dark `--tooltip`: they
-are information, and blue would read as an action.
+shade of what is already there. Tooltips use solid black with white text in
+light mode and solid white with black text in dark mode. The inverted palette
+keeps labels distinct from the surface behind them.
 
 An on/off choice is a `Switch`. `Segmented` is for three or more options, or two
 that are not on and off.
@@ -221,8 +224,10 @@ that are not on and off.
 
 ## 6. Type
 
-One family for the interface: Inter, at a 15px default. `--font-display` stays
-as a role for the one statement a page makes, and it is Inter too.
+One family for the interface: Inter by default, at 15px. The Typeface setting
+swaps the whole window through `--font-interface`, read once on `html`, so nothing
+below the root names a family except code, which stays `font-mono`. A sample of a
+face in Settings is the only other exception.
 
 **Roles, never sizes.** Components name `text-body`, `text-ui`, `text-caption`,
 `text-micro`, `text-title`. Nothing writes `text-sm`. Every role derives from

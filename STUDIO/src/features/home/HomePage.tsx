@@ -19,7 +19,7 @@ export function HomePage() {
           <div className="studio-home-clover-hitbox mx-auto w-fit">
             <StudioMark entrance size={72} className="studio-home-clover text-[color:var(--brand-ink)]" />
           </div>
-          <p className="mt-2 truncate font-display text-body leading-tight text-muted-foreground">
+          <p className="mt-2 truncate text-body leading-tight text-muted-foreground">
             <q cite="https://www.gutenberg.org/files/1497/1497-h/1497-h.htm" title="Plato, The Republic (translated by Benjamin Jowett)">
               The beginning is the most important part of any work.
             </q>

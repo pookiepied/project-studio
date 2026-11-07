@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { harnessBytesDataUrl } from '@/platform/harness'
-import { parsePathReference } from './pathReference'
+import { parsePathReference } from '@/features/files/pathReference'
 
 /**
  * A picture a reply embeds: `![alt](address)`.

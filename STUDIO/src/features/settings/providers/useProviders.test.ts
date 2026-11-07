@@ -46,6 +46,9 @@ function stubClient(overrides: {
   const error = overrides.fail
   return {
     getDiagnostics: () => refuse(),
+    listRunningConversations: () => refuse(),
+    locateFile: () => refuse(),
+    readFileText: () => refuse(),
     viewConversationBrowser: () => refuse(),
     interactConversationBrowser: () => refuse(),
     configureDiagnostics: () => refuse(),

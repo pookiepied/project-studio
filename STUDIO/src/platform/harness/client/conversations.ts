@@ -3,6 +3,9 @@ import {
   parseBackgroundJobs,
   parseConversationRecord,
   parseConversationRecords,
+  parseFileLocation,
+  parseFileText,
+  parseRunningConversations,
   parseCompactionReadiness,
   parseMeasuredContextUsage,
   parseOrphanSweepOutcome,
@@ -15,6 +18,8 @@ import {
   type ConversationPatch,
   type ConversationRecord,
   type CompactionReadiness,
+  type FileLocation,
+  type FileText,
   type MeasuredContextUsage,
   type OrphanSweepOutcome,
   type OrphanTrees,
@@ -44,6 +49,12 @@ export interface ConversationIndexClient {
   changeQueuedMessage(id: string, submissionId: string, action: 'steer' | 'remove'): Promise<HarnessResult<void>>
   editQueuedMessage(id: string, submissionId: string): Promise<HarnessResult<QueuedMessage>>
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
+  /** Which conversations have a turn in flight, whichever window started it. */
+  listRunningConversations(): Promise<HarnessResult<readonly string[]>>
+  /** Where a path a reply named really is, among this conversation's folders. */
+  locateFile(conversationId: string, path: string): Promise<HarnessResult<FileLocation | null>>
+  /** A located file's text for the viewer, or null when it has none to show. */
+  readFileText(conversationId: string, path: string): Promise<HarnessResult<FileText | null>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
   /**
    * Duplicates one conversation under a caller-chosen id: its index row,
@@ -186,6 +197,22 @@ export function conversationIndexClient({ json, empty }: Requester): Conversatio
   return {
     listConversations() {
       return json('GET', CONVERSATIONS_PATH, undefined, parseConversationRecords)
+    },
+
+    listRunningConversations() {
+      return json('GET', `${CONVERSATIONS_PATH}/running`, undefined, parseRunningConversations)
+    },
+
+    async locateFile(conversationId, path) {
+      const address = `/api/files/${encodeURIComponent(conversationId)}/locate?path=${encodeURIComponent(path)}`
+      const result = await json('GET', address, undefined, parseFileLocation)
+      return result.ok ? { ok: true, value: result.value.location } : result
+    },
+
+    async readFileText(conversationId, path) {
+      const address = `/api/files/${encodeURIComponent(conversationId)}/text?path=${encodeURIComponent(path)}`
+      const result = await json('GET', address, undefined, parseFileText)
+      return result.ok ? { ok: true, value: result.value.file } : result
     },
 
     createConversation(draft) {

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Arriving } from '@/components/motion/Arrive'
 import { Segmented } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
+import { MediaArtifact } from '@/features/artifacts/kinds/MediaArtifact'
+import { MediaEditContext, type MediaEditing } from '@/features/artifacts/media/edits'
 import { GENERATED_IMAGE, GENERATED_VIDEO, GENERATED_VIDEO_POSTER } from '@/features/chat/gallery/marks'
 import { NavigationProvider } from '@/stores/navigation'
 import { RailProvider } from '@/stores/rail'
@@ -25,6 +27,8 @@ import { Section } from './Section'
  */
 
 type Stage = 'running' | 'done' | 'failed'
+
+const SHOWCASE_EDITING: MediaEditing = { send: () => Promise.resolve({ ok: true }) }
 
 const STAGES: readonly { id: Stage; label: string }[] = [
   { id: 'running', label: 'Running' },
@@ -120,20 +124,29 @@ function video(stage: Stage): Artifact {
     kind: 'video_generation',
     id: 'show-video',
     title: 'Six-second loop for the splash',
-    status: stage,
+    // A stopped generation, not a failed one: the row says so in grey.
+    status: stage === 'failed' ? 'cancelled' : stage,
     data: {
       model: 'veo-3.1',
       aspectRatio: '16:9',
       prompt: 'Slow drift across a gradient horizon, no camera shake, seamless loop.',
       detail: stage === 'running' ? 'Encoding' : undefined,
       ...(stage === 'done' ? { outputs: [{ url: GENERATED_VIDEO, poster: GENERATED_VIDEO_POSTER }] } : {}),
-      ...(stage === 'failed' ? { error: 'The generation was stopped.' } : {}),
     },
   }
 }
 
+type Holder = 'bare' | 'held'
+
+const HOLDERS: readonly { id: Holder; label: string }[] = [
+  { id: 'bare', label: 'No holder' },
+  { id: 'held', label: 'Holder' },
+]
+
 export function ArtifactsSection() {
   const [stage, setStage] = useState<Stage>('done')
+  const [holder, setHolder] = useState<Holder>('bare')
+  const held = holder === 'held'
 
   return (
     <Section
@@ -149,21 +162,34 @@ export function ArtifactsSection() {
           onChange={setStage}
           options={STAGES}
         />
+        <span className="ml-4 text-micro text-muted-foreground">Media</span>
+        <Segmented<Holder>
+          layoutId="showcase-artifact-holder"
+          ariaLabel="Media holder"
+          value={holder}
+          onChange={setHolder}
+          options={HOLDERS}
+        />
       </div>
       <NavigationProvider>
         <WorkspaceProvider>
           <RailProvider>
             <Arriving live>
+            {/* The viewer's edit toolbar is drawn where a conversation can be
+                sent to; here there is none, so a send is accepted and dropped. */}
+            <MediaEditContext.Provider value={SHOWCASE_EDITING}>
             <div className="studio-prose flex flex-col">
-              {renderArtifact(one(stage))}
-              {renderArtifact(portrait(stage))}
-              {renderArtifact(four(stage))}
-              {renderArtifact(mixed(stage))}
-              {renderArtifact(video(stage))}
+              {/* The transcript's own call, with the keep action it offers. */}
+              <MediaArtifact artifact={one(stage)} video={false} held={held} onKeep={() => {}} />
+              <MediaArtifact artifact={portrait(stage)} video={false} held={held} onKeep={() => {}} />
+              <MediaArtifact artifact={four(stage)} video={false} held={held} onKeep={() => {}} />
+              <MediaArtifact artifact={mixed(stage)} video={false} held={held} onKeep={() => {}} />
+              <MediaArtifact artifact={video(stage)} video held={held} />
               {renderArtifact(oneSearch(stage))}
               {renderArtifact(burst(stage))}
               {renderArtifact(page(stage))}
             </div>
+            </MediaEditContext.Provider>
             </Arriving>
           </RailProvider>
         </WorkspaceProvider>

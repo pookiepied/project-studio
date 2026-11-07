@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DURATION } from '@/design/tokens'
 import { createFollower } from '@/features/chat/transcript/scroll/followEngine'
 
 /**
@@ -54,6 +55,13 @@ const THRESHOLD = 48
  * exists for the flights that never report.
  */
 export const FLIGHT_BELT_MS = 1_600
+
+/**
+ * How long after a click a shrink counts as a collapse in progress: the
+ * collapse's own length (`COLLAPSE`, `DURATION.base`) and a margin for the
+ * frame it starts on.
+ */
+export const COLLAPSE_HOLD_MS = DURATION.base * 1000 + 160
 
 /**
  * ---- The open ------------------------------------------------------------
@@ -139,6 +147,44 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
    */
   const pinnedRef = useRef(pinned)
   pinnedRef.current = pinned
+
+  /** The spacer under the transcript that holds the page's length; see `holdLength`. */
+  const reserve = useRef<HTMLDivElement>(null)
+  /** Until when a shrink is a collapse in progress, whose top must not move. */
+  const holdUntil = useRef(0)
+
+  /**
+   * ---- A collapse at the end of the page --------------------------------
+   *
+   * A row closing near the bottom of the transcript made the document
+   * shorter under a viewport standing at its end, and the browser pulled the
+   * position down with it, frame by frame, for the length of the collapse.
+   * Everything above the row slid down while its body folded - the row did
+   * not close, the page jittered toward it. Every disclosure in the
+   * transcript did this, because it is the scroller's doing, not the row's.
+   *
+   * So for a moment after a click - every collapse here starts with one -
+   * the page keeps its length: whatever a shrink takes from the content, a
+   * spacer under it gives back, and the position is put back where it was
+   * before the frame paints. The row folds in place and empty ground opens
+   * below it. Outside that moment the spacer only ever shrinks: to what the
+   * viewport is actually standing on, so it is gone the moment the reader
+   * scrolls up or new words arrive to fill it.
+   */
+  const fitReserve = useCallback(() => {
+    const element = viewport.current
+    const spacer = reserve.current
+    if (!element || !spacer) return
+    const holding = performance.now() < holdUntil.current    // Its own written height, not a measurement: nothing else sizes it.
+    const current = Number.parseFloat(spacer.style.height) || 0
+    if (!holding && current === 0) return
+    const natural = element.scrollHeight - current
+    const top = holding ? lastTop.current : element.scrollTop
+    const needed = Math.max(0, Math.ceil(top + element.clientHeight - natural))
+    const next = holding ? needed : Math.min(current, needed)
+    if (next !== current) spacer.style.height = `${String(next)}px`
+    if (holding && next > 0 && element.scrollTop !== top) element.scrollTop = top
+  }, [])
 
   const atBottom = useCallback(() => {
     const element = viewport.current
@@ -236,6 +282,8 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
 
     // The reader moved, so whatever a press was holding is theirs now.
     pressHeld.current = false
+    // And the spacer a collapse left trims to what is still under the view.
+    fitReserve()
 
     // Direction beats distance. On a trackpad a slow scroll up moves a few
     // pixels at a time, and if only distance counted the next chunk would
@@ -253,7 +301,7 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     setDistant(!atBottom())
     if (upward && atBottom()) return
     setPinned(!upward && atBottom())
-  }, [atBottom])
+  }, [atBottom, fitReserve])
 
   /** A gesture wins outright, including over a jump already in flight —
    *  and over the open: the reader who moves first decides where they are. */
@@ -414,14 +462,27 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     if (!content) return
 
     const observer = new ResizeObserver(() => {
+      // Before anything reads the position: a collapse's shrink is given
+      // back here, ahead of the paint, so neither the follow nor the reader
+      // ever sees the page pulled down.
+      fitReserve()
       if (pinnedRef.current) drive()
       else setDistant(!atBottom())
     })
     observer.observe(content)
     // The viewport too: the composer growing shortens it from below.
     if (element) observer.observe(element)
-    return () => observer.disconnect()
-  }, [drive, atBottom])
+    // A click is where every collapse in the transcript starts; the hold
+    // covers the collapse that follows it (see `fitReserve`).
+    const hold = () => {
+      holdUntil.current = performance.now() + COLLAPSE_HOLD_MS
+    }
+    element?.addEventListener('click', hold, true)
+    return () => {
+      observer.disconnect()
+      element?.removeEventListener('click', hold, true)
+    }
+  }, [drive, atBottom, fitReserve])
 
   /**
    * A change of conversation is the open again, even if a shell reuses this
@@ -449,6 +510,8 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     }
     follower.current.stop()
     lastTop.current = 0
+    holdUntil.current = 0
+    if (reserve.current) reserve.current.style.height = '0px'
     pressHeld.current = false
     setDistant(false)
     setPinned(true)
@@ -480,5 +543,5 @@ export function useAutoScroll(dependency: unknown, navigation?: unknown, ready =
     [],
   )
 
-  return { viewport, pinned, distant, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom }
+  return { viewport, reserve, pinned, distant, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom }
 }

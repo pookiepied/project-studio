@@ -81,6 +81,47 @@ describe('activity boundaries and order', () => {
 })
 
 describe('the activity disclosure', () => {
+  it('spaces every row in an open group the same, whichever kinds they are', () => {
+    render(<ActivityBlock conversationId="conv" active={false} segments={[
+      thought, tools('a', call('one'), call('two')), { ...thought, id: 'later' },
+    ]} />)
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+
+    const region = screen.getByRole('region', { name: 'Tool activity' })
+    expect(region.classList.contains('gap-2')).toBe(true)
+    const [first, group, last] = [...region.children]
+    expect(group?.classList.contains('gap-2')).toBe(true)
+    for (const row of [first, group, last]) {
+      expect(row?.className ?? '').not.toMatch(/(?:^|\s)m[tby]-/)
+    }
+  })
+
+  it('keeps a long running command to one line', () => {
+    const command = `curl -s "https://example.test/${'path/'.repeat(40)}" | head -c 400`
+    render(<ActivityBlock conversationId="conv" active segments={[
+      tools('a', { ...call('one', 'shell', false), input: { present: true, value: { command } } }),
+    ]} />)
+
+    const label = screen.getByRole('button', { expanded: false }).querySelector('.truncate')
+    expect(label).not.toBeNull()
+    expect(label?.parentElement?.classList.contains('flex-wrap')).toBe(false)
+  })
+
+  it('gives a thought that stands alone the one row gap, and no margin of its own', () => {
+    // A thought used to keep a bottom margin while a question row beside it
+    // kept none, so the gap between two rows depended on which came first.
+    const alone = render(<ActivityBlock conversationId="conv" active={false} segments={[thought]} />)
+    expect(alone.container.firstElementChild?.className ?? '').not.toMatch(/(?:^|\s)m[tby]-/)
+    alone.unmount()
+
+    const below = render(<ActivityBlock conversationId="conv" active={false} rowBefore segments={[thought]} />)
+    expect(below.container.firstElementChild?.classList.contains('mt-2')).toBe(true)
+    below.unmount()
+
+    const beforeWords = render(<ActivityBlock conversationId="conv" active={false} textAfter segments={[thought]} />)
+    expect(beforeWords.container.firstElementChild?.classList.contains('mb-4')).toBe(true)
+  })
+
   it('keeps space around activity while words and tool results arrive', () => {
     const view = render(<Arriving live><ActivityBlock conversationId="conv" active textBefore textAfter segments={[
       tools('a', call('search', 'web_search', false)),

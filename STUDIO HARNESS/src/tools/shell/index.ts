@@ -55,6 +55,8 @@ interface ShellInput {
   readonly timeoutMs: number | undefined;
   /** Start it and return, instead of waiting for it to finish. */
   readonly background: boolean;
+  /** What a background command is for. Required with `background`. */
+  readonly title: string | undefined;
   /**
    * Every program the line starts, in the order it names them.
    *
@@ -84,7 +86,11 @@ const SHELL_DESCRIPTION =
   // holds the call until the limit and then has its output thrown away with
   // the failure.
   "Set background: true for a command that is not meant to finish - a dev " +
-  "server, a watcher, a long download. It returns a job id at once; use " +
+  "server, a watcher, a long download - and give it a title: a few words " +
+  "saying what it is for and, when there is more than one project, which " +
+  'one ("Studio client dev server", "Harness unit tests"). The person sees ' +
+  "the title in their list of running work; the command line alone does " +
+  "not tell them which of several is which. It returns a job id at once; use " +
   "the jobs tool to read its output or stop it. You will be told when a " +
   "background command ends, so there is no need to keep checking on one - " +
   "start it, carry on with the work, and read its output when you hear. " +
@@ -99,6 +105,7 @@ const SHELL_SCHEMA = {
     cwd: { type: "string" },
     timeoutMs: { type: "number", minimum: 1000, maximum: 600000 },
     background: { type: "boolean" },
+    title: { type: "string", minLength: 1, maxLength: 80 },
   },
   required: ["command"],
   additionalProperties: false,
@@ -265,12 +272,30 @@ function createShellTool(
       if (value.background !== undefined && typeof value.background !== "boolean") {
         throw new ToolError("invalid_input", { message: "background must be true or false." });
       }
+      if (value.title !== undefined && typeof value.title !== "string") {
+        throw new ToolError("invalid_input", { message: "title must be text." });
+      }
+      const title = typeof value.title === "string" ? value.title.trim().replace(/\s+/g, " ") : "";
+      // Required for a background command, refused at parse time so the
+      // person is never asked to approve a call that would fail anyway. A
+      // foreground call ends inside its own turn, where the reply names it.
+      if (value.background === true && title === "") {
+        throw new ToolError("invalid_input", {
+          message:
+            'A background command needs a title: a few words saying what it is for, such as "Studio client dev server". ' +
+            "Call again with title set.",
+        });
+      }
+      if (title.length > 80) {
+        throw new ToolError("invalid_input", { message: "title must be 80 characters or fewer." });
+      }
 
       return {
         command: value.command,
         cwd: value.cwd,
         timeoutMs,
         background: value.background === true,
+        title: title === "" ? undefined : title,
         programs,
         interpreter,
       };
@@ -343,10 +368,11 @@ function createShellTool(
           const started = jobs.start({
             ...plan,
             command: input.command,
+            ...(input.title === undefined ? {} : { title: input.title }),
             conversationId: context.scope.conversationId,
           });
           return [
-            `Started ${started.id} in the background: ${input.command}`,
+            `Started ${started.id} (${input.title ?? input.command}) in the background: ${input.command}`,
             "",
             "It is running now and this call did not wait for it. Read its " +
               `output with jobs {"id": "${started.id}"}, and stop it with ` +

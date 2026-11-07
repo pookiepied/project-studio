@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Artifact } from '@/domain/artifacts/types'
 import { MediaArtifact } from './MediaArtifact'
 
-vi.mock('@/stores/rail', () => ({ useRail: () => ({ openArtifact: () => {} }) }))
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ route: { kind: 'home' } }) }))
 vi.mock('@/stores/workspace', () => ({ useWorkspace: () => ({ conversations: [] }) }))
 afterEach(cleanup)

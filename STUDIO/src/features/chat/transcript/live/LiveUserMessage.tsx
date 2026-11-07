@@ -1,3 +1,4 @@
+import { Tooltip } from '@/components/primitives'
 import { memo, useState, type Ref } from 'react'
 import { motion } from 'framer-motion'
 import { FileTypeMark } from '@/components/icons/fileTypes'
@@ -63,15 +64,15 @@ export const LiveUserMessage = memo(function LiveUserMessage({
                 words and named to the model by a signal, and these are that
                 signal's facts. Keyed by the id the harness gave the upload. */}
             {item.documents.map((document) => (
+              <Tooltip key={document.id} label={`${document.fileName} - ${formatPages(document)}, ${formatBytes(document.byteLength)}`}>
               <span
-                key={document.id}
-                title={`${document.fileName} - ${formatPages(document)}, ${formatBytes(document.byteLength)}`}
                 className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-caption text-muted-foreground"
               >
                 <FileTypeMark path={document.fileName} size="sm" />
                 <span className="max-w-48 truncate">{document.fileName}</span>
                 <span className="text-muted-foreground/70">{formatPages(document)}</span>
               </span>
+              </Tooltip>
             ))}
           </div>
         ) : null}

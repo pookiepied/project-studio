@@ -22,6 +22,8 @@ export {
   openDiagnosticWindow,
   startWindowDrag,
   applyWindowSize,
+  onWindowResized,
+  readWindowSize,
   signalAppReady,
   installWindowFrame,
 } from './window'
@@ -35,3 +37,4 @@ export {
 } from './screenOverlay'
 export { suppressWebviewChrome } from './nativeMenus'
 export { readDesktopClipboardText } from './clipboard'
+export type { WindowSize } from './window'

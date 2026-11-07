@@ -155,10 +155,6 @@ export function GeneralPane() {
         </Row>
       )}
 
-      <Row
-        label="Undo history"
-        hint="Every change the agent makes is snapshotted before it happens."
-      />
       <Row label="Studio version" hint="0.1.0" />
     </Pane>
   )

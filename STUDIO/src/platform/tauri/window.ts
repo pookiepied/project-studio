@@ -101,6 +101,26 @@ export async function applyWindowSize(size: WindowSize): Promise<void> {
   await current.center()
 }
 
+/** Which offered size the window is at; null for any other size, or maximized. */
+export async function readWindowSize(): Promise<WindowSize | null> {
+  if (!isTauri()) return null
+  const current = getCurrentWindow()
+  if (await current.isMaximized()) return null
+  const [physical, scale] = await Promise.all([current.innerSize(), current.scaleFactor()])
+  const { width, height } = physical.toLogical(scale)
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1
+  for (const size of Object.keys(WINDOW_SIZES) as WindowSize[]) {
+    if (near(width, WINDOW_SIZES[size].width) && near(height, WINDOW_SIZES[size].height)) return size
+  }
+  return null
+}
+
+/** Calls back whenever the window's size changes. Returns how to stop. */
+export async function onWindowResized(listener: () => void): Promise<() => void> {
+  if (!isTauri()) return () => {}
+  return getCurrentWindow().onResized(listener)
+}
+
 /** The panel inside the OS window, as the resize band needs to see it. */
 export interface WindowPanel {
   width: number

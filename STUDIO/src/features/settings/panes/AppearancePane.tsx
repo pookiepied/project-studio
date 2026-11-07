@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Stepper, Switch } from '@/components/primitives'
 import { useAppearance, type Theme } from '@/design/theme'
 import {
@@ -11,7 +11,7 @@ import {
   type Typeface,
   type UiScale,
 } from '@/design/tokens'
-import { applyWindowSize } from '@/platform/tauri'
+import { applyWindowSize, onWindowResized, readWindowSize, type WindowSize } from '@/platform/tauri'
 import { Pane, PaneSection, Row } from '@/features/settings/panes/Pane'
 import { useNavigation } from '@/stores/navigation'
 import { cn } from '@/lib/cn'
@@ -36,6 +36,11 @@ const THEMES: readonly { readonly id: Theme; readonly label: string }[] = [
   { id: 'system', label: 'System' },
 ]
 
+const WINDOW_SIZE_CHOICES: readonly { readonly id: WindowSize; readonly label: string; readonly sidebarOpen: boolean }[] = [
+  { id: 'compact', label: 'Compact', sidebarOpen: false },
+  { id: 'standard', label: 'Standard', sidebarOpen: true },
+]
+
 const TYPEFACE_LABELS: Readonly<Record<Typeface, string>> = {
   sans: 'Sans serif',
   serif: 'Serif',
@@ -45,6 +50,7 @@ const TYPEFACE_LABELS: Readonly<Record<Typeface, string>> = {
 export function AppearancePane() {
   const { appearance, update, isDefault, reset } = useAppearance()
   const { setSidebarOpen } = useNavigation()
+  const windowSize = useWindowSize()
   const codeSize = (offset: CodeOffset) => codeSizeFor(appearance.uiSize, offset)
 
   return (
@@ -64,7 +70,7 @@ export function AppearancePane() {
         </div>
       </PaneSection>
 
-      <PaneSection title="Typeface" hint="How replies read. The interface itself stays in Inter.">
+      <PaneSection title="Typeface" hint="Used across Studio. Code keeps its monospaced face.">
         <div role="radiogroup" aria-label="Typeface" className="studio-choice-grid">
           {TYPEFACE_CHOICES.map((typeface) => (
             <Choice
@@ -77,9 +83,6 @@ export function AppearancePane() {
             </Choice>
           ))}
         </div>
-        <p className="studio-prose studio-typeface-preview">
-          This is a preview. Replies in your conversations read like this, at the size you choose below.
-        </p>
       </PaneSection>
 
       <PaneSection title="Size">
@@ -110,6 +113,21 @@ export function AppearancePane() {
         </Row>
       </PaneSection>
 
+      <PaneSection title="Window size" hint="Compact is the default. Studio remembers any size you leave it at.">
+        <div role="radiogroup" aria-label="Window size" className="studio-choice-grid">
+          {WINDOW_SIZE_CHOICES.map((size) => (
+            <Choice
+              key={size.id}
+              label={size.label}
+              selected={windowSize === size.id}
+              onSelect={() => void applyWindowSize(size.id).then(() => setSidebarOpen(size.sidebarOpen))}
+            >
+              <WindowPreview size={size.id} sidebar={size.sidebarOpen} />
+            </Choice>
+          ))}
+        </div>
+      </PaneSection>
+
       <PaneSection title="Window and controls">
         <Row label="Pointer cursor" hint="Use the hand cursor over controls, the way a browser does.">
           <Switch
@@ -117,17 +135,6 @@ export function AppearancePane() {
             checked={appearance.pointerCursor}
             onChange={(value) => update({ pointerCursor: value })}
           />
-        </Row>
-
-        <Row label="Window size" hint="Compact is the default. Studio remembers any size you leave it at.">
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => void applyWindowSize('compact').then(() => setSidebarOpen(false))}>
-              Compact
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => void applyWindowSize('standard').then(() => setSidebarOpen(true))}>
-              Standard
-            </Button>
-          </div>
         </Row>
 
         {/* Says which of the two states you are in, and gets you out of one of
@@ -149,6 +156,32 @@ export function AppearancePane() {
       </PaneSection>
     </Pane>
   )
+}
+
+/**
+ * Read from the window rather than stored: a person can drag it to any size, and
+ * then neither choice is true. A stored choice would keep claiming one.
+ */
+function useWindowSize(): WindowSize | null {
+  const [size, setSize] = useState<WindowSize | null>(null)
+
+  useEffect(() => {
+    let live = true
+    let stop = () => {}
+    const refresh = () => void readWindowSize().then((next) => { if (live) setSize(next) })
+
+    refresh()
+    void onWindowResized(refresh).then((unlisten) => {
+      if (live) stop = unlisten
+      else unlisten()
+    })
+    return () => {
+      live = false
+      stop()
+    }
+  }, [])
+
+  return size
 }
 
 /** Long enough to reach for the next click, short enough to read as a response. */
@@ -207,6 +240,18 @@ function Choice({
       </span>
       <span className="text-ui text-foreground">{label}</span>
     </button>
+  )
+}
+
+/** The window at this size, with the sidebar it has room for. */
+function WindowPreview({ size, sidebar }: { size: WindowSize; sidebar: boolean }) {
+  return (
+    <span className="studio-window-preview" data-size={size}>
+      {sidebar ? <span className="studio-window-preview-side" /> : null}
+      <span className="studio-window-preview-body">
+        <span className="studio-window-preview-composer" />
+      </span>
+    </span>
   )
 }
 

@@ -128,15 +128,11 @@ describe('the clock while a run is live', () => {
 })
 
 /**
- * The row no longer expands anything in place — the trace opens into the
- * sheet, the house modal, so this control is a launch, not a disclosure.
- * What changed with that: the chevron never turns (nothing beneath the row
- * expands for it to rotate over), the row names what a press produces with
- * `aria-haspopup`, and the working-out itself renders nowhere in the
- * transcript — it is portalled over the conversation and closed without
- * moving anything beneath it.
+ * The trace opens in place, beneath the row, in a window of capped height
+ * with its own scroll - not in a modal over the conversation, which is where
+ * it used to go and why reading a few lines of it took the reader off the page.
  */
-describe('the row and the sheet it opens', () => {
+describe('the row and the trace it opens', () => {
   it('keeps its affordance hidden at rest, which is when it means nothing', () => {
     const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
@@ -144,32 +140,43 @@ describe('the row and the sheet it opens', () => {
     expect(disclosureClasses(container)).toContain('opacity-0')
   })
 
-  it('opens the reasoning sheet rather than expanding beneath the row', () => {
+  it('opens the trace beneath the row, not in a dialog', () => {
     const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
-    fireEvent.click(screen.getByRole('button'))
-
-    expect(screen.getByRole('dialog', { name: 'Reasoning' }).textContent).toContain('working it out')
-    // The trace is portalled, so the transcript's own container never holds
-    // it: the reply keeps its shape while the working-out is read.
     expect(container.textContent).not.toContain('working it out')
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(container.textContent).toContain('working it out')
+    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('claims no collapsed region, because nothing expands in place', () => {
+  it('holds the trace in a capped window that scrolls on its own', () => {
     const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
     fireEvent.click(screen.getByRole('button'))
-
-    expect(container.querySelector('[aria-expanded]')).toBeNull()
+    const window = container.querySelector('[data-trace-window]')
+    expect(window?.className).toContain('max-h-48')
+    expect(window?.className).toContain('overflow-y-auto')
   })
 
-  it('names what the press produces', () => {
-    render(
+  it('draws no rule beside the opened trace', () => {
+    const { container } = render(
       <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
     )
-    expect(screen.getByRole('button').getAttribute('aria-haspopup')).toBe('dialog')
+    fireEvent.click(screen.getByRole('button'))
+    expect(container.querySelector('.border-l-2')).toBeNull()
+  })
+
+  it('closes again on a second press', () => {
+    // The window itself leaves on the collapse animation, so the state is
+    // what is asserted here.
+    render(<ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />)
+    fireEvent.click(screen.getByRole('button'))
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('false')
   })
 })
 
@@ -197,8 +204,8 @@ describe('a run that has opened but delivered nothing', () => {
     // that no keystroke can open. This asserted `'false'` while the row was
     // still advertising itself as a closed disclosure.
     expect(row.getAttribute('aria-expanded')).toBeNull()
-    // Nor the sheet: there is no trace to show in one.
-    expect(row.getAttribute('aria-haspopup')).toBeNull()
+    // Nor anything beneath it: there is no trace to show.
+    expect(row.getAttribute('aria-controls')).toBeNull()
   })
 
   it('says only that the model is thinking when there is no start to count from', () => {

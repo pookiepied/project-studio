@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { InlineRename, MenuItem, MenuSeparator, Popover, SelectionChip } from '@/components/primitives'
-import { ActivityMark } from '@/shell/sidebar/ActivityMark'
+import { StatusMark } from '@/shell/sidebar/StatusMark'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { useForkConversation } from '@/features/chat/connection/fork'
 import { useNavigation } from '@/stores/navigation'
+import { useConversationStatuses } from '@/stores/status'
 import { useDetachConversation, useLiveWork, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/conversation/types'
 import { cn } from '@/lib/cn'
@@ -13,10 +14,10 @@ import { cn } from '@/lib/cn'
  * One conversation in the sidebar.
  *
  * The row's trailing slot has two occupants, never both. While the
- * conversation is working the dot-matrix mark holds it; otherwise an archive
- * button holds it, appearing on hover only. A running conversation never
- * offers archive under the pointer that is watching it finish — when the work
- * ends the mark swaps back out for the button.
+ * conversation has a status its mark holds it; otherwise an archive button
+ * holds it, appearing on hover only. A running conversation never offers
+ * archive under the pointer that is watching it finish, and a finished one
+ * gets the button back once it has been opened.
  *
   * Everything else about the conversation as a record — fork, pin, rename,
   * open elsewhere, archive, delete — lives in the menu, and the menu opens on
@@ -48,7 +49,8 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
   const [editing, setEditing] = useState(false)
 
   const active = route.kind === 'chat' && route.conversationId === conversation.id
-  const working = running.has(conversation.id)
+  // The witness answers where there is no provider: a detached window.
+  const status = useConversationStatuses().get(conversation.id) ?? (running.has(conversation.id) ? 'running' : undefined)
 
   const archive = () => {
     setArchived(conversation.id, true)
@@ -120,13 +122,13 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
           // One box, always the same size, so the menu anchors to the same
           // corner and the row never shifts as the occupants swap.
           <span className="relative flex size-[var(--control-xs)] shrink-0 items-center justify-center">
-            {working ? (
+            {status !== undefined ? (
               // After the title, not before it. Leading, it would push every
               // title in the column right the moment any one of them started
               // working, and the list would twitch each time a reply began or
               // ended. Trailing, it occupies the slack the truncation already
               // leaves.
-              <ActivityMark />
+              <StatusMark status={status} />
             ) : (
               <button
                 type="button"

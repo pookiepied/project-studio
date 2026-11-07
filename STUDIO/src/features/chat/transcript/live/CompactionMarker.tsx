@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { Icons } from '@/components/icons'
-import { formatTokens } from '@/domain/turn/context'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 
 type CompactionItem = Extract<TranscriptItem, { kind: 'compaction' }>
@@ -8,9 +7,10 @@ type CompactionItem = Extract<TranscriptItem, { kind: 'compaction' }>
 /**
  * Where the conversation was compacted.
  *
- * One line in the transcript's own quiet voice — "Conversation compacted ·
- * 172k folded into a summary" — standing where the cut happened, and nothing
- * else. The messages above it are still on the page, because they are still
+ * One line in the transcript's own quiet voice — "Context compacted" —
+ * standing where the cut happened, and nothing else. How many tokens moved is
+ * left out: it is a detail of the model's working state, and the line's job is
+ * only to mark the place. The messages above it are still on the page, because they are still
  * in the log; what changed is what the model remembers, and this row is
  * where that memory begins. It is not styled as a failure or a warning: a
  * compaction is the ordinary course of a long conversation, and the row's
@@ -23,24 +23,16 @@ type CompactionItem = Extract<TranscriptItem, { kind: 'compaction' }>
  * working state — the text the harness folded the earlier turns into so the
  * next request fits the window — and a disclosure invited the reader into a
  * document that was never written for them, in the one place of the page
- * whose only job is to be read past. The row says what happened and how much
- * moved; the summary itself lives in the conversation's record, where the
+ * whose only job is to be read past. The row says what happened; the summary
+ * itself lives in the conversation's record, where the
  * things that read it live too. A row that is a statement rather than a
  * control: no tab stop, no chevron, no body.
  */
-export const CompactionMarker = memo(function CompactionMarker({ item }: { item: CompactionItem }) {
+export const CompactionMarker = memo(function CompactionMarker(_props: { item: CompactionItem }) {
   return (
     <div className="studio-message flex items-center gap-1.5 text-caption text-muted-foreground">
       <Icons.compaction size="sm" />
-      <span>
-        Conversation compacted
-        {item.tokensBefore > 0 ? (
-          <span className="text-muted-foreground/70">
-            {' '}
-            · {formatTokens(item.tokensBefore)} folded into a summary
-          </span>
-        ) : null}
-      </span>
+      <span>Context compacted</span>
     </div>
   )
 })

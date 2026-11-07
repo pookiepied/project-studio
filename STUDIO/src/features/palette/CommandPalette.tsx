@@ -195,7 +195,7 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
           id={listId}
           role="listbox"
           aria-label="Results"
-          className="studio-scroll-bounded max-h-[min(22rem,44vh)] overflow-y-auto p-1.5"
+          className="studio-scroll-menu max-h-[min(22rem,44vh)] overflow-y-auto p-1.5"
         >
           {entries.length === 0 ? (
             <p className="px-2.5 py-6 text-center text-ui text-muted-foreground">

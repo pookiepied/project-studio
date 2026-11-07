@@ -1,6 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  MediaEditContext,
+  MediaViewerHostContext,
+  type MediaEditing,
+  type MediaViewerHandle,
+  type MediaViewerHost,
+  type ViewerSpec,
+} from '@/features/artifacts/media/edits'
+import { MediaViewer } from '@/features/artifacts/media/MediaViewer'
+import { cn } from '@/lib/cn'
+import { DURATION, EASE_AWAY, EASE_OUT, EASE_SETTLE, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
 import { uploadDocuments } from '@/features/chat/connection/documents'
@@ -22,11 +32,16 @@ import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
 import { usePendingApprovals } from '@/features/chat/permissions/usePendingApprovals'
 import { QuestionPrompt } from '@/features/chat/questions/QuestionPrompt'
 import { usePendingQuestions } from '@/features/chat/questions/usePendingQuestions'
-import { JobsPill, useBackgroundJobs } from '@/features/jobs'
-import { PlanPill, usePlan } from '@/features/plans'
-import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
+import { useBackgroundJobs } from '@/features/jobs'
+import { usePlan } from '@/features/plans'
+import type { RecordedChange } from '@/features/changes/recordedChanges'
+import { useRail, type ActivityView } from '@/stores/rail'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
-import { useWorkspaceTasks } from '@/features/rail/useWorkspaceTasks'
+import { viewTitle } from '@/features/rail/Activity'
+import { PILL_ENTER, WorkSurface, isWorking, usePillPhase } from '@/features/rail/WorkPill'
+import { useTurnChanges } from '@/features/rail/useTurnChanges'
+import { ChatSheet, sheetTitle } from '@/features/chat/sheet/ChatSheet'
+import { SheetHostContext, type SheetHost, type SheetSpec } from '@/features/chat/sheet/sheet'
 import { useAgentTasks } from '@/features/jobs/useAgentTasks'
 import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
 import { useScreenCollaboration } from '@/features/screen/useScreenCollaboration'
@@ -244,6 +259,19 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const [revealedFor, setRevealedFor] = useState<string | null>(null)
   const arrival = useFirstSendTransition(conversation.id)
   const arriving = arrival.submissionId !== undefined
+
+  // The composer's height, kept current, so a question card can open from it:
+  // the composer turns into the card rather than one box replacing another.
+  const [composerHeight, setComposerHeight] = useState<number | null>(null)
+  const composerWatch = useRef<ResizeObserver | null>(null)
+  const watchComposer = useCallback((node: HTMLDivElement | null) => {
+    composerWatch.current?.disconnect()
+    composerWatch.current = null
+    if (node === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setComposerHeight(node.offsetHeight))
+    observer.observe(node)
+    composerWatch.current = observer
+  }, [])
   const revealed = gallery || arriving || revealedFor === conversation.id
   // Something to show: an item from the log, or the message this window
   // just sent and is waiting to see echoed. A first send in a new
@@ -251,7 +279,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // nothing in it.
   const hasWords = items.length > 0 || (!gallery && live.pending !== null)
 
-  const { viewport, pinned, distant, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
+  const { viewport, reserve, pinned, distant, landed, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(items, conversation.id, revealed)
 
   // Nothing is shown while the replay is still coming. It arrives a
@@ -377,43 +405,44 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     void live.abort()
   }, [approvals, questions, live])
 
-  // The pill is a disclosure control and nothing else: open when the rail is
-  // showing this conversation's plan, and a second click takes it back down.
-  // A plan entry that exists but is not on screen comes forward rather than
-  // being opened twice - the rail keys it to the conversation either way.
+  // The workspace: what the conversation is doing behind the reply, and
+  // what it has changed (see `RailProvider`). This page tells it; the docked
+  // column, or this page's sheet when the window has no room for one, draws
+  // it whole, and the pill over the composer draws the moment.
   const {
-    open: railOpen,
-    activeId: railActiveId,
-    openPlan,
-    openJobs,
-    showResources,
-    close: closeRailEntry,
+    docked: workspaceDocked,
+    activity,
+    browser,
+    publishActivity,
+    show: showInWorkspace,
+    overviewRequests,
   } = useRail()
-  const planEntryVisible = railOpen && railActiveId === planEntryId(conversation.id)
-  const jobsEntryVisible = railOpen && railActiveId === jobsEntryId(conversation.id)
-  const togglePlanPanel = useCallback(() => {
-    if (planEntryVisible) {
-      closeRailEntry(planEntryId(conversation.id))
-      return
-    }
-    openPlan(conversation.id, conversation.title ?? 'Conversation')
-  }, [planEntryVisible, closeRailEntry, openPlan, conversation.id, conversation.title])
-
-  const toggleJobsPanel = useCallback(() => {
-    if (jobsEntryVisible) {
-      closeRailEntry(jobsEntryId(conversation.id))
-      return
-    }
-    openJobs(conversation.id, conversation.title ?? 'Conversation')
-  }, [jobsEntryVisible, closeRailEntry, openJobs, conversation.id, conversation.title])
-
-  // The rail's browser preview follows the conversation without ever taking it
-  // over: the entry is kept current, and opening it stays the person's move.
-  useBrowserPreview(conversation.id, conversation.title ?? 'Conversation', live.items)
-  useWorkspaceTasks(conversation.id, live.items, running, live.phase.status === 'submitted' || live.phase.status === 'streaming' ? live.phase.submissionId : null, queue.messages)
+  useBrowserPreview(conversation.id, live.items)
+  const turnChanges = useTurnChanges(live.items)
   useEffect(() => {
-    showResources(conversation.id, conversation.title ?? 'Conversation', plan.hasPlan, jobs.jobs.length > 0 || agents.tasks.length > 0)
-  }, [conversation.id, conversation.title, plan.hasPlan, jobs.jobs.length, agents.tasks.length, showResources])
+    if (gallery) return
+    publishActivity(conversation.id, { plan: plan.snapshot, agents: agents.tasks, jobs: jobs.jobs, turns: turnChanges.turns })
+  }, [gallery, conversation.id, plan.snapshot, agents.tasks, jobs.jobs, turnChanges.turns, publishActivity])
+  const pillPhase = usePillPhase(!gallery && isWorking(activity, browser, running, turnChanges.current), conversation.id)
+  const [cardOpen, setCardOpen] = useState(false)
+  const cardAnchor = useRef<HTMLDivElement>(null)
+  useEffect(() => setCardOpen(false), [conversation.id])
+  useEffect(() => { if (pillPhase === 'hidden') setCardOpen(false) }, [pillPhase])
+  useEffect(() => {
+    if (!cardOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setCardOpen(false) }
+    }
+    const onDown = (event: PointerEvent) => {
+      if (cardAnchor.current !== null && !cardAnchor.current.contains(event.target as Node)) setCardOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onDown)
+    }
+  }, [cardOpen])
 
   // Chat Stop includes driver cleanup. The desktop sign itself lives above
   // navigation and follows the live lease through ComputerPresenceMonitor.
@@ -423,7 +452,104 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // The agent's marks on the screen, and the person's ink coming back.
   useScreenCollaboration(conversation.id, live.items)
 
+  // An edit from the image viewer is a message like any other: it goes the
+  // composer's way, queued behind a running turn as a typed one would be.
+  const mediaEditing = useMemo<MediaEditing>(
+    () => ({ send: (text, images) => sendTurn(text, images, [], running ? 'queue' : undefined) }),
+    [sendTurn, running],
+  )
+
+  // The image viewer, laid over the transcript with the composer kept under
+  // it: what is typed while a picture is open goes with the picture, and with
+  // its marks when a tool has marked it (`MediaViewer`).
+  //
+  // The sheet is the same layer for everything else too big for the reply: a
+  // file, a set of changes, one thing from the workspace (`ChatSheet`). One
+  // layer at a time, so opening one replaces the other.
+  const [viewing, setViewing] = useState<ViewerSpec | null>(null)
+  const [sheet, setSheet] = useState<SheetSpec | null>(null)
+  const [sheetFromList, setSheetFromList] = useState(false)
+  const viewer = useRef<MediaViewerHandle>(null)
+  const viewerHost = useMemo<MediaViewerHost>(() => ({ open: (spec) => { setSheet(null); setViewing(spec) } }), [])
+  const openSheet = useCallback((spec: SheetSpec, fromList = false) => {
+    setCardOpen(false)
+    // With a docked column, the workspace is shown where the workspace is.
+    if (spec.kind === 'activity' && workspaceDocked) {
+      showInWorkspace(spec.view)
+      return
+    }
+    if (spec.kind === 'workspace' && workspaceDocked) {
+      showInWorkspace(null)
+      return
+    }
+    setViewing(null)
+    setSheetFromList(fromList)
+    setSheet(spec)
+  }, [workspaceDocked, showInWorkspace])
+  const sheetHost = useMemo<SheetHost>(() => ({ open: (spec) => openSheet(spec) }), [openSheet])
+  const closeSheet = useCallback(() => setSheet(null), [])
+  useEffect(() => { setViewing(null); setSheet(null) }, [conversation.id])
+  // A workspace thing open in the sheet moves to the column when the window
+  // grows enough to have one.
+  useEffect(() => {
+    if (!workspaceDocked || (sheet?.kind !== 'activity' && sheet?.kind !== 'workspace')) return
+    showInWorkspace(sheet.kind === 'activity' ? sheet.view : null)
+    setSheet(null)
+  }, [workspaceDocked, sheet, showInWorkspace])
+  // The header's Workspace item, in a window with no column.
+  const seenRequests = useRef(overviewRequests)
+  useEffect(() => {
+    if (overviewRequests === seenRequests.current) return
+    seenRequests.current = overviewRequests
+    openSheet({ kind: 'workspace', conversationId: conversation.id })
+  }, [overviewRequests, openSheet, conversation.id])
+  const covered = viewing !== null || sheet !== null
+  const pickActivity = useCallback((view: ActivityView) => {
+    openSheet({ kind: 'activity', view, conversationId: conversation.id }, true)
+  }, [openSheet, conversation.id])
+  const openChanges = useCallback((changes: readonly RecordedChange[]) => {
+    openSheet({ kind: 'changes', changes, conversationId: conversation.id })
+  }, [openSheet, conversation.id])
+  const openEverything = useCallback(() => {
+    openSheet({ kind: 'workspace', conversationId: conversation.id })
+  }, [openSheet, conversation.id])
+  const dock = useRef<HTMLDivElement>(null)
+  const [dockHeight, setDockHeight] = useState(0)
+  useLayoutEffect(() => {
+    const element = dock.current
+    if (element === null || !covered) return
+    const measure = () => setDockHeight(element.offsetHeight)
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(element)
+    return () => observer?.disconnect()
+  }, [covered])
+  const sendFromComposer = useCallback(
+    async (text: string, images: readonly TurnImageWire[], documents: readonly File[], deliveryMode?: 'queue') => {
+      const handle = viewing === null ? null : viewer.current
+      if (handle === null) {
+        // Over a file or a workspace thing the words go as written; the sheet
+        // steps aside so the reply to them can be read.
+        const sent = await sendTurn(text, images, documents, deliveryMode)
+        if (sent.ok) setSheet(null)
+        return sent
+      }
+      const prepared = handle.prepare(text)
+      if ('refusal' in prepared) {
+        setAttachRefusal({ kind: 'rejected', message: prepared.refusal })
+        return { ok: false }
+      }
+      const sent = await sendTurn(prepared.text, [...prepared.images, ...images], documents, deliveryMode)
+      if (sent.ok) setViewing(null)
+      return sent
+    },
+    [viewing, sendTurn],
+  )
+
   return (
+    <MediaEditContext.Provider value={mediaEditing}>
+    <MediaViewerHostContext.Provider value={gallery ? null : viewerHost}>
+    <SheetHostContext.Provider value={gallery ? null : sheetHost}>
     <div data-attachment-drop-zone className="relative flex h-full flex-col">
       <div
         ref={viewport}
@@ -474,6 +600,10 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             </motion.div>
           )}
         </div>
+        {/* The length a collapse at the end of the page keeps for a moment,
+            so the row folds in place instead of the page sliding down to it.
+            Sized by the scroll hook alone (`fitReserve`); zero at rest. */}
+        <div ref={reserve} aria-hidden />
       </div>
 
       {/* `pointer-events-none` matters: a gradient laid over the transcript
@@ -526,7 +656,8 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         ) : null}
       </AnimatePresence>
 
-      <div className="relative shrink-0">
+      {/* Above the image viewer while one is open: the composer is its field. */}
+      <div ref={dock} className={cn('relative shrink-0', covered && 'z-40')}>
         {/* Behind the composer, not over it.
 
             Without the stacking order stated, the fade painted on top of the
@@ -537,7 +668,10 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             composer draws. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-full z-0 h-10 bg-gradient-to-t from-surface to-transparent"
+          className={cn(
+            'pointer-events-none absolute inset-x-0 bottom-full z-0 h-10 bg-gradient-to-t from-surface to-transparent',
+            covered && 'hidden',
+          )}
         />
 
         {/* The floating layer: chrome that belongs above the composer without
@@ -560,7 +694,12 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
             `pointer-events-none` on the column so the transcript behind it
             stays reachable in the gaps; each child takes its own events back. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-full z-20 flex flex-col items-center gap-2 pb-3">
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-x-0 bottom-full z-20 flex flex-col items-center gap-2 pb-3',
+            covered && 'hidden',
+          )}
+        >
           {/* Only offered once the reader has scrolled away. Shown permanently
               it is a button that does nothing most of the time. */}
           <AnimatePresence>
@@ -580,38 +719,43 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             ) : null}
           </AnimatePresence>
 
-          {/* Nearest the composer, because it describes the run the composer
-              is feeding. It only describes it - an approval or a question
-              blocks the run, and those stay in the flow below where the
-              layout gives them weight. */}
-          {/* Both pills sit here for the same reason: they describe the run
-              the composer is feeding without blocking it. The commands come
-              second because the plan is what the run says it is doing, and a
-              process it left behind is a footnote to that. */}
-          {!gallery && (plan.hasPlan || jobs.jobs.length > 0) ? (
-            <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-2 px-4">
-              {plan.snapshot !== null && plan.hasPlan ? (
-                <PlanPill
-                  snapshot={plan.snapshot}
-                  items={plan.items}
-                  open={planEntryVisible}
-                  onToggle={togglePlanPanel}
+          {/* Nearest the composer, because it describes the run the
+              composer is feeding without blocking it. An approval or a
+              question blocks the run, and those stay in the flow below where
+              the layout gives them weight.
+
+              One pill, in the middle: the plan's progress or what is running,
+              and what this turn has changed. It stays while work goes on,
+              says it is done for a few seconds, and goes (`usePillPhase`).
+              It opens a card over itself, clear of the composer; the card
+              opens everything else. */}
+          <AnimatePresence>
+            {pillPhase !== 'hidden' ? (
+              <motion.div key="work" ref={cardAnchor} className="pointer-events-none relative flex w-full justify-center" {...PILL_ENTER}>
+                <WorkSurface
+                  phase={pillPhase}
+                  activity={activity}
+                  browser={browser}
+                  current={turnChanges.current}
+                  turnRunning={running}
+                  open={cardOpen}
+                  onToggle={() => setCardOpen((value) => !value)}
+                  onPick={pickActivity}
+                  onOpenChanges={openChanges}
+                  onExpand={openEverything}
+                  onStopJob={(id) => void jobs.stop(id)}
+                  stoppingJobId={jobs.stoppingId}
+                  onStopAgent={(id) => void agents.cancel(id)}
+                  isStoppingAgent={agents.isCancelling}
                 />
-              ) : null}
-              {jobs.jobs.length > 0 ? (
-                <JobsPill
-                  jobs={jobs.jobs}
-                  open={jobsEntryVisible}
-                  onToggle={toggleJobsPanel}
-                />
-              ) : null}
-            </div>
-          ) : null}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
 
         {gallery ? null : (
           <div
-            className="studio-content-column relative z-10 bg-surface pb-4"
+            className={cn('studio-content-column relative z-10 pb-4', !covered && 'bg-surface')}
           >
             <ConnectionNotice
               phase={live.phase}
@@ -622,38 +766,6 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             {attachRefusal !== null ? (
               <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
             ) : null}
-            {approvals.questions.length > 0 ? (
-              <div className="mb-3">
-                <ApprovalPrompt
-                  // Keyed by the active question, so answering one and
-                  // moving to the next remounts the card. Without it the
-                  // duration chosen for the previous question stays
-                  // selected, and a person who granted "Always" once would
-                  // find the next question already set to "Always" - a
-                  // wider consent than they were asked for, preselected by
-                  // an answer they gave about something else.
-                  key={approvals.questions[0]?.id}
-                  questions={approvals.questions}
-                  answeringId={approvals.answeringId}
-                  onAnswer={approvals.answer}
-                  hasProject={conversation.projectId !== null}
-                />
-              </div>
-            ) : null}
-            {questions.rows.length > 0 ? (
-              <div className="mb-3">
-                <QuestionPrompt
-                  // Keyed the same way, and for the same reason: a
-                  // selection made for one question must never be found
-                  // still holding when the next one is on screen.
-                  key={questions.rows[0]?.id}
-                  rows={questions.rows}
-                  answeringId={questions.answeringId}
-                  onAnswer={questions.answer}
-                  onStop={questions.stop}
-                />
-              </div>
-            ) : null}
             {approvals.answeredElsewhere !== null ? (
               <AnsweredElsewhere sentence={approvals.answeredElsewhere} />
             ) : null}
@@ -663,36 +775,109 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
             {queue.error ? <p role="alert" className="mb-2 text-caption text-muted-foreground">{queue.error}</p> : null}
             <QueuedMessages messages={queue.messages} disabled={queue.changing} onAction={(message, action) => { void queue.change(message, action) }} />
-            <div ref={arrival.composer}>
-              <Composer
-                conversationId={conversation.id}
-                turnControl={<TurnMenu conversationId={conversation.id} />}
-                queueFull={queue.messages.length >= 3}
-                restoredMessage={queue.restoredMessage}
-                // A queued follow-up does not answer the tool's question. Keep
-                // that distinction visible while the answer holds the run.
-                placeholder={
-                  approvals.questions.length > 0 || questions.rows.length > 0
-                    ? 'Answer above, or queue a follow-up'
-                    : isTurnRunning(live.phase)
-                      ? 'Queue a follow-up'
-                      : 'Reply'
-                }
-                onSend={sendTurn}
-                onQueue={(text, images, documents) => sendTurn(text, images, documents, 'queue')}
-                // Admitted counts. A turn the harness has taken but not yet
-                // started producing is still a turn: the words are gone, the
-                // stop control is the only thing that can call it back, and on
-                // the real provider that window has been most of the turn's
-                // length. Reading `streaming` alone is what left the composer
-                // idle for six of a seven-second turn.
-                busy={isTurnRunning(live.phase)}
-                onStop={stopWithComputerCleanup}
-              />
-            </div>
+            {/* A waiting question takes the composer's place until it is
+                answered: one surface to answer on, and no second field asking
+                whether words typed there answer the question or follow it.
+                The card carries the composer's stop, so the run can still be
+                ended, and the composer returns with its draft once the run
+                moves on. Permissions first: the run is parked on those. */}
+            <AnimatePresence mode="wait" initial={false}>
+              {approvals.questions.length > 0 ? (
+                <ApprovalPrompt
+                  key="approval"
+                  questions={approvals.questions}
+                  answeringId={approvals.answeringId}
+                  onAnswer={approvals.answer}
+                  hasProject={conversation.projectId !== null}
+                  onStop={stopWithComputerCleanup}
+                  fromHeight={composerHeight}
+                />
+              ) : questions.rows.length > 0 ? (
+                <QuestionPrompt
+                  key="question"
+                  rows={questions.rows}
+                  answeringId={questions.answeringId}
+                  onAnswer={questions.answer}
+                  onStop={stopWithComputerCleanup}
+                  fromHeight={composerHeight}
+                />
+              ) : (
+                <motion.div
+                  key="composer"
+                  ref={watchComposer}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0, transition: { duration: DURATION.slow, ease: EASE_OUT } }}
+                  exit={{ opacity: 0, transition: { duration: DURATION.fast } }}
+                >
+                  <div ref={arrival.composer}>
+                    <Composer
+                      conversationId={conversation.id}
+                      turnControl={<TurnMenu conversationId={conversation.id} />}
+                      queueFull={queue.messages.length >= 3}
+                      restoredMessage={queue.restoredMessage}
+                      placeholder={
+                        viewing !== null ? 'Describe an edit to this image'
+                          : sheet !== null ? `Ask about ${sheetTitle(sheet, (item) => viewTitle(item.view, activity, browser))}`
+                          : isTurnRunning(live.phase) ? 'Queue a follow-up' : 'Reply'
+                      }
+                      onSend={sendFromComposer}
+                      onQueue={(text, images, documents) => sendFromComposer(text, images, documents, 'queue')}
+                      // Admitted counts. A turn the harness has taken but not yet
+                      // started producing is still a turn: the words are gone, the
+                      // stop control is the only thing that can call it back, and on
+                      // the real provider that window has been most of the turn's
+                      // length. Reading `streaming` alone is what left the composer
+                      // idle for six of a seven-second turn.
+                      busy={isTurnRunning(live.phase)}
+                      onStop={stopWithComputerCleanup}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {viewing !== null ? (
+          <motion.div
+            key="media-viewer"
+            className="absolute inset-0 z-30 flex flex-col bg-black/85 px-3 backdrop-blur-md"
+            style={{ paddingTop: SHELL.topStrip.height, paddingBottom: dockHeight + 4 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: DURATION.base, ease: EASE_OUT } }}
+            exit={{ opacity: 0, transition: { duration: DURATION.fast } }}
+          >
+            <MediaViewer spec={viewing} onClose={() => setViewing(null)} composer handle={viewer} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sheet !== null ? (
+          <motion.div
+            key="sheet"
+            className="absolute inset-0 z-30 flex origin-bottom flex-col bg-surface px-3"
+            style={{ paddingBottom: dockHeight + 12 }}
+            // It rises from the bottom, where the pill's card was, so opening
+            // the workspace reads as the card growing into it.
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: DURATION.slow, ease: EASE_SETTLE, opacity: { duration: DURATION.base } } }}
+            exit={{ opacity: 0, y: 16, scale: 0.98, transition: { duration: DURATION.base, ease: EASE_AWAY } }}
+          >
+            <ChatSheet
+              spec={sheet}
+              onClose={closeSheet}
+              onPick={pickActivity}
+              {...(sheetFromList ? { onBack: () => setSheet({ kind: 'workspace', conversationId: conversation.id }) } : {})}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
+    </SheetHostContext.Provider>
+    </MediaViewerHostContext.Provider>
+    </MediaEditContext.Provider>
   )
 }

@@ -829,14 +829,43 @@ describe("running a command in the background", () => {
     const answer = await run(instance, {
       command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
       background: true,
+      title: "Idle node process",
     });
 
     // A foreground call here would sit until its timeout; this one came back.
     // The id is matched by shape rather than spelled out: it carries a tag for
     // the run that minted it, so that a remembered id from before a restart
     // cannot land on a different process.
-    expect(String(answer)).toMatch(/Started job_\w+ in the background/);
+    expect(String(answer)).toMatch(/Started job_\w+ \(Idle node process\) in the background/);
     expect(jobs.list(SCOPE.conversationId)).toHaveLength(1);
+    expect(jobs.list(SCOPE.conversationId)[0]?.title).toBe("Idle node process");
+    await releaseAll(jobs);
+  });
+
+  it("refuses a background command with no title, before anything starts", async () => {
+    // The person reads their running work by its title; a command line alone
+    // does not say which of three dev servers is which.
+    const jobs = new BackgroundJobs();
+    const instance = gate({ jobs });
+    await expect(
+      run(instance, { command: `${NODEQ} -e "setInterval(() => {}, 1000)"`, background: true }),
+    ).rejects.toThrow(/needs a title/);
+    await expect(
+      run(instance, { command: `${NODEQ} -e "setInterval(() => {}, 1000)"`, background: true, title: "   " }),
+    ).rejects.toThrow(/needs a title/);
+    expect(jobs.list(SCOPE.conversationId)).toHaveLength(0);
+  });
+
+  it("names the title in the jobs listing", async () => {
+    const jobs = new BackgroundJobs();
+    const instance = gate({ jobs });
+    await run(instance, {
+      command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
+      background: true,
+      title: "Studio client dev server",
+    });
+    const listed = await instance.call({ name: "native/jobs", input: {}, scope: SCOPE });
+    expect(String(listed)).toContain("Studio client dev server: ");
     await releaseAll(jobs);
   });
 
@@ -846,6 +875,7 @@ describe("running a command in the background", () => {
     await run(instance, {
       command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
       background: true,
+      title: "Idle node process",
     });
 
     const id = jobs.list(SCOPE.conversationId)[0]?.id ?? "";
@@ -911,6 +941,7 @@ describe("running a command in the background", () => {
     await run(instance, {
       command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
       background: true,
+      title: "Idle node process",
     });
     const generation = startGeneration(mediaJobs, "running");
 
@@ -995,7 +1026,7 @@ describe("running a command in the background", () => {
     const instance = gate();
 
     await expect(
-      run(instance, { command: `${NODEQ} -e "0"`, background: true }),
+      run(instance, { command: `${NODEQ} -e "0"`, background: true, title: "Quick exit" }),
     ).rejects.toThrow(/cannot run background commands/);
   });
 })

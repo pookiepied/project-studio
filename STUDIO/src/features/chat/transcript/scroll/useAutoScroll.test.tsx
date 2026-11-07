@@ -31,7 +31,13 @@ function measure(height: number, client: number): void {
   geometry.clientHeight = client
 }
 
+/** The last observer's callback, so a test can report a resize. */
+let resized: (() => void) | null = null
+
 class ResizeObserverStub {
+  constructor(callback: () => void) {
+    resized = callback
+  }
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
@@ -456,5 +462,109 @@ describe('a press that goes nowhere', () => {
     press()
     lift()
     expect(latest?.pinned).toBe(false)
+  })
+})
+
+/**
+ * A row closing near the end of the page. The document gets shorter under a
+ * viewport standing at its end, and the browser pulls the position down with
+ * it - every frame of the collapse, the content above the row sliding down
+ * toward it. For a moment after a click the page keeps its length instead:
+ * a spacer under the transcript gives back what the shrink took, and the
+ * position stays where the reader left it.
+ */
+describe('a collapse at the end of the page', () => {
+  function ReserveProbe(): ReactElement {
+    const auto = useAutoScroll(1, 'cnv_a', true)
+    latest = auto
+    return (
+      <div ref={auto.viewport} onScroll={auto.onScroll} onWheel={auto.onWheel} onPointerDown={auto.onPointerDown}>
+        <div><button type="button">row</button></div>
+        <div ref={auto.reserve} />
+      </div>
+    )
+  }
+
+  /** The page's natural length; the element reports it plus the spacer. */
+  let natural = 0
+
+  function mountWithReserve(): { viewport: HTMLElement; spacer: HTMLElement } {
+    render(<ReserveProbe />)
+    const viewport = viewportElement()
+    const spacer = latest?.reserve.current
+    if (!spacer) throw new Error('no spacer')
+    installGeometry(viewport)
+    const length = () => natural + (Number.parseFloat(spacer.style.height) || 0)
+    Object.defineProperty(viewport, 'scrollHeight', { configurable: true, get: length })
+    // The position clamps against that same length, spacer and all.
+    Object.defineProperty(viewport, 'scrollTop', {
+      configurable: true,
+      get: () => geometry.top,
+      set(value: number) {
+        geometry.top = Math.min(Math.max(value, 0), Math.max(length() - geometry.clientHeight, 0))
+        viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+      },
+    })
+    geometry.clientHeight = 500
+    return { viewport, spacer }
+  }
+
+  /** The content shrinks, and the browser clamps the position to the new end. */
+  function shrinkTo(length: number, viewport: HTMLElement): void {
+    natural = length
+    geometry.top = Math.min(geometry.top, Math.max(viewport.scrollHeight - geometry.clientHeight, 0))
+  }
+
+  it('keeps the position through a collapse that follows a click', () => {
+    const { viewport, spacer } = mountWithReserve()
+    natural = 2000
+    act(() => {
+      viewport.scrollTop = 1500
+    })
+
+    fireEvent.click(viewport.querySelector('button') as HTMLElement)
+    act(() => {
+      shrinkTo(1800, viewport)
+      resized?.()
+    })
+
+    expect(spacer.style.height).toBe('200px')
+    expect(geometry.top).toBe(1500)
+  })
+
+  it('lets the spacer go as the reader scrolls up, and leaves an unclicked shrink alone', () => {
+    const now = vi.spyOn(performance, 'now')
+    const { viewport, spacer } = mountWithReserve()
+    natural = 2000
+    now.mockReturnValue(1_000)
+    act(() => {
+      viewport.scrollTop = 1500
+    })
+    fireEvent.click(viewport.querySelector('button') as HTMLElement)
+    act(() => {
+      shrinkTo(1800, viewport)
+      resized?.()
+    })
+    expect(spacer.style.height).toBe('200px')
+
+    // The collapse is over; the reader scrolls up a hundred pixels. The
+    // spacer trims to what is still under the view, never moving it.
+    now.mockReturnValue(10_000)
+    act(() => {
+      fireEvent.wheel(viewport, { deltaY: -100 })
+      viewport.scrollTop = 1400
+    })
+    expect(spacer.style.height).toBe('100px')
+    expect(geometry.top).toBe(1400)
+
+    // A shrink with no click before it is not held: the browser's clamp
+    // stands, and no new spacer is made for it.
+    act(() => {
+      viewport.scrollTop = 1200
+      shrinkTo(1500, viewport)
+      resized?.()
+    })
+    expect(spacer.style.height).toBe('0px')
+    now.mockRestore()
   })
 })
