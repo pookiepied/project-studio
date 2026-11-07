@@ -507,6 +507,11 @@ struct Shared {
     state: Mutex<Inner>,
     spawn_settled: Condvar,
     lifecycle: Mutex<Option<LifecycleSink>>,
+    /// The Studio home every Harness this supervisor launches is pointed at.
+    /// Last so it drops last: `state` owns the containment that ends the
+    /// child, and the directory cannot go while the child holds its database.
+    #[cfg(test)]
+    home: crate::harness::test_support::IsolatedHome,
 }
 
 /// What the webview is told when it asks how the Harness is doing.
@@ -1062,6 +1067,14 @@ impl HarnessSupervisor {
         apply_harness_environment(&mut cmd);
 
         apply_deliberate_environment(&mut cmd);
+
+        // After the policy for the same reason as the line above: it clears,
+        // and `PROJECT_STUDIO_HOME` is not on the allowlist. Here, in the one
+        // function every launch passes through, rather than in each test, so
+        // a test that starts a Harness cannot forget and open the user's data.
+        #[cfg(test)]
+        cmd.env("PROJECT_STUDIO_HOME", self.shared.home.path());
+
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
@@ -1744,17 +1757,14 @@ mod tests {
         (seen, sink)
     }
 
-    /// Where the Harness keeps `studio.db` when nothing overrides the home —
-    /// which is every launch this crate makes, because the environment
-    /// allowlist deliberately does not pass `PROJECT_STUDIO_HOME`.
-    fn studio_wal_path() -> PathBuf {
-        let home = std::env::var("USERPROFILE")
-            .or_else(|_| std::env::var("HOME"))
-            .expect("a home directory");
-        PathBuf::from(home)
-            .join(".studio")
-            .join("data")
-            .join("studio.db-wal")
+    /// Where this supervisor's Harness keeps the WAL beside `studio.db`.
+    ///
+    /// Inside the supervisor's own temporary home, so the file belongs to the
+    /// Harness under test and to nothing else. Against `~/.studio` a running
+    /// Studio holds the same WAL open, and the "no hot WAL" assertion then
+    /// measures the app rather than the stop.
+    fn studio_wal_path(supervisor: &HarnessSupervisor) -> PathBuf {
+        supervisor.shared.home.path().join("data").join("studio.db-wal")
     }
 
     /// The old shutdown, kept as the contrast case: `TerminateProcess` on
@@ -1860,6 +1870,27 @@ mod tests {
         }
     }
 
+    /// Each supervisor gets a home of its own, and the home is not the user's.
+    /// The live tests below prove the child really uses it: their WAL
+    /// assertions look only there.
+    #[test]
+    fn a_test_supervisor_never_shares_a_studio_home() {
+        let first = HarnessSupervisor::new();
+        let second = HarnessSupervisor::new();
+        let home = first.shared.home.path().to_path_buf();
+
+        assert_ne!(home, second.shared.home.path());
+        assert!(home.is_dir(), "the home exists before any launch: {}", home.display());
+        assert!(
+            !home.components().any(|part| part.as_os_str() == ".studio"),
+            "a test home must sit outside the user's: {}",
+            home.display()
+        );
+
+        drop(first);
+        assert!(!home.exists(), "the home goes with its supervisor: {}", home.display());
+    }
+
     /// The observable proof of the graceful stop: a clean close checkpoints
     /// and removes the WAL, so nothing hot is left beside `studio.db`. The
     /// file existing *while the harness runs* is what makes the final
@@ -1876,7 +1907,7 @@ mod tests {
 
         assert_eq!(supervisor.status().state, "running");
 
-        let wal = studio_wal_path();
+        let wal = studio_wal_path(&supervisor);
         assert!(
             wal.exists(),
             "the WAL sits beside studio.db while the harness runs: {}",
@@ -1927,7 +1958,7 @@ mod tests {
 
         // Nothing has looked yet, so nothing has reacted: the WAL is still
         // hot, and no restart has been scheduled.
-        let wal = studio_wal_path();
+        let wal = studio_wal_path(&supervisor);
         assert!(wal.exists(), "a hard kill leaves the WAL un-checkpointed");
 
         assert!(

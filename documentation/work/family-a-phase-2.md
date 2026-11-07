@@ -136,7 +136,5 @@ Each task runs the type check and the tests for what it touched. The full client
 check runs at the end of the phase, not per task.
 
 End of phase, 2026-11-07: `pnpm -C STUDIO check` passed, 232 files and 1956 tests.
-`cargo test --lib` passed, 172 with 2 ignored, with Studio closed. With Studio open,
-`a_deliberate_stop_reports_stopped_and_leaves_no_hot_wal` fails, because the test
-uses the real `~/.studio` home and the running app holds the same WAL open. That
-test breaks the isolated-state rule and is not fixed here.
+`cargo test --lib` passes, 173 with 2 ignored, with Studio open: the supervisor
+tests now run the Harness in a temporary home rather than `~/.studio`.

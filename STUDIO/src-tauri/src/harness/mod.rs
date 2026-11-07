@@ -27,7 +27,43 @@ pub use supervisor::{HarnessStatus, HarnessSupervisor};
 /// exactly because that test runs on no runtime at all.
 #[cfg(test)]
 pub(crate) mod test_support {
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     pub static ONE_HARNESS_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// A temporary Studio home, removed when dropped.
+    ///
+    /// Every supervisor built under test owns one and launches into it, so no
+    /// test reaches the user's `~/.studio`: not their database, and not the
+    /// WAL a running Studio is holding. Removal is best effort, because a
+    /// leftover directory in the temp folder must not fail a test that passed.
+    pub struct IsolatedHome(PathBuf);
+
+    impl IsolatedHome {
+        pub fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Default for IsolatedHome {
+        fn default() -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "studio-native-test-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir_all(&path).expect("create a temporary Studio home");
+            Self(path)
+        }
+    }
+
+    impl Drop for IsolatedHome {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
 
     /// Shuts a supervisor down even when an assertion between start and stop
     /// panics.
