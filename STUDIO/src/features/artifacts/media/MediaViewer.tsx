@@ -20,6 +20,7 @@ import { MAX_IMAGE_BYTES_PER_TURN } from '@/domain/attachments/limits'
 import type { MediaOutput } from '@/domain/artifacts/media'
 import type { TurnImageWire } from '@/platform/harness'
 import { cn } from '@/lib/cn'
+import { SHELL } from '@/design/tokens'
 
 const VideoPlayer = lazyNamed(
   () => import('@/features/artifacts/media/VideoPlayer'),
@@ -74,6 +75,9 @@ export function MediaViewer({
   const [sending, setSending] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [image, setImage] = useState<HTMLImageElement | null>(null)
+  // The clip's own shape, once it is known: the box is drawn at it, so the
+  // controls sit on the picture and not across empty space beside it.
+  const [clipRatio, setClipRatio] = useState<number | null>(null)
   const bounds = useRef<HTMLDivElement>(null)
   const drag = useDragControls()
 
@@ -86,6 +90,7 @@ export function MediaViewer({
     setStrokes([])
     setInstruction('')
     setNote(null)
+    setClipRatio(null)
   }, [output])
 
   // On the page there is no overlay to hear Escape: a tool down first, then the viewer.
@@ -157,7 +162,13 @@ export function MediaViewer({
 
   return (
     <div ref={bounds} className="flex size-full min-h-0 flex-col items-center gap-3" onPointerDown={closeFromBackground}>
-      <div className="flex w-full shrink-0 items-center gap-1.5" onPointerDown={closeFromBackground}>
+      <div
+        className="flex w-full shrink-0 items-center gap-1.5"
+        // On the page the row stands in the band the window's header
+        // occupies, so the model and the controls sit at the very top.
+        style={composer ? { height: SHELL.topStrip.height } : undefined}
+        onPointerDown={closeFromBackground}
+      >
         {model ? <span className={PILL_TEXT}>{model}</span> : null}
         <span className="ml-auto flex items-center gap-1.5">
           {keepButton(onKeep, video)}
@@ -167,16 +178,24 @@ export function MediaViewer({
         </span>
       </div>
 
-      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center" onPointerDown={closeFromBackground}>
+      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]" onPointerDown={closeFromBackground}>
         {video && src ? (
-          <div className="relative aspect-video max-h-full w-full overflow-hidden rounded-[18px]">
+          <div
+            className="relative overflow-hidden rounded-[18px] bg-black"
+            // As large as fits: the full width, or the full height at the
+            // clip's shape, whichever is smaller.
+            style={{
+              aspectRatio: String(clipRatio ?? output.ratio ?? 16 / 9),
+              width: `min(100cqw, ${String(clipRatio ?? output.ratio ?? 16 / 9)} * 100cqh)`,
+            }}
+          >
             <Deferred
               label="Video player"
               {...(poster
-                ? { fallback: <img src={poster} alt="" aria-hidden className="size-full object-contain opacity-60" /> }
+                ? { fallback: <img src={poster} alt="" aria-hidden className="size-full object-cover opacity-60" /> }
                 : {})}
             >
-              <VideoPlayer src={src} poster={poster} title={title} autoPlay />
+              <VideoPlayer src={src} poster={poster} title={title} autoPlay onRatio={setClipRatio} />
             </Deferred>
           </div>
         ) : (

@@ -57,4 +57,17 @@ describe('the docked workspace', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(screen.queryByRole('complementary')).toBeNull()
   })
+
+  it('opens on request even with nothing in it, and says so', async () => {
+    function Asked() {
+      const { open, publishActivity, openOverview } = useRail()
+      useEffect(() => { publishActivity('a', { plan: null, agents: [], jobs: [], turns: [] }) }, [publishActivity])
+      return <div><button onClick={openOverview}>Workspace</button><SideRail open={open} /></div>
+    }
+    render(<RailProvider conversationId="a"><Asked /></RailProvider>)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByRole('complementary')).toBeNull()
+    fireEvent.click(screen.getByText('Workspace'))
+    expect(await screen.findByText(/No plan, agents, commands or file changes/)).toBeTruthy()
+  })
 })

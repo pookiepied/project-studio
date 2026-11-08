@@ -504,6 +504,19 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     openSheet({ kind: 'workspace', conversationId: conversation.id })
   }, [overviewRequests, openSheet, conversation.id])
   const covered = viewing !== null || sheet !== null
+  // The composer stays raised over a layer until the layer has finished
+  // leaving, not just until it was asked to. Dropping it the moment the
+  // viewer closed put the still-fading viewer over the composer for a
+  // frame - a dark flash across the field - and brought the transcript's
+  // fades and the pill back on top of a picture still on screen.
+  const [layerLeaving, setLayerLeaving] = useState(false)
+  const wasCovered = useRef(covered)
+  useLayoutEffect(() => {
+    if (wasCovered.current && !covered) setLayerLeaving(true)
+    wasCovered.current = covered
+  }, [covered])
+  const layerGone = useCallback(() => setLayerLeaving(false), [])
+  const layered = covered || layerLeaving
   const pickActivity = useCallback((view: ActivityView) => {
     openSheet({ kind: 'activity', view, conversationId: conversation.id }, true)
   }, [openSheet, conversation.id])
@@ -517,13 +530,13 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const [dockHeight, setDockHeight] = useState(0)
   useLayoutEffect(() => {
     const element = dock.current
-    if (element === null || !covered) return
+    if (element === null || !layered) return
     const measure = () => setDockHeight(element.offsetHeight)
     measure()
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
     observer?.observe(element)
     return () => observer?.disconnect()
-  }, [covered])
+  }, [layered])
   const sendFromComposer = useCallback(
     async (text: string, images: readonly TurnImageWire[], documents: readonly File[], deliveryMode?: 'queue') => {
       const handle = viewing === null ? null : viewer.current
@@ -657,7 +670,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       </AnimatePresence>
 
       {/* Above the image viewer while one is open: the composer is its field. */}
-      <div ref={dock} className={cn('relative shrink-0', covered && 'z-40')}>
+      <div ref={dock} className={cn('relative shrink-0', layered && 'z-40')}>
         {/* Behind the composer, not over it.
 
             Without the stacking order stated, the fade painted on top of the
@@ -670,7 +683,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           aria-hidden
           className={cn(
             'pointer-events-none absolute inset-x-0 bottom-full z-0 h-10 bg-gradient-to-t from-surface to-transparent',
-            covered && 'hidden',
+            layered && 'hidden',
           )}
         />
 
@@ -697,7 +710,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         <div
           className={cn(
             'pointer-events-none absolute inset-x-0 bottom-full z-20 flex flex-col items-center gap-2 pb-3',
-            covered && 'hidden',
+            layered && 'hidden',
           )}
         >
           {/* Only offered once the reader has scrolled away. Shown permanently
@@ -755,7 +768,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
         {gallery ? null : (
           <div
-            className={cn('studio-content-column relative z-10 pb-4', !covered && 'bg-surface')}
+            className={cn('studio-content-column relative z-10 pb-4', !layered && 'bg-surface')}
           >
             <ConnectionNotice
               phase={live.phase}
@@ -839,22 +852,24 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         )}
       </div>
 
-      <AnimatePresence>
+      <AnimatePresence onExitComplete={layerGone}>
         {viewing !== null ? (
           <motion.div
             key="media-viewer"
             className="absolute inset-0 z-30 flex flex-col bg-black/85 px-3 backdrop-blur-md"
-            style={{ paddingTop: SHELL.topStrip.height, paddingBottom: dockHeight + 4 }}
+            // Its own top row sits in the band the window's header occupies,
+            // as the sheet's does; the viewer covers that band.
+            style={{ paddingBottom: dockHeight + 12 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: DURATION.base, ease: EASE_OUT } }}
-            exit={{ opacity: 0, transition: { duration: DURATION.fast } }}
+            exit={{ opacity: 0, transition: { duration: DURATION.base, ease: EASE_AWAY } }}
           >
             <MediaViewer spec={viewing} onClose={() => setViewing(null)} composer handle={viewer} />
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <AnimatePresence>
+      <AnimatePresence onExitComplete={layerGone}>
         {sheet !== null ? (
           <motion.div
             key="sheet"

@@ -110,7 +110,7 @@ export function MediaFrame({
               poster ? (
                 <span aria-hidden className="block size-full">
                   <Backdrop src={poster} />
-                  <img src={poster} alt="" className="relative size-full object-contain opacity-60" />
+                  <img src={poster} alt="" className="relative size-full object-cover opacity-60" />
                 </span>
               ) : (
                 <Waiting active />

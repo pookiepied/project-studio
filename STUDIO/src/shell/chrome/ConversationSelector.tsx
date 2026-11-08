@@ -3,6 +3,7 @@ import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover, SearchField } from '@/components/primitives'
 import { cn } from '@/lib/cn'
 import { STATUS_LABELS, StatusMark } from '@/shell/sidebar/StatusMark'
+import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { useNavigation } from '@/stores/navigation'
 import { useConversationStatuses } from '@/stores/status'
 import { useWorkspace } from '@/stores/workspace'
@@ -76,7 +77,9 @@ export function ConversationSelector({
           className="flex h-[var(--header-control)] min-w-0 items-center rounded-full pl-[11px] pr-2.5 transition-colors duration-fast hover:bg-tint"
         >
           <span className="relative flex shrink-0 items-center">
-            <Icons.history size="header" />
+            {/* While this conversation works, its mark is the working ring -
+                the same one its row shows - in the history glyph's place. */}
+            {running ? <ActivityMark size="var(--header-mark)" label="Working" /> : <Icons.history size="header" />}
             {calling !== null ? (
               <span
                 data-status-dot={calling}

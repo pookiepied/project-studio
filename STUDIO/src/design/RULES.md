@@ -224,7 +224,10 @@ that are not on and off.
 
 ## 6. Type
 
-One family for the interface: Inter by default, at 15px. The Typeface setting
+One family for the interface: Inter by default, at 14px (code 13px). The reference
+measures 15px for its message text, but `--ui-size` sizes the whole chrome - sidebar,
+menus, icons, header - and at 15 that read a size large for a desktop app; 15 stays
+one step up in Settings. The Typeface setting
 swaps the whole window through `--font-interface`, read once on `html`, so nothing
 below the root names a family except code, which stays `font-mono`. A sample of a
 face in Settings is the only other exception.

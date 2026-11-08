@@ -13,6 +13,10 @@ type MediaElement = DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> 
   src?: string
   /** Seconds of inactivity before the control bar fades. */
   autohide?: string
+  /** A time display that counts down what is left. */
+  remaining?: string
+  /** A time display that does not switch between gone and left when clicked. */
+  notoggle?: string
 }
 
 declare module 'react' {

@@ -148,6 +148,11 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
   const [collapsed, setCollapsed] = useState(false)
   const [ready, setReady] = useState(false)
   const [overviewRequests, setOverviewRequests] = useState(0)
+  // The conversation whose workspace was asked for by name - the header's
+  // Workspace item - which opens even with nothing in it to show. Without
+  // this the item did nothing in a conversation with no activity: the
+  // column only stands up for activity, and there was none.
+  const [summoned, setSummoned] = useState<string | null>(null)
   const preferenceChanged = useRef(false)
   const docked = useWindowFits(DOCKED_MIN_WINDOW)
 
@@ -200,10 +205,10 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
   const show = useCallback((value: ActivityView | null) => { select(value); setVisibility(false) }, [select, setVisibility])
   const overview = useCallback(() => select(null), [select])
   const openOverview = useCallback(() => {
-    if (docked) { select(null); setVisibility(false) }
+    if (docked) { select(null); setSummoned(selectedScope); setVisibility(false) }
     else setOverviewRequests((count) => count + 1)
-  }, [docked, select, setVisibility])
-  const collapse = useCallback(() => setVisibility(true), [setVisibility])
+  }, [docked, select, selectedScope, setVisibility])
+  const collapse = useCallback(() => { setSummoned(null); setVisibility(true) }, [setVisibility])
   const expand = useCallback(() => setVisibility(false), [setVisibility])
   const setWidth = useCallback((value: number) => {
     if (Number.isFinite(value)) setRawWidth(Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, Math.round(value))))
@@ -211,11 +216,11 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
 
   const value = useMemo<RailValue>(() => ({
     conversationId: scope ?? null,
-    open: ready && docked && hasActivity && !collapsed,
+    open: ready && docked && (hasActivity || (summoned !== null && summoned === selectedScope)) && !collapsed,
     collapsed: hasActivity && collapsed,
     docked, activity, browser, view, width, overviewRequests,
     publishActivity, showBrowser, show, overview, openOverview, collapse, expand, closeAll: collapse, setWidth,
-  }), [scope, ready, docked, hasActivity, collapsed, activity, browser, view, width, overviewRequests, publishActivity, showBrowser, show, overview, openOverview, collapse, expand, setWidth])
+  }), [scope, ready, docked, hasActivity, summoned, selectedScope, collapsed, activity, browser, view, width, overviewRequests, publishActivity, showBrowser, show, overview, openOverview, collapse, expand, setWidth])
   return <RailContext.Provider value={value}>{children}</RailContext.Provider>
 }
 

@@ -291,7 +291,7 @@ export function WorkCard({ phase, activity, browser, current, turnRunning, onPic
   return (
     <div className="relative flex flex-col pb-0.5">
       <div className="absolute right-0 top-0 z-10">
-        <IconButton label="Open the workspace" size="sm" onClick={onExpand}><Icons.expand size="sm" /></IconButton>
+        <IconButton label="Open the workspace" size="sm" onClick={onExpand}><Icons.workspace size="sm" /></IconButton>
       </div>
 
       {empty ? (

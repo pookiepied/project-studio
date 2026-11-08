@@ -1,13 +1,14 @@
 import { motion } from 'framer-motion'
-import { LOOP } from '@/design/tokens'
 
 /**
- * A conversation that is working while you are somewhere else.
+ * A conversation that is working.
  *
- * Family A's own working mark: a thin ring of short ticks, strongest at its head
- * and fading around the circle, turning. Lighter than a spinner's solid arc, which
- * in a row reads as "this row is loading", when the row is fine and the work is in
- * the thing it points at.
+ * Family A's working mark: a ring of round dots chasing around a circle. The
+ * head is the accent and the largest; each dot behind it is a little smaller
+ * and fades from blue toward grey, so the ring reads as one thing moving
+ * rather than twelve lights. It turns a dot at a time, not smoothly - the
+ * step is what makes a ring of dots read as a chase rather than a rotating
+ * picture of one.
  *
  * ---- Why it is not a percentage or a count -------------------------------
  *
@@ -18,34 +19,41 @@ import { LOOP } from '@/design/tokens'
  * claim made.
  */
 
-const TICKS = 12
-const FAINTEST = 0.15
+const DOTS = 12
+/** One full turn, in seconds: a dot every 80ms. */
+const TURN = 0.96
 
-export function ActivityMark({ size = 14 }: { size?: number }) {
+/** Moves only on each dot's beat, so the head jumps dot to dot. */
+const stepped = (progress: number) => Math.floor(progress * DOTS) / DOTS
+
+export function ActivityMark({ size = 14, label = 'Working' }: { size?: number | string; label?: string }) {
   return (
     <motion.svg
       role="img"
-      aria-label="Working"
+      aria-label={label}
       viewBox="0 0 24 24"
       className="block shrink-0 text-accent"
       style={{ width: size, height: size }}
       animate={{ rotate: 360 }}
-      transition={{ ...LOOP.spin, duration: 1.4 }}
+      transition={{ duration: TURN, ease: stepped, repeat: Infinity }}
     >
-      {Array.from({ length: TICKS }, (_, index) => (
-        <line
-          key={index}
-          x1="12"
-          y1="1.5"
-          x2="12"
-          y2="4.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          opacity={1 - (index / TICKS) * (1 - FAINTEST)}
-          transform={`rotate(${-index * (360 / TICKS)} 12 12)`}
-        />
-      ))}
+      {Array.from({ length: DOTS }, (_, index) => {
+        // 0 at the head, 1 at the very end of the tail.
+        const behind = index / (DOTS - 1)
+        const angle = (-index * 2 * Math.PI) / DOTS
+        return (
+          <circle
+            key={index}
+            cx={12 + 9 * Math.sin(angle)}
+            cy={12 - 9 * Math.cos(angle)}
+            r={1.9 - behind * 0.7}
+            // The head third is the accent; the rest goes over to the
+            // interface's grey as it fades, as the reference's tail does.
+            fill={behind < 0.34 ? 'currentColor' : 'var(--muted-foreground)'}
+            opacity={1 - behind * 0.8}
+          />
+        )
+      })}
     </motion.svg>
   )
 }

@@ -6,6 +6,7 @@ import { WorkSurface, type PillPhase } from '@/features/rail/WorkPill'
 import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
 import type { TurnChanges } from '@/stores/rail'
+import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { Section } from './Section'
 
 const now = Date.now()
@@ -65,6 +66,14 @@ function Specimens() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <span className="text-micro text-muted-foreground">The working mark: a conversation's row, and its title while it works</span>
+        <div className="flex items-center gap-6 rounded-xl bg-surface p-4 shadow-panel">
+          <span className="flex items-center gap-3 text-body text-muted-foreground"><ActivityMark size="var(--header-mark)" />Getting a detailed report…</span>
+          <ActivityMark />
+          <ActivityMark size={32} />
+        </div>
+      </div>
       <div className="flex flex-col gap-2">
         <span className="text-micro text-muted-foreground">The pill over the composer, and the card it grows into</span>
         <div className="flex flex-wrap gap-2">

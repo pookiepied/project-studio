@@ -621,3 +621,50 @@ pill) and a screenshot of the sheet:
   "Everything in this conversation" and the close button are gone.
 - Not yet seen in the running desktop app; the showcase specimen is steppable to exercise each
   animation.
+
+### The viewer's close, its header, and the video player (2026-11-08)
+
+- Closing the image viewer or the sheet flashed: the composer dropped out of its raised layer the
+  moment the layer was asked to close, so the still-fading viewer covered it, and the transcript's
+  fades and the pill came back over a picture still on screen. ChatPage now keeps the layer
+  raised (`layered`) until `AnimatePresence` reports the exit complete. The viewer's exit is the
+  base duration on `EASE_AWAY` instead of a 120ms cut.
+- The viewer's model name, Keep and Close sit in the window header's band on the chat page, as the
+  sheet's row does, instead of a header's height below it.
+- The video player keeps media-chrome for behaviour and replaces everything visible: our own filled
+  play, pause, sound and muted glyphs slotted into its buttons; one frosted-glass bar inside the
+  picture, shown only while the pointer or keyboard is on the clip; no hover boxes; a thin
+  scrubber whose knob appears under the pointer; time gone and time left either side; the centred
+  play in the same glass.
+- Seen in the showcase (player at rest and on hover). The close flash and the header row are not
+  yet seen in the running app.
+
+### Video box, standard size, the Workspace item (2026-11-08)
+
+- Video: the box was the clip's shape, but before playing it showed the poster - the source
+  picture, a different shape - contained inside it, leaving bands. The player now fills its box
+  (`object-fit: cover`), which crops nothing of the clip because the box is the clip's shape. The
+  viewer's box was a fixed 16:9; it now takes the clip's measured ratio and fits the area with
+  container units, so the controls sit on the picture.
+- Standard window size: 1140x866 OS window, a 1084x810 panel, measured from the person's own
+  standard-width window (the compact screenshot confirmed 1:1 logical pixels). Applying a size is
+  cut to the screen's usable area so a 768-high screen still fits it. Compact is unchanged.
+- The header's Workspace item did nothing in a wide window when the conversation had no activity,
+  because the column only stands up for activity. An explicit request now opens it
+  (`summoned` in `RailProvider`) with an honest empty line; collapsing clears the request. The
+  card's corner button uses the same workspace mark as the menu.
+
+### The working mark (2026-11-08)
+
+- `ActivityMark` is now a ring of twelve round dots after the person's reference: an accent head,
+  each dot behind smaller and fading over to the interface grey, turning one dot per beat
+  (stepped, 0.96s a turn) rather than smoothly. It serves the sidebar row and the conversation
+  menu as before, and the header now shows it in the history glyph's place while the current
+  conversation works. Showcase specimen in the Workspace section.
+
+### Default text size 14 (2026-11-08)
+
+- `DEFAULT_UI_SIZE` 15 -> 14 (code follows at 13 through the -1 offset), with `styles/type.css`
+  kept in step and the reason in `RULES.md` §6. One number sizes the whole chrome, and at the
+  reference's 15 the sidebar and menus read a size large for a desktop app. An install with a
+  saved size keeps it; 15 is one step up in Settings.

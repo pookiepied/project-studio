@@ -180,7 +180,7 @@ export function ActivityList({ rows, onPick, selected = null }: {
   onPick: (view: ActivityView) => void
   selected?: ActivityView | null
 }) {
-  if (rows.length === 0) return <p className="px-2.5 py-2 text-caption text-muted-foreground">Nothing has happened in this conversation yet.</p>
+  if (rows.length === 0) return <p className="px-2.5 py-2 text-caption text-muted-foreground">No plan, agents, commands or file changes in this conversation yet.</p>
   return (
     <div className="flex flex-col gap-1">
       {GROUPS.map((group) => {

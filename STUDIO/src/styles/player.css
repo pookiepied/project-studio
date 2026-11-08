@@ -4,47 +4,56 @@
    The video player
 
    `media-chrome` provides behaviour and a browser-default appearance. The
-   appearance is replaced here rather than accepted, because the default is a
-   full-width opaque strip with square hover boxes -- a YouTube-shaped object
-   dropped into a chat message.
+   appearance is replaced here, and the glyphs are slotted in from
+   `VideoPlayer.tsx`, because the default is a browser's own player dropped
+   into a chat message.
 
-   What replaces it is one floating pill: translucent, blurred, round controls,
-   sitting inside the picture rather than under it. The reference is the system
-   player, which stays out of the way of the thing it is playing.
+   The reference is the system player: one bar of frosted glass floating
+   inside the picture, there while the pointer is and gone while it is not;
+   controls that brighten rather than sit in a grey box on hover; a thin
+   scrubber whose knob only appears where the pointer is; the time gone and
+   the time left either side of it.
    --------------------------------------------------------------------------- */
 .studio-player {
   display: block;
   width: 100%;
   height: 100%;
-  /* The default is black, and it was showing as a band below the picture
-     whenever the clip's ratio did not match the frame -- outside the panel's
-     fill, so outside the rounded shape. */
   --media-background-color: transparent;
-  --media-object-fit: contain;
+  /* The box is always the clip's own shape (the grid and the viewer both
+     measure it), so filling it crops nothing of the clip. What it stops is
+     the poster - the picture the clip was made from, often a different
+     shape - shrinking inside the box and leaving bands above and below. */
+  --media-object-fit: cover;
 
-  --media-primary-color: oklch(1 0 0);
-  --media-secondary-color: oklch(1 0 0 / 26%);
-  --media-text-color: oklch(1 0 0);
+  --media-primary-color: oklch(1 0 0 / 92%);
+  --media-secondary-color: transparent;
+  --media-text-color: oklch(1 0 0 / 92%);
   --media-font-family: var(--font-interface, var(--font-sans));
   --media-font-size: var(--text-micro);
+  --media-font-weight: 500;
 
-  /* Controls are round and transparent until touched. A default control paints
-     a grey rectangle on hover, which is the single ugliest thing about a stock
-     player at this size. */
+  /* No box behind a control, on hover or ever: the glyph brightens instead. */
   --media-control-background: transparent;
-  --media-control-hover-background: oklch(1 0 0 / 18%);
+  --media-control-hover-background: transparent;
   --media-control-height: var(--button-sm);
   --media-control-padding: 6px;
   --media-button-icon-width: var(--icon-sm);
   --media-button-icon-height: var(--icon-sm);
 
-  --media-range-track-height: 3px;
-  --media-range-track-background: oklch(1 0 0 / 24%);
-  --media-range-bar-color: oklch(1 0 0);
+  --media-range-padding: 0;
+  --media-range-track-height: 4px;
+  --media-range-track-border-radius: 999px;
+  --media-range-track-background: oklch(1 0 0 / 22%);
+  --media-time-range-buffered-color: oklch(1 0 0 / 32%);
+  --media-range-bar-color: oklch(1 0 0 / 92%);
   --media-range-thumb-background: oklch(1 0 0);
-  --media-range-thumb-width: 10px;
-  --media-range-thumb-height: 10px;
+  --media-range-thumb-width: 0px;
+  --media-range-thumb-height: 0px;
   --media-range-thumb-border-radius: 999px;
+  --media-range-thumb-box-shadow: 0 1px 4px oklch(0 0 0 / 35%);
+  --media-preview-time-display: none;
+  --media-preview-thumbnail-display: none;
+  --media-box-arrow-display: none;
 
   /* The library's own tooltips are a second, differently-styled tooltip system
      inside an app that already has one. */
@@ -54,68 +63,131 @@
 .studio-player video {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  /* The panel already rounds; matching here keeps the picture inside the curve
-     even while the element is transformed during the lightbox's entrance. */
+  object-fit: cover;
   border-radius: inherit;
+}
+
+/* One material for both floating pieces: dark frosted glass with a hairline
+   edge, as the system draws its player's controls. */
+.studio-player media-control-bar,
+.studio-player .studio-player-centre {
+  background: oklch(0.2 0 0 / 46%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 0 0 0.5px oklch(1 0 0 / 14%),
+    0 8px 24px -8px oklch(0 0 0 / 55%);
 }
 
 .studio-player media-control-bar {
   position: absolute;
-  inset-inline: 10px;
-  bottom: 10px;
-  min-height: calc(var(--button-sm) + 10px);
-  padding-inline: 4px;
+  inset-inline: 12px;
+  bottom: 12px;
+  height: calc(var(--button-sm) + 6px);
+  padding-inline: 6px 4px;
   display: flex;
   align-items: center;
   gap: 2px;
-  border-radius: 999px;
-  background: oklch(0.16 0 0 / 55%);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  box-shadow: 0 4px 16px -4px oklch(0 0 0 / 45%);
+  border-radius: 14px;
+  transition:
+    opacity var(--duration-base) var(--ease-out-quint),
+    transform var(--duration-base) var(--ease-out-quint);
 }
 
-.studio-player media-control-bar > * {
-  border-radius: 999px;
+/* There while the pointer or the keyboard is on the clip, and while it is
+   paused part-way; gone at rest, so a still frame is only the picture with
+   its one play glyph. */
+.studio-player:not(:hover):not(:focus-within) media-control-bar,
+.studio-player[userinactive]:not([mediapaused]) media-control-bar {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
 }
 
-/* The scrubber takes the room left over; everything else is intrinsic. */
+.studio-player media-play-button,
+.studio-player media-mute-button {
+  width: var(--button-sm);
+  border-radius: 999px;
+  opacity: 0.86;
+  transition:
+    opacity var(--duration-fast) ease-out,
+    transform var(--duration-fast) ease-out;
+}
+
+.studio-player media-play-button:hover,
+.studio-player media-mute-button:hover {
+  opacity: 1;
+}
+
+.studio-player media-play-button:active,
+.studio-player media-mute-button:active {
+  transform: scale(0.9);
+}
+
+/* A step up from the interface's small glyph: drawn on a 20-unit grid with
+   room around the mark, they read small at the interface's own size. */
+.studio-player .studio-player-glyph {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  display: block;
+}
+
+/* The scrubber takes the room left over, and shows its knob only where the
+   pointer is. */
 .studio-player media-time-range {
   flex: 1 1 auto;
   min-width: 0;
   height: var(--button-sm);
+  padding-inline: 6px;
+  background: transparent;
 }
 
-.studio-player media-time-display {
-  padding-inline: 6px;
+.studio-player media-time-range:hover,
+.studio-player media-time-range:focus-visible {
+  --media-range-track-height: 6px;
+  --media-range-thumb-width: 12px;
+  --media-range-thumb-height: 12px;
+}
+
+.studio-player .studio-player-time {
+  padding-inline: 4px;
+  min-width: 4ch;
+  justify-content: center;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  background: transparent;
+  opacity: 0.86;
 }
 
 /* ---------------------------------------------------------------------------
    The centred play control
 
-   The invitation on a still frame. It is the one control drawn over the
-   middle of the picture, and it is drawn only while the clip is not moving:
+   The invitation on a still frame, drawn only while the clip is not moving:
    media-chrome reflects the element's state as `mediapaused`, so its absence
-   is the clip playing, and the glyph leaves in the app's own duration. The
-   pointer keeps passing through to the controller underneath while hidden.
+   is the clip playing, and the glyph leaves in the app's own duration.
    --------------------------------------------------------------------------- */
 .studio-player .studio-player-centre {
   width: var(--control-xl);
   height: var(--control-xl);
   padding: 0;
   border-radius: 999px;
-  background: oklch(0.16 0 0 / 55%);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  box-shadow: 0 4px 16px -4px oklch(0 0 0 / 45%);
+  opacity: 1;
   --media-button-icon-width: var(--icon-lg);
   --media-button-icon-height: var(--icon-lg);
-  --media-control-hover-background: oklch(0.16 0 0 / 70%);
   transition:
     opacity var(--duration-base) var(--ease-out-quint),
-    transform var(--duration-base) var(--ease-out-quint);
+    transform var(--duration-base) var(--ease-out-quint),
+    background-color var(--duration-fast) ease-out;
+}
+
+.studio-player .studio-player-centre .studio-player-glyph {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+.studio-player .studio-player-centre:hover {
+  background: oklch(0.2 0 0 / 62%);
+  transform: scale(1.04);
 }
 
 .studio-player .studio-player-centre:not([mediapaused]) {

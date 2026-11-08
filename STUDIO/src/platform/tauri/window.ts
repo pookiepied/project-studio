@@ -19,11 +19,14 @@ import { open } from '@tauri-apps/plugin-dialog'
  * Both are the OS window, which is the panel plus the frame's margin on each side
  * (`--window-inset` in styles/layout.css). Compact matches the `width`/`height`
  * defaults in tauri.conf.json: the reference's 720x845 panel, with the sidebar as
- * a drawer. Standard is wide enough to keep the sidebar open (`SHELL.compactWidth`).
+ * a drawer. Standard is a 1084x810 panel, measured from the size the person
+ * settled on with the sidebar open; it keeps the sidebar open
+ * (`SHELL.compactWidth`). On a screen too small for either, the size is cut to
+ * the screen's usable area (`applyWindowSize`).
  */
 const WINDOW_SIZES = {
   compact: { width: 776, height: 901 },
-  standard: { width: 1040, height: 720 },
+  standard: { width: 1140, height: 866 },
 } as const
 
 export type WindowSize = keyof typeof WINDOW_SIZES
@@ -97,7 +100,12 @@ export async function applyWindowSize(size: WindowSize): Promise<void> {
   const current = getCurrentWindow()
   await current.unmaximize()
   const { width, height } = WINDOW_SIZES[size]
-  await current.setSize(new LogicalSize(width, height))
+  // `screen.avail*` is the usable area in the same logical pixels the size is
+  // given in: a 768-high laptop screen with a taskbar cannot take an 866-high
+  // window, and one whose top or bottom is off the screen is one whose header
+  // or composer cannot be reached.
+  const fitted = new LogicalSize(Math.min(width, window.screen.availWidth), Math.min(height, window.screen.availHeight))
+  await current.setSize(fitted)
   await current.center()
 }
 
