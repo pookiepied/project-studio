@@ -1,15 +1,26 @@
 import { useState } from 'react'
 import { Button, MenuItem, Popover, Segmented, Tooltip } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
+import { ComposerField } from '@/features/chat/composer/ComposerField'
 import { Section } from './Section'
 
 /** Constrained specimens exercise real layout roles without a harness or user data. */
 export function LayoutSection() {
   const [choice, setChoice] = useState('system')
   const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('A question, a task, or a thought to think through.')
   return (
-    <Section title="Responsive layout" note="Compare the same settings rows in narrow and wide panes. Text preferences above apply to both.">
+    <Section title="Responsive layout" note="The real draft field and settings rows at the current text size. This draft stays in the preview and sends nothing.">
       <div className="flex flex-col gap-6">
+        <div className="studio-content-column">
+          <div className="studio-composer">
+            <ComposerField value={draft} onChange={setDraft} onSubmit={() => undefined} placeholder="Try a longer draft" />
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <span className="text-caption text-muted-foreground">Draft preview</span>
+              <Button variant="ghost" size="xs" onClick={() => setDraft('')}>Clear draft</Button>
+            </div>
+          </div>
+        </div>
         {(['22.5rem', '36rem'] as const).map((width) => (
           <div key={width} data-layout-specimen={width} className="w-full rounded-lg border p-3" style={{ maxWidth: width }}>
             <Pane title="Appearance" description="The control stays with its label as the pane narrows.">

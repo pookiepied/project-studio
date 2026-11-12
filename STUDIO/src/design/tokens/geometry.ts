@@ -55,8 +55,8 @@ export const SHELL = {
    * and is masked by a gradient rather than hidden behind a bar.
    */
   topStrip: {
-    height: 66,
-    paddingInline: 18,
+    height: 44,
+    paddingInline: 12,
   },
 
   /** Window controls. Monochrome — see `TrafficLights`. */
@@ -89,7 +89,7 @@ export const SHELL = {
    * Mirrored by `--scroll-inset-top` / `--scroll-inset-bottom` in `styles/tokens.css`,
    * which is what `.studio-scroll-inset` actually reads.
    */
-  scrollbarInset: { top: 66 + 20, bottom: 40 },
+  scrollbarInset: { top: 44 + 20, bottom: 40 },
 } as const
 
 /** The composer: one rounded box, with the field above its row of tools. */
@@ -101,8 +101,10 @@ export const COMPOSER = {
    * scroll to, and how far the scrollbar's thumb is held back from them.
    */
   edgeFade: 14,
-  /** Grow to about eight lines, then scroll inside. */
-  maxHeight: 184,
+  /** The visible draft budget follows its actual font and line height. */
+  maxLines: 6,
+  /** Six default 22px lines and 8px padding, before styles can be measured. */
+  maxHeight: 140,
 } as const
 
 /**

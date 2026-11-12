@@ -638,7 +638,7 @@ export function Composer({
       {/* The field stays mounted under whatever stands in for it, hidden and
           inert, so a draft keeps its height while the microphone has the slot,
           and a passage landing reshapes the box as it arrives. */}
-      <div data-composer-slot className="relative flex min-h-[var(--button-md)] min-w-0 flex-col justify-center">
+      <div data-composer-slot className="relative flex min-h-[var(--composer-line-box)] min-w-0 flex-col justify-center">
         <div
           inert={fieldAside || dictating}
           className={cn(

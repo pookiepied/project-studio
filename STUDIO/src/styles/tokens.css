@@ -107,14 +107,14 @@
      guessed at:
 
        top     the strip is solid for its own height (`SHELL.topStrip.height`,
-               40) and then fades for 20 more -- so 60 is the first pixel the
+               44) and then fades for 20 more -- so 64 is the first pixel the
                thumb is fully legible on.
        bottom  the composer paints no fill; only its 40px gradient sits over
                the transcript, so 40 clears it exactly.
 
      If either gradient changes, these change with it -- they are the same
      numbers, written once. */
-  --scroll-inset-top: 86px;
+  --scroll-inset-top: 64px;
   --scroll-inset-bottom: 40px;
 
   --duration-fast: 120ms;

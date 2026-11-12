@@ -1,7 +1,7 @@
 # Studio — minimal workspace design
 
-**Status:** Exploration with the first typography pass implemented; layout and
-theme changes remain proposed.
+**Status:** Typography and the first spacing/composer-sizing pass are implemented;
+the three-panel layout and theme changes remain proposed.
 **Date:** 2026-11-12
 **Working branch:** `codex/minimal-workspace`, created from `design/family-a`
 at `6ac47e84` after the user chose to preserve its fixes and features.
@@ -873,6 +873,49 @@ Inter/JetBrains Mono families, light/dark rendering, 720px and 1440px viewports,
 and preserved 11px/18px size choices. The root rem grid stayed at 16px. This
 does not validate the future three-panel layout or native desktop composition.
 
+### Second pass — shared spacing and composer sizing
+
+This pass keeps the inherited application features and changes their shared
+presentation geometry:
+
+| Area | Before | Second pass |
+| --- | --- | --- |
+| Header | 66px height, 18px horizontal inset | 44px height, 12px inset |
+| Top scrollbar clearance | 86px | 64px, matching header plus its 20px fade |
+| Default inner reading measure | 652px | 680px, scaling with the reading size |
+| Settings content measure | 576px maximum | 720px maximum |
+| Composer outside edges | Extended beyond the reading column | Aligned to the reading column |
+| Composer frame | 28px radius, asymmetric padding | 12px radius, 8px padding |
+| Draft inset | 8px inside frame padding | 4px inside frame padding |
+| Quote / answer-field corners | Larger rounded shapes | 8px corners |
+| Pending decision corners | 24px | 12px, with the same column edges as composer |
+| Visible long draft | Fixed 184px ceiling | Six rendered lines plus measured padding |
+
+At the default reading size, the long-draft ceiling is 140px. At the 18px text
+setting it is approximately 177.7px; reducing the size restores the smaller
+ceiling without losing text. The development showcase now includes the real
+draft field inside the real composer frame, with local preview text and an
+explicit note that it sends nothing.
+
+The full model, attachment, dictation, voice, queue and Stop controls stay in
+the actual composer during this pass. Their final header/menu placement remains
+later work. Window presets, map/provider code, tool execution and diagnostics
+are unchanged. This pass adds no effectful entry point or capture boundary.
+
+The new `ComposerField.test.tsx` case checks line-height changes, overflow and
+unchanged draft/callback state. Replacing the measured ceiling with the fixed
+140px fallback made that exact test fail when 176px was required; the measured
+calculation was then restored. Browser inspection exercised the draft at
+390px, 720px and 1440px viewports, default/large text and both themes. The local
+preview frame measured 78px high for a single-line draft at the default size;
+the actual toolbar can be taller according to its contents and recording state.
+
+Validation: `pnpm -C STUDIO check` passed typechecking, linting and 2,053 tests
+across 238 files (2,052 tests at the preceding checkpoint). The production build
+passed with the same large-chunk advisory. The new regression was verified
+against a deliberately broken fixed ceiling before restoring the line-based
+calculation. No new rule outside the agreed design direction was introduced.
+
 ### Following passes
 
 1. **Review this direction.** Compare the source reference with full-size
@@ -941,7 +984,8 @@ on these refinements:
 | How should viewer reading density change? | Dense body in workspace; optional relaxed focus reading | Consistency and comfort without surprising text-size jumps |
 
 **Current completion:** the new branch preserves the previous implementation,
-and the first shared typography pass is implemented. Reference analysis, target
+and shared typography plus the first spacing/composer-sizing pass are implemented.
+Reference analysis, target
 layout/color tokens, composer placement, screen/state inventory and implementation
 gates are specified. The three-panel shell, new composer composition, theme/rim
 changes, native material checks and full redesign validation remain pending.

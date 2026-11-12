@@ -13,9 +13,9 @@ grey surfaces, one blue accent, and a composer that holds its tools. When a
 choice here and the reference disagree, the reference wins and this file changes.
 
 The `codex/minimal-workspace` exploration uses
-`documentation/architecture/design.md` as its new target. Section 6 reflects the
-first typography pass; other sections still describe the inherited presentation
-until their corresponding design pass is implemented.
+`documentation/architecture/design.md` as its new target. Typography and composer
+sizing follow the first two passes recorded there; other sections still describe
+the inherited presentation until their corresponding design pass is implemented.
 
 ---
 
@@ -158,6 +158,11 @@ Reduced motion is handled twice, globally, and never in a component:
 ---
 
 ## 3. Shape
+
+The minimal workspace composer uses a 12px corner with 8px padding. Its quote
+and answer fields use 8px corners, and pending decisions share its column edges.
+The header is 44px high. These are the current sizing changes; menu, window and
+viewer geometry below still describe the inherited implementation.
 
 Radius descends from the window. The window is 40, the reference's corner at
 Studio's scale; everything else agrees with it or looks pasted on.

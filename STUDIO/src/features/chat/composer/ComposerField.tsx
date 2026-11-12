@@ -139,8 +139,15 @@ export function ComposerField({
     if (!element) return
 
     const natural = measure(element, element.getBoundingClientRect().width)
-    const clamped = Math.min(natural, COMPOSER.maxHeight)
-    element.style.overflowY = natural > COMPOSER.maxHeight ? 'auto' : 'hidden'
+    const style = window.getComputedStyle(element)
+    const lineHeight = Number.parseFloat(style.lineHeight)
+    const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+    // A pixel ceiling would show fewer lines after the person enlarges text.
+    const maximum = Number.isFinite(lineHeight) && lineHeight > 0 && Number.isFinite(padding)
+      ? lineHeight * COMPOSER.maxLines + padding
+      : COMPOSER.maxHeight
+    const clamped = Math.min(natural, maximum)
+    element.style.overflowY = natural > maximum ? 'auto' : 'hidden'
     // `stable` reserves the thumb gutter whether it is needed or not. Otherwise
     // appearing a scrollbar on a paste changes the content width mid-type and
     // the text jitters left.
@@ -225,7 +232,7 @@ export function ComposerField({
       className={cn(
         'studio-selectable block w-full resize-none bg-transparent',
         'text-body text-foreground outline-none placeholder:text-muted-foreground/70',
-        'studio-composer-scroll px-2 py-2',
+        'studio-composer-scroll px-1 py-1',
       )}
     />
   )

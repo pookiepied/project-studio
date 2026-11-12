@@ -1,8 +1,8 @@
 /* Layout roles own their measure and gutter together, including nested panes. */
 :root {
-  /* Preserve Chat's existing inner reading width while giving Home the same box. */
-  --reading-measure: calc(var(--text-body) * 50 - 48px);
-  --settings-measure: 36rem;
+  /* The default reading column is 680px; larger text keeps its character budget. */
+  --reading-measure: calc(var(--text-body) * 680 / 14);
+  --settings-measure: 45rem;
   --settings-nav-width: 12.5rem;
   --content-gutter: clamp(1rem, 3vw, 1.5rem);
   --floating-edge: 8px;
@@ -39,15 +39,16 @@
     border-radius: var(--window-radius);
   }
 
-  /* The reference's box: its margin from the panel is 15px at the default size,
-     whatever gutter the column around it keeps for reading. */
+  /* The composer and decisions share the reading column's outside edges. */
   .studio-composer {
-  caret-color: var(--accent);
+    --button-xs: calc(var(--ui-size) * 2);
+    --composer-line-box: calc(var(--text-body) * var(--leading-body) + 8px);
+    caret-color: var(--accent);
     position: relative;
     isolation: isolate;
-    margin-inline: calc(15px - var(--content-gutter));
-    padding: 6px 16px 13px 12px;
-    border-radius: 28px;
+    margin-inline: 0;
+    padding: 8px;
+    border-radius: 12px;
     background: var(--composer-surface);
     box-shadow: var(--shadow-raised);
     transition: box-shadow var(--duration-fast, 120ms) ease-out;
@@ -57,24 +58,22 @@
     box-shadow: 0 0 0 1px var(--composer-edge), 0 0 0 4px var(--composer-halo);
   }
 
-  /* The dock reaches past the box's padding, so the strip sits 6px in from its
-     edge on three sides. It clips while it opens and closes, which is why the
-     reach belongs here: on the strip, this clip would cut the strip's corners. */
+  /* Keep the quote inside the same inset while its measured dock opens. */
   .studio-composer-quote-dock {
-    margin-inline: -6px -10px;
+    margin-inline: 0;
     overflow: hidden;
   }
 
-  /* Top corners follow the box's curve; bottom ones are a row's. */
+  /* A compact inset rather than another large curved surface. */
   .studio-composer-quote {
     display: flex;
     min-width: 0;
     height: 41px;
     margin-bottom: 4px;
     align-items: center;
-    gap: 17px;
+    gap: 12px;
     padding-inline: 13px 10px;
-    border-radius: 22px 22px 14px 14px;
+    border-radius: 8px;
     background: var(--accent-wash);
     color: var(--accent-wash-foreground);
     transform-origin: center bottom;
@@ -90,9 +89,9 @@
      questions; the padding lives on the inner box, so the height it measures
      is the whole card. */
   .studio-prompt-card {
-    margin-inline: calc(15px - var(--content-gutter, 15px));
+    margin-inline: 0;
     overflow: clip;
-    border-radius: 24px;
+    border-radius: 12px;
     background: var(--prompt-card-surface);
     box-shadow: 0 10px 32px -14px var(--shadow-tint-strong), inset 0 0 0 1px var(--prompt-card-edge);
     backdrop-filter: blur(28px) saturate(1.4);
@@ -106,7 +105,7 @@
      edge and shadow, so the two things that rise out of the composer read as
      one family. */
   .studio-slash-panel {
-    border-radius: 20px;
+    border-radius: 12px;
     background: var(--prompt-card-surface);
     box-shadow: 0 10px 32px -14px var(--shadow-tint-strong), inset 0 0 0 1px var(--prompt-card-edge);
     backdrop-filter: blur(28px) saturate(1.4);
@@ -120,7 +119,7 @@
     gap: 6px;
     min-height: 44px;
     padding: 6px 6px 6px 14px;
-    border-radius: 18px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--foreground) 4%, transparent);
     transition: background-color var(--duration-fast, 120ms) ease-out, box-shadow var(--duration-fast, 120ms) ease-out;
   }

@@ -13,6 +13,41 @@ afterEach(() => {
 })
 
 describe('composer appearance changes', () => {
+  it('keeps six draft lines visible as line height changes without changing the draft', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const root = document.documentElement
+    root.style.setProperty('--draft-line-height', '22px')
+    const computedStyle = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element instanceof HTMLTextAreaElement) {
+        const style = document.createElement('div').style
+        style.lineHeight = root.style.getPropertyValue('--draft-line-height')
+        style.paddingTop = '4px'
+        style.paddingBottom = '4px'
+        return style
+      }
+      return computedStyle(element)
+    })
+    vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000)
+    const onChange = vi.fn()
+    const onSubmit = vi.fn()
+    const draft = 'Keep all of this draft, including the lines beyond the visible field.'
+    render(<ComposerField value={draft} onChange={onChange} onSubmit={onSubmit} placeholder="Reply" />)
+    const field = screen.getByRole<HTMLTextAreaElement>('textbox')
+
+    for (const lineHeight of [22, 28, 32, 22]) {
+      root.style.setProperty('--draft-line-height', `${lineHeight}px`)
+      await waitFor(() => expect(Number.parseFloat(field.style.height)).toBeCloseTo(lineHeight * 6 + 8))
+      expect(field.style.overflowY).toBe('auto')
+      expect(field.value).toBe(draft)
+    }
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
   it('dissolves only the ends that have more text past them', () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
