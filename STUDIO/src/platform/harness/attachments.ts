@@ -138,12 +138,23 @@ async function throughTauri(path: string): Promise<ArrayBuffer> {
  * pairing gate. A refusal is an error rather than a quiet empty buffer, so
  * the resolver's failure cache treats it like any other miss.
  */
-async function throughBrowser(path: string): Promise<ArrayBuffer> {
-  const response = await fetch(path)
+async function throughBrowser(path: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const response = await (signal === undefined ? fetch(path) : fetch(path, { signal }))
   if (!response.ok) {
     throw new Error(`The attachment was refused with ${response.status}.`)
   }
   return response.arrayBuffer()
+}
+
+/** The shared admitted binary transport, before an attachment is turned into a data URL. */
+export async function readHarnessBytes(path: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('The read was cancelled.', 'AbortError')
+  const bytes = await (bytesTransport !== null ? bytesTransport(path)
+    : isTauri() ? throughTauri(path) : throughBrowser(path, signal))
+  // The existing native GET command has no cancellation message. Its reply
+  // can still be discarded when the originating view no longer needs it.
+  if (signal?.aborted) throw signal.reason ?? new DOMException('The read was cancelled.', 'AbortError')
+  return bytes
 }
 
 /**
@@ -259,8 +270,7 @@ export function harnessBytesDataUrl(
 
   const request = (async (): Promise<string | null> => {
     try {
-      const transport = bytesTransport ?? (isTauri() ? throughTauri : throughBrowser)
-      const bytes = await transport(path)
+      const bytes = await readHarnessBytes(path)
       const kind = options.sniff === true ? (sniffImageKind(bytes) ?? mimeType) : mimeType
       const url = `data:${kind};base64,${base64Of(bytes)}`
       remember(key, url)

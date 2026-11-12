@@ -127,16 +127,32 @@ export class ApprovalBook {
     bounded(this.#held);
   }
 
-  /** Spends one held approval for this actor and this exact process, if there is one. */
-  take(actor: string, target: ApprovalTarget): boolean {
+  /**
+   * The id of a held approval for this actor and this exact process, without
+   * spending it. A call is checked before the lease admits it, and a call the
+   * lease then refuses has sent nothing: the person's yes must still be there
+   * for the call that follows the next look, or they are asked again for
+   * input that never went out.
+   */
+  held(actor: string, target: ApprovalTarget): string | undefined {
     for (const [id, held] of this.#held) {
       if (this.#now() - held.at > HELD_TTL_MS) { this.#held.delete(id); continue; }
-      if (held.actor === actor && same(held.target, target)) {
-        this.#held.delete(id);
-        return true;
-      }
+      if (held.actor === actor && same(held.target, target)) return id;
     }
-    return false;
+    return undefined;
+  }
+
+  /** Spends a held approval, once the input it allows is about to be sent. */
+  spend(id: string): void {
+    this.#held.delete(id);
+  }
+
+  /** Spends one held approval for this actor and this exact process, if there is one. */
+  take(actor: string, target: ApprovalTarget): boolean {
+    const id = this.held(actor, target);
+    if (id === undefined) return false;
+    this.spend(id);
+    return true;
   }
 
   /** A new request for the person, remembered so its answer can be recognised. */

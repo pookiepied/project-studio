@@ -100,7 +100,7 @@ export interface Providers {
  */
 export type HarnessConnect = () => Promise<HarnessClient | null>
 
-async function connectToHarness(): Promise<HarnessClient | null> {
+export async function connectToHarness(): Promise<HarnessClient | null> {
   const address = await resolveHarnessAddress()
   return address === null ? null : createHarnessClient(address)
 }

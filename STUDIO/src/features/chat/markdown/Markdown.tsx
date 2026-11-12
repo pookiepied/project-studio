@@ -129,6 +129,7 @@ interface FenceNode {
   readonly value?: string
   readonly children?: readonly FenceNode[]
   readonly properties?: Readonly<Record<string, unknown>>
+  readonly position?: { readonly start: { readonly offset?: number }; readonly end: { readonly offset?: number } }
 }
 
 /** The fence info and the raw text of a fenced block, read off the tree. */
@@ -164,6 +165,7 @@ type PluggableList = NonNullable<Options['rehypePlugins']>
 
 const StreamingContext = createContext(false)
 const UserContext = createContext(false)
+const MapFenceSource = createContext<string | null>(null)
 const InsideLink = createContext(false)
 
 /**
@@ -196,14 +198,31 @@ function InlineCode({ className, children, ...rest }: ComponentProps<'code'> & E
 function Fence({ node }: { node: FenceNode | undefined }) {
   const streaming = useContext(StreamingContext)
   const user = useContext(UserContext)
+  const mapSource = useContext(MapFenceSource)
   const { fence, text } = fenceOf(node)
   if (fence === 'artifact') return user ? <TextBlock text={text} fence="text" /> : <ArtifactBlock source={text} />
+  if (fence === 'map' && !user && !closedMapFence(node, mapSource)) {
+    return <CodeBlock code={text} fence="map" streaming={streaming} />
+  }
   // A visual is drawn for a reply and shown as written in a person's own message.
   if (fence !== undefined && VISUAL_FENCES.has(fence)) {
     return user ? <TextBlock text={text} fence="text" /> : <VisualBlock fence={fence} source={text} streaming={streaming} />
   }
   if (fence === undefined || fence in TEXT_FENCES) return <TextBlock text={text} fence={fence ?? 'text'} />
   return <CodeBlock code={text} fence={fence} streaming={streaming} />
+}
+
+/** An incomplete tail can have a synthetic closer just for Markdown display. */
+function closedMapFence(node: FenceNode | undefined, source: string | null): boolean {
+  const start = node?.position?.start.offset
+  const end = node?.position?.end.offset
+  if (source === null || start === undefined || end === undefined) return false
+  const lines = source.slice(start, end).trimEnd().split(/\r?\n/)
+  const opening = /^(`{3,}|~{3,})map\s*$/.exec(lines[0])
+  const closing = lines.at(-1)?.trim()
+  if (opening === null || closing === undefined) return false
+  const marker = opening[1]
+  return closing.length >= marker.length && closing === marker[0].repeat(closing.length)
 }
 
 function ReplyLink({ href, title, children }: ComponentProps<'a'>) {
@@ -291,7 +310,13 @@ const COMPONENTS: Components = {
   a: ReplyLink,
 }
 
-export const Markdown = memo(function Markdown({ text, streaming = false, user = false, sources, caret = false }: { text: string; streaming?: boolean; user?: boolean; sources?: Sources; /** This block holds the end of a reply still being written. */ caret?: boolean }): ReactNode {
+export const Markdown = memo(function Markdown({ text, streaming = false, user = false, sources, caret = false, allowMaps = false }: {
+  text: string; streaming?: boolean; user?: boolean; sources?: Sources
+  /** This block holds the end of a reply still being written. */
+  caret?: boolean
+  /** Only the assistant transcript mounts map views. */
+  allowMaps?: boolean
+}): ReactNode {
   // The maths plugins join the pipeline only for a reply that carries a
   // formula, and only once they have arrived (`useMath`). The sanitiser
   // keeps its place between raw and katex either way.
@@ -299,7 +324,8 @@ export const Markdown = memo(function Markdown({ text, streaming = false, user =
   const source = math === null ? text : prepareMath(text)
   const reply: [typeof rehypeReply, { sources?: Sources }] = [rehypeReply, { sources }]
   return (
-    <UserContext.Provider value={user}><StreamingContext.Provider value={streaming}><ReactMarkdown
+    <UserContext.Provider value={user}><StreamingContext.Provider value={streaming}>
+    <MapFenceSource.Provider value={allowMaps && !streaming ? source : null}><ReactMarkdown
       skipHtml={user}
       remarkPlugins={math === null ? [remarkGfm, remarkReplyFiles] : [remarkGfm, remarkReplyFiles, math.remark]}
       urlTransform={urlTransform}
@@ -312,6 +338,6 @@ export const Markdown = memo(function Markdown({ text, streaming = false, user =
       components={COMPONENTS}
     >
       {source}
-    </ReactMarkdown></StreamingContext.Provider></UserContext.Provider>
+    </ReactMarkdown></MapFenceSource.Provider></StreamingContext.Provider></UserContext.Provider>
   )
 })

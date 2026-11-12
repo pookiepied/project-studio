@@ -140,7 +140,7 @@ permission.
 
 ## The native tools
 
-Twenty-one tools in eleven families, registered under one `native` namespace
+Twenty-two tools in twelve families, registered under one `native` namespace
 by `registerNativeTools` when their dependencies are composed:
 
 | Family | Tools |
@@ -150,6 +150,7 @@ by `registerNativeTools` when their dependencies are composed:
 | git | `git` |
 | shell | `shell`, `jobs` |
 | web | `web_search`, `fetch` |
+| maps | `walking_route` |
 | media | `studio_image`, `studio_video` |
 | documents | `ocr` |
 | library | `library_search`, `library_keep` |
@@ -157,7 +158,7 @@ by `registerNativeTools` when their dependencies are composed:
 | plan | `plan` |
 | discover | `discover` |
 
-The normal application composes all twenty-one. Framework tools such as `task`,
+The normal application composes all twenty-two. Framework tools such as `task`,
 `activate_skill` and the conditional `read_skill_resource` are separate from
 this native count.
 

@@ -892,7 +892,30 @@ function Get-Window($handle, $processId, $started, $app) {
   return [ordered]@{ found = $candidates.Count -gt 0; same = $false; reused = $null -ne $row; windows = @($candidates | Select-Object -First 20) }
 }
 
-function Focus-Window($handle) {
+# Whether the keyboard focus is inside this window. A web page's controls -
+# Chrome, Edge, Electron, WebView2, Studio itself - are windowless to UI
+# Automation: the focused text box reports NativeWindowHandle 0, so testing
+# that handle alone read "focus is elsewhere" while it sat in the field the
+# model had clicked, and the fallback below then moved it to the window's
+# first focusable control (the tab strip, the address bar). The nearest
+# ancestor that has a window handle says where the focus really is.
+function Focus-InWindow($handle) {
+  try {
+    $el = [System.Windows.Automation.AutomationElement]::FocusedElement
+    $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+    for ($i = 0; $i -lt 64 -and $null -ne $el; $i++) {
+      $own = [int64]$el.Current.NativeWindowHandle
+      if ($own -ne 0) { return (Same-Window $own ([int64]$handle)) }
+      $el = $walker.GetParent($el)
+    }
+  } catch {}
+  return $false
+}
+
+# $keepFocus: bring the window back without choosing a control in it. Used
+# after the person answered a prompt in Studio, when the window's own focus
+# memory still holds the field the model was working in.
+function Focus-Window($handle, $keepFocus) {
   $h = [IntPtr][int64]$handle
   if ([Studio.Native]::IsIconic($h)) { [void][Studio.Native]::ShowWindow($h, 9) }
   # A process that is not in the foreground may not steal it, by design.
@@ -929,13 +952,11 @@ function Focus-Window($handle) {
   # on 2026-09-15 as Escape, digits and Alt+F4 accepted and going nowhere.
   # What a person's click does is put the focus on a control inside; UI
   # Automation's SetFocus on the first focusable descendant does the same.
-  # Left alone when the focus is already inside the window.
+  # Left alone when the focus is already inside the window, and never done
+  # when the caller asked to keep the window's own focus.
   try {
     $rootEl = [System.Windows.Automation.AutomationElement]::FromHandle($h)
-    $focusedNow = [System.Windows.Automation.AutomationElement]::FocusedElement
-    $inside = $false
-    try { $inside = ($null -ne $focusedNow) -and (Same-Window ([int64]$focusedNow.Current.NativeWindowHandle) ([int64]$handle)) } catch {}
-    if (-not $inside) {
+    if ($keepFocus -ne $true -and -not (Focus-InWindow $handle)) {
       $cond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::IsKeyboardFocusableProperty, $true)
       $first = $rootEl.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
       if ($null -ne $first) { $first.SetFocus(); Start-Sleep -Milliseconds 100 }
@@ -944,6 +965,75 @@ function Focus-Window($handle) {
   $focused = (Same-Window ([int64][Studio.Native]::GetForegroundWindow()) ([int64]$handle))
   if ($focused) { Set-Target $handle }
   return [ordered]@{ focused = $focused; asked = [bool]$ok; handle = [int64]$handle; title = (Get-WindowTitle $h) }
+}
+
+# ---- After the person answered in Studio ------------------------------------
+#
+# Approving a computer call is a click in Studio's own window, so Studio is in
+# front when the approved keys are about to go out, and the target rule then
+# refused them: "the window in front is Studio". Measured as the person
+# approving typing into a browser and every attempt failing or landing badly.
+# Studio is the process this driver descends from (driver <- computer server
+# <- harness <- Studio), identified as the nearest ancestor that owns a
+# visible window, so Explorer above it never counts, and never a terminal or
+# browser (a harness run by hand from a shell, answered from a web page).
+# Process identity, pid and start time together, never a window title.
+
+$script:StudioProcess = $null
+
+function Studio-Process {
+  if ($null -ne $script:StudioProcess) { return $script:StudioProcess }
+  $found = ""
+  try {
+    $owners = @{}
+    foreach ($w in (Get-TopWindows $null)) { $owners[[int]$w.pid] = $true }
+    $id = [int]$PID
+    for ($i = 0; $i -lt 8; $i++) {
+      $self = Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction Stop
+      $parent = [int]$self.ParentProcessId
+      if ($parent -le 4) { break }
+      $p = Get-Process -Id $parent -ErrorAction SilentlyContinue
+      # A parent that started after its child is a reused id, not the parent.
+      if ($null -eq $p -or $p.StartTime -gt $self.CreationDate) { break }
+      if ($owners.ContainsKey($parent)) {
+        if ($null -eq (App-Category $p.ProcessName)) { $found = "$parent/$([string]$p.StartTime.ToUniversalTime().Ticks)" }
+        break
+      }
+      $id = $parent
+    }
+  } catch { $found = "" }
+  $script:StudioProcess = $found
+  return $found
+}
+
+# Read-only: whether Studio's own window is in front while the target, the
+# same window as when it was chosen, is not. Sends nothing.
+function Approval-Front {
+  Resume-Owner
+  $studio = Studio-Process
+  $fg = [int64][Studio.Native]::GetForegroundWindow()
+  $front = if ($fg -eq 0) { $null } else { Window-Row (Root-Of $fg) }
+  $studioInFront = $studio -ne "" -and $null -ne $front -and "$($front.pid)/$($front.processStarted)" -eq $studio
+  $intact = $script:Target -ne 0 -and (Window-Identity (Window-Row $script:Target)) -eq $script:TargetIdentity
+  return [ordered]@{
+    studioKnown = ($studio -ne ""); studioInFront = $studioInFront; targetIntact = $intact
+    targetInFront = ($intact -and (Same-Window $fg $script:Target))
+  }
+}
+
+# Brings the target back after the person answered in Studio, checked again
+# here because a moment has passed since the read-only look. Only from
+# Studio's own window and only to the same target: anything else in front is
+# the person's choice and is left alone, and the keys are then refused by the
+# target rule as before. The window's own focus is kept, so the field the
+# model clicked is still the one that takes the text.
+function Restore-Target {
+  $state = Approval-Front
+  if ($state.targetInFront) { return [ordered]@{ restored = $false; reason = "already_in_front" } }
+  if (-not $state.targetIntact) { return [ordered]@{ restored = $false; reason = "target_changed" } }
+  if (-not $state.studioInFront) { return [ordered]@{ restored = $false; reason = "front_not_studio" } }
+  $focused = Focus-Window $script:Target $true
+  return [ordered]@{ restored = [bool]$focused.focused; reason = $(if ($focused.focused) { "restored" } else { "refused_by_windows" }); title = $focused.title; handle = $focused.handle }
 }
 
 # The window a launch produced: the first visible top-level window that was
@@ -1834,6 +1924,8 @@ try { while ($true) {
       "read_ui" { Answer $id (Read-Ui $a.window $a.depth $a.limit $a.all $a.query) }
       "observe" { Answer $id (Observe-Window $a) }
       "sensitivity" { Answer $id (Get-Sensitivity $a) }
+      "approval_front" { Answer $id (Approval-Front) }
+      "restore_target" { Answer $id (Restore-Target) }
       # A new turn of the actor that read them: its references end with it.
       "reset_refs" { Reset-UiRefs; Answer $id ([ordered]@{ reset = $true }) }
       "act" { Answer $id ([ordered]@{ said = (Ui-Act $a.ref $a.action $a) }) }

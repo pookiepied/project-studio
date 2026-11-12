@@ -80,6 +80,43 @@ function turnFrom(meta: unknown): string | undefined {
   return typeof turn === "string" && turn !== "" ? turn : undefined;
 }
 
+/**
+ * Whether the harness says the person answered a permission prompt for this
+ * call, which they do by clicking in Studio's own window. Stamped by the
+ * harness from the kernel's own decision; a model never spells it.
+ */
+function askedFrom(meta: unknown): boolean {
+  return isRecord(meta) && meta["studio/asked"] === "1";
+}
+
+/**
+ * Input that goes to the keyboard focus of the window being worked in. The
+ * driver checks that window is in front before any of it is sent, so after
+ * the person answered in Studio it can be brought back without depending on
+ * where the screen's pixels are. Pointer input is not: a point read off a
+ * picture taken before Studio came forward may now be on Studio.
+ */
+function isKeyboardInput(bare: string, args: Record<string, unknown>): boolean {
+  if (bare === "type" || bare === "key") return true;
+  if (bare === "hold_key") return args["action"] !== "up";
+  return bare === "clipboard" && args["action"] === "paste";
+}
+
+/** Whether a driver's `approval_front` answer says only Studio's window took the person's answer. */
+function answeredInStudio(value: unknown): boolean {
+  return isRecord(value) && value["studioInFront"] === true && value["targetIntact"] === true;
+}
+
+/** What the model reads when the target was brought back after the person answered. */
+function restoredSentence(value: unknown): string | undefined {
+  if (!isRecord(value) || value["reason"] === "already_in_front") return undefined;
+  if (value["restored"] === true) {
+    const title = typeof value["title"] === "string" && value["title"] !== "" ? `"${value["title"].slice(0, 200)}"` : "the window being worked in";
+    return `The person approved this in Studio, which brought Studio to the front; Studio put ${title} back in front before the input, keeping its own focused control. The input activity reported for this call includes that approval.`;
+  }
+  return undefined;
+}
+
 /** Who an approval is for: one actor of one conversation. */
 function approvalActor(actor: Actor): string {
   return `${actor.conversation}\u0000${actor.id}`;
@@ -169,6 +206,14 @@ export class ComputerService {
     const ticket = this.desktop.ticket(actor);
     const newTurn = this.desktop.beginTurn(actor, turnFrom(meta));
     this.#approvals.accept(approvalIdFrom(meta), approvalActor(actor));
+    // The person answered a prompt in Studio for this keyboard input. Their
+    // click there is how they said yes, not a change to the window being
+    // worked in, so - when the driver confirms only Studio took it - it does
+    // not make the actor look again, and the target is brought back before
+    // the keys go out. Without this every approved keystroke was refused
+    // (the screen "changed", then "the window in front is Studio").
+    const keyboard = isKeyboardInput(bareTool(name), args);
+    let answered = false;
     try {
       const answer = await session.runTool(async () => {
         // A new turn ends the references its actor read in the last one.
@@ -176,7 +221,10 @@ export class ComputerService {
           await session.request("reset_refs");
           this.#refsReader.delete(actor.conversation);
         }
-        const gated = await this.#gate(session, actor, name, args, ticket);
+        if (keyboard && askedFrom(meta) && session.running) {
+          answered = answeredInStudio(await session.request("approval_front"));
+        }
+        const gated = await this.#gate(session, actor, name, args, ticket, answered);
         if (gated.request !== undefined) {
           return {
             isError: true,
@@ -185,16 +233,24 @@ export class ComputerService {
           };
         }
         const gate = async (step: string, stepArgs: Record<string, unknown>): Promise<{ refusal?: string; allowPassword?: boolean }> => {
-          const checked = await this.#gate(session, actor, step, stepArgs, undefined);
+          const checked = await this.#gate(session, actor, step, stepArgs, undefined, false);
+          // A batch step is checked as it is about to be sent, inside its admitted batch.
+          if (checked.held !== undefined) this.#approvals.spend(checked.held);
           return checked.request === undefined
             ? { allowPassword: checked.allowPassword === true }
             : { refusal: `This step would reach ${checked.request.displayName}, and Studio asks the person before that, so it and the steps after it were not sent. Send that step on its own so the person can be asked.` };
         };
         const granted = { ...context, allowPassword: gated.allowPassword === true, gate };
-        return this.desktop.run(session, name, () => tool.run(session, args, granted), actor, args, ticket);
+        return this.desktop.run(session, name, async () => {
+          // Admitted: the person's yes is spent only now, when input goes out.
+          if (gated.held !== undefined) this.#approvals.spend(gated.held);
+          const restored = answered ? restoredSentence(await session.request("restore_target")) : undefined;
+          const result = await tool.run(session, args, granted);
+          return restored === undefined ? result : { ...result, content: [...result.content, { type: "text", text: restored }] };
+        }, actor, args, ticket);
       }, actorKey(actor));
       this.#commit(session, actor, sharedAt, name);
-      if (sawHumanInput(answer)) this.desktop.noteHumanInput();
+      if (sawHumanInput(answer) && !answered) this.desktop.noteHumanInput();
       return this.#withinSharing(actor, sharedAt, { ...answer, structuredContent: { ...answer.structuredContent, desktop: this.desktop.state(actor) } });
     } catch (error) {
       this.#commit(session, actor, sharedAt, name);
@@ -252,7 +308,8 @@ export class ComputerService {
     name: string,
     args: Record<string, unknown>,
     ticket: ReturnType<DesktopControl["ticket"]> | undefined,
-  ): Promise<{ readonly request?: ApprovalRequest; readonly allowPassword?: boolean }> {
+    answeredInStudio: boolean,
+  ): Promise<{ readonly request?: ApprovalRequest; readonly allowPassword?: boolean; readonly held?: string }> {
     const reach = reachOf(name, args, { actor, desktop: this.desktop });
     if (reach === undefined) return {};
     if (ticket !== undefined && this.desktop.wouldRefuse(actor, name, args, ticket) !== undefined) return {};
@@ -260,14 +317,18 @@ export class ComputerService {
     if ("category" in reach) target = { category: reach.category, app: "", pid: 0, processStarted: "" };
     else {
       target = targetFrom(await session.request("sensitivity", reach.probe));
-      // The person's own input since the last answer - a click on Studio's
-      // own approval prompt among it - leaves the pictured screen behind, so
-      // the lease hears of it before it admits anything.
-      if (session.humanInputInCall) this.desktop.noteHumanInput();
+      // The person's own input since the last answer leaves the pictured
+      // screen behind, so the lease hears of it before it admits anything -
+      // unless it was only their answer in Studio to keyboard input, which
+      // the driver confirmed and which changed nothing in the target.
+      if (session.humanInputInCall && !answeredInStudio) this.desktop.noteHumanInput();
     }
     if (target === undefined) return {};
     const key = approvalActor(actor);
-    if (this.#approvals.take(key, target)) return { allowPassword: target.category === "password_field" };
+    // Found, not spent: the lease may still refuse this call, and a refused
+    // call has sent nothing, so the yes must outlast it (spent on admission).
+    const held = this.#approvals.held(key, target);
+    if (held !== undefined) return { allowPassword: target.category === "password_field", held };
     return { request: this.#approvals.ask(key, target) };
   }
 

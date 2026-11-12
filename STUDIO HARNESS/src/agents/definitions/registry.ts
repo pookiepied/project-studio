@@ -108,6 +108,7 @@ export const NATIVE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "ocr",
   "web_search",
   "fetch",
+  "walking_route",
 ]);
 
 /**

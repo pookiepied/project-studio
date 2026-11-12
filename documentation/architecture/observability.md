@@ -1,5 +1,16 @@
 # Identity and observations: developer contract
 
+Inline file references are located by `GET /api/files/:id/locate` and read for the
+viewer by `/text`, each an `observeOperation` of its own (`files.locate`,
+`files.read_text`) whose observations carry no path; the path travels only in the
+admitted request, as it already does for `/api/media/workspace`. Nothing found is
+a 200 with `null`, so a missing file is never reported as a failed read. The native
+commands `open_file`, `open_in_editor` and `list_editors` join `reveal_path` on the
+fixed command-name list. Arrival is recorded; completion and whether the launched
+app showed the file are not diagnostic outcomes. `open_file` accepts only a fixed
+list of inert types and no links, and `open_in_editor` accepts only an editor name
+from a fixed list, so the webview names neither a program nor its arguments.
+
 Inline file references use the existing native `reveal_path` command and shared
 IPC arrival observation. The native host owns the existing command-arrival UUID;
 no new execution parent, retry or automatic resend is introduced. Only the fixed
@@ -374,7 +385,14 @@ execution or approval-store id, and reaches the server back only in
 The ask itself is an ordinary kernel decision under the existing
 `tools.authorize` stage with resource `computer:<category>:<process name>`
 (no window text); its grant, refusal and pending-approval row are the kernel's
-own records. The turn stamp `_meta["studio/turn"]` passes the existing Flue
+own records. `_meta["studio/asked"]` is a flag, not an id: the kernel marks a
+decision `asked` only when the person answered a prompt shown for that call,
+the gate exposes it as `ToolContext.personAsked`, and the bridge writes it for
+Studio's own servers alone. It changes no admission; the computer server uses
+it, with a read-only driver check that Studio's own process owns the window in
+front, to treat that answer as not a change to the working window. The
+driver's restore of the working window is input inside the admitted call and
+its result (restored or why not) is result content. The turn stamp `_meta["studio/turn"]` passes the existing Flue
 submission id through unchanged. A deliberate stop is one flag in the driver's
 input report beside the counts; no key value or history crosses the boundary,
 and the hooks still read flags only.
@@ -447,6 +465,41 @@ inspection does not borrow the parent's file scope. Painting, provider use of
 visual formats and local file changes during a read remain unverified by these
 boundaries. Coverage: `reply-images.test.ts`, `ReplyImage.test.tsx`,
 `WorkspaceOverview.test.tsx` and `visuals.test.tsx`.
+
+Places maps render in the assistant transcript after a real fence closes.
+Viewport delivery reuses the native binary GET command or the paired
+browser's same-origin binary read. The admitted `GET /api/maps/tiles/:z/:x/:y`
+and `GET /api/maps/glyphs/:range` routes report HTTP request outcomes. A
+cache miss starts `map.basemap.fetch` under the initiating HTTP operation.
+It records the fixed provider and resource kind, with the existing
+operation writer holding the capture epoch. Cached or joined reads are
+delivery and have their own HTTP outcomes without inventing a second
+provider operation. Only validated tile indices and font ranges reach the
+fixed provider. There is no provider retry loop. Provider and IPC reads
+already in flight can finish after a map closes. Paint, viewport, place
+selection, and Google Maps navigation completion are outside this boundary.
+Tile indices, glyph ranges, coordinates, place labels, paths, and bytes
+are excluded from diagnostics. The upstream basemap sees tile indices
+for the visible viewport. Coverage: `map-basemap.test.ts` and
+`places-map.test.tsx`.
+
+The native `walking_route` capability uses the existing network gate and
+authorizes the fixed HeiGIT destination before contacting it. The provider
+operation `map.routing.fetch` inherits the tool's execution parent and
+records provider, mode, and outcome. No retry loop is introduced. A missing
+key results in a tool failure without a provider attempt. Provider failure
+bodies and headers are discarded. The settings routes under
+`/api/providers/routing` require provider-management admission and return only
+key presence. `map.routing.key` records the save or remove operation beneath
+its HTTP request. Credentials stay in the OS store and never enter capture.
+
+The saved tool result uses Flue's existing tool-call identity and structured
+output. The route and leg estimates are product data and only enter
+diagnostics as gated tool content. Stops, coordinates, geometry and provider
+bodies do not enter attributes. A replay renders the saved route without
+calling the routing provider again. Map painting and the route's real-world
+walkability remain outside this boundary. Coverage: `walking-route.test.ts`
+and `walkingRouteCall.test.tsx`.
 
 Image read disclosures reuse native `read` results and their existing tool-call
 and conversation identities. Only returned PNG/JPEG/GIF/WebP image blocks earn
@@ -584,6 +637,12 @@ or an ended session does not show Studio's cursor. The pill's fixed Stop slot an
 shared text line box are presentation only. `computer-indicator-layout.test.ts`
 checks the actual fonts, geometry and clipping in isolated headless browsers across
 supported font sizes, light/dark themes and 100/125/150 percent display scales.
+
+Conversation status uses admitted `GET /api/conversations/running`, a read of
+journal submission statuses under the existing HTTP request observation. It returns
+existing conversation IDs only, with no content, and starts nothing. A failed read
+keeps the last known list rather than proving a run ended. "Finished" in the window
+means a run left that list; it does not claim the submission succeeded.
 
 Desktop presence uses admitted `GET /api/computer/activity`, the child operation
 `computer.activity`, and the existing private `studio/computer` RPC. The desktop

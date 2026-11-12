@@ -53,6 +53,10 @@ import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
 import { createSandboxRoutes } from "./routes/sandbox.js";
 import { createWebRoutes } from "./routes/web.js";
+import { createMapRoutes } from "./routes/maps.js";
+import type { MapBasemap } from "../../gateway/maps/basemap.js";
+import type { WalkingRoutes } from "../../gateway/maps/walking.js";
+import { createRoutingSettingsRoutes } from "./routes/routing-settings.js";
 import { streamHeartbeat } from "./sse-heartbeat.js";
 import type { FaviconSource } from "../../web/favicons.js";
 import type { WebImageSource } from "../../web/images.js";
@@ -108,6 +112,8 @@ export interface CreateHttpAppOptions {
   readonly favicons?: FaviconSource;
   /** Pictures a reply embeds from the web, fetched on the window's behalf. */
   readonly webImages?: WebImageSource;
+  readonly mapBasemap?: MapBasemap;
+  readonly walkingRoutes?: WalkingRoutes;
   readonly approvals: PermissionApprovalBroker;
   /**
    * The stored grants, as the narrow view a route may hold. Required the way
@@ -280,6 +286,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   }
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
+  if (options.walkingRoutes !== undefined) {
+    app.route("/api/providers/routing", createRoutingSettingsRoutes(options.walkingRoutes));
+  }
   const projectFolders = (conversationId: string): readonly string[] => {
     const projectId = options.conversations.get(conversationId)?.projectId;
     if (projectId === undefined || projectId === null) return [];
@@ -300,6 +309,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/permissions/grants", createGrantsRoutes(options.grants));
   if (options.favicons !== undefined) {
     app.route("/api/web", createWebRoutes(options.favicons, options.webImages));
+  }
+  if (options.mapBasemap !== undefined) {
+    app.route("/api/maps", createMapRoutes(options.mapBasemap));
   }
   if (options.questions !== undefined) {
     app.route("/api/questions", createQuestionRoutes(options.questions));

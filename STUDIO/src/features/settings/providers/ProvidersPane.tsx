@@ -25,6 +25,7 @@ import { AddModelDialog } from './AddModelDialog'
 import { ConnectionModelList } from './ConnectionModelList'
 import { DefaultsSection } from './DefaultsSection'
 import { VoiceModelSetting } from './VoiceModelSetting'
+import { WalkingRouteSetting } from './WalkingRouteSetting'
 import { useProviders, type Providers } from './useProviders'
 import { cn } from '@/lib/cn'
 
@@ -57,7 +58,7 @@ const PAGES: Readonly<Record<ProviderKind, { title: string; description: string 
   media: { title: 'Media', description: 'Which provider makes each kind of media, and with which model.' },
   retrieval: {
     title: 'Tools',
-    description: 'Web search and page reading: which service answers, and which is tried next.',
+    description: 'Connect services for web search, page reading, and walking routes.',
   },
 }
 
@@ -274,6 +275,8 @@ function PurposeBody({ providers, kind, purpose }: { providers: Providers; kind:
         {kind === 'language' ? <VoiceModelSetting models={kindModels} connections={connections} /> : null}
         {kind === 'language' ? <VoiceModelSetting models={kindModels} connections={connections} role="tasks" /> : null}
       </Section>
+
+      {kind === 'retrieval' ? <Section caption="Maps"><WalkingRouteSetting /></Section> : null}
 
       <Section caption="Providers">
         {connections.length === 0 ? (

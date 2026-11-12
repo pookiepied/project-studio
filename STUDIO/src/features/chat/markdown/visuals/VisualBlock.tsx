@@ -1,6 +1,8 @@
 import { CodeBlock } from '../blocks'
+import { useMemo } from 'react'
 import { Chart } from './Chart'
 import { Cards, Progress, Stats, Timeline } from './Figures'
+import { PlaceMap } from './PlaceMap'
 import { parseVisual } from './parse'
 
 /**
@@ -12,7 +14,7 @@ import { parseVisual } from './parse'
  * never swallowed by a renderer that could not use it.
  */
 export function VisualBlock({ fence, source, streaming }: { fence: string; source: string; streaming: boolean }) {
-  const result = parseVisual(fence, source, streaming)
+  const result = useMemo(() => parseVisual(fence, source, streaming), [fence, source, streaming])
   if (result.kind === 'pending') {
     return <div aria-busy className="my-5 h-48 w-full rounded-2xl bg-surface-raised shadow-raised" />
   }
@@ -31,5 +33,6 @@ export function VisualBlock({ fence, source, streaming }: { fence: string; sourc
     case 'progress': return <Progress progress={visual} />
     case 'timeline': return <Timeline timeline={visual} />
     case 'cards': return <Cards cards={visual} />
+    case 'map': return <PlaceMap visual={visual} />
   }
 }

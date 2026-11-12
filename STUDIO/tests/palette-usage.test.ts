@@ -113,6 +113,8 @@ const NOT_COLOURS: ReadonlySet<string> = new Set([
 const RAW_PALETTE =
   /\b(?:bg|text|border|ring|fill|stroke|divide|outline|decoration|caret|accent|shadow)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|grey|zinc|neutral|stone)-(?:50|\d{3})\b/
 
+const MAP_STYLE_KEYS = new Set(['text-field', 'text-font', 'text-halo-color', 'text-halo-width'])
+
 /**
  * The named values the stylesheet declares to Tailwind.
  *
@@ -148,6 +150,9 @@ describe('the colours components are allowed to name', () => {
       for (const match of source.matchAll(pattern)) {
         const name = match[1]
         if (name === undefined || NOT_COLOURS.has(name)) continue
+        // These are quoted MapLibre style keys. A class with the same text
+        // still has to resolve to a Studio theme token.
+        if (MAP_STYLE_KEYS.has(match[0]) && source.slice((match.index ?? 0) - 1).startsWith(`'${match[0]}':`)) continue
         // An arbitrary-value utility carries its own colour.
         if (name.startsWith('[')) continue
         // `border-foreground/40` and friends: the token is the part before

@@ -320,10 +320,17 @@ behaving:
 - *Per-monitor-v2 DPI (P1-9).* `SetProcessDpiAwarenessContext(-4)` with the
   process-wide call as fallback before Windows 10 1703.
 
-Known limits: the approval wait counts against the call's 120 s gate deadline;
-approving with a click in Studio is the person's own input, so the re-sent
-call is usually refused as stale and goes through after the next look, using
-the held approval. Clipboard snapshot/restore (T2-9) moved to wave 4 with the
+Known limits: the approval wait counts against the call's 120 s gate deadline.
+*(Corrected 2026-11-08.)* What this paragraph used to say was not true. A held
+approval was spent before the lease refused the re-sent call as stale, so the
+next look led to a second ask, and a "once" answer looped. Studio also stayed
+in front, so approved keys were refused as "the window in front is Studio".
+Now the approval is spent only on admission. For keyboard input the harness's
+`studio/asked` stamp and a driver check that Studio's own window is in front
+mean the approval click is not a screen change, and the target is brought back
+before the keys go out, its focus untouched. Pointer input still looks again
+first, now without asking again. See `studio-observability-progress.md`
+(2026-11-08). Clipboard snapshot/restore (T2-9) moved to wave 4 with the
 other clipboard work.
 
 **Wave 3 — capability and surface (implemented).** One new tool,

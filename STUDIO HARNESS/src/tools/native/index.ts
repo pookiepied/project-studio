@@ -16,6 +16,8 @@ import { registerGitTools } from "../git/index.js";
 import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
 import { registerWebTools } from "../web/index.js";
+import { WalkingRoutes } from "../../gateway/maps/walking.js";
+import { createWalkingRouteTool } from "../maps/walking-route.js";
 import { registerMediaTools, type MediaToolRegistration } from "../media/index.js";
 import { registerDocumentTools } from "../documents/index.js";
 import { registerLibraryTools } from "../library/index.js";
@@ -151,6 +153,7 @@ export function registerNativeTools(
       merged: mergedRetrievalLink(options.database, options.credentials),
     }),
   );
+  gate.register(createWalkingRouteTool(new WalkingRoutes(options.credentials)));
 }
 
 /**

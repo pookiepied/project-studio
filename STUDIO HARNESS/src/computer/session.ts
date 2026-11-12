@@ -58,6 +58,8 @@ const OP_MS: Readonly<Record<string, number>> = {
   screenshot: 10_000, clipboard: 5_000, focus: 10_000, arrange: 10_000, windows: 10_000, apps: 15_000,
   act: 10_000, set_value: 10_000, select_text: 10_000, open: 30_000, read_ui: 30_000, observe: 30_000,
   key_toggle: 8_000, paste: 10_000, get_window: 10_000,
+  // The first asks the OS for the driver's parent processes once, then caches.
+  approval_front: 10_000, restore_target: 10_000,
 };
 
 /** The budget for one request; ops whose length is in their arguments get it added. */

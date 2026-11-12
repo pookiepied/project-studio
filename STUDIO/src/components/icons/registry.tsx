@@ -132,6 +132,7 @@ import {
   GalleryVerticalEnd,
   Pause,
   FastForward,
+  Focus,
   PictureInPicture2,
   FoldVertical,
   type LucideIcon,
@@ -428,6 +429,7 @@ const REGISTRY = {
   // produced object in three others. A plain container is the fallback because
   // the fallback's whole claim is that it does not know what is inside.
   artifact: { mark: Box },
+  fitMap: { mark: Focus },
   video: { mark: Video01Icon },
   file: { mark: File01Icon },
   // A file's kind, where no language's mark applies. See `fileTypes`.

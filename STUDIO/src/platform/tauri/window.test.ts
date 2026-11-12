@@ -1,8 +1,41 @@
-import { describe, expect, it } from 'vitest'
+import { PhysicalSize } from '@tauri-apps/api/dpi'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { resizeDirectionAt } from './window'
+import { applyWindowSize, readWindowSize, resizeDirectionAt } from './window'
 
-const panel = { width: 776, height: 901, inset: 28, radius: 40 }
+const native = vi.hoisted(() => ({
+  unmaximize: vi.fn(),
+  setSize: vi.fn(),
+  center: vi.fn(),
+  isMaximized: vi.fn(() => false),
+  innerSize: vi.fn<() => PhysicalSize>(),
+  scaleFactor: vi.fn(() => 1),
+}))
+vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => native }))
+
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('desktop window presets', () => {
+  it.each([
+    { size: 'standard', availWidth: 1920, availHeight: 1200, width: 1690, height: 1122 },
+    { size: 'standard', availWidth: 1920, availHeight: 1040, width: 1566, height: 1040 },
+    { size: 'compact', availWidth: 1920, availHeight: 1200, width: 776, height: 901 },
+    { size: 'compact', availWidth: 1280, availHeight: 720, width: 776, height: 720 },
+  ] as const)('sets and recognizes $size at $width x $height', async ({ size, availWidth, availHeight, width, height }) => {
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: {}, screen: { availWidth, availHeight } })
+    native.innerSize.mockReturnValue(new PhysicalSize(width, height))
+
+    await applyWindowSize(size)
+
+    expect(native.setSize).toHaveBeenCalledWith(expect.objectContaining({ width, height }))
+    expect(await readWindowSize()).toBe(size)
+  })
+})
+
+const panel = { width: 776, height: 901, inset: 28, radius: 20 }
 
 describe('the resize band around the panel', () => {
   it('sits just outside each straight edge', () => {
@@ -20,12 +53,11 @@ describe('the resize band around the panel', () => {
   })
 
   it('follows the curve at the corners, where the panel is cut away', () => {
-    // Outside the arc but inside the panel's bounding box: about 42px from the
-    // corner's centre at (68, 68), along the diagonal.
-    expect(resizeDirectionAt(38, 38, panel)).toBe('NorthWest')
-    expect(resizeDirectionAt(738, 38, panel)).toBe('NorthEast')
-    expect(resizeDirectionAt(38, 863, panel)).toBe('SouthWest')
-    expect(resizeDirectionAt(738, 863, panel)).toBe('SouthEast')
+    // Outside the arc but inside the panel's bounding box.
+    expect(resizeDirectionAt(32, 32, panel)).toBe('NorthWest')
+    expect(resizeDirectionAt(744, 32, panel)).toBe('NorthEast')
+    expect(resizeDirectionAt(32, 869, panel)).toBe('SouthWest')
+    expect(resizeDirectionAt(744, 869, panel)).toBe('SouthEast')
     // Still on the panel, just inside the arc.
     expect(resizeDirectionAt(45, 45, panel)).toBeNull()
     // Past the band, in the empty corner of the margin.

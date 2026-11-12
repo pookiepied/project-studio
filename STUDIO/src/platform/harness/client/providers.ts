@@ -23,6 +23,7 @@ import {
   type ReasoningLevel,
 } from '../contracts'
 import type { HarnessResult, Requester } from './request'
+import { isRecord } from '@/lib/guards'
 
 /**
  * `/api/providers`: the connections, the models each one offers, and the
@@ -49,6 +50,9 @@ export interface ManualModelInput {
 }
 
 export interface ProviderClient {
+  getRoutingStatus(): Promise<HarnessResult<{ readonly configured: boolean }>>
+  setRoutingKey(apiKey: string): Promise<HarnessResult<void>>
+  removeRoutingKey(): Promise<HarnessResult<void>>
   listConnections(): Promise<HarnessResult<readonly ProviderConnection[]>>
   /** The vendors any catalog can name, with the capability slots each serves. */
   listLibrary(): Promise<HarnessResult<readonly LibraryProvider[]>>
@@ -114,6 +118,19 @@ function modelPath(connectionId: string, modelId: string): string {
 
 export function providerClient({ json, empty }: Requester): ProviderClient {
   return {
+    getRoutingStatus() {
+      return json('GET', `${PROVIDERS_PATH}/routing`, undefined, (value) =>
+        isRecord(value) && typeof value.configured === 'boolean' ? { configured: value.configured } : null)
+    },
+
+    setRoutingKey(apiKey) {
+      return empty('PUT', `${PROVIDERS_PATH}/routing/key`, { apiKey })
+    },
+
+    removeRoutingKey() {
+      return empty('DELETE', `${PROVIDERS_PATH}/routing/key`)
+    },
+
     listConnections() {
       return json('GET', `${PROVIDERS_PATH}/connections`, undefined, parseProviderConnections)
     },

@@ -23,6 +23,34 @@ held/released, blank capture), `computer-server` (30 tools, effect rows).
 Not established on hardware: PrintWindow on real apps, ScrollPattern/
 RangeValue/Transform against real controls, HTML paste into real editors.
 
+## Computer-use approval and focus repair (2026-11-08)
+
+Approving computer input left it unusable. The person's click in Studio
+counted as a screen change and spent the held approval before the lease
+refused the call. Studio was also left in front, so the target rule refused
+the keys. Now a held approval is found in the gate and spent only once the
+lease admits the call (`ApprovalBook.held`/`spend`). The kernel marks a decision
+`asked` only for a prompt the person answered, the gate passes it on as
+`ToolContext.personAsked`, and the bridge stamps `_meta["studio/asked"]` for
+system servers only. For keyboard input (type, key, hold_key down,
+clipboard paste) on an asked call, driver op `approval_front` (read-only)
+confirms Studio's own process (the nearest windowed ancestor of the driver,
+never a terminal or browser) owns the front window and the target is intact.
+That answer is then not noted as human input, and `restore_target` brings the
+target back without moving its focus. Pointer input still requires a fresh
+look. `Focus-Window` resolves windowless UIA focus (web content) through its
+nearest windowed ancestor, so it no longer moves focus to a window's first
+control.
+
+No attribute, stage or route is added. Coverage: `computer-approval` (kernel
+`asked` only on a prompt, bridge stamp and third-party exclusion),
+`tool-gate` (`personAsked` per call), `computer-lease` (yes survives a
+refused call, restore order and freshness, no restore without the stamp, no
+excuse when another window is in front). Not established on hardware:
+foreground restore across Studio and Chrome/Edge/Electron, the
+ancestor-chain identification of Studio in installed and dev builds, and a
+browser-hosted client (where nothing is restored, by design).
+
 ## Computer-use trust, wave 2 (2026-10-31)
 
 The person, not the model, answers for sensitive input. The computer server
@@ -1196,3 +1224,27 @@ its implementation and verification now live in
 [Studio Inspector progress](studio-inspector-progress.md). The new opt-in desktop
 sharing boundary is described in the durable observability contract. It is
 diagnostic self-control, excludes itself from capture and preserves source policy.
+
+## Places map reply
+
+The assistant reply can display a bounded set of pins on the Studio basemap.
+The existing HTTP observation covers tile and glyph delivery, including
+refusals and unavailable resources. The fixed OpenFreeMap adapter records
+one `map.basemap.fetch` per upstream read under the initiating request.
+Concurrent reads of one resource share that read and each keeps its own
+HTTP identity. Neither route parameters nor bytes enter the observation.
+The binary IPC has no map-specific command or cancellation message.
+Source read outcome is supported. Tile paint and navigation completion
+are outside capture. The map tests cover admission, resource bounds, cache
+coalescing, failure correlation, diagnostics privacy, reply provenance
+and selection when tiles are unavailable.
+
+## Walking route reply
+
+`native/walking_route` uses the existing network permission, tool-call
+identity, and Flue structured result. Its one bounded request runs as
+`map.routing.fetch` under the gate. Refusal, missing setup, timeout, and
+malformed provider data do not create route geometry. The admitted settings
+surface records `map.routing.key` save and remove outcomes without credentials.
+Replay uses the saved result. The focused fixtures cover permission refusal,
+operation linkage, credential handling, route validation and map presentation.

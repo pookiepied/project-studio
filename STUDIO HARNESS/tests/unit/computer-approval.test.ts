@@ -73,6 +73,13 @@ describe("the kernel's half of the ask", () => {
     expect(asked).toHaveLength(1);
   });
 
+  it("says the person was asked only when they answered a prompt, not when a grant answered for them", async () => {
+    const k = kernel("conversation");
+    const call = { resource: "computer:browser:chrome", kind: "command" as const, maxDuration: "always" as const };
+    expect((await k.authorize(COMPUTER.id, SCOPE, call)).asked).toBe(true);
+    expect((await k.authorize(COMPUTER.id, SCOPE, call)).asked).toBeUndefined();
+  });
+
   it("does not ask about an ordinary computer call, which names no target", () => {
     expect(kernel("once").evaluate(COMPUTER.id, SCOPE, { resource: undefined, kind: "command" }).source).not.toBe("policy");
   });
@@ -90,7 +97,7 @@ describe("the harness bridge", () => {
   const ASKED = { isError: true, content: [{ type: "text", text: "No input was sent." }],
     structuredContent: { approvalRequest: { id: "a1", category: "terminal", app: "WindowsTerminal", displayName: "x", riskLevel: "high", allowPersistentApproval: false, maxDuration: "conversation" } } };
 
-  async function run(answers: unknown[], authorize: ((resource: string, limits?: { maxDuration?: GrantDuration }) => Promise<void>) | undefined, provenance: "system" | "user" = "system") {
+  async function run(answers: unknown[], authorize: ((resource: string, limits?: { maxDuration?: GrantDuration }) => Promise<void>) | undefined, provenance: "system" | "user" = "system", personAsked?: () => boolean) {
     const metas: unknown[] = [];
     const catalog = new McpCapabilityCatalog({ actorMeta: () => ({ "studio/actor": "cnv_1", "studio/role": "conversation" }) });
     const connection = {
@@ -105,6 +112,7 @@ describe("the harness bridge", () => {
     const result = await tool.execute({ x: 1 }, {
       scope: SCOPE, sandbox: new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace })), signal: undefined,
       ...(authorize === undefined ? {} : { authorize }),
+      ...(personAsked === undefined ? {} : { personAsked }),
     }) as { isError: boolean; content: { text?: string }[] };
     return { result, metas, text: result.content.map((part) => part.text ?? "").join("\n") };
   }
@@ -139,6 +147,18 @@ describe("the harness bridge", () => {
     expect(asks).toBe(1);
     expect(metas).toHaveLength(2);
     expect(text).toContain("changed while they were asked");
+  });
+
+  it("tells Studio's server the person was asked once they answered, read when each send goes out", async () => {
+    let answered = false;
+    const { metas } = await run([ASKED, { content: [{ type: "text", text: "Clicked." }] }], async () => { answered = true; }, "system", () => answered);
+    expect(metas[0]).not.toHaveProperty("studio/asked");
+    expect(metas[1]).toMatchObject({ "studio/approval": "a1", "studio/asked": "1" });
+  });
+
+  it("never tells a server Studio did not write that the person was asked", async () => {
+    const { metas } = await run([{ content: [] }], undefined, "user", () => true);
+    expect(metas).toEqual([undefined]);
   });
 
   it("never acts on an approval request from a server Studio did not write", async () => {

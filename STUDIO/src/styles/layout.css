@@ -13,13 +13,11 @@
   --window-radius: 0px;
 }
 
-/* The 28px holds the shadow. 40 is the reference's corner at Studio's scale.
-   The margin is outside the interface, so it stays 28 real pixels at any UI scale;
-   left to scale, it would take the room the larger interface needs. */
+/* The margin holds the shadow and stays 28 real pixels at any UI scale. */
 :root[data-window='framed'] {
   --window-inset-px: 28;
   --window-inset: calc(28px / var(--ui-zoom, 1));
-  --window-radius: 40px;
+  --window-radius: 20px;
   --floating-edge: 36px;
 }
 
@@ -27,6 +25,11 @@
   .studio-window {
     border-radius: var(--window-radius);
     box-shadow: var(--shadow-window);
+  }
+
+  :root[data-window='framed'] .studio-window {
+    outline: 1px solid var(--border);
+    outline-offset: -1px;
   }
 
   /* A layer that covers the panel, not the transparent margin around it. */
@@ -445,7 +448,7 @@
     font-size: calc(var(--text-body) * 1.3);
   }
 
-  /* A window size, drawn to scale with the other: 776x901 and 1040x720. */
+  /* The window presets in platform/tauri/window.ts. */
   .studio-window-preview {
     display: flex;
     height: 68px;
@@ -458,7 +461,7 @@
 
   .studio-window-preview[data-size='standard'] {
     height: 54px;
-    aspect-ratio: 1040 / 720;
+    aspect-ratio: 1690 / 1122;
   }
 
   .studio-window-preview-side {

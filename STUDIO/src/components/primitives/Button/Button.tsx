@@ -38,6 +38,7 @@ export function Button({
   role,
   label,
   expanded,
+  pressed,
   hasPopup,
   children,
 }: {
@@ -57,6 +58,7 @@ export function Button({
   /** Accessible name, when the visible text alone does not say enough. */
   label?: string
   expanded?: boolean
+  pressed?: boolean
   hasPopup?: 'menu'
   children: ReactNode
 }) {
@@ -66,6 +68,7 @@ export function Button({
       role={role}
       aria-label={label}
       aria-expanded={expanded}
+      aria-pressed={pressed}
       aria-haspopup={hasPopup}
       onClick={onClick}
       disabled={disabled || busy}

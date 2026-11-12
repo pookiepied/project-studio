@@ -1,11 +1,11 @@
 ---
 name: visual-responses
-description: The formats for charts, stats, progress bars, timelines and product cards that Studio draws inside a reply. Activate before writing any of them.
+description: The formats for charts, stats, progress bars, timelines, cards, and places maps that Studio draws inside a reply. Activate before writing any of them.
 ---
 
 # Visual responses
 
-Studio can draw five kinds of visual inside your reply. To use one, write a
+Studio can draw six kinds of visual inside your reply. To use one, write a
 fenced code block with the visual's name as the language, and put one JSON
 object inside it. Studio draws it. You do not choose colors, fonts, or sizes.
 
@@ -22,9 +22,8 @@ Rules for every visual:
 - Use the matching visual for the cases in the system prompt's Visuals section.
   Do not wait for the user to request it. Use at most one visual for each
   distinct point, and respect requests for plain text or a specific format.
-- Use only the five fence names below, with one JSON object per fence. Do not
-  wrap a visual fence inside another code block. Maps and arbitrary HTML are
-  not supported by these formats.
+- Use only the fence names below, with one JSON object per fence. Write it
+  at the top level of your reply and close the fence.
 - Before sending, check the JSON, required fields, units, and source data.
   The sample values and addresses below demonstrate the format; they are not
   verified facts to reuse in an answer.
@@ -40,6 +39,7 @@ Rules for every visual:
 | How complete several parts of a task are | `progress` |
 | A schedule, history, or plan with several dates or stages | `timeline` |
 | Products, places, or options to choose from | `cards` |
+| Where places are and how they relate spatially | `map` |
 
 ## chart
 
@@ -168,6 +168,33 @@ For one series, you can use `data` instead of `x` and `series`:
   needs to compare many exact attributes across the options.
 - `rating` is a number from 0 to 5.
 - `tags` holds at most four short labels.
+
+## map
+
+```map
+{
+  "title": "Survey locations",
+  "subtitle": "Coordinates from the supplied dataset",
+  "places": [
+    { "name": "Sample point A", "lat": 23.81, "lng": 90.41, "detail": "First observation site" },
+    { "name": "Sample point B", "lat": 23.79, "lng": 90.43, "detail": "Second observation site" }
+  ]
+}
+```
+
+- Supply one to twelve places. Each has a name and numeric `lat` and `lng`
+  in decimal degrees. Latitude must be within ±85°, longitude within ±180°.
+- Use coordinates supplied by the person, present in their data, or verified
+  against a source. Omit a pin whose coordinates you cannot establish and say
+  which place was omitted. If none are known, answer in text.
+- Use `detail` for a short explanation and cite sources in the surrounding
+  reply. The basemap gives context, and the pins are the data in your reply.
+- Use this format for pins. For a requested walking route, call
+  `walking_route` with two to five named stops in the user's order and
+  reliable numeric coordinates. Studio displays the returned route and
+  estimated times directly, so there is no map fence to copy. If a stop's
+  coordinates are missing, ask for them. If the provider or permission
+  prevents the route, explain that outcome without drawing a substitute.
 
 ## Pictures you made yourself
 

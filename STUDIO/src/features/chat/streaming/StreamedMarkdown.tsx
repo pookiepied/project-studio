@@ -20,7 +20,7 @@ import { segment } from '@/features/chat/streaming/segment'
  * component ordinary growing text, so nothing below this line knows there is a
  * stream at all.
  */
-export function StreamedMarkdown({ text, streaming }: { text: string; streaming: boolean }) {
+export function StreamedMarkdown({ text, streaming, allowMaps = false }: { text: string; streaming: boolean; allowMaps?: boolean }) {
   const { stable, tail } = segment(text, !streaming)
   const blocks = tail ? [...stable, tail] : stable
   // Citations and their source list usually sit in different blocks, so the
@@ -39,6 +39,7 @@ export function StreamedMarkdown({ text, streaming }: { text: string; streaming:
           key={index}
           text={block}
           sources={sources}
+          allowMaps={allowMaps}
           streaming={streaming && index === blocks.length - 1 && tail !== ''}
           caret={streaming && index === blocks.length - 1}
         />
@@ -56,6 +57,6 @@ export function StreamedMarkdown({ text, streaming }: { text: string; streaming:
  * grows with the length of the reply, and a long answer stutters worse the
  * further it gets.
  */
-const Block = memo(function Block({ text, streaming, sources, caret }: { text: string; streaming: boolean; sources: Sources; caret: boolean }) {
-  return <Markdown text={text} streaming={streaming} sources={sources} caret={caret} />
+const Block = memo(function Block({ text, streaming, sources, caret, allowMaps }: { text: string; streaming: boolean; sources: Sources; caret: boolean; allowMaps: boolean }) {
+  return <Markdown text={text} streaming={streaming} sources={sources} caret={caret} allowMaps={allowMaps} />
 })

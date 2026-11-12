@@ -18,18 +18,26 @@ import { open } from '@tauri-apps/plugin-dialog'
  *
  * Both are the OS window, which is the panel plus the frame's margin on each side
  * (`--window-inset` in styles/layout.css). Compact matches the `width`/`height`
- * defaults in tauri.conf.json: the reference's 720x845 panel, with the sidebar as
- * a drawer. Standard is a 1084x810 panel, measured from the size the person
- * settled on with the sidebar open; it keeps the sidebar open
- * (`SHELL.compactWidth`). On a screen too small for either, the size is cut to
- * the screen's usable area (`applyWindowSize`).
+ * defaults in tauri.conf.json and gives a 720x845 panel with a sidebar drawer.
+ * Standard matches the 1634x1066 panel in the displayed reference.
  */
 const WINDOW_SIZES = {
   compact: { width: 776, height: 901 },
-  standard: { width: 1140, height: 866 },
+  standard: { width: 1690, height: 1122 },
 } as const
 
 export type WindowSize = keyof typeof WINDOW_SIZES
+
+function fittedWindowSize(size: WindowSize): LogicalSize {
+  const { width, height } = WINDOW_SIZES[size]
+  const { availWidth, availHeight } = window.screen
+  if (size === 'standard') {
+    // Preserve the wide shape when a display cannot fit the reference size.
+    const scale = Math.min(1, availWidth / width, availHeight / height)
+    return new LogicalSize(Math.round(width * scale), Math.round(height * scale))
+  }
+  return new LogicalSize(Math.min(width, availWidth), Math.min(height, availHeight))
+}
 
 type ResizeDirection = Parameters<ReturnType<typeof getCurrentWindow>['startResizeDragging']>[0]
 
@@ -99,13 +107,7 @@ export async function applyWindowSize(size: WindowSize): Promise<void> {
   if (!isTauri()) return
   const current = getCurrentWindow()
   await current.unmaximize()
-  const { width, height } = WINDOW_SIZES[size]
-  // `screen.avail*` is the usable area in the same logical pixels the size is
-  // given in: a 768-high laptop screen with a taskbar cannot take an 866-high
-  // window, and one whose top or bottom is off the screen is one whose header
-  // or composer cannot be reached.
-  const fitted = new LogicalSize(Math.min(width, window.screen.availWidth), Math.min(height, window.screen.availHeight))
-  await current.setSize(fitted)
+  await current.setSize(fittedWindowSize(size))
   await current.center()
 }
 
@@ -118,7 +120,8 @@ export async function readWindowSize(): Promise<WindowSize | null> {
   const { width, height } = physical.toLogical(scale)
   const near = (a: number, b: number) => Math.abs(a - b) <= 1
   for (const size of Object.keys(WINDOW_SIZES) as WindowSize[]) {
-    if (near(width, WINDOW_SIZES[size].width) && near(height, WINDOW_SIZES[size].height)) return size
+    const target = fittedWindowSize(size)
+    if (near(width, target.width) && near(height, target.height)) return size
   }
   return null
 }

@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 use std::os::unix::process::CommandExt;
 #[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 use windows::core::PCWSTR;
@@ -32,6 +34,9 @@ use crate::harness::environment::apply_harness_environment;
 use crate::harness::endpoint::{
     parse_readiness_line, HarnessEndpoint, HarnessEndpointView, HarnessReadiness,
 };
+
+#[cfg(windows)]
+const DETACHED_PROCESS: u32 = 0x0000_0008;
 
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -1095,6 +1100,11 @@ impl HarnessSupervisor {
         #[cfg(unix)]
         cmd.process_group(0);
 
+        // A GUI host has no console for Node to inherit. The bootstrap and
+        // logs already use pipes, so Windows need not allocate a terminal.
+        #[cfg(windows)]
+        cmd.creation_flags(DETACHED_PROCESS);
+
         let mut child = cmd.spawn().map_err(|e| {
             format!(
                 "failed to spawn node harness: {e} (path={})",
@@ -1907,6 +1917,9 @@ mod tests {
 
         assert_eq!(supervisor.status().state, "running");
 
+        #[cfg(windows)]
+        assert_no_console(endpoint.pid);
+
         let wal = studio_wal_path(&supervisor);
         assert!(
             wal.exists(),
@@ -1936,6 +1949,41 @@ mod tests {
         assert!(
             !recorded.iter().any(|e| e.contains(&endpoint.token)),
             "the bearer must not ride an event: {recorded:?}"
+        );
+    }
+
+    #[cfg(windows)]
+    fn assert_no_console(pid: u32) {
+        // AttachConsole can only probe from a process without a console of its own.
+        let output = Command::new(std::env::current_exe().expect("test executable"))
+            .args(["--ignored", "--exact", "harness::supervisor::tests::console_probe"])
+            .env("STUDIO_TEST_CONSOLE_PID", pid.to_string())
+            .creation_flags(DETACHED_PROCESS)
+            .output()
+            .expect("run the console probe");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(output.status.success() && stdout.contains("1 passed"), "{stdout}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "launched by the Windows harness lifecycle test"]
+    fn console_probe() {
+        use windows::Win32::Foundation::ERROR_INVALID_HANDLE;
+
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn AttachConsole(pid: u32) -> i32;
+        }
+
+        let pid = std::env::var("STUDIO_TEST_CONSOLE_PID")
+            .expect("probe target PID")
+            .parse()
+            .expect("numeric PID");
+        assert_eq!(unsafe { AttachConsole(pid) }, 0, "the harness owns a console");
+        assert_eq!(
+            std::io::Error::last_os_error().raw_os_error(),
+            Some(ERROR_INVALID_HANDLE.0 as i32)
         );
     }
 

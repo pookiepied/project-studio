@@ -45,6 +45,9 @@ function stubClient(overrides: {
   const refuse = <T,>(): Promise<HarnessResult<T>> => Promise.resolve({ ok: false, error: failure() })
   const error = overrides.fail
   return {
+    getRoutingStatus: () => refuse(),
+    setRoutingKey: () => refuse(),
+    removeRoutingKey: () => refuse(),
     getDiagnostics: () => refuse(),
     listRunningConversations: () => refuse(),
     locateFile: () => refuse(),

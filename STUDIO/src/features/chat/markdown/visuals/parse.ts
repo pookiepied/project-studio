@@ -16,7 +16,7 @@
 
 import { StudioError } from '@/lib/errors'
 
-export const VISUAL_FENCES: ReadonlySet<string> = new Set(['chart', 'stats', 'progress', 'timeline', 'cards'])
+export const VISUAL_FENCES: ReadonlySet<string> = new Set(['chart', 'stats', 'progress', 'timeline', 'cards', 'map'])
 
 /** Eight hues, in order; a ninth series is not invented (see `--series-*`). */
 export const MAX_SERIES = 8
@@ -69,7 +69,33 @@ export interface Card {
 }
 export interface CardsVisual { readonly kind: 'cards'; readonly title?: string; readonly items: readonly Card[] }
 
-export type Visual = ChartVisual | StatsVisual | ProgressVisual | TimelineVisual | CardsVisual
+export interface MapPlace {
+  readonly name: string
+  readonly lat: number
+  readonly lng: number
+  readonly detail?: string
+}
+
+export interface RouteMetrics {
+  readonly distanceMeters: number
+  readonly durationSeconds: number
+}
+
+export interface MapRoute extends RouteMetrics {
+  readonly coordinates: readonly (readonly [longitude: number, latitude: number])[]
+  readonly legs: readonly RouteMetrics[]
+}
+
+export interface MapVisual {
+  readonly kind: 'map'
+  readonly title?: string
+  readonly subtitle?: string
+  readonly places: readonly MapPlace[]
+  /** Only the walking tool's structured result supplies this. */
+  readonly route?: MapRoute
+}
+
+export type Visual = ChartVisual | StatsVisual | ProgressVisual | TimelineVisual | CardsVisual | MapVisual
 
 export type VisualResult =
   | { readonly kind: 'visual'; readonly visual: Visual }
@@ -227,9 +253,30 @@ function cards(document: Json): CardsVisual {
   }
 }
 
-const READERS: Record<string, (document: Json) => Visual> = { chart, stats, progress, timeline, cards }
+function placesMap(document: Json): MapVisual {
+  const places = list(document.places, 'places')
+  if (places.length > 12) throw new Invalid('at most 12 places')
+  return {
+    kind: 'map',
+    title: text(document.title)?.slice(0, 120),
+    subtitle: text(document.subtitle)?.slice(0, 240),
+    places: places.map((place, index) => {
+      const label = `place ${index + 1}`
+      if (!isRecord(place) || typeof place.name !== 'string') throw new Invalid(`${label} needs a name and coordinates`)
+      const { lat, lng } = place
+      if (typeof lat !== 'number' || !Number.isFinite(lat) || Math.abs(lat) > 85 ||
+        typeof lng !== 'number' || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+        throw new Invalid(`${label} needs numeric coordinates within ±85° latitude and ±180° longitude`)
+      }
+      return { name: required(place.name, `${label}'s name`).slice(0, 120), lat, lng, detail: text(place.detail)?.slice(0, 320) }
+    }),
+  }
+}
+
+const READERS: Record<string, (document: Json) => Visual> = { chart, stats, progress, timeline, cards, map: placesMap }
 
 export function parseVisual(fence: string, source: string, streaming: boolean): VisualResult {
+  if (fence === 'map' && source.length > 16_384) return { kind: 'invalid', message: 'The map is too large' }
   let document: unknown
   try {
     document = JSON.parse(source)

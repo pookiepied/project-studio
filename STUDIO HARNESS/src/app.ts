@@ -67,6 +67,8 @@ import { MediaService } from "./gateway/media/service.js";
 import { conversationArtifactsDirectory, studioPath } from "./platform/paths.js";
 import { FaviconStore } from "./web/favicons.js";
 import { WebImageProxy } from "./web/images.js";
+import { MapBasemap } from "./gateway/maps/basemap.js";
+import { WalkingRoutes } from "./gateway/maps/walking.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
 import { RetrievalSettingsStore } from "./gateway/retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
@@ -416,6 +418,8 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       // cache directory; the window asks here and never the site.
       favicons: new FaviconStore({ directory: studioPath("cache", "favicons") }),
       webImages: new WebImageProxy(),
+      mapBasemap: new MapBasemap(),
+      walkingRoutes: new WalkingRoutes(new KeyringCredentialStore()),
       approvals,
       grants,
       questions,

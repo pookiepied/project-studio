@@ -10,7 +10,7 @@ afterEach(() => {
 })
 
 describe('the window frame', () => {
-  it('is the rounded, shadowed panel with no border on the desktop, where the app is its own window', () => {
+  it('applies the panel frame on the desktop, where the app is its own window', () => {
     Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true })
 
     const frame = windowFrame()
