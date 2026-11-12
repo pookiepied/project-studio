@@ -16,9 +16,8 @@
 
      A mono face at the same nominal size as its sans surroundings paints
      larger -- x-heights and stroke density differ -- so a step down is what
-     keeps a fenced block from outweighing the sentence introducing it. Now
-     that `body` is level with `ui`, this step is the only thing still doing
-     that job.
+     keeps a fenced block from outweighing the sentence introducing it. The
+     offset follows the reading base rather than the smaller chrome role.
 
      Stated as an offset because as an absolute it only held at one setting:
      code was pinned at 11px, so at `--ui-size: 14` it sat three steps under
@@ -29,37 +28,16 @@
   --code-offset: -1px;
   --code-size: calc(var(--ui-size) + var(--code-offset));
 
-  /* A dense desktop UI keeps most of its text at one size on purpose, so the
-     steps below are not where hierarchy comes from -- weight, colour and
-     tracking on the role classes are. What the sizes must do is separate the
-     three things that are genuinely different tasks: labelling a control,
-     reading prose, and heading a section. */
-  --text-micro: calc(var(--ui-size) - 2px);
-  --text-caption: calc(var(--ui-size) - 1px);
-  --text-ui: var(--ui-size);
-  /* Level with `ui`, and this is the correction that mattered.
-     Body has now been all three things: a pixel over the interface, level with
-     it, and one under. One step under was the last of them, and measurement is
-     what ended the argument: at `ui - 1` the transcript was rendering at 11px
-     while every button, menu and sidebar row around it rendered at 12 -- the
-     one column of text in the app anyone actually *reads* was the smallest
-     text on screen, and the composer you type into was smaller still.
-
-     The optics argument for the step was real -- a full-foreground column does
-     carry more mass than muted chrome -- but the answer to that is leading and
-     measure, which this role already has (`--leading-body` is the loosest in
-     the scale, and the shared content column caps the measure). Size was the wrong lever:
-     it bought a little optical calm and paid for it by making reading text the
-     least legible thing in the window.
-
-     Level also collapses a duplicate. `caption` was `ui - 1` too, so the two
-     roles were byte-identical in size and differed only in leading -- which is
-     what made the interface read as inconsistent for reasons nobody could
-     point at: identical pixels at different rhythm read as different sizes.
-     Caption is now the only role at `ui - 1`, and it means one thing. */
+  /* The saved size remains the reading base. Chrome sits one step under it,
+     so a narrow workspace can stay quiet without shrinking the conversation.
+     Existing small-size preferences remain valid; supporting labels stop at
+     12px rather than becoming unreadable as the base is reduced. */
+  --text-micro: max(12px, calc(var(--ui-size) - 2px));
+  --text-caption: max(12px, calc(var(--ui-size) - 2px));
+  --text-ui: max(12px, calc(var(--ui-size) - 1px));
   --text-body: var(--ui-size);
-  --text-title: calc(var(--ui-size) + 7px);
-  --text-display: calc(var(--ui-size) + 19px);
+  --text-title: calc(var(--ui-size) + 10px);
+  --text-display: calc(var(--ui-size) + 14px);
 
   /* -- Leading ---------------------------------------------------------------
 
@@ -69,11 +47,12 @@
      and `.studio-prose` are the pair this actually happened to: both were
      `--text-body`, one led at 1.68 and the other at 1.72, and the transcript
      visibly disagreed with itself. They read the same token now. */
-  --leading-micro: 1.45;
-  --leading-caption: 1.5;
-  --leading-ui: 1.55;
-  --leading-body: 1.7;
-  --leading-title: 1.3;
+  --leading-micro: calc(16 / 12);
+  --leading-caption: calc(17 / 12);
+  --leading-ui: calc(18 / 13);
+  --leading-body: calc(22 / 14);
+  --leading-title: calc(31 / 24);
+  --leading-display: calc(34 / 28);
 
   /* -- The icon steps --------------------------------------------------------
 

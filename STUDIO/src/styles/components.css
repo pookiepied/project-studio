@@ -247,7 +247,9 @@
      title. The face is the window's own, so the Typeface setting reaches it. */
   .studio-display {
     font-size: var(--text-display);
-    line-height: 1.15;
+    line-height: var(--leading-display);
+    font-weight: 500;
+    letter-spacing: -0.025em;
     font-optical-sizing: auto;
   }
 
@@ -255,7 +257,9 @@
      the sidebar wordmark. */
   .studio-heading {
     font-size: var(--text-title);
-    line-height: 1.25;
+    line-height: var(--leading-title);
+    font-weight: 500;
+    letter-spacing: -0.025em;
   }
 
   /* -- The type roles, as classes -----------------------------------------
@@ -267,19 +271,16 @@
      differed by one pixel and by nothing else, so applying the right class
      changed nothing visible and the whole interface read as one flat size.
 
-     Tracking moves against size, which is how type has always worked: small
-     text needs its letters opened up to stay legible, large text needs them
-     closed up or it looks loose and amateurish. Inter is drawn for this and
-     responds well to about a half-percent either side.
+     Small roles keep Inter's optical spacing. Headings tighten slightly;
+     reading text keeps the same natural spacing as the draft field.
      ---------------------------------------------------------------------- */
 
-  /* Section headers, badges, counts. A little tracking separates the letters
-     without turning every small label into an uppercase-style tag. */
+  /* Weight distinguishes short labels and counts from supporting captions. */
   .text-micro {
     font-size: var(--text-micro);
     line-height: var(--leading-micro);
     font-weight: 500;
-    letter-spacing: 0.018em;
+    letter-spacing: 0;
   }
 
   /* Secondary: hints, notes, timestamps. The one role that leans on colour --
@@ -287,22 +288,21 @@
   .text-caption {
     font-size: var(--text-caption);
     line-height: var(--leading-caption);
-    letter-spacing: 0.006em;
+    letter-spacing: 0;
   }
 
-  /* The workhorse. Buttons, menus, rows, the composer. */
+  /* Chrome stays quieter than the reading role used by the composer. */
   .text-ui {
     font-size: var(--text-ui);
     line-height: var(--leading-ui);
     letter-spacing: 0;
   }
 
-  /* Transcript prose, and nothing else. Wider leading because this is the only
-     text in the app anyone reads a paragraph of. */
+  /* Messages and drafts share one readable size and line rhythm. */
   .text-body {
     font-size: var(--text-body);
     line-height: var(--leading-body);
-    letter-spacing: -0.003em;
+    letter-spacing: 0;
   }
 
   /* Padding follows the control's chosen height and line box so larger text
@@ -333,8 +333,8 @@
   .text-title {
     font-size: var(--text-title);
     line-height: var(--leading-title);
-    font-weight: 590;
-    letter-spacing: -0.014em;
+    font-weight: 500;
+    letter-spacing: -0.025em;
   }
 }
 

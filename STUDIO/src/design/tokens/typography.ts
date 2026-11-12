@@ -13,32 +13,10 @@
  * The offset is about +1px at UI sizes and +2px once text is large enough for
  * its counters to open up.
  *
- * ---- Why 13 ----------------------------------------------------------------
- *
- * Twelve kept the chrome compact, but it also made the transcript, composer and
- * secondary labels do their work at 12, 12 and 10px. The reading column was the
- * densest text in the window and the smallest labels read as tags. Thirteen
- * gives prose and captions enough room without changing the type system's
- * relationships: caption and micro remain derived steps, code remains one step
- * under, and every paired icon and control derives from the same value.
- *
- * The measure and leading carry the calm, not a smaller font. This is a desktop
- * reading size, not a universal absolute: the appearance choices still move the
- * whole scale together.
- *
- * `body` sits level with `ui`. It spent a while one step under, on the theory
- * that the transcript is the one full-foreground column on screen and identical
- * pixels read as bigger there than beside muted chrome. The optics are real;
- * the lever was wrong. One step under meant the transcript rendered at 11px
- * against 12px chrome — the only text in the app anyone reads a paragraph of
- * was the smallest text in the window, and the composer you type into matched
- * it. Leading and measure answer the mass argument without costing legibility,
- * and `body` is the loosest-led role in the scale for exactly that reason.
- *
- * Level also retires a duplicate: `caption` is `ui - 1` too, so for as long as
- * `body` was, the two roles were identical in size and differed only in
- * leading. Same pixels at a different rhythm is the most reliable way to make
- * an interface read as inconsistent while every measurement says it is fine.
+ * The saved size is the conversation and draft base. Minimal workspace chrome
+ * sits one pixel under it, with supporting labels two pixels under and a 12px
+ * floor. This keeps reading comfortable when several panels share the window.
+ * Existing text-size, typeface and interface-scale preferences remain valid.
  *
  * ---- Stroke weight --------------------------------------------------------
  *
@@ -69,7 +47,7 @@ export const UI_SCALE_CHOICES = [90, 100, 110, 125, 150, 175, 200] as const
 export type UiScale = (typeof UI_SCALE_CHOICES)[number]
 export const DEFAULT_UI_SCALE: UiScale = 100
 
-/** What replies are set in. The interface itself always stays in Inter. */
+/** The whole window's face; code retains its monospaced role. */
 export const TYPEFACE_CHOICES = ['sans', 'serif', 'mono'] as const
 export type Typeface = (typeof TYPEFACE_CHOICES)[number]
 export const DEFAULT_TYPEFACE: Typeface = 'sans'
@@ -102,9 +80,8 @@ export type CodeOffset = (typeof CODE_OFFSET_CHOICES)[number]
  * disagree — the CSS is a safety net, these are the authority.
  */
 /**
- * 14, not the reference's 15: this one number sizes the whole chrome as well as
- * the conversation, and at 15 the sidebar and menus read a size large for a
- * desktop app. 15 is one step up in Settings.
+ * The default reading base gives messages and drafts 14px, interface labels
+ * 13px and supporting labels 12px. CSS roles derive from this saved value.
  */
 export const DEFAULT_UI_SIZE: UiSize = 14
 export const DEFAULT_CODE_OFFSET: CodeOffset = -1

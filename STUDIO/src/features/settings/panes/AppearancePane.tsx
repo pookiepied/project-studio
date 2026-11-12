@@ -86,7 +86,7 @@ export function AppearancePane() {
       </PaneSection>
 
       <PaneSection title="Size">
-        <Row label="Text size" hint="Menus, the sidebar, the composer and replies.">
+        <Row label="Text size" hint="Replies and drafts use this size. Interface labels stay one step smaller, at least 12px.">
           <Stepper
             label="Text size"
             value={appearance.uiSize}

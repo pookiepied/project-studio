@@ -224,7 +224,7 @@ export function ComposerField({
       }}
       className={cn(
         'studio-selectable block w-full resize-none bg-transparent',
-        'text-ui text-foreground outline-none placeholder:text-muted-foreground/70',
+        'text-body text-foreground outline-none placeholder:text-muted-foreground/70',
         'studio-composer-scroll px-2 py-2',
       )}
     />

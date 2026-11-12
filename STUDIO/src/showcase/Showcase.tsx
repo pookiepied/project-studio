@@ -474,11 +474,11 @@ function TypeSection() {
           <p className="text-micro text-foreground">Micro — the label under a control</p>
           <p className="text-caption text-foreground">Caption — secondary lines, states, notes</p>
           <p className="text-ui text-foreground">Interface — buttons, rows, fields</p>
-          <p className="text-body text-foreground">{'Body \u2014 supporting interface text'}</p>
+            <p className="text-body text-foreground">{'Body \u2014 messages and drafts'}</p>
           <p className="studio-prose">{'Conversation \u2014 the shared reading size for messages'}</p>
           <p className="text-title text-foreground">Title — a section's heading</p>
           <p className="studio-heading text-foreground">Heading — a sheet's title voice</p>
-          <p className="studio-display text-foreground">Display — the serif, arriving once</p>
+            <p className="studio-display text-foreground">Display — a quiet page introduction</p>
           <p className="text-code font-mono text-foreground">Code — one step under its sentence, always</p>
         </div>
       </Card>

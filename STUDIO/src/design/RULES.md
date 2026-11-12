@@ -12,6 +12,11 @@ Its look is Family A (ADR 0060): one compact rounded window, white and neutral
 grey surfaces, one blue accent, and a composer that holds its tools. When a
 choice here and the reference disagree, the reference wins and this file changes.
 
+The `codex/minimal-workspace` exploration uses
+`documentation/architecture/design.md` as its new target. Section 6 reflects the
+first typography pass; other sections still describe the inherited presentation
+until their corresponding design pass is implemented.
+
 ---
 
 ## 1. Interaction
@@ -224,10 +229,11 @@ that are not on and off.
 
 ## 6. Type
 
-One family for the interface: Inter by default, at 14px (code 13px). The reference
-measures 15px for its message text, but `--ui-size` sizes the whole chrome - sidebar,
-menus, icons, header - and at 15 that read a size large for a desktop app; 15 stays
-one step up in Settings. The Typeface setting
+The minimal workspace exploration starts with Inter by default: 14px messages
+and drafts, 13px interface labels, 12px supporting text and 13px code. The saved
+`--ui-size` remains the reading base, with chrome one step under and supporting
+text two steps under, both held above a 12px floor. The first typography pass
+keeps the existing controls, icon alignment and preference choices. The Typeface setting
 swaps the whole window through `--font-interface`, read once on `html`, so nothing
 below the root names a family except code, which stays `font-mono`. A sample of a
 face in Settings is the only other exception.
@@ -239,7 +245,7 @@ face in Settings is the only other exception.
 Use the large capsule for a standalone commit or a clear progression action
 such as Continue. Inline utilities and dense card actions use compact steps.
 
-Conversation documents use `--text-body`, level with interface text, through
+Conversation documents use `--text-body`, the saved reading base, through
 `.studio-prose`. User messages, assistant answers and the composer share that
 base size. Code inherits the global user-selected offset; prose never replaces
 it locally. Markdown structure supplies the hierarchy, while caption and micro
