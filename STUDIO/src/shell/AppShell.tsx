@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { RADIUS } from '@/design/tokens'
+import { AnimatePresence, motion } from 'framer-motion'
+import { DURATION, EASE_AWAY, EASE_SETTLE, RADIUS } from '@/design/tokens'
 import { PageTransition } from '@/components/primitives'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
@@ -8,17 +9,17 @@ import { CommandPalette } from '@/features/palette'
 import { NewProjectDialog, ProjectPage } from '@/features/projects'
 import { SettingsPage } from '@/features/settings'
 import { VoiceModeProvider } from '@/features/voice'
-import { FileViewer, useViewer } from '@/features/viewer'
+import { WorkspacePanel, useWorkspacePanel } from '@/features/workspace'
 import { ActionsMenu } from '@/shell/menus/ActionsMenu'
 import { SelectionMenu } from '@/shell/menus/SelectionMenu'
 import { HarnessDownPage } from '@/shell/HarnessDownPage'
 import { TopStrip } from '@/shell/chrome/TopStrip'
-import { SideRail } from '@/features/rail'
+import { OverviewPanel } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
 import { usePanelHandover } from '@/shell/panelHandover'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
-import { useRail } from '@/stores/rail'
+import { useOverview } from '@/stores/overview'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 import { isTauri } from '@/platform/tauri'
@@ -27,9 +28,8 @@ import { isTauri } from '@/platform/tauri'
  * The window.
  *
  * Compact leaves room for the panel's shadow and resize band; Standard's frame
- * fills the native window. Its glass rim and inner panel share a corner centre:
- * the inner radius is the outer radius minus the rim. Windows' own border stays
- * disabled so it cannot add a competing curve.
+ * fills the native window. Both clipping layers share the same soft corner.
+ * Windows' own border stays disabled so it cannot add a competing curve.
  *
  * `overflow-hidden` is what makes the corner real: without it a scrolling
  * transcript paints square right through the rounded edge.
@@ -49,14 +49,14 @@ export function AppShell() {
   const { conversations, projects, storePhase } = useWorkspace()
   const {
     open: railOpen,
-    openOverview: openWorkspace,
+    openOverview,
     width: railWidth,
     collapse: collapseRail,
-  } = useRail()
+  } = useOverview()
   const [newProjectOpen, setNewProjectOpen] = useState(false)
-  const viewer = useViewer()
-  const canViewFiles = route.kind === 'chat' || route.kind === 'home'
-  const viewerOpen = canViewFiles && viewer?.open === true
+  const workspacePanel = useWorkspacePanel()
+  const canOpenWorkspace = route.kind === 'chat' || route.kind === 'home'
+  const workspaceOpen = canOpenWorkspace && workspacePanel?.open === true
 
   /**
    * The two columns are mutually exclusive, and the one asked for last wins:
@@ -64,7 +64,7 @@ export function AppShell() {
    * the reasons are with `usePanelHandover`; what the shell draws from is
    * the pair of `shown` flags, never the stores' own `open` directly. The
    * rail is folded rather than closed, so its contents survive. The header's
-   * Workspace button restores it through this same handover.
+   * Overview button restores it through this same handover.
    */
   const { sidebarShown, railShown, sidebarSettled, railSettled } = usePanelHandover({
     sidebarOpen,
@@ -160,8 +160,7 @@ export function AppShell() {
 
   return (
     <div
-      // The outer frame owns the glass. The inner sunken ground keeps the page's
-      // rounded corners visible against the sidebar without tinting the glass.
+      // One soft contour, with no rim between the shell and its contents.
       className={cn('studio-main-window relative flex h-full w-full overflow-hidden', frame.className)}
       style={frame.style}
     >
@@ -224,17 +223,24 @@ export function AppShell() {
             facts from the shell: whether the sidebar is the floating drawer
             (narrow window) and whether that drawer is on screen decide both
             the toggle's place and the centred title's. */}
-        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' ? openWorkspace : undefined}
-          viewerOpen={viewerOpen} onToggleViewer={canViewFiles ? viewer?.toggle : undefined} />
+        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenOverview={route.kind === 'chat' ? openOverview : undefined}
+          workspaceOpen={workspaceOpen} onToggleWorkspace={canOpenWorkspace ? workspacePanel?.toggle : undefined} />
 
-        <div className="studio-reader-container h-full">
-        <div className="studio-reader-layout h-full" data-viewer={viewerOpen}>
-        <div className="studio-reader-chat relative h-full min-h-0 min-w-0 overflow-hidden">
+        <div className="studio-workspace-container h-full">
+        <div className="studio-workspace-layout h-full" data-workspace={workspaceOpen}>
+        <div className="studio-workspace-chat relative h-full min-h-0 min-w-0 overflow-hidden">
         <PageTransition view={routeKey(route)} move={move} main>
           {Surface({ route, conversations, projects })}
         </PageTransition>
         </div>
-        {viewerOpen ? <FileViewer /> : null}
+        <AnimatePresence initial={false}>
+          {workspaceOpen ? <motion.div key="workspace" className="studio-workspace-slot h-full min-w-0 overflow-hidden"
+            initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 8, transition: { duration: DURATION.slow, ease: EASE_AWAY } }}
+            transition={{ duration: DURATION.slow, ease: EASE_SETTLE, opacity: { duration: DURATION.base } }}>
+            <div className="studio-workspace-panel-frame h-full"><WorkspacePanel /></div>
+          </motion.div> : null}
+        </AnimatePresence>
         </div>
         </div>
       </div>
@@ -242,8 +248,8 @@ export function AppShell() {
       {/* Outside the page's rounded container, so the rail is a sibling of the
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
-      {route.kind === 'chat' ? <SideRail key={route.conversationId} open={railShown} onClosed={railSettled}
-        minPageWidth={viewerOpen ? 800 : undefined} /> : null}
+      {route.kind === 'chat' ? <OverviewPanel key={route.conversationId} open={railShown} onClosed={railSettled}
+        minPageWidth={workspaceOpen ? 800 : undefined} /> : null}
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />

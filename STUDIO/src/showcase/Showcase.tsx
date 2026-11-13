@@ -30,7 +30,7 @@ import {
 import { StateNote } from '@/components/state'
 import { ArtifactsSection } from './ArtifactsSection'
 import { Section } from './Section'
-import { WorkspaceSection } from './WorkspaceSection'
+import { OverviewSection } from './OverviewSection'
 import { ConversationSection, PromptCardsSection } from './ConversationSection'
 import { LayoutSection } from './LayoutSection'
 
@@ -111,7 +111,7 @@ function ShowcasePage() {
         <TypeSection />
         <ElevationSection />
         <MotionSection />
-        <WorkspaceSection />
+        <OverviewSection />
         <ArtifactsSection />
 
         <footer className="pb-4">

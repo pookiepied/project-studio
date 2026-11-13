@@ -5,14 +5,14 @@ import { SHELL } from '@/design/tokens'
 import { FilePreview } from '@/features/files/FilePreview'
 import { ChangesPanel } from '@/features/changes/ChangesPanel'
 import { ActivityBody, ActivityList, activityRows, viewTitle } from '@/features/rail/Activity'
-import { useRail, type ActivityView } from '@/stores/rail'
+import { useOverview, type ActivityView } from '@/stores/overview'
 import { fileName, type SheetSpec } from './sheet'
 
 /** The sheet's name for what it holds: the header, and the composer's prompt. */
 export function sheetTitle(spec: SheetSpec, title: (spec: Extract<SheetSpec, { kind: 'activity' }>) => string): string {
   if (spec.kind === 'file') return fileName(spec.file.path)
   if (spec.kind === 'changes') return spec.changes.length === 1 && spec.changes[0] !== undefined ? fileName(spec.changes[0].path) : 'Changes'
-  if (spec.kind === 'workspace') return 'this conversation'
+  if (spec.kind === 'overview') return 'this conversation'
   return title(spec)
 }
 
@@ -25,18 +25,18 @@ export function sheetTitle(spec: SheetSpec, title: (spec: Extract<SheetSpec, { k
  * two read as separate things.
  *
  * Back is offered only where there is somewhere to go back to - the whole
- * workspace, for something picked from it. Escape closes, as it does
+ * Overview, for something picked from it. Escape closes, as it does
  * everywhere a layer sits over the page.
  */
 export function ChatSheet({ spec, onClose, onBack, onPick }: {
   spec: SheetSpec
   onClose: () => void
   onBack?: () => void
-  /** Opens one thing picked from the whole workspace. */
+  /** Opens one thing picked from Overview. */
   onPick: (view: ActivityView) => void
 }) {
-  const { activity, browser } = useRail()
-  const title = spec.kind === 'workspace' ? 'Workspace' : sheetTitle(spec, (item) => viewTitle(item.view, activity, browser))
+  const { activity, browser } = useOverview()
+  const title = spec.kind === 'overview' ? 'Overview' : sheetTitle(spec, (item) => viewTitle(item.view, activity, browser))
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -49,13 +49,13 @@ export function ChatSheet({ spec, onClose, onBack, onPick }: {
   let body: ReactNode
   if (spec.kind === 'file') body = <FilePreview key={spec.file.path} file={spec.file} conversationId={spec.conversationId} />
   else if (spec.kind === 'changes') body = <ChangesPanel changes={spec.changes} conversationId={spec.conversationId} />
-  else if (spec.kind === 'workspace') body = <ActivityList rows={activityRows(activity, browser)} onPick={onPick} />
+  else if (spec.kind === 'overview') body = <ActivityList rows={activityRows(activity, browser)} onPick={onPick} />
   else body = <ActivityBody view={spec.view} conversationId={spec.conversationId} />
 
   return (
     <div role="dialog" aria-label={title} className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-1.5 px-2" style={{ height: SHELL.topStrip.height }}>
-        {onBack ? <IconButton label="Back to the workspace" onClick={onBack}><Icons.back /></IconButton> : null}
+        {onBack ? <IconButton label="Back to Overview" onClick={onBack}><Icons.back /></IconButton> : null}
         <h2 className="min-w-0 flex-1 truncate pl-1 text-body font-medium text-foreground">{title}</h2>
         <IconButton label="Close" onClick={onClose}><Icons.close /></IconButton>
       </div>

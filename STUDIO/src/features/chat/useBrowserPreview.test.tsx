@@ -10,7 +10,7 @@ import type {
   ToolCallView,
   TranscriptItem,
 } from '@/features/chat/transcript/projection'
-import { RailProvider, useRail } from '@/stores/rail/RailProvider'
+import { OverviewProvider, useOverview } from '@/stores/overview/OverviewProvider'
 import { useBrowserPreview } from './useBrowserPreview'
 
 /**
@@ -65,14 +65,14 @@ function answeredWith(url: string): ToolCallView['output'] {
 }
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <RailProvider>{children}</RailProvider>
+  return <OverviewProvider>{children}</OverviewProvider>
 }
 
 describe('deriving the browser report from the transcript', () => {
   /** The hook under test, alongside the rail state it feeds. */
   function usePreview(list: readonly TranscriptItem[]) {
     useBrowserPreview('cnv_1', list)
-    return useRail()
+    return useOverview()
   }
 
   it('hands the rail every step, oldest first, with the newest place and picture', () => {

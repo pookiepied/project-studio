@@ -1,30 +1,31 @@
 import { createContext, useContext } from 'react'
 import type { LocatedFile } from '@/features/files/useLocatedFile'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
-import type { ActivityView } from '@/stores/rail'
+import type { ActivityView } from '@/stores/overview'
 
 /**
  * What the chat page can lay over its transcript, with the composer kept.
  *
  * The sheet is where something too big for the reply is looked at: a file, a
- * set of changes, one thing from the workspace. It covers the transcript and
+ * set of changes, one thing from Overview. It covers the transcript and
  * stops at the composer, so what is typed while it is open is about what is
  * open. It works at any window size, which is why viewers live here and not
- * in the workspace column: the column only exists when the window is wide.
+ * in the Overview column: the column only exists when the window is wide.
  *
- * A picture has its own viewer (`MediaViewer`), opened the same way through
+ * Main-window documents open in the central Workspace. Detached windows keep
+ * their file sheet fallback. A picture has its own viewer (`MediaViewer`), opened through
  * `MediaViewerHostContext`, because typing over a picture attaches it.
  */
 export type SheetSpec =
   | { readonly kind: 'file'; readonly file: LocatedFile; readonly conversationId: string }
   | { readonly kind: 'changes'; readonly changes: readonly RecordedChange[]; readonly conversationId: string }
   | { readonly kind: 'activity'; readonly view: ActivityView; readonly conversationId: string }
-  /** The whole workspace: what is going, what each turn changed, what finished. */
-  | { readonly kind: 'workspace'; readonly conversationId: string }
+  /** The activity overview: what is going, what each turn changed, what finished. */
+  | { readonly kind: 'overview'; readonly conversationId: string }
 
 export interface SheetHost {
   /**
-   * Opens the sheet. Workspace activity goes to the docked column instead
+   * Opens the sheet. Overview activity goes to the docked column instead
    * when the window has one, so the same row works at any size.
    */
   open: (spec: SheetSpec) => void

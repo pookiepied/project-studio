@@ -28,20 +28,20 @@ export function ConversationRename({ conversation, onDone }: { conversation: Con
 /**
  * The header's three dots: everything the reference leaves no room for.
  *
- * Studio's own actions live here: the workspace, search and settings, then what
+ * Studio's own actions live here: Overview, search and settings, then what
  * can be done to the open conversation. An untitled conversation has had no
  * exchange yet, so it has nothing to act on.
  */
 export function ConversationMenu({
   conversation,
   onRename,
-  onOpenWorkspace,
+  onOpenOverview,
   general = false,
 }: {
   conversation: Conversation | null
   onRename: () => void
-  /** Present while the right workspace is folded. */
-  onOpenWorkspace?: () => void
+  /** Opens the right-hand activity summary. */
+  onOpenOverview?: () => void
   /** The main window also carries search and settings. */
   general?: boolean
 }) {
@@ -65,7 +65,7 @@ export function ConversationMenu({
 
   const titled = conversation !== null && conversation.title !== null ? conversation : null
   const project = projects.find((item) => item.id === titled?.projectId) ?? null
-  if (titled === null && !general && onOpenWorkspace === undefined) return null
+  if (titled === null && !general && onOpenOverview === undefined) return null
 
   const close = () => {
     setOpen(false)
@@ -115,8 +115,8 @@ export function ConversationMenu({
             </>
           ) : (
             <>
-              {onOpenWorkspace ? (
-                <MenuItem icon={<Icons.workspace />} onSelect={() => act(onOpenWorkspace)}>Workspace</MenuItem>
+              {onOpenOverview ? (
+                <MenuItem icon={<Icons.workspace />} onSelect={() => act(onOpenOverview)}>Overview</MenuItem>
               ) : null}
               {general ? (
                 <>
@@ -126,7 +126,7 @@ export function ConversationMenu({
               ) : null}
               {titled !== null ? (
                 <>
-                  {general || onOpenWorkspace ? <MenuSeparator /> : null}
+                  {general || onOpenOverview ? <MenuSeparator /> : null}
                   <MenuItem icon={<Icons.edit />} onSelect={() => act(onRename)}>Rename</MenuItem>
                   <MenuItem icon={<Icons.pin />} onSelect={() => act(() => togglePin(titled.id))}>
                     {titled.pinned ? 'Unpin' : 'Pin to top'}

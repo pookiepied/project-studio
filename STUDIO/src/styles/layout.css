@@ -11,7 +11,6 @@
      browser tab and a maximized window, where the host already has an edge. */
   --window-inset: 0px;
   --window-radius: 0px;
-  --window-rim: 0px;
 }
 
 /* The margin holds the shadow and stays 28 real pixels at any UI scale. */
@@ -22,7 +21,7 @@
   --floating-edge: 36px;
 }
 
-/* Wide main windows use the reference's concentric glass frame. Keep the
+/* Wide main windows keep the reference's soft corner without an outer rim. Keep the
    compact frame, browser tabs and maximized windows on their existing geometry.
    The breakpoint follows SHELL.compactWidth, independently of an open rail. */
 @media (min-width: 901px) {
@@ -30,46 +29,64 @@
     --window-inset-px: 0;
     --window-inset: 0px;
     --window-radius: 28px;
-    --window-rim: 6px;
     --floating-edge: 8px;
   }
 }
 
 @layer components {
-  .studio-reader-container {
+  .studio-workspace-container {
     container-type: inline-size;
   }
 
-  .studio-reader-layout[data-viewer='true'] {
+  .studio-workspace-layout {
     display: grid;
-    grid-template-columns: minmax(320px, 0.8fr) minmax(360px, 1.2fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0fr);
+    transition: grid-template-columns var(--duration-slow) var(--ease-settle);
+  }
+
+  .studio-workspace-layout[data-workspace='false'] {
+    transition-timing-function: var(--ease-away);
+  }
+
+  .studio-workspace-layout[data-workspace='true'] {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+
+  /* Keep work at its final measure while the frame reveals it. */
+  .studio-workspace-panel-frame {
+    width: 60cqi;
+  }
+
+  .studio-workspace-slot {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   /* One connected sheet, with a quiet seam rather than cards in a gutter. */
-  .studio-reader {
+  .studio-workspace {
     margin-top: 66px;
     height: calc(100% - 66px);
     border-left: 1px solid var(--border);
   }
 
-  .studio-reader-tab {
+  .studio-workspace-tab {
     color: var(--muted-foreground);
   }
 
-  .studio-reader-tab:hover {
+  .studio-workspace-tab:hover {
     background: var(--tint);
   }
 
-  .studio-reader-tab[data-selected='true'] {
+  .studio-workspace-tab[data-selected='true'] {
     background: var(--selected);
     color: var(--foreground);
   }
 
-  .studio-reader-document {
+  .studio-workspace-document {
     padding: clamp(16px, 4cqi, 36px);
   }
 
-  .studio-reader-document > * {
+  .studio-workspace-document > * {
     max-width: 690px;
     margin-inline: auto;
   }
@@ -77,15 +94,19 @@
   /* At narrow sizes the document gets the page; closing it returns to chat.
      The conversation stays mounted so an ongoing reply is never interrupted. */
   @container (max-width: 799px) {
-    .studio-reader-layout[data-viewer='true'] {
-      grid-template-columns: minmax(0, 1fr);
+    .studio-workspace-layout[data-workspace='true'] {
+      grid-template-columns: minmax(0, 0fr) minmax(0, 1fr);
     }
 
-    .studio-reader-layout[data-viewer='true'] .studio-reader-chat {
-      display: none;
+    .studio-workspace-layout[data-workspace='true'] .studio-workspace-chat {
+      visibility: hidden;
     }
 
-    .studio-reader {
+    .studio-workspace-panel-frame {
+      width: 100cqi;
+    }
+
+    .studio-workspace {
       border-left: 0;
     }
   }
@@ -100,30 +121,12 @@
     outline-offset: -1px;
   }
 
-  .studio-main-window {
-    padding: var(--window-rim);
+  :root[data-window='framed'] .studio-main-window {
+    outline: none;
   }
 
   .studio-window-body {
-    border-radius: max(0px, calc(var(--window-radius) - var(--window-rim)));
-  }
-
-  @media (min-width: 901px) {
-    :root[data-window='framed'] .studio-main-window {
-      outline: none;
-      background: var(--window-glass);
-      backdrop-filter: blur(48px) saturate(130%);
-    }
-
-    /* Inherit the clipping curve instead of drawing a second offset outline. */
-    :root[data-window='framed'] .studio-main-window::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      box-shadow: inset 0 0 0 1px var(--window-glass-edge);
-      pointer-events: none;
-    }
+    border-radius: var(--window-radius);
   }
 
   /* A layer that covers the panel, not the transparent margin around it. */

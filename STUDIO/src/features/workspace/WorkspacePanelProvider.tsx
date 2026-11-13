@@ -1,19 +1,19 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { LocatedFile } from '@/features/files/useLocatedFile'
 
-export type ViewerTab =
+export type WorkspaceTab =
   | { readonly key: string; readonly kind: 'file'; readonly file: LocatedFile }
   | { readonly key: 'browser'; readonly kind: 'browser' }
 
-interface ViewerSession {
-  readonly tabs: readonly ViewerTab[]
+interface WorkspaceSession {
+  readonly tabs: readonly WorkspaceTab[]
   readonly selected: string | null
 }
 
-interface ViewerValue extends ViewerSession {
+interface WorkspacePanelValue extends WorkspaceSession {
   readonly conversationId: string | null
   readonly open: boolean
-  readonly active: ViewerTab | null
+  readonly active: WorkspaceTab | null
   toggle: () => void
   close: () => void
   openFile: (file: LocatedFile) => void
@@ -22,20 +22,20 @@ interface ViewerValue extends ViewerSession {
   closeTab: (key: string) => void
 }
 
-const EMPTY: ViewerSession = { tabs: [], selected: null }
-const ViewerContext = createContext<ViewerValue | null>(null)
+const EMPTY: WorkspaceSession = { tabs: [], selected: null }
+const WorkspacePanelContext = createContext<WorkspacePanelValue | null>(null)
 
 /** Window visibility is shared; documents stay in their owning conversation.
  * Everything is session memory, so this experiment adds no stored migration. */
-export function ViewerProvider({ conversationId, children }: { conversationId: string | null; children: ReactNode }) {
+export function WorkspacePanelProvider({ conversationId, children }: { conversationId: string | null; children: ReactNode }) {
   const [open, setOpen] = useState(false)
-  const [sessions, setSessions] = useState<ReadonlyMap<string, ViewerSession>>(new Map())
+  const [sessions, setSessions] = useState<ReadonlyMap<string, WorkspaceSession>>(new Map())
   const session = conversationId === null ? EMPTY : sessions.get(conversationId) ?? EMPTY
-  const update = useCallback((change: (current: ViewerSession) => ViewerSession) => {
+  const update = useCallback((change: (current: WorkspaceSession) => WorkspaceSession) => {
     if (conversationId === null) return
     setSessions(current => new Map(current).set(conversationId, change(current.get(conversationId) ?? EMPTY)))
   }, [conversationId])
-  const openTab = useCallback((tab: ViewerTab) => {
+  const openTab = useCallback((tab: WorkspaceTab) => {
     if (conversationId === null) return
     update(current => ({
       tabs: current.tabs.some(item => item.key === tab.key)
@@ -56,14 +56,14 @@ export function ViewerProvider({ conversationId, children }: { conversationId: s
   }), [update])
   const toggle = useCallback(() => setOpen(value => !value), [])
   const close = useCallback(() => setOpen(false), [])
-  const value = useMemo<ViewerValue>(() => ({
+  const value = useMemo<WorkspacePanelValue>(() => ({
     ...session, conversationId, open, active: session.tabs.find(tab => tab.key === session.selected) ?? null,
     toggle, close, openFile, openBrowser, select, closeTab,
   }), [session, conversationId, open, toggle, close, openFile, openBrowser, select, closeTab])
-  return <ViewerContext.Provider value={value}>{children}</ViewerContext.Provider>
+  return <WorkspacePanelContext.Provider value={value}>{children}</WorkspacePanelContext.Provider>
 }
 
 /** Existing detached and isolated renderers keep their sheet fallback. */
-export function useViewer(): ViewerValue | null {
-  return useContext(ViewerContext)
+export function useWorkspacePanel(): WorkspacePanelValue | null {
+  return useContext(WorkspacePanelContext)
 }

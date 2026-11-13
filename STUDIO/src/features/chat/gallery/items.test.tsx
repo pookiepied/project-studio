@@ -6,7 +6,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { NavigationProvider } from '@/stores/navigation'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 import { WorkspaceProvider } from '@/stores/workspace'
 import { galleryItems } from './items'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
@@ -55,7 +55,7 @@ describe('the gallery as transcript items', () => {
     render(
       <NavigationProvider>
         <WorkspaceProvider>
-          <RailProvider>
+          <OverviewProvider>
             <LiveTranscript
               items={galleryItems()}
               pending={null}
@@ -63,7 +63,7 @@ describe('the gallery as transcript items', () => {
               viewport={createRef<HTMLElement>()}
               conversationId="cnv_gallery"
             />
-          </RailProvider>
+          </OverviewProvider>
         </WorkspaceProvider>
       </NavigationProvider>,
     )

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { present } from '@/platform/harness/contracts/chunks'
 import type { ToolCallView, TranscriptItem } from '@/features/chat/transcript/projection'
 import { useMemo, useState, type ReactNode } from 'react'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 import { SheetHostContext, type SheetSpec } from '@/features/chat/sheet/sheet'
 import { ChangesPanel } from '@/features/changes/ChangesPanel'
 import { AssistantTurn } from './AssistantTurn'
@@ -31,16 +31,16 @@ describe('completed work and its results', () => {
         { kind: 'tools', id: 'tools', groups: [{ id: 'edit', file: null, calls: [edit(1)] }] },
         { kind: 'text', id: 'final', text: 'Fixed the startup bug. All checks passed.' }],
     }
-    const view = render(<RailProvider><AssistantTurn item={item} conversationId="conv" live={false} turnInFlight /></RailProvider>)
+    const view = render(<OverviewProvider><AssistantTurn item={item} conversationId="conv" live={false} turnInFlight /></OverviewProvider>)
     expect(screen.queryByRole('button', { name: 'Work in progress' })).toBeNull()
     expect(screen.getByText('I am changing the startup handler.')).toBeTruthy()
     expect(view.container.querySelector('hr')).toBeNull()
-    view.rerender(<RailProvider><AssistantTurn item={{ ...item, end: { state: 'stopped' }, segments: item.segments.slice(0, 2).map((segment) => segment.kind === 'tools'
-      ? { ...segment, groups: [{ id: 'edit', file: null, calls: [{ ...edit(1), output: null }] }] } : segment) }} conversationId="conv" live turnInFlight /></RailProvider>)
+    view.rerender(<OverviewProvider><AssistantTurn item={{ ...item, end: { state: 'stopped' }, segments: item.segments.slice(0, 2).map((segment) => segment.kind === 'tools'
+      ? { ...segment, groups: [{ id: 'edit', file: null, calls: [{ ...edit(1), output: null }] }] } : segment) }} conversationId="conv" live turnInFlight /></OverviewProvider>)
     expect(screen.queryByRole('button', { name: 'Work in progress' })).toBeNull()
     expect(screen.getByText('I am changing the startup handler.')).toBeTruthy()
     expect(view.container.querySelector('hr')).toBeNull()
-    view.rerender(<RailProvider><AssistantTurn item={item} conversationId="conv" live={false} /></RailProvider>)
+    view.rerender(<OverviewProvider><AssistantTurn item={item} conversationId="conv" live={false} /></OverviewProvider>)
     expect(screen.getByRole('button', { name: 'Updated file-1.ts' }).getAttribute('aria-expanded')).toBe('false')
     expect(view.container.querySelector('hr')).not.toBeNull()
     expect(screen.getByText(/All checks passed/)).toBeTruthy()
@@ -64,7 +64,7 @@ describe('completed work and its results', () => {
         { kind: 'text', id: 'final', text: 'Fixed the startup bug. All checks passed.' },
       ],
     }
-    const view = render(<RailProvider><AssistantTurn item={item} conversationId="conv" live={false} /></RailProvider>)
+    const view = render(<OverviewProvider><AssistantTurn item={item} conversationId="conv" live={false} /></OverviewProvider>)
     expect(screen.getByRole('button', { name: 'Updated file-1.ts' }).getAttribute('aria-expanded')).toBe('false')
     expect(screen.getByText(/All checks passed/)).toBeTruthy()
     expect(screen.queryByText('I will inspect the old code.')).toBeNull()
@@ -72,7 +72,7 @@ describe('completed work and its results', () => {
     expect(screen.getByText('I will inspect the old code.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Changed files' })).toBeTruthy()
     expect(view.container.querySelector('.border-l-2')).toBeNull()
-    view.rerender(<RailProvider><AssistantTurn item={item} conversationId="conv" live={false} turnInFlight /></RailProvider>)
+    view.rerender(<OverviewProvider><AssistantTurn item={item} conversationId="conv" live={false} turnInFlight /></OverviewProvider>)
     expect(screen.queryByRole('button', { name: 'Updated file-1.ts' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Recorded file changes' })).toBeNull()
   })
@@ -97,14 +97,14 @@ describe('completed work and its results', () => {
   it('offers only actual returned web URLs and deduplicates browser results', () => {
     const browser: ToolCallView = { toolCallId: 'browser', toolName: 'mcp__studio_browser_open', input: present({ url: 'http://localhost:3000' }),
       output: present({ content: [{ type: 'text', text: 'Opened.\nTab: tab-1\nURL: http://localhost:3000/\nTitle: Studio preview' }] }), errorText: null }
-    const { rerender } = render(<RailProvider><WorkResults conversationId="conv" calls={[browser, { ...browser, toolCallId: 'again' }]} /></RailProvider>)
+    const { rerender } = render(<OverviewProvider><WorkResults conversationId="conv" calls={[browser, { ...browser, toolCallId: 'again' }]} /></OverviewProvider>)
     expect(screen.getAllByRole('region', { name: 'Web preview' })).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Open web preview: Studio preview' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open in' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull()
-    rerender(<RailProvider><WorkResults conversationId="conv" calls={[{ ...browser, output: null }]} /></RailProvider>)
+    rerender(<OverviewProvider><WorkResults conversationId="conv" calls={[{ ...browser, output: null }]} /></OverviewProvider>)
     expect(screen.queryByRole('region', { name: 'Web preview' })).toBeNull()
-    rerender(<RailProvider><WorkResults conversationId="conv" calls={[{ ...browser, output: present({ content: [{ type: 'text', text: 'URL: javascript:alert(1)' }] }) }]} /></RailProvider>)
+    rerender(<OverviewProvider><WorkResults conversationId="conv" calls={[{ ...browser, output: present({ content: [{ type: 'text', text: 'URL: javascript:alert(1)' }] }) }]} /></OverviewProvider>)
     expect(screen.queryByRole('region', { name: 'Web preview' })).toBeNull()
   })
   it('retains a native computer screenshot outside the collapsed working history', () => {

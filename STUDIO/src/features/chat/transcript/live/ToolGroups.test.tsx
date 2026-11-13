@@ -8,7 +8,7 @@ import { present } from '@/platform/harness/contracts/chunks'
 import { openExternalUrl } from '@/platform/tauri/external'
 import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/projection'
 import { NavigationProvider } from '@/stores/navigation'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 import { WorkspaceProvider } from '@/stores/workspace'
 
 import { RollingCount, STEP_MS } from './RollingCount'
@@ -126,10 +126,10 @@ describe('the chip is the default', () => {
   })
 
   it('keeps web sources behind a compact research row', () => {
-    render(<NavigationProvider><WorkspaceProvider><RailProvider><ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'web_search', calls: [call({
+    render(<NavigationProvider><WorkspaceProvider><OverviewProvider><ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'web_search', calls: [call({
       toolName: 'web_search', input: present({ query: 'react docs' }),
       output: present('Searched with Brave.\n\n1. React\nhttps://react.dev/\nReact documentation'),
-    })] })} /></RailProvider></WorkspaceProvider></NavigationProvider>)
+    })] })} /></OverviewProvider></WorkspaceProvider></NavigationProvider>)
     expect(screen.queryByRole('link')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /react docs/ }))
     expect(screen.getByRole('link', { name: /React/ })).toBeTruthy()
@@ -813,14 +813,14 @@ describe('every Studio and framework tool', () => {
       const { container } = render(
         <NavigationProvider>
           <WorkspaceProvider>
-            <RailProvider>
+            <OverviewProvider>
               <ToolGroups conversationId="conv"
                 groups={groupsOf({
                   toolName,
                   calls: [call({ toolName, input: present({ path: 'a.ts' }), output: present('done') })],
                 })}
               />
-            </RailProvider>
+            </OverviewProvider>
           </WorkspaceProvider>
         </NavigationProvider>,
       )

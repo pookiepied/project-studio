@@ -5,7 +5,7 @@ import { IconButton } from '@/components/primitives'
 import { RollingNumber, SwapText } from '@/components/motion/Rolling'
 import { DURATION, EASE_AWAY, EASE_SETTLE } from '@/design/tokens'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
-import { hasPlan, type Activity, type ActivityView, type BrowserActivity, type TurnChanges } from '@/stores/rail'
+import { hasPlan, type Activity, type ActivityView, type BrowserActivity, type TurnChanges } from '@/stores/overview'
 import { activityRows, agentLive, jobLive, linesOf, planFinished } from './Activity'
 
 /** How long the finished state stays before the pill goes. */
@@ -267,7 +267,7 @@ function liveRows(activity: Activity, browser: BrowserActivity | null, stops: St
  * enough to tell them apart. The plan's steps, the files the turn is
  * changing while it changes them, and what is still running, each with a
  * square Stop where it can be stopped. One button in the corner opens the
- * whole workspace; the pill, a click outside or Escape closes the card.
+ * whole Overview; the pill, a click outside or Escape closes the card.
  */
 export function WorkCard({ phase, activity, browser, current, turnRunning, onPick, onOpenChanges, onExpand, ...stops }: {
   phase: Exclude<PillPhase, 'hidden'>
@@ -291,7 +291,7 @@ export function WorkCard({ phase, activity, browser, current, turnRunning, onPic
   return (
     <div className="relative flex flex-col pb-0.5">
       <div className="absolute right-0 top-0 z-10">
-        <IconButton label="Open the workspace" size="sm" onClick={onExpand}><Icons.workspace size="sm" /></IconButton>
+        <IconButton label="Open Overview" size="sm" onClick={onExpand}><Icons.workspace size="sm" /></IconButton>
       </div>
 
       {empty ? (

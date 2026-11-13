@@ -33,18 +33,18 @@ const NEW_CONVERSATION = 'New conversation'
 export function TopStrip({
   compact = false,
   sidebarShown = false,
-  onOpenWorkspace,
-  viewerOpen = false,
-  onToggleViewer,
+  onOpenOverview,
+  workspaceOpen = false,
+  onToggleWorkspace,
 }: {
   /** The window is narrow: the sidebar floats over the page rather than beside it. */
   compact?: boolean
   /** The floating column is on screen (handed from the shell's handover state). */
   sidebarShown?: boolean
-  /** Present while the right workspace is folded. Opens it through the shell handover. */
-  onOpenWorkspace?: () => void
-  viewerOpen?: boolean
-  onToggleViewer?: () => void
+  /** Opens the right activity summary through the shell handover. */
+  onOpenOverview?: () => void
+  workspaceOpen?: boolean
+  onToggleWorkspace?: () => void
 }) {
   const { route, sidebarOpen, toggleSidebar, goHome } = useNavigation()
   const { conversations, projects } = useWorkspace()
@@ -103,8 +103,8 @@ export function TopStrip({
           </>
         )}
         <div className="flex items-center gap-1.5">
-          {onToggleViewer ? <IconButton label={viewerOpen ? 'Hide File Viewer' : 'Show File Viewer'} size="header"
-            tooltipSide="bottom" active={viewerOpen} onClick={onToggleViewer}><Icons.file size="header" /></IconButton> : null}
+          {onToggleWorkspace ? <IconButton label={workspaceOpen ? 'Hide Workspace' : 'Show Workspace'} size="header"
+            tooltipSide="bottom" active={workspaceOpen} onClick={onToggleWorkspace}><Icons.workspace size="header" /></IconButton> : null}
           <IconButton label="New conversation" size="header" tooltipSide="bottom" onClick={goHome}>
             <Icons.compose size="header" />
           </IconButton>
@@ -131,7 +131,7 @@ export function TopStrip({
             general
             conversation={conversation}
             onRename={() => setRenaming(true)}
-            onOpenWorkspace={onOpenWorkspace}
+            onOpenOverview={onOpenOverview}
           />
           <CloseControl />
         </div>

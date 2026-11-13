@@ -35,14 +35,14 @@ import { usePendingQuestions } from '@/features/chat/questions/usePendingQuestio
 import { useBackgroundJobs } from '@/features/jobs'
 import { usePlan } from '@/features/plans'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
-import { useRail, type ActivityView } from '@/stores/rail'
+import { useOverview, type ActivityView } from '@/stores/overview'
 import { useBrowserPreview } from '@/features/chat/useBrowserPreview'
 import { viewTitle } from '@/features/rail/Activity'
 import { PILL_ENTER, WorkSurface, isWorking, usePillPhase } from '@/features/rail/WorkPill'
 import { useTurnChanges } from '@/features/rail/useTurnChanges'
 import { ChatSheet, sheetTitle } from '@/features/chat/sheet/ChatSheet'
 import { SheetHostContext, type SheetHost, type SheetSpec } from '@/features/chat/sheet/sheet'
-import { useViewer } from '@/features/viewer/ViewerProvider'
+import { useWorkspacePanel } from '@/features/workspace/WorkspacePanelProvider'
 import { useAgentTasks } from '@/features/jobs/useAgentTasks'
 import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
 import { useScreenCollaboration } from '@/features/screen/useScreenCollaboration'
@@ -406,18 +406,18 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     void live.abort()
   }, [approvals, questions, live])
 
-  // The workspace: what the conversation is doing behind the reply, and
-  // what it has changed (see `RailProvider`). This page tells it; the docked
+  // Overview: what the conversation is doing behind the reply, and
+  // what it has changed (see `OverviewProvider`). This page tells it; the docked
   // column, or this page's sheet when the window has no room for one, draws
   // it whole, and the pill over the composer draws the moment.
   const {
-    docked: workspaceDocked,
+    docked: overviewDocked,
     activity,
     browser,
     publishActivity,
-    show: showInWorkspace,
+    show: showInOverview,
     overviewRequests,
-  } = useRail()
+  } = useOverview()
   useBrowserPreview(conversation.id, live.items)
   const turnChanges = useTurnChanges(live.items)
   useEffect(() => {
@@ -465,51 +465,51 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // its marks when a tool has marked it (`MediaViewer`).
   //
   // The sheet is the same layer for everything else too big for the reply: a
-  // file, a set of changes, one thing from the workspace (`ChatSheet`). One
+  // file, a set of changes, one item from Overview (`ChatSheet`). One
   // layer at a time, so opening one replaces the other.
   const [viewing, setViewing] = useState<ViewerSpec | null>(null)
   const [sheet, setSheet] = useState<SheetSpec | null>(null)
   const [sheetFromList, setSheetFromList] = useState(false)
-  const documentViewer = useViewer()
+  const workspacePanel = useWorkspacePanel()
   const viewer = useRef<MediaViewerHandle>(null)
   const viewerHost = useMemo<MediaViewerHost>(() => ({ open: (spec) => { setSheet(null); setViewing(spec) } }), [])
   const openSheet = useCallback((spec: SheetSpec, fromList = false) => {
     setCardOpen(false)
-    if (spec.kind === 'file' && documentViewer?.conversationId === spec.conversationId) {
-      documentViewer.openFile(spec.file)
+    if (spec.kind === 'file' && workspacePanel?.conversationId === spec.conversationId) {
+      workspacePanel.openFile(spec.file)
       setViewing(null)
       setSheet(null)
       return
     }
-    // With a docked column, the workspace is shown where the workspace is.
-    if (spec.kind === 'activity' && workspaceDocked) {
-      showInWorkspace(spec.view)
+    // Activity belongs to Overview; documents belong to the central Workspace.
+    if (spec.kind === 'activity' && overviewDocked) {
+      showInOverview(spec.view)
       return
     }
-    if (spec.kind === 'workspace' && workspaceDocked) {
-      showInWorkspace(null)
+    if (spec.kind === 'overview' && overviewDocked) {
+      showInOverview(null)
       return
     }
     setViewing(null)
     setSheetFromList(fromList)
     setSheet(spec)
-  }, [workspaceDocked, showInWorkspace, documentViewer])
+  }, [overviewDocked, showInOverview, workspacePanel])
   const sheetHost = useMemo<SheetHost>(() => ({ open: (spec) => openSheet(spec) }), [openSheet])
   const closeSheet = useCallback(() => setSheet(null), [])
   useEffect(() => { setViewing(null); setSheet(null) }, [conversation.id])
-  // A workspace thing open in the sheet moves to the column when the window
+  // An Overview item open in the sheet moves to the column when the window
   // grows enough to have one.
   useEffect(() => {
-    if (!workspaceDocked || (sheet?.kind !== 'activity' && sheet?.kind !== 'workspace')) return
-    showInWorkspace(sheet.kind === 'activity' ? sheet.view : null)
+    if (!overviewDocked || (sheet?.kind !== 'activity' && sheet?.kind !== 'overview')) return
+    showInOverview(sheet.kind === 'activity' ? sheet.view : null)
     setSheet(null)
-  }, [workspaceDocked, sheet, showInWorkspace])
-  // The header's Workspace item, in a window with no column.
+  }, [overviewDocked, sheet, showInOverview])
+  // The header's Overview item, in a window with no column.
   const seenRequests = useRef(overviewRequests)
   useEffect(() => {
     if (overviewRequests === seenRequests.current) return
     seenRequests.current = overviewRequests
-    openSheet({ kind: 'workspace', conversationId: conversation.id })
+    openSheet({ kind: 'overview', conversationId: conversation.id })
   }, [overviewRequests, openSheet, conversation.id])
   const covered = viewing !== null || sheet !== null
   // The composer stays raised over a layer until the layer has finished
@@ -532,7 +532,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     openSheet({ kind: 'changes', changes, conversationId: conversation.id })
   }, [openSheet, conversation.id])
   const openEverything = useCallback(() => {
-    openSheet({ kind: 'workspace', conversationId: conversation.id })
+    openSheet({ kind: 'overview', conversationId: conversation.id })
   }, [openSheet, conversation.id])
   const dock = useRef<HTMLDivElement>(null)
   const [dockHeight, setDockHeight] = useState(0)
@@ -549,7 +549,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     async (text: string, images: readonly TurnImageWire[], documents: readonly File[], deliveryMode?: 'queue') => {
       const handle = viewing === null ? null : viewer.current
       if (handle === null) {
-        // Over a file or a workspace thing the words go as written; the sheet
+        // Over a file or an Overview item the words go as written; the sheet
         // steps aside so the reply to them can be read.
         const sent = await sendTurn(text, images, documents, deliveryMode)
         if (sent.ok) setSheet(null)
@@ -884,7 +884,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
             className="absolute inset-0 z-30 flex origin-bottom flex-col bg-surface px-3"
             style={{ paddingBottom: dockHeight + 12 }}
             // It rises from the bottom, where the pill's card was, so opening
-            // the workspace reads as the card growing into it.
+            // Overview reads as the card growing into it.
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: DURATION.slow, ease: EASE_SETTLE, opacity: { duration: DURATION.base } } }}
             exit={{ opacity: 0, y: 16, scale: 0.98, transition: { duration: DURATION.base, ease: EASE_AWAY } }}
@@ -893,7 +893,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
               spec={sheet}
               onClose={closeSheet}
               onPick={pickActivity}
-              {...(sheetFromList ? { onBack: () => setSheet({ kind: 'workspace', conversationId: conversation.id }) } : {})}
+              {...(sheetFromList ? { onBack: () => setSheet({ kind: 'overview', conversationId: conversation.id }) } : {})}
             />
           </motion.div>
         ) : null}

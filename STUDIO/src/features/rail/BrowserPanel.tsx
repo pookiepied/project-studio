@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useViewer } from '@/features/viewer/ViewerProvider'
+import { useWorkspacePanel } from '@/features/workspace/WorkspacePanelProvider'
 import { cn } from '@/lib/cn'
 import { useWorkspace } from '@/stores/workspace'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 import type { BrowserStep } from '@/features/chat/transcript/live/browserCall'
 import { familyById, type ReportFamily } from '@/features/chat/transcript/live/reportFamily'
-import type { BrowserActivity } from '@/stores/rail'
+import type { BrowserActivity } from '@/stores/overview'
 import { openBrowserWindow } from '@/platform/tauri'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives/IconButton/IconButton'
@@ -46,7 +46,7 @@ export function BrowserPanel({
 }: {
   entry: BrowserActivity
 }) {
-  const viewer = useViewer()
+  const workspacePanel = useWorkspacePanel()
   // The newest step with something to show, which is where a reader's eye
   // starts: "now" is what they came to see. A list walked backwards once beats
   // a state initialiser racing an entry that replaces itself mid-render.
@@ -74,8 +74,8 @@ export function BrowserPanel({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {family.id === 'browser' && viewer?.conversationId === entry.conversationId ? (
-            <IconButton label="Open browser in File Viewer" onClick={viewer.openBrowser}><Icons.file /></IconButton>
+          {family.id === 'browser' && workspacePanel?.conversationId === entry.conversationId ? (
+            <IconButton label="Open browser in Workspace" onClick={workspacePanel.openBrowser}><Icons.workspace /></IconButton>
           ) : null}
           {family.id !== 'browser' ? null : (
             <IconButton label="Open browser in new window" onClick={() => {

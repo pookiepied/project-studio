@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 import { callsIn } from '@/features/chat/transcript/live/taskEvidence'
 import { recordedChanges } from '@/features/changes/recordedChanges'
-import type { TurnChanges } from '@/stores/rail'
+import type { TurnChanges } from '@/stores/overview'
 
 /**
  * Every turn that changed files, oldest first, and the one answering the
@@ -14,7 +14,7 @@ import type { TurnChanges } from '@/stores/rail'
  *
  * The list keeps its identity while nothing in it changed, so a chunk of
  * words streaming into a reply does not publish a "new" history to the
- * workspace on every token.
+ * Overview on every token.
  */
 export function useTurnChanges(items: readonly TranscriptItem[]): { turns: readonly TurnChanges[]; current: TurnChanges | null } {
   const previous = useRef<{ signature: string; turns: readonly TurnChanges[] }>({ signature: '', turns: [] })

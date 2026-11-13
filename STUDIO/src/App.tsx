@@ -20,12 +20,12 @@ import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { CaptureMonitor } from '@/shell/CaptureMonitor'
 import { DetachedShell } from '@/shell/DetachedShell'
 import { BrowserWindow } from '@/features/browser/BrowserWindow'
-import { ViewerProvider } from '@/features/viewer/ViewerProvider'
+import { WorkspacePanelProvider } from '@/features/workspace/WorkspacePanelProvider'
 import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { useFileDropGuard } from '@/shell/useFileDropGuard'
 import { NavigationProvider, useNavigation } from '@/stores/navigation'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 import { ConversationStatusProvider } from '@/stores/status'
 import { WorkspaceProvider, useWorkspace } from '@/stores/workspace'
 
@@ -142,9 +142,9 @@ function ConversationWorkspace({ detached, children }: { detached: string | null
   const { route } = useNavigation()
   const conversationId = detached ?? (route.kind === 'chat' ? route.conversationId : null)
   return (
-    <RailProvider conversationId={conversationId}>
-      {detached === null ? <ViewerProvider conversationId={conversationId}>{children}</ViewerProvider> : children}
-    </RailProvider>
+    <OverviewProvider conversationId={conversationId}>
+      {detached === null ? <WorkspacePanelProvider conversationId={conversationId}>{children}</WorkspacePanelProvider> : children}
+    </OverviewProvider>
   )
 }
 

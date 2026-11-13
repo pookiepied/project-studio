@@ -5,7 +5,7 @@ import { clientObservations } from '@/platform/diagnostics/events'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 import { AssistantTurn } from './AssistantTurn'
 import { present } from '@/platform/harness/contracts/chunks'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 
 vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
 // jsdom's window frame clock and Node's performance clock have different origins.
@@ -27,7 +27,7 @@ describe('assistant text display observations', () => {
         { kind: 'text', id: 'answer', text: 'Final answer.' },
       ],
     }
-    render(<RailProvider><AssistantTurn item={item} live={false} conversationId="conversation" /></RailProvider>)
+    render(<OverviewProvider><AssistantTurn item={item} live={false} conversationId="conversation" /></OverviewProvider>)
     clientObservations.take()
     const toggle = screen.getByRole('button', { name: 'Updated a.ts' })
     fireEvent.click(toggle)

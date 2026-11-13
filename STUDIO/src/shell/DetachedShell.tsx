@@ -10,8 +10,8 @@ import { ActionsMenu } from '@/shell/menus/ActionsMenu'
 import { SelectionMenu } from '@/shell/menus/SelectionMenu'
 import { WindowControls } from '@/shell/chrome/WindowControls'
 import { useWorkspace } from '@/stores/workspace'
-import { useRail } from '@/stores/rail'
-import { SideRail } from '@/features/rail'
+import { useOverview } from '@/stores/overview'
+import { OverviewPanel } from '@/features/rail'
 
 /**
  * One conversation, in a window of its own.
@@ -37,7 +37,7 @@ import { SideRail } from '@/features/rail'
  */
 export function DetachedShell({ conversationId }: { conversationId: string }) {
   const { conversations } = useWorkspace()
-  const rail = useRail()
+  const rail = useOverview()
   const conversation = conversations.find((item) => item.id === conversationId)
   const [renaming, setRenaming] = useState(false)
 
@@ -79,7 +79,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
             <ConversationMenu
               conversation={conversation}
               onRename={() => setRenaming(true)}
-              onOpenWorkspace={rail.openOverview}
+              onOpenOverview={rail.openOverview}
             />
             <WindowControls />
           </div>
@@ -87,7 +87,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
 
         <ChatPage conversation={conversation} />
       </div>
-      <SideRail key={conversationId} open={rail.open} />
+      <OverviewPanel key={conversationId} open={rail.open} />
       {isTauri() ? <ActionsMenu /> : null}
       <SelectionMenu />
       </VoiceModeProvider>

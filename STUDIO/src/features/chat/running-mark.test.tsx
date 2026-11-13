@@ -9,7 +9,7 @@ import type { Conversation } from '@/domain/conversation/types'
 import type { ConversationPhase } from '@/features/chat/connection/useConversation'
 import { VoiceModeProvider } from '@/features/voice'
 import { NavigationProvider } from '@/stores/navigation'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 import { WorkspaceProvider, useLiveWork } from '@/stores/workspace'
 import { ChatPage } from './ChatPage'
 
@@ -73,10 +73,10 @@ function tree(conversation: Conversation) {
         <VoiceModeProvider>
           {/* ChatPage reads the rail store since the plan pill arrived, and
               this harness never carried it; the assertions are unchanged. */}
-          <RailProvider>
+          <OverviewProvider>
             <ChatPage conversation={conversation} />
             <RunningProbe />
-          </RailProvider>
+          </OverviewProvider>
         </VoiceModeProvider>
       </WorkspaceProvider>
     </NavigationProvider>

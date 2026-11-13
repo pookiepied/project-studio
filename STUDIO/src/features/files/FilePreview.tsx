@@ -19,9 +19,9 @@ type Content =
   | { readonly state: 'picture'; readonly url: string }
 
 /**
- * A file shown in the side rail, which already opens as an overlay at the compact
- * window size, so the viewer costs no room of its own. It shows what the file
- * says now, read from disk, not what the reply remembered writing.
+ * The shared file renderer for the central Workspace and chat-sheet fallback.
+ * It shows what the file says now, read from disk, not what the reply remembered
+ * writing. Overview remains an activity summary rather than a document viewer.
  */
 export function FilePreview({ file, conversationId, source = false, revision = 0 }: {
   file: LocatedFile

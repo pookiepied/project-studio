@@ -3,14 +3,14 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import type { LocatedFile } from '@/features/files/useLocatedFile'
-import { ViewerProvider, useViewer } from './ViewerProvider'
+import { WorkspacePanelProvider, useWorkspacePanel } from './WorkspacePanelProvider'
 
 afterEach(cleanup)
 const file: LocatedFile = { path: 'C:\\work\\notes.md', kind: 'markdown', line: null, column: null, inConversation: true, others: 0 }
 
 describe('the document desk', () => {
   it('reuses a file tab and restores its document after visiting the browser', () => {
-    const { result } = renderHook(useViewer, { wrapper: ({ children }: { children: ReactNode }) => <ViewerProvider conversationId="a">{children}</ViewerProvider> })
+    const { result } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId="a">{children}</WorkspacePanelProvider> })
     act(() => { result.current?.openFile(file); result.current?.openFile({ ...file, line: 42 }) })
     expect(result.current?.tabs).toHaveLength(1)
     expect(result.current?.open).toBe(true)
@@ -27,7 +27,7 @@ describe('the document desk', () => {
 
   it('keeps documents in their own conversation, including a late old callback', () => {
     let scope = 'a'
-    const { result, rerender } = renderHook(useViewer, { wrapper: ({ children }: { children: ReactNode }) => <ViewerProvider conversationId={scope}>{children}</ViewerProvider> })
+    const { result, rerender } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId={scope}>{children}</WorkspacePanelProvider> })
     const openInA = result.current?.openFile
     act(() => result.current?.openFile(file))
     scope = 'b'
@@ -43,7 +43,7 @@ describe('the document desk', () => {
   })
 
   it('opens an empty desk on Home without inventing file or browser ownership', () => {
-    const { result } = renderHook(useViewer, { wrapper: ({ children }: { children: ReactNode }) => <ViewerProvider conversationId={null}>{children}</ViewerProvider> })
+    const { result } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId={null}>{children}</WorkspacePanelProvider> })
     act(() => { result.current?.toggle(); result.current?.openFile(file); result.current?.openBrowser() })
     expect(result.current?.open).toBe(true)
     expect(result.current?.tabs).toHaveLength(0)

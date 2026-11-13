@@ -8,12 +8,12 @@ import { BrowserPanel } from './BrowserPanel'
 import { AgentActivity } from './AgentActivity'
 import { familyById } from '@/features/chat/transcript/live/reportFamily'
 import { readableName } from '@/features/chat/transcript/live/toolResult'
-import { hasPlan, sameView, useRail, type Activity, type ActivityView, type BrowserActivity, type TurnChanges } from '@/stores/rail'
+import { hasPlan, sameView, useOverview, type Activity, type ActivityView, type BrowserActivity, type TurnChanges } from '@/stores/overview'
 import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
 import { cn } from '@/lib/cn'
 
 /**
- * The workspace's rows, and the one thing each opens.
+ * Overview's rows, and the one thing each opens.
  *
  * One list for both sizes of window: the docked column draws it as its first
  * page, and the compact window draws it in the sheet. It is the conversation's
@@ -174,7 +174,7 @@ export function ActivityRowButton({ row, onPick, selected = false }: { row: Acti
   )
 }
 
-/** The whole workspace: what is going, what each turn changed, what finished. */
+/** The activity overview: what is going, what each turn changed, what finished. */
 export function ActivityList({ rows, onPick, selected = null }: {
   rows: readonly ActivityRow[]
   onPick: (view: ActivityView) => void
@@ -199,7 +199,7 @@ export function ActivityList({ rows, onPick, selected = null }: {
   )
 }
 
-/** The name of one thing in the workspace, for a header. */
+/** The name of one thing in Overview, for a header. */
 export function viewTitle(view: ActivityView, activity: Activity, browser: BrowserActivity | null): string {
   if (view.kind === 'plan') return 'Plan'
   if (view.kind === 'jobs') return 'Commands'
@@ -211,9 +211,9 @@ export function viewTitle(view: ActivityView, activity: Activity, browser: Brows
   return activity.agents.find((agent) => agent.id === view.agentId)?.title ?? 'Agent'
 }
 
-/** One thing in the workspace, looked at on its own. */
+/** One thing in Overview, looked at on its own. */
 export function ActivityBody({ view, conversationId }: { view: ActivityView; conversationId: string }) {
-  const { activity, browser } = useRail()
+  const { activity, browser } = useOverview()
   if (view.kind === 'plan') return <PlanPanel conversationId={conversationId} />
   if (view.kind === 'jobs') return <JobsPanel conversationId={conversationId} />
   if (view.kind === 'browser') {

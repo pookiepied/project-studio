@@ -4,7 +4,7 @@ import { FADE, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton, PageTransition } from '@/components/primitives'
 import { ActivityBody, ActivityList, activityRows, viewTitle } from './Activity'
-import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail } from '@/stores/rail'
+import { OVERVIEW_MAX_WIDTH, OVERVIEW_MIN_WIDTH, useOverview } from '@/stores/overview'
 
 /**
  * The narrowest the conversation may become.
@@ -20,28 +20,15 @@ const MIN_PAGE_WIDTH = SHELL.minPageWidth
 
 
 /**
- * The side rail.
- *
- * The workspace, docked beside the conversation when the window has room
- * for it (`docked` in the rail store): the activity list, and one thing from
+ * The right-hand Overview, docked beside chat and the central Workspace when
+ * there is room (`docked` in the Overview store): the activity list, and one thing from
  * it at a time. Without the room there is no column; the chat page draws the
  * same list from a pill over the composer and opens a thing in its sheet.
  *
- * ---- The two placements ---------------------------------------------------
- *
- * `inset` floats the rail as its own rounded panel with the window's ground
- * visible above and below, which is the same language the page uses — a panel
- * resting on the sidebar rather than a region of one sheet. It is the default
- * because it keeps the window reading as a set of objects.
- *
- * `full` runs flush from top to bottom. It gives back the vertical margins and
- * squares the corners against the window edge, which is what you want when the
- * thing being read is long enough that the margins are just lost lines.
- *
- * The toggle is in the header rather than in settings: which one is right
- * depends on what is open right now, not on a preference held across sessions.
+ * The header shares the conversation strip's geometry; its title and close
+ * control belong to the same row, even though the contents are independent.
  */
-export function SideRail({
+export function OverviewPanel({
   open,
   onClosed,
   minPageWidth = MIN_PAGE_WIDTH,
@@ -58,7 +45,7 @@ export function SideRail({
   /** Chat and an open document need room beside the activity column. */
   minPageWidth?: number
 }) {
-  const { activity, browser, view, width, setWidth, closeAll, overview, show, conversationId } = useRail()
+  const { activity, browser, view, width, setWidth, closeAll, overview, show, conversationId } = useOverview()
   const reducedMotion = useReducedMotion()
   const frame = useRef<HTMLElement>(null)
   const [room, setRoom] = useState(Number.POSITIVE_INFINITY)
@@ -88,14 +75,14 @@ export function SideRail({
     return () => observer.disconnect()
   }, [open])
 
-  const ceiling = Math.max(RAIL_MIN_WIDTH, room - minPageWidth)
+  const ceiling = Math.max(OVERVIEW_MIN_WIDTH, room - minPageWidth)
   const effective = Math.min(width, ceiling, room)
 
   return (
     <AnimatePresence initial={false} onExitComplete={onClosed}>
       {open ? (
         <motion.aside
-          aria-label="Conversation workspace"
+          aria-label="Conversation overview"
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             event.stopPropagation()
@@ -145,14 +132,14 @@ export function SideRail({
               the width the rail is, the frame's edge clips them instead, the
               way the sidebar's inner column has always been sized. */}
           <div className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: effective }}>
-            <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
-              {view !== null ? <IconButton label="Back to workspace" size="sm" onClick={overview}><Icons.back size="sm" /></IconButton> : null}
-              <h2 className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
-                {view === null ? 'Workspace' : viewTitle(view, activity, browser)}
+            <header className="flex shrink-0 items-center gap-1" style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}>
+              {view !== null ? <IconButton label="Back to Overview" size="header" onClick={overview}><Icons.back size="header" /></IconButton> : null}
+              <h2 className="min-w-0 flex-1 truncate text-body font-medium text-foreground">
+                {view === null ? 'Overview' : viewTitle(view, activity, browser)}
               </h2>
 
-              <IconButton label="Collapse workspace" size="sm" onClick={closeAll}>
-                <Icons.close size="sm" />
+              <IconButton label="Collapse Overview" size="header" onClick={closeAll}>
+                <Icons.close size="header" />
               </IconButton>
             </header>
 
@@ -232,10 +219,10 @@ function ResizeHandle({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize the rail"
+      aria-label="Resize Overview"
       aria-valuenow={width}
-      aria-valuemin={RAIL_MIN_WIDTH}
-      aria-valuemax={Math.min(RAIL_MAX_WIDTH, ceiling)}
+      aria-valuemin={OVERVIEW_MIN_WIDTH}
+      aria-valuemax={Math.min(OVERVIEW_MAX_WIDTH, ceiling)}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

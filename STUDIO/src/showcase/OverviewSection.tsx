@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { RailProvider, useRail } from '@/stores/rail'
+import { OverviewProvider, useOverview } from '@/stores/overview'
 import { WorkspaceProvider } from '@/stores/workspace'
-import { SideRail } from '@/features/rail/SideRail'
+import { OverviewPanel } from '@/features/rail/OverviewPanel'
 import { WorkSurface, type PillPhase } from '@/features/rail/WorkPill'
 import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
-import type { TurnChanges } from '@/stores/rail'
+import type { TurnChanges } from '@/stores/overview'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { Section } from './Section'
 
@@ -32,12 +32,12 @@ const jobs: BackgroundJob[] = [
 const edited = (path: string, added: number, removed: number): RecordedChange =>
   ({ path, action: 'Edited', calls: [], diff: { added, removed } } as unknown as RecordedChange)
 const turns: TurnChanges[] = [
-  { id: 'earlier', at: new Date(now - 3_600_000).toISOString(), changes: [edited('src/stores/rail/RailProvider.tsx', 120, 64)] },
+  { id: 'earlier', at: new Date(now - 3_600_000).toISOString(), changes: [edited('src/stores/overview/OverviewProvider.tsx', 120, 64)] },
   { id: 'current', at: new Date(now - 60_000).toISOString(), changes: [edited('codex-ui-demo/PLAN.md', 6, 0), edited('codex-ui-demo/README.md', 5, 0)] },
 ]
 
 function Specimens() {
-  const rail = useRail()
+  const rail = useOverview()
   const { publishActivity, showBrowser } = rail
   const [cardOpen, setCardOpen] = useState(false)
   // A run you can step through, so every change the pill animates can be seen.
@@ -98,19 +98,19 @@ function Specimens() {
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-3 p-8">
             <p className="text-title">The conversation's record.</p>
             <p className="max-w-72 text-caption text-muted-foreground">What is going now, what each turn changed, and what finished. In a compact window the same list opens in the sheet over the transcript.</p>
-            <button type="button" className="w-fit rounded-lg bg-tint px-3 py-2 text-caption" onClick={rail.open ? rail.collapse : rail.expand}>{rail.open ? 'Collapse workspace' : 'Open workspace'}</button>
+            <button type="button" className="w-fit rounded-lg bg-tint px-3 py-2 text-caption" onClick={rail.open ? rail.collapse : rail.expand}>{rail.open ? 'Collapse Overview' : 'Open Overview'}</button>
           </div>
-          <SideRail open={rail.open} />
+          <OverviewPanel open={rail.open} />
         </div>
       </div>
     </div>
   )
 }
 
-export function WorkspaceSection() {
+export function OverviewSection() {
   return (
-    <Section title="Workspace" note="What the conversation is doing behind the reply. A pill and a list in the compact window; a docked column when there is room.">
-      <WorkspaceProvider><RailProvider conversationId="workspace-specimen"><Specimens /></RailProvider></WorkspaceProvider>
+    <Section title="Overview" note="What the conversation is doing behind the reply. A pill and a list in the compact window; a docked column when there is room.">
+      <WorkspaceProvider><OverviewProvider conversationId="workspace-specimen"><Specimens /></OverviewProvider></WorkspaceProvider>
     </Section>
   )
 }

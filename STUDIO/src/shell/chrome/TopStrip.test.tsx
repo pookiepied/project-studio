@@ -80,7 +80,7 @@ function ChatOpener({ conversationId }: { conversationId: string }) {
   )
 }
 
-function mountStrip(props: { compact?: boolean; sidebarShown?: boolean; onOpenWorkspace?: () => void }) {
+function mountStrip(props: { compact?: boolean; sidebarShown?: boolean; onOpenOverview?: () => void; workspaceOpen?: boolean; onToggleWorkspace?: () => void }) {
   return render(
     <NavigationProvider>
       <WorkspaceProvider>
@@ -161,12 +161,20 @@ describe('the controls', () => {
     expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull()
   })
 
-  it('opens the workspace from the menu while it is folded', async () => {
-    const onOpenWorkspace = vi.fn()
-    mountStrip({ onOpenWorkspace })
+  it('opens Overview from the menu while it is folded', async () => {
+    const onOpenOverview = vi.fn()
+    mountStrip({ onOpenOverview })
     fireEvent.click(screen.getByRole('button', { name: 'More' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Workspace' }))
-    expect(onOpenWorkspace).toHaveBeenCalledOnce()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Overview' }))
+    expect(onOpenOverview).toHaveBeenCalledOnce()
+  })
+
+  it('names the central work area separately from the activity overview', () => {
+    const onToggleWorkspace = vi.fn()
+    mountStrip({ onToggleWorkspace })
+    fireEvent.click(screen.getByRole('button', { name: 'Show Workspace' }))
+    expect(onToggleWorkspace).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Show File Viewer' })).toBeNull()
   })
 
   it('renames the open conversation where its title stood', async () => {

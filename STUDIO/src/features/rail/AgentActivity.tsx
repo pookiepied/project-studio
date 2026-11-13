@@ -33,7 +33,7 @@ export function stepLabel(call: ToolCallView): string {
  * Its transcript is read only to name its steps. The words it wrote, its
  * reasoning and its tools' results are its own conversation's business, and
  * the answer comes back to the parent conversation as the reply's - drawing
- * them here was the history this workspace no longer keeps. Closing this view
+ * them here was the history Overview no longer keeps. Closing this view
  * cancels the read, never the agent.
  */
 export function AgentActivity({ task, conversationId }: { task: AgentTask; conversationId: string }) {

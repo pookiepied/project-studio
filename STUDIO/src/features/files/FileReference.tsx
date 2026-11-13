@@ -4,7 +4,7 @@ import { FileTypeMark, fileToneClass, splitFilePath } from '@/components/icons/f
 import { ReplyConversation } from '@/features/chat/markdown/ReplyImage'
 import { cn } from '@/lib/cn'
 import { useSheetHost } from '@/features/chat/sheet/sheet'
-import { useViewer } from '@/features/viewer/ViewerProvider'
+import { useWorkspacePanel } from '@/features/workspace/WorkspacePanelProvider'
 import { FileMenu } from './FileMenu'
 import { namesFolder, type PathReference } from './pathReference'
 import { useLocatedFile } from './useLocatedFile'
@@ -46,7 +46,7 @@ function InteractiveFileReference({ reference, variant, conversationId }: {
 }) {
   const [open, setOpen] = useState(false)
   const sheet = useSheetHost()
-  const viewer = useViewer()
+  const workspacePanel = useWorkspacePanel()
   // Parsed afresh on each render above; this component is keyed by the text, so
   // the first parse stands and a parent's re-render does not repeat the lookup.
   const [pinned] = useState(reference)
@@ -66,7 +66,7 @@ function InteractiveFileReference({ reference, variant, conversationId }: {
   const preview = conversationId !== null && located !== null
     ? sheet !== null
       ? () => { sheet.open({ kind: 'file', file: located, conversationId }) }
-      : viewer?.conversationId === conversationId ? () => viewer.openFile(located) : null
+      : workspacePanel?.conversationId === conversationId ? () => workspacePanel.openFile(located) : null
     : null
 
   // `chip` is the inline-code presentation, a `code` element so the existing

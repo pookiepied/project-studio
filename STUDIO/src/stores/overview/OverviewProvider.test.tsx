@@ -3,7 +3,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
-import { RailProvider, useRail, type Activity } from './RailProvider'
+import { OverviewProvider, useOverview, type Activity } from './OverviewProvider'
 
 let wide = true
 beforeEach(() => {
@@ -24,11 +24,11 @@ const plan = (count: number): PlanSnapshot => ({
 const activity = (overrides: Partial<Activity> = {}): Activity => ({ plan: null, agents: [], jobs: [], turns: [], ...overrides })
 
 function mount(scope: { current: string | null }) {
-  const wrapper = ({ children }: { children: ReactNode }) => <RailProvider conversationId={scope.current}>{children}</RailProvider>
-  return renderHook(() => useRail(), { wrapper })
+  const wrapper = ({ children }: { children: ReactNode }) => <OverviewProvider conversationId={scope.current}>{children}</OverviewProvider>
+  return renderHook(() => useOverview(), { wrapper })
 }
 
-describe('the workspace holds activity, per conversation', () => {
+describe('Overview holds activity, per conversation', () => {
   it('keeps each conversation its own activity, browser and open view', async () => {
     const scope = { current: 'a' as string | null }
     const { result, rerender } = mount(scope)
@@ -74,8 +74,8 @@ describe('the workspace holds activity, per conversation', () => {
 
   it('does not notify consumers when the same activity is published again', async () => {
     let renders = 0
-    const wrapper = ({ children }: { children: ReactNode }) => <RailProvider conversationId="a">{children}</RailProvider>
-    const { result } = renderHook(() => { renders += 1; return useRail() }, { wrapper })
+    const wrapper = ({ children }: { children: ReactNode }) => <OverviewProvider conversationId="a">{children}</OverviewProvider>
+    const { result } = renderHook(() => { renders += 1; return useOverview() }, { wrapper })
     const agents = [agent('one')]
     act(() => result.current.publishActivity('a', activity({ agents })))
     await waitFor(() => expect(result.current.open).toBe(true))
@@ -85,7 +85,7 @@ describe('the workspace holds activity, per conversation', () => {
   })
 })
 
-describe('where the workspace draws', () => {
+describe('where Overview draws', () => {
   it('has no docked column in a window too narrow for one', async () => {
     wide = false
     const { result } = mount({ current: 'a' })

@@ -4,18 +4,18 @@ import type { ReportFamilyId } from '@/features/chat/transcript/live/reportFamil
 import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
 import { SHELL } from '@/design/tokens'
-import { loadWorkspaceCollapsed, saveWorkspaceCollapsed } from '@/platform/workspace-preferences'
+import { loadOverviewCollapsed, saveOverviewCollapsed } from '@/platform/overview-preferences'
 import { StudioError } from '@/lib/errors'
 
 /**
- * The conversation's workspace: what is happening behind the reply.
+ * The conversation's Overview: what is happening behind the reply.
  *
  * Activity, not history. It holds the plan, the agents the conversation
  * started, the commands it left running, and the browser or computer it is
  * driving - each as the harness reports it now. What the transcript already
  * says (every turn, every tool call, every agent's transcript) is not
- * repeated here, and nothing opened from a reply lands here either: a file,
- * a diff or a picture opens in the sheet over the transcript instead.
+ * repeated here. Documents belong to the central Workspace; diffs and pictures
+ * keep their chat sheets. Overview is the activity summary, not the work surface.
  *
  * Where it draws depends on the room. With space beside the conversation it
  * is a docked column (`docked`); without it, a pill over the composer, a
@@ -50,7 +50,7 @@ export interface Activity {
   readonly turns: readonly TurnChanges[]
 }
 
-/** One thing in the workspace, looked at on its own. */
+/** One thing in Overview, looked at on its own. */
 export type ActivityView =
   | { readonly kind: 'plan' }
   | { readonly kind: 'jobs' }
@@ -58,14 +58,14 @@ export type ActivityView =
   | { readonly kind: 'browser' }
   | { readonly kind: 'changes'; readonly turnId: string }
 
-export const RAIL_MIN_WIDTH = 320
-export const RAIL_MAX_WIDTH = 760
+export const OVERVIEW_MIN_WIDTH = 320
+export const OVERVIEW_MAX_WIDTH = 760
 
 /**
  * The narrowest window the docked column fits: the page's floor, the column's
- * floor, and the gutter between them. Below it the workspace is the pill.
+ * floor, and the gutter between them. Below it Overview is the pill.
  */
-export const DOCKED_MIN_WINDOW = SHELL.minPageWidth + RAIL_MIN_WIDTH + SHELL.railGutter
+export const DOCKED_MIN_WINDOW = SHELL.minPageWidth + OVERVIEW_MIN_WIDTH + SHELL.railGutter
 
 /** The same rows, or both empty: a fresh empty list is not news. */
 function sameList(a: readonly unknown[], b: readonly unknown[]): boolean {
@@ -90,7 +90,7 @@ export function sameView(a: ActivityView | null, b: ActivityView | null): boolea
   return true
 }
 
-interface RailValue {
+interface OverviewValue {
   readonly conversationId: string | null
   /** The docked column is on screen. */
   readonly open: boolean
@@ -104,8 +104,8 @@ interface RailValue {
   readonly view: ActivityView | null
   readonly width: number
   /**
-   * Counts requests to see the whole workspace from outside the page (the
-   * header's Workspace item) in a window with no column, where the page
+   * Counts requests to see Overview from outside the page (the
+   * header's Overview item) in a window with no column, where the page
    * answers by opening its sheet.
    */
   readonly overviewRequests: number
@@ -114,7 +114,7 @@ interface RailValue {
   /** Brings one thing - or, given null, the whole list - forward in the docked column, unfolding it. */
   show: (view: ActivityView | null) => void
   overview: () => void
-  /** The whole workspace: the column's list when docked, else the page's sheet. */
+  /** The activity overview: the column's list when docked, else the page's sheet. */
   openOverview: () => void
   collapse: () => void
   expand: () => void
@@ -122,7 +122,7 @@ interface RailValue {
   setWidth: (width: number) => void
 }
 
-const RailContext = createContext<RailValue | null>(null)
+const OverviewContext = createContext<OverviewValue | null>(null)
 
 function useWindowFits(width: number): boolean {
   const query = `(min-width: ${String(width)}px)`
@@ -139,7 +139,7 @@ function useWindowFits(width: number): boolean {
 }
 
 /** Conversation data and focus have owners; visibility is the person's window preference. */
-export function RailProvider({ children, conversationId: scope }: { children: ReactNode; conversationId?: string | null }) {
+export function OverviewProvider({ children, conversationId: scope }: { children: ReactNode; conversationId?: string | null }) {
   const [activities, setActivities] = useState<ReadonlyMap<string, Activity>>(new Map())
   const [browsers, setBrowsers] = useState<ReadonlyMap<string, BrowserActivity>>(new Map())
   const [views, setViews] = useState<ReadonlyMap<string, ActivityView | null>>(new Map())
@@ -148,8 +148,8 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
   const [collapsed, setCollapsed] = useState(false)
   const [ready, setReady] = useState(false)
   const [overviewRequests, setOverviewRequests] = useState(0)
-  // The conversation whose workspace was asked for by name - the header's
-  // Workspace item - which opens even with nothing in it to show. Without
+  // The conversation whose Overview was asked for by name - the header's
+  // Overview item - which opens even with nothing in it to show. Without
   // this the item did nothing in a conversation with no activity: the
   // column only stands up for activity, and there was none.
   const [summoned, setSummoned] = useState<string | null>(null)
@@ -159,11 +159,11 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
   const setVisibility = useCallback((value: boolean) => {
     preferenceChanged.current = true
     setCollapsed(value)
-    void saveWorkspaceCollapsed(value)
+    void saveOverviewCollapsed(value)
   }, [])
   useEffect(() => {
     let disposed = false
-    void loadWorkspaceCollapsed().then((value) => {
+    void loadOverviewCollapsed().then((value) => {
       if (disposed) return
       if (!preferenceChanged.current) setCollapsed(value)
       setReady(true)
@@ -171,7 +171,7 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
     return () => { disposed = true }
   }, [])
 
-  const publishActivity = useCallback<RailValue['publishActivity']>((conversationId, activity) => {
+  const publishActivity = useCallback<OverviewValue['publishActivity']>((conversationId, activity) => {
     setActivities((current) => {
       const held = current.get(conversationId)
       if (held !== undefined && held.plan === activity.plan && sameList(held.agents, activity.agents) && sameList(held.jobs, activity.jobs) && sameList(held.turns, activity.turns)) return current
@@ -179,7 +179,7 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
     })
     setLastScope(conversationId)
   }, [])
-  const showBrowser = useCallback<RailValue['showBrowser']>((conversationId, report) => {
+  const showBrowser = useCallback<OverviewValue['showBrowser']>((conversationId, report) => {
     setBrowsers((current) => new Map(current).set(conversationId, { conversationId, ...report }))
     setLastScope(conversationId)
   }, [])
@@ -211,21 +211,21 @@ export function RailProvider({ children, conversationId: scope }: { children: Re
   const collapse = useCallback(() => { setSummoned(null); setVisibility(true) }, [setVisibility])
   const expand = useCallback(() => setVisibility(false), [setVisibility])
   const setWidth = useCallback((value: number) => {
-    if (Number.isFinite(value)) setRawWidth(Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, Math.round(value))))
+    if (Number.isFinite(value)) setRawWidth(Math.max(OVERVIEW_MIN_WIDTH, Math.min(OVERVIEW_MAX_WIDTH, Math.round(value))))
   }, [])
 
-  const value = useMemo<RailValue>(() => ({
+  const value = useMemo<OverviewValue>(() => ({
     conversationId: scope ?? null,
     open: ready && docked && (hasActivity || (summoned !== null && summoned === selectedScope)) && !collapsed,
     collapsed: hasActivity && collapsed,
     docked, activity, browser, view, width, overviewRequests,
     publishActivity, showBrowser, show, overview, openOverview, collapse, expand, closeAll: collapse, setWidth,
   }), [scope, ready, docked, hasActivity, summoned, selectedScope, collapsed, activity, browser, view, width, overviewRequests, publishActivity, showBrowser, show, overview, openOverview, collapse, expand, setWidth])
-  return <RailContext.Provider value={value}>{children}</RailContext.Provider>
+  return <OverviewContext.Provider value={value}>{children}</OverviewContext.Provider>
 }
 
-export function useRail(): RailValue {
-  const value = useContext(RailContext)
-  if (!value) throw new StudioError('workspace_context', 'useRail must be used inside RailProvider')
+export function useOverview(): OverviewValue {
+  const value = useContext(OverviewContext)
+  if (!value) throw new StudioError('overview_context', 'useOverview must be used inside OverviewProvider')
   return value
 }

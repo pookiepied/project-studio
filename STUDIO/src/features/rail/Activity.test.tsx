@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentTask, BackgroundJob, PlanSnapshot } from '@/platform/harness'
 import type { RecordedChange } from '@/features/changes/recordedChanges'
-import type { Activity } from '@/stores/rail'
+import type { Activity } from '@/stores/overview'
 import { ActivityList, activityRows, linesOf, planFinished } from './Activity'
 import { DONE_LINGER_MS, WorkCard, WorkPill, isWorking, usePillPhase } from './WorkPill'
 
@@ -28,7 +28,7 @@ const change = (path: string, added: number, removed: number): RecordedChange =>
   ({ path, action: 'Edited', calls: [], diff: { added, removed } } as unknown as RecordedChange)
 const activity = (overrides: Partial<Activity> = {}): Activity => ({ plan: null, agents: [], jobs: [], turns: [], ...overrides })
 
-describe('the workspace rows', () => {
+describe('the Overview rows', () => {
   it('leads a command with its title and keeps the line beside the state', () => {
     const [row] = activityRows(activity({ jobs: [job({ title: 'Studio client dev server' })] }), null)
     expect(row?.title).toBe('Studio client dev server')
@@ -124,12 +124,12 @@ describe('the card', () => {
     expect(handlers.onStopAgent).toHaveBeenCalledWith('agent-running')
   })
 
-  it('opens the whole workspace from one button, with no list of everything in the card', () => {
+  it('opens Overview from one button, with no list of everything in the card', () => {
     const onExpand = vi.fn()
     render(<WorkCard phase="working" activity={activity({ jobs: [job({ state: 'exited', exitCode: 0, title: 'Old lint' })] })} browser={null}
       current={null} turnRunning onPick={() => {}} onOpenChanges={() => {}} onExpand={onExpand} {...stops()} />)
     expect(screen.queryByText('Old lint')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Open the workspace' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Overview' }))
     expect(onExpand).toHaveBeenCalled()
   })
 })

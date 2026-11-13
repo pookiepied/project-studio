@@ -6,7 +6,7 @@ import { MediaArtifact } from '@/features/artifacts/kinds/MediaArtifact'
 import { MediaEditContext, type MediaEditing } from '@/features/artifacts/media/edits'
 import { GENERATED_IMAGE, GENERATED_VIDEO, GENERATED_VIDEO_POSTER } from '@/features/chat/gallery/marks'
 import { NavigationProvider } from '@/stores/navigation'
-import { RailProvider } from '@/stores/rail'
+import { OverviewProvider } from '@/stores/overview'
 import { WorkspaceProvider } from '@/stores/workspace'
 import type { Artifact } from '@/domain/artifacts/types'
 import { Section } from './Section'
@@ -173,7 +173,7 @@ export function ArtifactsSection() {
       </div>
       <NavigationProvider>
         <WorkspaceProvider>
-          <RailProvider>
+          <OverviewProvider>
             <Arriving live>
             {/* The viewer's edit toolbar is drawn where a conversation can be
                 sent to; here there is none, so a send is accepted and dropped. */}
@@ -191,7 +191,7 @@ export function ArtifactsSection() {
             </div>
             </MediaEditContext.Provider>
             </Arriving>
-          </RailProvider>
+          </OverviewProvider>
         </WorkspaceProvider>
       </NavigationProvider>
     </Section>

@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FileViewer } from './FileViewer'
-import { ViewerProvider } from './ViewerProvider'
-import type { TurnChanges } from '@/stores/rail'
+import { WorkspacePanel } from './WorkspacePanel'
+import { WorkspacePanelProvider } from './WorkspacePanelProvider'
+import type { TurnChanges } from '@/stores/overview'
 
 const mocks = vi.hoisted(() => {
   const turns: TurnChanges[] = []
@@ -13,7 +13,7 @@ vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({ locateFile: mocks.locate, readFileText: mocks.text }),
   useOptionalWorkspace: () => null,
 }))
-vi.mock('@/stores/rail', () => ({ useRail: () => ({ activity: mocks.activity }) }))
+vi.mock('@/stores/overview', () => ({ useOverview: () => ({ activity: mocks.activity }) }))
 vi.mock('@/platform/tauri/window', () => ({ isTauri: () => false }))
 vi.mock('@/platform/tauri/reveal', () => ({ revealPath: vi.fn() }))
 vi.mock('@/platform/tauri/files', () => ({ installedEditors: async () => [], openFile: vi.fn(), openInEditor: vi.fn() }))
@@ -22,7 +22,7 @@ vi.mock('@/features/browser/BrowserWindow', () => ({ BrowserWindow: ({ conversat
   <p>{embedded ? 'Embedded' : 'Window'} browser: {conversationId}</p> }))
 
 const found = { ok: true, value: { path: 'C:\\work\\notes.md', kind: 'file', others: 0 } }
-const tree = (scope = 'a') => <ViewerProvider conversationId={scope}><FileViewer /></ViewerProvider>
+const tree = (scope = 'a') => <WorkspacePanelProvider conversationId={scope}><WorkspacePanel /></WorkspacePanelProvider>
 const open = () => {
   fireEvent.change(screen.getByRole('textbox', { name: 'File path' }), { target: { value: 'notes.md' } })
   fireEvent.click(screen.getByRole('button', { name: 'Open' }))
@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks(); window.getSelection()?.removeAllRanges() })
 
-describe('the central File Viewer', () => {
+describe('the central Workspace', () => {
   it('offers the latest surviving files without probing files from old receipts', () => {
     mocks.activity.turns = [
       { id: 'old', at: null, changes: [
@@ -88,7 +88,7 @@ describe('the central File Viewer', () => {
     render(tree())
     open()
     await screen.findByRole('heading', { name: 'Notes' })
-    fireEvent.click(screen.getByRole('button', { name: 'Open Studio Browser in viewer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Studio Browser in Workspace' }))
     expect(screen.getByText('Embedded browser: a')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close Browser' }))
     await screen.findByRole('heading', { name: 'Notes' })

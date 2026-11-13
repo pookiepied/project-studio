@@ -1,1 +1,1 @@
-export { SideRail } from './SideRail'
+export { OverviewPanel } from './OverviewPanel'

@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 import type { BrowserFrame, BrowserStep } from '@/features/chat/transcript/live/browserCall'
 import { REPORT_FAMILIES, type ReportFamily } from '@/features/chat/transcript/live/reportFamily'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
-import { useRail } from '@/stores/rail'
+import { useOverview } from '@/stores/overview'
 
 /**
- * Keeps the rail's browser preview following the conversation.
+ * Keeps Overview's browser activity following the conversation.
  *
  * The transcript row already shows the report where the work happens. This is
  * the other half of ADR 0049 §7: one entry that always holds the *latest*
@@ -35,7 +35,7 @@ export function useBrowserPreview(
   conversationId: string,
   items: readonly TranscriptItem[],
 ): void {
-  const { showBrowser } = useRail()
+  const { showBrowser } = useOverview()
   // What was last reported, as a signature of the derived report. Without it
   // every transcript chunk - including ones that touch no browser call - would
   // rebuild the report and replace the entry, and every replacement is a state
