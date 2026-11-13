@@ -16,14 +16,14 @@ import { open } from '@tauri-apps/plugin-dialog'
  * the window's width as it does at any size a person drags it to, so a preset
  * adds nothing to keep working.
  *
- * Both are the OS window, which is the panel plus the frame's margin on each side
- * (`--window-inset` in styles/layout.css). Compact matches the `width`/`height`
- * defaults in tauri.conf.json and gives a 720x845 panel with a sidebar drawer.
- * Standard matches the 1634x1066 panel in the displayed reference.
+ * Both are OS window sizes. Compact keeps the shadow margin on each side
+ * (`--window-inset` in styles/layout.css), matches the `width`/`height` defaults
+ * in tauri.conf.json and gives a 720x845 panel with a sidebar drawer. Standard
+ * fills its 1280x800 OS window with the reference Studio's glass frame.
  */
 const WINDOW_SIZES = {
   compact: { width: 776, height: 901 },
-  standard: { width: 1690, height: 1122 },
+  standard: { width: 1280, height: 800 },
 } as const
 
 export type WindowSize = keyof typeof WINDOW_SIZES

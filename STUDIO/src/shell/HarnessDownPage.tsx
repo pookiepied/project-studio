@@ -97,9 +97,10 @@ export function HarnessDownPage() {
 
   return (
     <div
-      className={cn('relative flex h-full w-full flex-col overflow-hidden bg-surface', frame.className)}
+      className={cn('studio-main-window relative flex h-full w-full overflow-hidden', frame.className)}
       style={frame.style}
     >
+      <div className="studio-window-body relative flex h-full w-full flex-col overflow-hidden bg-surface">
       {/* The window, and only the window: controls and the drag they sit in.
           Nothing else in the strip — a sidebar toggle over a page with no
           sidebar would be a promise about a room that is not there. */}
@@ -169,6 +170,7 @@ export function HarnessDownPage() {
             </Button>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

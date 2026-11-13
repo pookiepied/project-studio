@@ -11,6 +11,7 @@
      browser tab and a maximized window, where the host already has an edge. */
   --window-inset: 0px;
   --window-radius: 0px;
+  --window-rim: 0px;
 }
 
 /* The margin holds the shadow and stays 28 real pixels at any UI scale. */
@@ -19,6 +20,19 @@
   --window-inset: calc(28px / var(--ui-zoom, 1));
   --window-radius: 20px;
   --floating-edge: 36px;
+}
+
+/* Wide main windows use the reference's concentric glass frame. Keep the
+   compact frame, browser tabs and maximized windows on their existing geometry.
+   The breakpoint follows SHELL.compactWidth, independently of an open rail. */
+@media (min-width: 901px) {
+  :root[data-window='framed']:has(.studio-main-window) {
+    --window-inset-px: 0;
+    --window-inset: 0px;
+    --window-radius: 28px;
+    --window-rim: 6px;
+    --floating-edge: 8px;
+  }
 }
 
 @layer components {
@@ -30,6 +44,32 @@
   :root[data-window='framed'] .studio-window {
     outline: 1px solid var(--border);
     outline-offset: -1px;
+  }
+
+  .studio-main-window {
+    padding: var(--window-rim);
+  }
+
+  .studio-window-body {
+    border-radius: max(0px, calc(var(--window-radius) - var(--window-rim)));
+  }
+
+  @media (min-width: 901px) {
+    :root[data-window='framed'] .studio-main-window {
+      outline: none;
+      background: var(--window-glass);
+      backdrop-filter: blur(48px) saturate(130%);
+    }
+
+    /* Inherit the clipping curve instead of drawing a second offset outline. */
+    :root[data-window='framed'] .studio-main-window::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 1px var(--window-glass-edge);
+      pointer-events: none;
+    }
   }
 
   /* A layer that covers the panel, not the transparent margin around it. */
@@ -461,7 +501,7 @@
 
   .studio-window-preview[data-size='standard'] {
     height: 54px;
-    aspect-ratio: 1690 / 1122;
+    aspect-ratio: 1280 / 800;
   }
 
   .studio-window-preview-side {

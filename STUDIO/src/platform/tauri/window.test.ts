@@ -20,8 +20,8 @@ afterEach(() => {
 
 describe('desktop window presets', () => {
   it.each([
-    { size: 'standard', availWidth: 1920, availHeight: 1200, width: 1690, height: 1122 },
-    { size: 'standard', availWidth: 1920, availHeight: 1040, width: 1566, height: 1040 },
+    { size: 'standard', availWidth: 1920, availHeight: 1200, width: 1280, height: 800 },
+    { size: 'standard', availWidth: 1024, availHeight: 720, width: 1024, height: 640 },
     { size: 'compact', availWidth: 1920, availHeight: 1200, width: 776, height: 901 },
     { size: 'compact', availWidth: 1280, availHeight: 720, width: 776, height: 720 },
   ] as const)('sets and recognizes $size at $width x $height', async ({ size, availWidth, availHeight, width, height }) => {

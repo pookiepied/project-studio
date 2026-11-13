@@ -25,10 +25,10 @@ import { isTauri } from '@/platform/tauri'
 /**
  * The window.
  *
- * One rounded panel filling the transparent OS window. There is no tray and no
- * inset, so there is exactly one radius in the shell — this one, matched by
- * the DWM corner preference in `src-tauri/src/window.rs`. Two radii is how a
- * frameless window ends up with arcs that cross.
+ * Compact leaves room for the panel's shadow and resize band; Standard's frame
+ * fills the native window. Its glass rim and inner panel share a corner centre:
+ * the inner radius is the outer radius minus the rim. Windows' own border stays
+ * disabled so it cannot add a competing curve.
  *
  * `overflow-hidden` is what makes the corner real: without it a scrolling
  * transcript paints square right through the rounded edge.
@@ -156,15 +156,12 @@ export function AppShell() {
 
   return (
     <div
-      // Sunken, not `surface`. The page's rounded corner cuts away to whatever
-      // is behind it, and behind it was the same white the page is painted in
-      // — so the radius existed and was invisible. The window's own ground is
-      // the sunken tone the sidebar uses, which is what makes the corner read
-      // as the page lifting off it. With the sidebar closed the page covers
-      // this completely, so nothing shows through.
-      className={cn('relative flex h-full w-full overflow-hidden bg-surface-sunken', frame.className)}
+      // The outer frame owns the glass. The inner sunken ground keeps the page's
+      // rounded corners visible against the sidebar without tinting the glass.
+      className={cn('studio-main-window relative flex h-full w-full overflow-hidden', frame.className)}
       style={frame.style}
     >
+      <div className="studio-window-body relative flex h-full w-full min-w-0 overflow-hidden bg-surface-sunken">
       {/* Voice mode mounts inside the rounded root, not at the app root, so
           the stage is clipped by the same window corner everything else is
           and cannot paint outside it. It is the last child for the same
@@ -240,6 +237,7 @@ export function AppShell() {
       {isTauri() ? <ActionsMenu /> : null}
       <SelectionMenu />
       </VoiceModeProvider>
+      </div>
     </div>
   )
 
