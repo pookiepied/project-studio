@@ -20,6 +20,8 @@
  * is a read reaching `up-to-date` — the moment a reader has caught up to the
  * present is the moment the handoff has done its whole job.
  */
+import type { TurnImageWire } from '@/platform/harness'
+
 export interface FirstAdmission {
   /** Opaque stream offset from the receipt. Reading from here yields the turn. */
   readonly offset: string
@@ -33,6 +35,7 @@ export interface FirstAdmission {
    * `PendingSubmission`.
    */
   readonly text: string
+  readonly images?: readonly TurnImageWire[]
   /** Viewport positions used only by the opening chat surface. */
   readonly origin?: FirstComposerPosition
 }

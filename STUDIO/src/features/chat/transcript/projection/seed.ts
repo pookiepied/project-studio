@@ -51,7 +51,7 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
       for (const part of message.parts) {
         if (part.kind === 'text') texts.push(part.text)
         else if (part.kind === 'file')
-          attachments.push({ mediaType: part.mediaType, filename: part.filename, size: part.size })
+          attachments.push({ id: part.id, url: part.url, mediaType: part.mediaType, filename: part.filename, size: part.size })
       }
       items.push({
         kind: 'user',

@@ -6,6 +6,7 @@ import { ENTER } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
+import { UserImageAttachment } from './UserImageAttachment'
 
 /**
  * What you asked for, in the live conversation: the same bubble the demo
@@ -20,12 +21,18 @@ export const LiveUserMessage = memo(function LiveUserMessage({
   item,
   firstArrival = false,
   bubbleRef,
+  conversationId = null,
 }: {
   item: Extract<TranscriptItem, { kind: 'user' }>
   firstArrival?: boolean
   bubbleRef?: Ref<HTMLDivElement>
+  conversationId?: string | null
 }) {
   const [hovered, setHovered] = useState(false)
+  const hasText = item.text.trim() !== ''
+  const pictures = item.attachments.flatMap((attachment, index) => /^image\//i.test(attachment.mediaType) ? [{ attachment, index }] : [])
+  const files = item.attachments.flatMap((attachment, index) => /^image\//i.test(attachment.mediaType) ? [] : [{ attachment, index }])
+  const hasBubble = hasText || files.length > 0 || item.documents.length > 0
   return (
     <motion.div
       initial={firstArrival ? false : ENTER.initial}
@@ -35,20 +42,18 @@ export const LiveUserMessage = memo(function LiveUserMessage({
       onPointerLeave={() => setHovered(false)}
       className="flex flex-col items-end"
     >
-      <div ref={bubbleRef} className="min-w-0 max-w-[90%] rounded-2xl rounded-br-md bg-user-bubble px-4 py-3 text-foreground">
-        <CollapsibleText text={item.text} />
-        {item.attachments.length > 0 ? (
+      {pictures.length > 0 ? <div ref={hasBubble ? undefined : bubbleRef} className="mb-2 flex max-w-[90%] flex-wrap justify-end gap-2">
+        {pictures.map(({ attachment, index }) => <UserImageAttachment
+          key={`${conversationId ?? ''}:${item.id}:${index}:${attachment.id ?? ''}`}
+          attachment={attachment} index={index} conversationId={conversationId} />)}
+      </div> : null}
+      {hasBubble ? <div ref={bubbleRef} className="min-w-0 max-w-[90%] rounded-2xl rounded-br-md bg-user-bubble px-4 py-3 text-foreground">
+        {hasText ? <CollapsibleText text={item.text} /> : null}
+        {files.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap justify-end gap-1">
-            {/* Keyed by position, which is the only identity these have. An
-                attachment carries no id, and two files can honestly share a
-                type and a name - a pasted screenshot is `image.png` every
-                time - so keying on those collided the moment somebody
-                attached two of them: React warned, and one of the pair was
-                free to be dropped or duplicated. Position is safe here in
-                the way it usually is not, because this list is a sent
-                message's own record: it arrives once and never reorders,
-                grows or shrinks. */}
-            {item.attachments.map((attachment, index) => (
+            {/* Position stays in the key: old records may have no id, and two
+                uploads may share a name. A sent attachment list never reorders. */}
+            {files.map(({ attachment, index }) => (
               <span
                 key={`${index}-${attachment.mediaType}-${attachment.filename ?? ''}`}
                 className="rounded-full bg-surface-raised px-2 py-0.5 text-caption text-muted-foreground"
@@ -76,9 +81,9 @@ export const LiveUserMessage = memo(function LiveUserMessage({
             ))}
           </div>
         ) : null}
-      </div>
+      </div> : null}
 
-      <MessageActions visible={hovered} align="end" copyPayload={item.text} actions={[]} />
+      {hasText ? <MessageActions visible={hovered} align="end" copyPayload={item.text} actions={[]} /> : null}
     </motion.div>
   )
 })

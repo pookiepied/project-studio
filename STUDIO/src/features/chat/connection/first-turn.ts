@@ -103,6 +103,7 @@ export async function startConversation(request: {
     offset: sent.value.offset,
     submissionId: sent.value.submissionId,
     text: request.text,
+    ...(request.images === undefined || request.images.length === 0 ? {} : { images: request.images }),
   })
   return { ok: true, conversationId }
 }

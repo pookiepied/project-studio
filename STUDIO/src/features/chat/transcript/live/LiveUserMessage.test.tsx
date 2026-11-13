@@ -1,11 +1,18 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
+import { MediaViewerHostContext } from '@/features/artifacts/media/edits'
+
+const mocks = vi.hoisted(() => ({ resolve: vi.fn() }))
+vi.mock('@/platform/harness', async original => ({
+  ...await original<object>(),
+  attachmentDataUrl: (...args: unknown[]) => mocks.resolve(...args),
+}))
 
 /**
  * A sent message's attachments, and the identity they are drawn under.
@@ -19,7 +26,7 @@ import type { TranscriptItem } from '@/features/chat/transcript/projection'
  */
 
 function message(
-  attachments: readonly { mediaType: string; filename: string | null; size: number | null }[],
+  attachments: Extract<TranscriptItem, { kind: 'user' }>['attachments'],
 ): Extract<TranscriptItem, { kind: 'user' }> {
   return {
     kind: 'user',
@@ -37,6 +44,7 @@ const SCREENSHOT = { mediaType: 'image/png', filename: 'image.png', size: 1_024 
 let warnings: string[]
 
 beforeEach(() => {
+  mocks.resolve.mockReset().mockResolvedValue('data:image/png;base64,AAAA')
   warnings = []
   // jsdom has no ResizeObserver; the collapsible body measures its own height.
   vi.stubGlobal(
@@ -61,6 +69,82 @@ afterEach(() => {
 })
 
 describe('a message carrying attachments', () => {
+  it('shows a clickable picture above the text bubble and opens the original in the viewer', async () => {
+    const open = vi.fn()
+    const { container } = render(<MediaViewerHostContext.Provider value={{ open }}>
+      <LiveUserMessage conversationId="cnv_pictures" item={message([{ ...SCREENSHOT, id: 'att_original' }])} />
+    </MediaViewerHostContext.Provider>)
+    const image = await screen.findByRole('img', { name: 'image.png' })
+    expect(image.getAttribute('src')).toBe('data:image/png;base64,AAAA')
+    expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith('cnv_pictures', { id: 'att_original', mimeType: 'image/png' })
+    const bubble = container.querySelector('.bg-user-bubble')
+    expect(bubble?.contains(image)).toBe(false)
+    expect(bubble && (image.compareDocumentPosition(bubble) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Preview image.png' }))
+    expect(open).toHaveBeenCalledWith({ output: { url: 'data:image/png;base64,AAAA', mimeType: 'image/png', ratio: null }, title: 'image.png', video: false })
+  })
+
+  it('preserves two uploaded pictures with the same name as distinct previews', async () => {
+    mocks.resolve.mockResolvedValueOnce('data:image/png;base64,AAAA').mockResolvedValueOnce('data:image/png;base64,BBBB')
+    render(<LiveUserMessage conversationId="cnv_pair" item={message([
+      { ...SCREENSHOT, id: 'att_one' }, { ...SCREENSHOT, id: 'att_two' },
+    ])} />)
+    const images = await screen.findAllByRole('img', { name: 'image.png' })
+    expect(images.map(image => image.getAttribute('src'))).toEqual(['data:image/png;base64,AAAA', 'data:image/png;base64,BBBB'])
+    expect(warnings.filter(line => line.includes('same key'))).toEqual([])
+  })
+
+  it('shows an image-only message without an empty text bubble', async () => {
+    const { container } = render(<LiveUserMessage conversationId="cnv_only_image" item={{ ...message([{ ...SCREENSHOT, id: 'att_only' }]), text: '' }} />)
+    await screen.findByRole('img', { name: 'image.png' })
+    expect(container.querySelector('.bg-user-bubble')).toBeNull()
+  })
+
+  it('never carries an image from one conversation into another while bytes load', async () => {
+    mocks.resolve.mockResolvedValueOnce('data:image/png;base64,AAAA')
+      .mockImplementationOnce(() => new Promise<string | null>(() => {}))
+    const item = message([{ ...SCREENSHOT, id: 'att_shared_name' }])
+    const view = render(<LiveUserMessage conversationId="cnv_first" item={item} />)
+    await screen.findByRole('img', { name: 'image.png' })
+    view.rerender(<LiveUserMessage conversationId="cnv_second" item={item} />)
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(mocks.resolve).toHaveBeenLastCalledWith('cnv_second', { id: 'att_shared_name', mimeType: 'image/png' })
+  })
+
+  it('shows admitted inline pixels immediately, without making a byte request', () => {
+    render(<LiveUserMessage item={message([{ ...SCREENSHOT, url: 'data:image/png;base64,AAAA' }])} />)
+    expect(screen.getByRole('img', { name: 'image.png' }).getAttribute('src')).toBe('data:image/png;base64,AAAA')
+    expect(mocks.resolve).not.toHaveBeenCalled()
+  })
+
+  it('keeps a clear unavailable state when the stored image cannot be read', async () => {
+    mocks.resolve.mockResolvedValue(null)
+    render(<LiveUserMessage conversationId="cnv_missing_image" item={message([{ ...SCREENSHOT, id: 'att_missing' }])} />)
+    await screen.findByLabelText('Image preview unavailable: image.png')
+    expect(screen.getByRole('button', { name: 'Preview image.png' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('img')).toBeNull()
+  })
+
+  it('replaces an undecodable image with the unavailable state', async () => {
+    render(<LiveUserMessage conversationId="cnv_corrupt_image" item={message([{ ...SCREENSHOT, id: 'att_corrupt' }])} />)
+    fireEvent.error(await screen.findByRole('img', { name: 'image.png' }))
+    expect(screen.getByLabelText('Image preview unavailable: image.png')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Preview image.png' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('does not load an arbitrary remote image URL from attachment metadata', () => {
+    const { container } = render(<LiveUserMessage item={message([{ ...SCREENSHOT, url: 'https://example.com/tracker.png' }])} />)
+    expect(container.querySelector('img')).toBeNull()
+    expect(mocks.resolve).not.toHaveBeenCalled()
+  })
+
+  it('keeps ordinary file chips in the bubble alongside image previews', async () => {
+    const { container } = render(<LiveUserMessage conversationId="cnv_mixed" item={message([
+      { ...SCREENSHOT, id: 'att_mixed' }, { mediaType: 'text/plain', filename: 'notes.txt', size: 12 },
+    ])} />)
+    await screen.findByRole('img', { name: 'image.png' })
+    expect(container.querySelector('.bg-user-bubble')?.textContent).toContain('notes.txt')
+  })
   it('renders the structure of pasted Markdown inside the user bubble', () => {
     const { container } = render(<LiveUserMessage item={{ ...message([]),
       text: '# Research brief\n\nKeep **important** details and *emphasis*.\n\n1. First\n2. Second\n\n`workspace/chart.png`',

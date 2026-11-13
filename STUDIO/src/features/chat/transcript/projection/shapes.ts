@@ -4,7 +4,7 @@
  * built.
  */
 
-import type { ModelRefFacts, Present, UsageFacts } from '@/platform/harness'
+import type { ModelRefFacts, Present, TurnImageWire, UsageFacts } from '@/platform/harness'
 
 /** One tool call, as a collapsed group expands to show it. */
 export interface ToolCallView {
@@ -71,6 +71,10 @@ export type MessageEnd =
   | { readonly state: 'aborted'; readonly reason: string | null }
 
 export interface UserAttachmentView {
+  /** The harness's attachment identity, retained for history and live previews. */
+  readonly id?: string | null
+  /** Inline pixels are available while an admitted upload awaits its echo. */
+  readonly url?: string | null
   readonly mediaType: string
   readonly filename: string | null
   readonly size: number | null
@@ -166,4 +170,5 @@ export interface PendingSubmission {
   /** The submission the harness admitted. Its echo is what clears this. */
   readonly submissionId: string
   readonly text: string
+  readonly images?: readonly TurnImageWire[]
 }

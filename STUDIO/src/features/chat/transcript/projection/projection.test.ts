@@ -9,6 +9,7 @@ import {
   applyChunks,
   emptyProjection,
   isMessageBeingWritten,
+  pendingUserItem,
   seededFrom,
 } from './index'
 
@@ -48,6 +49,25 @@ function resetChunk(): unknown {
 }
 
 describe('seeding from history', () => {
+  it('keeps canonical image references for both history and live user messages', () => {
+    const raw = { type: 'message-appended', message: {
+      id: 'image-message', role: 'user', submissionId: SUBMISSION, metadata: {},
+      parts: [{ type: 'file', id: 'att_image_original', mediaType: 'image/png', filename: 'image.png', size: 20 }],
+    }, position: at(1) }
+    const projected = applyChunks(emptyProjection(), chunksOf(raw))
+    expect(projected.items).toMatchObject([{ kind: 'user', attachments: [{ id: 'att_image_original', url: null, mediaType: 'image/png', filename: 'image.png' }] }])
+    const snapshot: ConversationSnapshotFacts = {
+      version: 1, conversationId: CONVERSATION, offset: '1', compactions: [], settlements: [],
+      messages: [{ id: 'image-message', role: 'user', submissionId: SUBMISSION, timestamp: null, model: null, usage: null, signal: null,
+        parts: [{ kind: 'file', id: 'att_image_original', url: null, mediaType: 'image/png', filename: 'image.png', size: 20 }] }],
+    }
+    expect(seededFrom(snapshot)).toEqual(projected.items)
+  })
+
+  it('keeps uploaded pixels in the admitted message until the canonical echo arrives', () => {
+    const user = pendingUserItem({ submissionId: SUBMISSION, text: '', images: [{ type: 'image', data: 'AAAA', mimeType: 'image/png', filename: 'image.png' }] })
+    expect(user.attachments).toEqual([{ mediaType: 'image/png', filename: 'image.png', size: null, url: 'data:image/png;base64,AAAA' }])
+  })
   it('renders voice transcriptions as user bubbles while retaining their canonical signal identity', () => {
     const snapshot: ConversationSnapshotFacts = {
       version: 1, conversationId: CONVERSATION, offset: '1', compactions: [], settlements: [],

@@ -68,6 +68,7 @@ function openingProjection(conversationId: string): TranscriptProjection {
     : withPendingSubmission(emptyProjection(), {
         submissionId: opening.submissionId,
         text: opening.text,
+        ...(opening.images === undefined ? {} : { images: opening.images }),
       })
 }
 
@@ -160,7 +161,7 @@ export function useConversationTranscript(conversationId: string): {
       if (sent.ok && settings.deliveryMode !== 'queue') {
         const admitted = sent.value.submissionId
         setProjection((current) =>
-          withPendingSubmission(current, { submissionId: admitted, text: message }),
+          withPendingSubmission(current, { submissionId: admitted, text: message, ...(images === undefined || images.length === 0 ? {} : { images }) }),
         )
       }
       setQueued(queuedMessages(conversationId))

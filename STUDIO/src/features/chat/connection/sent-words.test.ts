@@ -4,7 +4,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ChunkFacts } from '@/platform/harness'
+import type { ChunkFacts, TurnImageWire } from '@/platform/harness'
 import { readChunkFacts } from '@/platform/harness'
 import {
   forgetFirstAdmission,
@@ -108,6 +108,20 @@ afterEach(() => {
 })
 
 describe('a message between the composer and the log', () => {
+  it('keeps a follow-up upload visible while waiting for its canonical echo', async () => {
+    connection.submit.mockImplementation(admits('sub_with_image'))
+    const images: readonly TurnImageWire[] = [{ type: 'image', data: 'AAAA', mimeType: 'image/png', filename: 'photo.png' }]
+    const view = renderHook(() => useConversationTranscript('cnv_1'))
+    await act(async () => { await view.result.current.submit(WORDS, SETTINGS, images) })
+    expect(view.result.current.pending).toEqual({ submissionId: 'sub_with_image', text: WORDS, images })
+  })
+
+  it('restores the first upload alongside the first admitted message', () => {
+    const images: readonly TurnImageWire[] = [{ type: 'image', data: 'AAAA', mimeType: 'image/png', filename: 'photo.png' }]
+    rememberFirstAdmission('cnv_1', { offset: '1', submissionId: 'sub_first_image', text: WORDS, images })
+    const view = renderHook(() => useConversationTranscript('cnv_1'))
+    expect(view.result.current.pending).toEqual({ submissionId: 'sub_first_image', text: WORDS, images })
+  })
   it('shows a promoted queue message immediately and replaces it with its echo once', () => {
     const view = renderHook(() => useConversationTranscript('cnv_1'))
     const message = { submissionId: 'promoted', text: 'Use this correction' }

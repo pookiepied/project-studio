@@ -5,6 +5,7 @@ import {
   type ServiceInvoke,
   type StreamChannel,
   type WireStreamEvent,
+  type TurnImageWire,
 } from '@/platform/harness'
 import { firstAdmission, forgetFirstAdmission } from '@/features/chat/connection/first-attach'
 import type { ContactHarness } from '@/features/chat/connection/useConversation'
@@ -66,6 +67,15 @@ function harness(mode: 'admits' | 'refuses' | 'absent'): Attempt {
 }
 
 describe('starting a conversation with a live first turn', () => {
+  it('carries uploaded image pixels through the first-message admission handoff', async () => {
+    const attempt = harness('admits')
+    const images: readonly TurnImageWire[] = [{ type: 'image', data: 'AAAA', mimeType: 'image/png', filename: 'photo.png' }]
+    const outcome = await startConversation({ text: 'Look at this', settings: SETTINGS, images, contactFor: attempt.contactFor })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) throw new Error('Expected the image submission to be admitted')
+    expect(firstAdmission(outcome.conversationId)?.images).toEqual(images)
+    forgetFirstAdmission(outcome.conversationId)
+  })
   it('mints an id, admits the turn, and keeps the receipt for the view to come', async () => {
     const attempt = harness('admits')
     const outcome = await startConversation({

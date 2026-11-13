@@ -66,7 +66,12 @@ export function pendingUserItem(
     id: pending.submissionId,
     submissionId: pending.submissionId,
     text: pending.text,
-    attachments: [],
+    attachments: (pending.images ?? []).map(image => ({
+      mediaType: image.mimeType,
+      filename: image.filename ?? null,
+      size: null,
+      url: `data:${image.mimeType};base64,${image.data}`,
+    })),
     documents: [],
     timestamp: null,
   }

@@ -132,6 +132,7 @@ export function LiveTranscript({
           <LiveUserMessage
             key={item.submissionId === firstSubmissionId ? firstSubmissionId : item.id}
             item={item}
+            conversationId={conversationId}
             firstArrival={item.submissionId === firstSubmissionId}
             bubbleRef={item.submissionId === firstSubmissionId ? firstBubbleRef : undefined}
           />
