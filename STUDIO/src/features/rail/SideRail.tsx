@@ -44,6 +44,7 @@ const MIN_PAGE_WIDTH = SHELL.minPageWidth
 export function SideRail({
   open,
   onClosed,
+  minPageWidth = MIN_PAGE_WIDTH,
 }: {
   /**
    * Whether the rail is on screen. Handed in by the shell rather than read
@@ -54,6 +55,8 @@ export function SideRail({
   open: boolean
   /** The rail has finished leaving. What releases a sidebar waiting on it. */
   onClosed?: () => void
+  /** Chat and an open document need room beside the activity column. */
+  minPageWidth?: number
 }) {
   const { activity, browser, view, width, setWidth, closeAll, overview, show, conversationId } = useRail()
   const reducedMotion = useReducedMotion()
@@ -85,7 +88,7 @@ export function SideRail({
     return () => observer.disconnect()
   }, [open])
 
-  const ceiling = Math.max(RAIL_MIN_WIDTH, room - MIN_PAGE_WIDTH)
+  const ceiling = Math.max(RAIL_MIN_WIDTH, room - minPageWidth)
   const effective = Math.min(width, ceiling, room)
 
   return (

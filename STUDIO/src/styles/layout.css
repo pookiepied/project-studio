@@ -36,6 +36,60 @@
 }
 
 @layer components {
+  .studio-reader-container {
+    container-type: inline-size;
+  }
+
+  .studio-reader-layout[data-viewer='true'] {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.8fr) minmax(360px, 1.2fr);
+  }
+
+  /* One connected sheet, with a quiet seam rather than cards in a gutter. */
+  .studio-reader {
+    margin-top: 66px;
+    height: calc(100% - 66px);
+    border-left: 1px solid var(--border);
+  }
+
+  .studio-reader-tab {
+    color: var(--muted-foreground);
+  }
+
+  .studio-reader-tab:hover {
+    background: var(--tint);
+  }
+
+  .studio-reader-tab[data-selected='true'] {
+    background: var(--selected);
+    color: var(--foreground);
+  }
+
+  .studio-reader-document {
+    padding: clamp(16px, 4cqi, 36px);
+  }
+
+  .studio-reader-document > * {
+    max-width: 690px;
+    margin-inline: auto;
+  }
+
+  /* At narrow sizes the document gets the page; closing it returns to chat.
+     The conversation stays mounted so an ongoing reply is never interrupted. */
+  @container (max-width: 799px) {
+    .studio-reader-layout[data-viewer='true'] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .studio-reader-layout[data-viewer='true'] .studio-reader-chat {
+      display: none;
+    }
+
+    .studio-reader {
+      border-left: 0;
+    }
+  }
+
   .studio-window {
     border-radius: var(--window-radius);
     box-shadow: var(--shadow-window);

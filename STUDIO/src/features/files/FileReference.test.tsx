@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Markdown } from '@/features/chat/markdown/Markdown'
 import { ReplyConversation } from '@/features/chat/markdown/ReplyImage'
 import { SheetHostContext } from '@/features/chat/sheet/sheet'
+import { ViewerProvider, useViewer } from '@/features/viewer/ViewerProvider'
 import { FileReference } from './FileReference'
 import { parsePathReference } from './pathReference'
 
@@ -81,6 +82,29 @@ async function openMenu(name: string, lastRow = 'Show in folder') {
 }
 
 describe('a file reference chip', () => {
+  it('opens a referenced document in the central viewer without a chat sheet', async () => {
+    function CurrentDocument() {
+      const active = useViewer()?.active
+      return <output aria-label="Active document">{active?.kind === 'file' ? active.file.path : ''}</output>
+    }
+    mocks.locate.mockResolvedValue(found('C:\\Work\\chapter.md'))
+    render(<ViewerProvider conversationId="cnv_1"><ReplyConversation.Provider value="cnv_1">
+      <FileReference reference={reference('chapter.md')} /><CurrentDocument />
+    </ReplyConversation.Provider></ViewerProvider>)
+    await openMenu('chapter.md')
+    fireEvent.click(menu().getByRole('menuitem', { name: 'Preview' }))
+    await waitFor(() => expect(screen.getByLabelText('Active document').textContent).toBe('C:\\Work\\chapter.md'))
+    expect(mocks.openInSheet).not.toHaveBeenCalled()
+  })
+
+  it('does not send a referenced file to another conversation\'s viewer', async () => {
+    mocks.locate.mockResolvedValue(found('C:\\Work\\chapter.md'))
+    render(<ViewerProvider conversationId="cnv_other"><ReplyConversation.Provider value="cnv_1">
+      <FileReference reference={reference('chapter.md')} />
+    </ReplyConversation.Provider></ViewerProvider>)
+    await openMenu('chapter.md')
+    expect(menu().queryByRole('menuitem', { name: 'Preview' })).toBeNull()
+  })
   it.each(['workspace/flower.png', 'src/app.ts', 'tools/setup.exe'])(
     'shows a file-type mark on the inline reference %s', (path) => {
       render(<FileReference reference={reference(path)} />)

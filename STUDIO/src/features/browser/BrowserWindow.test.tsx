@@ -14,6 +14,14 @@ vi.mock('@/platform/tauri', async (original) => ({ ...await original<object>(), 
 afterEach(() => { cleanup(); send.mockClear(); state = { ...state, running: true, control: 'agent', frame: null, cursor: null } })
 
 describe('detached browser window', () => {
+  it('embeds the working browser without a second window heading', () => {
+    state = { ...state, control: 'human' }
+    render(<BrowserWindow conversationId="cnv_1" embedded />)
+    expect(screen.queryByText('Studio Browser')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Address' }).getAttribute('readonly')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'New tab' }))
+    expect(send).toHaveBeenCalledWith({ action: 'new' })
+  })
   it('hides Studio input feedback for another human controller or an ended session', () => {
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
     state = { ...state, control: 'other', cursor: { x: 0.5, y: 0.5, tabId: 'tab_1', pressed: true },

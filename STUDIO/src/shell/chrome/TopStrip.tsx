@@ -34,6 +34,8 @@ export function TopStrip({
   compact = false,
   sidebarShown = false,
   onOpenWorkspace,
+  viewerOpen = false,
+  onToggleViewer,
 }: {
   /** The window is narrow: the sidebar floats over the page rather than beside it. */
   compact?: boolean
@@ -41,6 +43,8 @@ export function TopStrip({
   sidebarShown?: boolean
   /** Present while the right workspace is folded. Opens it through the shell handover. */
   onOpenWorkspace?: () => void
+  viewerOpen?: boolean
+  onToggleViewer?: () => void
 }) {
   const { route, sidebarOpen, toggleSidebar, goHome } = useNavigation()
   const { conversations, projects } = useWorkspace()
@@ -99,6 +103,8 @@ export function TopStrip({
           </>
         )}
         <div className="flex items-center gap-1.5">
+          {onToggleViewer ? <IconButton label={viewerOpen ? 'Hide File Viewer' : 'Show File Viewer'} size="header"
+            tooltipSide="bottom" active={viewerOpen} onClick={onToggleViewer}><Icons.file size="header" /></IconButton> : null}
           <IconButton label="New conversation" size="header" tooltipSide="bottom" onClick={goHome}>
             <Icons.compose size="header" />
           </IconButton>

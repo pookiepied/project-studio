@@ -11,7 +11,7 @@ import { windowFrame } from '@/shell/chrome/windowFrame'
 import { useLiveBrowser } from './useLiveBrowser'
 import { StudioCursor } from './StudioCursor'
 
-export function BrowserWindow({ conversationId }: { conversationId: string }) {
+export function BrowserWindow({ conversationId, embedded = false }: { conversationId: string; embedded?: boolean }) {
   const { state, error, inputError, reconnecting, send, reconnect } = useLiveBrowser(conversationId)
   const frame = windowFrame()
   const active = state?.tabs.find((tab) => tab.id === state.activeTabId)
@@ -23,12 +23,12 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
   return (
     <motion.div initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: DURATION.slow, ease: EASE_OUT }}
-      className={cn('flex h-full flex-col overflow-hidden bg-surface', frame.className)} style={frame.style}>
-      <header className="flex shrink-0 items-center gap-4 px-4" style={{ height: SHELL.topStrip.height }}
+      className={cn('flex h-full flex-col overflow-hidden bg-surface', !embedded && frame.className)} style={embedded ? undefined : frame.style}>
+      <header className="flex shrink-0 items-center gap-3 px-4" style={{ height: embedded ? 44 : SHELL.topStrip.height }}
         onPointerDown={(event) => {
           if (event.button === 0 && event.target === event.currentTarget) void startWindowDrag()
         }}>
-        <span className="pointer-events-none text-caption text-muted-foreground">Studio Browser</span>
+        {embedded ? null : <span className="pointer-events-none text-caption text-muted-foreground">Studio Browser</span>}
         <span className="ml-auto text-micro text-muted-foreground" role="status">
           {reconnecting ? 'Reconnecting' : error ? 'Disconnected' : !state ? 'Connecting' : !state.running ? 'Session ended' : manual ? 'You have control' : state.control === 'other' ? 'Controlled in another window' : 'Studio has control'}
         </span>
@@ -37,7 +37,7 @@ export function BrowserWindow({ conversationId }: { conversationId: string }) {
           className="rounded-full bg-tint px-3 py-1 text-caption text-muted-foreground transition-colors duration-base hover:bg-muted disabled:opacity-40">
           {manual ? 'Resume Studio' : 'Take control'}
         </button>
-        <WindowControls />
+        {embedded ? null : <WindowControls />}
       </header>
 
       <div className="flex shrink-0 items-center gap-1 overflow-x-auto px-3 pb-1" aria-label="Browser tabs">

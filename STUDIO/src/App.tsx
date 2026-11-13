@@ -20,6 +20,7 @@ import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { CaptureMonitor } from '@/shell/CaptureMonitor'
 import { DetachedShell } from '@/shell/DetachedShell'
 import { BrowserWindow } from '@/features/browser/BrowserWindow'
+import { ViewerProvider } from '@/features/viewer/ViewerProvider'
 import { PairingGate } from '@/shell/PairingGate'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { useFileDropGuard } from '@/shell/useFileDropGuard'
@@ -139,7 +140,12 @@ export default function App({ initialAppearance, initialPermission }: {
 /** The main window: the studio, arriving out of the splash. */
 function ConversationWorkspace({ detached, children }: { detached: string | null; children: ReactNode }) {
   const { route } = useNavigation()
-  return <RailProvider conversationId={detached ?? (route.kind === 'chat' ? route.conversationId : null)}>{children}</RailProvider>
+  const conversationId = detached ?? (route.kind === 'chat' ? route.conversationId : null)
+  return (
+    <RailProvider conversationId={conversationId}>
+      {detached === null ? <ViewerProvider conversationId={conversationId}>{children}</ViewerProvider> : children}
+    </RailProvider>
+  )
 }
 
 function StudioApp() {

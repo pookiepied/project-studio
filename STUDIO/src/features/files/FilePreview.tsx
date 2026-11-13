@@ -23,7 +23,12 @@ type Content =
  * window size, so the viewer costs no room of its own. It shows what the file
  * says now, read from disk, not what the reply remembered writing.
  */
-export function FilePreview({ file, conversationId }: { file: LocatedFile; conversationId: string }) {
+export function FilePreview({ file, conversationId, source = false, revision = 0 }: {
+  file: LocatedFile
+  conversationId: string
+  source?: boolean
+  revision?: number
+}) {
   const { readFileText } = useWorkspace()
   const { verbs, run, error, copied, copy } = useFileVerbs(file, null)
   const [content, setContent] = useState<Content>({ state: 'loading' })
@@ -46,7 +51,7 @@ export function FilePreview({ file, conversationId }: { file: LocatedFile; conve
       })
     }
     return () => { live = false }
-  }, [conversationId, file.path, mode, readFileText])
+  }, [conversationId, file.path, mode, readFileText, revision])
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -70,7 +75,7 @@ export function FilePreview({ file, conversationId }: { file: LocatedFile; conve
         : null}
       {content.state === 'text' ? (
         <ReplyConversation.Provider value={conversationId}>
-          {mode === 'markdown'
+          {mode === 'markdown' && !source
             ? <div className="studio-prose min-w-0"><Markdown text={content.text} /></div>
             : <CodeBlock code={content.text} fence={fileTypeOf(file.path) ?? 'text'} />}
           {content.truncated ? <p className="text-caption text-muted-foreground">Showing the start of this file.</p> : null}

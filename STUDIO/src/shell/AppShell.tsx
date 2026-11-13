@@ -8,6 +8,7 @@ import { CommandPalette } from '@/features/palette'
 import { NewProjectDialog, ProjectPage } from '@/features/projects'
 import { SettingsPage } from '@/features/settings'
 import { VoiceModeProvider } from '@/features/voice'
+import { FileViewer, useViewer } from '@/features/viewer'
 import { ActionsMenu } from '@/shell/menus/ActionsMenu'
 import { SelectionMenu } from '@/shell/menus/SelectionMenu'
 import { HarnessDownPage } from '@/shell/HarnessDownPage'
@@ -53,6 +54,9 @@ export function AppShell() {
     collapse: collapseRail,
   } = useRail()
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const viewer = useViewer()
+  const canViewFiles = route.kind === 'chat' || route.kind === 'home'
+  const viewerOpen = canViewFiles && viewer?.open === true
 
   /**
    * The two columns are mutually exclusive, and the one asked for last wins:
@@ -220,17 +224,26 @@ export function AppShell() {
             facts from the shell: whether the sidebar is the floating drawer
             (narrow window) and whether that drawer is on screen decide both
             the toggle's place and the centred title's. */}
-        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' ? openWorkspace : undefined} />
+        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenWorkspace={route.kind === 'chat' ? openWorkspace : undefined}
+          viewerOpen={viewerOpen} onToggleViewer={canViewFiles ? viewer?.toggle : undefined} />
 
+        <div className="studio-reader-container h-full">
+        <div className="studio-reader-layout h-full" data-viewer={viewerOpen}>
+        <div className="studio-reader-chat relative h-full min-h-0 min-w-0 overflow-hidden">
         <PageTransition view={routeKey(route)} move={move} main>
           {Surface({ route, conversations, projects })}
         </PageTransition>
+        </div>
+        {viewerOpen ? <FileViewer /> : null}
+        </div>
+        </div>
       </div>
 
       {/* Outside the page's rounded container, so the rail is a sibling of the
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
-      {route.kind === 'chat' ? <SideRail key={route.conversationId} open={railShown} onClosed={railSettled} /> : null}
+      {route.kind === 'chat' ? <SideRail key={route.conversationId} open={railShown} onClosed={railSettled}
+        minPageWidth={viewerOpen ? 800 : undefined} /> : null}
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />

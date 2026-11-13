@@ -42,6 +42,7 @@ import { PILL_ENTER, WorkSurface, isWorking, usePillPhase } from '@/features/rai
 import { useTurnChanges } from '@/features/rail/useTurnChanges'
 import { ChatSheet, sheetTitle } from '@/features/chat/sheet/ChatSheet'
 import { SheetHostContext, type SheetHost, type SheetSpec } from '@/features/chat/sheet/sheet'
+import { useViewer } from '@/features/viewer/ViewerProvider'
 import { useAgentTasks } from '@/features/jobs/useAgentTasks'
 import { useComputerIndicator } from '@/features/chat/useComputerIndicator'
 import { useScreenCollaboration } from '@/features/screen/useScreenCollaboration'
@@ -469,10 +470,17 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const [viewing, setViewing] = useState<ViewerSpec | null>(null)
   const [sheet, setSheet] = useState<SheetSpec | null>(null)
   const [sheetFromList, setSheetFromList] = useState(false)
+  const documentViewer = useViewer()
   const viewer = useRef<MediaViewerHandle>(null)
   const viewerHost = useMemo<MediaViewerHost>(() => ({ open: (spec) => { setSheet(null); setViewing(spec) } }), [])
   const openSheet = useCallback((spec: SheetSpec, fromList = false) => {
     setCardOpen(false)
+    if (spec.kind === 'file' && documentViewer?.conversationId === spec.conversationId) {
+      documentViewer.openFile(spec.file)
+      setViewing(null)
+      setSheet(null)
+      return
+    }
     // With a docked column, the workspace is shown where the workspace is.
     if (spec.kind === 'activity' && workspaceDocked) {
       showInWorkspace(spec.view)
@@ -485,7 +493,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
     setViewing(null)
     setSheetFromList(fromList)
     setSheet(spec)
-  }, [workspaceDocked, showInWorkspace])
+  }, [workspaceDocked, showInWorkspace, documentViewer])
   const sheetHost = useMemo<SheetHost>(() => ({ open: (spec) => openSheet(spec) }), [openSheet])
   const closeSheet = useCallback(() => setSheet(null), [])
   useEffect(() => { setViewing(null); setSheet(null) }, [conversation.id])
