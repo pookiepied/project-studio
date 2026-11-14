@@ -73,6 +73,8 @@ export function AppShell() {
     collapseRail,
   })
   const compact = useCompactLayout(railShown ? railWidth : 0)
+  // An open Overview may float the sidebar, but cannot change the window's controls.
+  const compactWindow = useCompactLayout(0)
   const { setCompactLayout } = useNavigation()
   useEffect(() => {
     if (route.kind !== 'chat') railSettled()
@@ -223,7 +225,7 @@ export function AppShell() {
             facts from the shell: whether the sidebar is the floating drawer
             (narrow window) and whether that drawer is on screen decide both
             the toggle's place and the centred title's. */}
-        <TopStrip compact={compact} sidebarShown={sidebarShown} onOpenOverview={route.kind === 'chat' ? openOverview : undefined}
+        <TopStrip compact={compact} standard={!compactWindow} sidebarShown={sidebarShown} onOpenOverview={route.kind === 'chat' ? openOverview : undefined}
           workspaceOpen={workspaceOpen} onToggleWorkspace={canOpenWorkspace ? workspacePanel?.toggle : undefined} />
 
         <div className="studio-workspace-container h-full">

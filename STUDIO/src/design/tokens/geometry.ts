@@ -60,6 +60,7 @@ export const SHELL = {
   },
 
   /** Window controls. Monochrome — see `TrafficLights`. */
+  trafficLight: { size: 11, gap: SPACE.md },
 
   sidebar: {
     /** Icon-only rail. Project marks, no labels; the name is a tooltip. */

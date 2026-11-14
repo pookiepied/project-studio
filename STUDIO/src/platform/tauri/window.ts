@@ -19,11 +19,11 @@ import { open } from '@tauri-apps/plugin-dialog'
  * Both are OS window sizes. Compact keeps the shadow margin on each side
  * (`--window-inset` in styles/layout.css), matches the `width`/`height` defaults
  * in tauri.conf.json and gives a 720x845 panel with a sidebar drawer. Standard
- * fills its 1280x800 OS window with the reference Studio's soft rounded edge.
+ * fills the reference project's 1040x720 OS window with a soft rounded edge.
  */
 const WINDOW_SIZES = {
   compact: { width: 776, height: 901 },
-  standard: { width: 1280, height: 800 },
+  standard: { width: 1040, height: 720 },
 } as const
 
 export type WindowSize = keyof typeof WINDOW_SIZES

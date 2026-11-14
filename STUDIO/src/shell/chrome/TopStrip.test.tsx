@@ -2,13 +2,28 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 
 import { NavigationProvider, useNavigation } from '@/stores/navigation'
 import { WorkspaceProvider } from '@/stores/workspace/WorkspaceProvider'
 import { KNOWN_VENDOR, modelFor } from '@/features/settings/providers/harness.fixtures'
 import { TopStrip } from './TopStrip'
+
+const native = vi.hoisted(() => ({
+  desktop: false,
+  closeWindow: vi.fn(async () => {}),
+  minimizeWindow: vi.fn(async () => {}),
+  toggleMaximizeWindow: vi.fn(async () => {}),
+}))
+
+vi.mock('@/platform/tauri', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/platform/tauri')>(),
+  isTauri: () => native.desktop,
+  closeWindow: native.closeWindow,
+  minimizeWindow: native.minimizeWindow,
+  toggleMaximizeWindow: native.toggleMaximizeWindow,
+}))
 
 /**
  * The header. On a narrow window the sidebar is a drawer over the page: its left
@@ -58,6 +73,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  native.desktop = false
+  vi.clearAllMocks()
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
 })
@@ -80,7 +97,7 @@ function ChatOpener({ conversationId }: { conversationId: string }) {
   )
 }
 
-function mountStrip(props: { compact?: boolean; sidebarShown?: boolean; onOpenOverview?: () => void; workspaceOpen?: boolean; onToggleWorkspace?: () => void }) {
+function mountStrip(props: { compact?: boolean; standard?: boolean; sidebarShown?: boolean; onOpenOverview?: () => void; workspaceOpen?: boolean; onToggleWorkspace?: () => void }) {
   return render(
     <NavigationProvider>
       <WorkspaceProvider>
@@ -148,6 +165,37 @@ describe('the selector', () => {
 })
 
 describe('the controls', () => {
+  it.each([false, true])('keeps Standard controls before the title with a resident sidebar shown: %s', (sidebarShown) => {
+    native.desktop = true
+    mountStrip({ compact: false, sidebarShown })
+    const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
+    const controls = screen.getByRole('group', { name: 'Window controls' })
+    expect(within(controls).getAllByRole('button')).toHaveLength(3)
+    expect(controls.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Maximize' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show sidebar' }))
+    expect(screen.getByRole('button', { name: 'Hide sidebar' })).toBeTruthy()
+  })
+
+  it('keeps the Standard controls when Overview makes the sidebar float', () => {
+    native.desktop = true
+    mountStrip({ compact: true, standard: true })
+    expect(screen.getByRole('group', { name: 'Window controls' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Minimize' })).toBeTruthy()
+  })
+
+  it('keeps Compact window controls at the right of the title', () => {
+    native.desktop = true
+    mountStrip({ compact: true })
+    const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
+    const close = screen.getByRole('button', { name: 'Close' })
+    expect(selector.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Maximize' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Window controls' })).toBeNull()
+  })
+
   it('shows Personalize and capture as not yet working', () => {
     mountStrip({})
     expect(screen.getByRole('switch', { name: 'Personalize' }).hasAttribute('disabled')).toBe(true)

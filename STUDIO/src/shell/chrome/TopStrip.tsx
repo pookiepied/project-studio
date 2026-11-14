@@ -5,6 +5,7 @@ import { IconButton, Switch, Tooltip } from '@/components/primitives'
 import { ConversationMenu, ConversationRename } from '@/shell/chrome/ConversationMenu'
 import { ConversationSelector } from '@/shell/chrome/ConversationSelector'
 import { CloseControl, MaximizeControl } from '@/shell/chrome/WindowControls'
+import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { cn } from '@/lib/cn'
 import { startWindowDrag } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
@@ -14,12 +15,12 @@ import { useLiveWork, useWorkspace } from '@/stores/workspace'
 const NEW_CONVERSATION = 'New conversation'
 
 /**
- * The header, as Family A lays it out.
+ * The page header, with Standard's reference window controls at its left edge.
  *
- * Left is where you are: the selector. Right runs Personalize, a divider, then
- * new conversation, screen capture, sidebar, maximize, more and close at one
- * pitch. Personalize and capture are drawn from the reference ahead of their
- * features, so both say they are coming rather than pretending to work.
+ * Standard's controls belong to the page, so they move beside a resident
+ * sidebar with the rest of the header. Compact keeps its right-hand controls.
+ * Personalize and capture are drawn ahead of their features, so both say they
+ * are coming rather than pretending to work.
  *
  * It is a transparent layer over the page, which scrolls underneath behind a
  * gradient. Dragging belongs to the empty header, never to a child of it, and
@@ -32,6 +33,7 @@ const NEW_CONVERSATION = 'New conversation'
  */
 export function TopStrip({
   compact = false,
+  standard = !compact,
   sidebarShown = false,
   onOpenOverview,
   workspaceOpen = false,
@@ -39,6 +41,8 @@ export function TopStrip({
 }: {
   /** The window is narrow: the sidebar floats over the page rather than beside it. */
   compact?: boolean
+  /** Follows the window width rather than the space left by an open Overview. */
+  standard?: boolean
   /** The floating column is on screen (handed from the shell's handover state). */
   sidebarShown?: boolean
   /** Opens the right activity summary through the shell handover. */
@@ -59,6 +63,7 @@ export function TopStrip({
   useEffect(() => setRenaming(false), [conversationId])
 
   const drawerOut = compact && sidebarShown
+  const controlsAtLeft = standard && !drawerOut
 
   return (
     <header
@@ -70,8 +75,17 @@ export function TopStrip({
         '@container absolute inset-x-0 top-0 z-30 flex items-center gap-4',
         drawerOut && 'pointer-events-none',
       )}
-      style={{ height: SHELL.topStrip.height, paddingInline: SHELL.topStrip.paddingInline }}
+      style={{ height: SHELL.topStrip.height, paddingInline: standard ? 12 : SHELL.topStrip.paddingInline }}
     >
+      {controlsAtLeft ? (
+        <div className="flex shrink-0 items-center gap-2">
+          <TrafficLights />
+          <IconButton label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'} size="header"
+            tooltipSide="bottom" onClick={toggleSidebar} active={sidebarOpen}>
+            <Icons.sidebar size="header" />
+          </IconButton>
+        </div>
+      ) : null}
       {drawerOut ? null : (
         <div className="flex min-w-0 items-center">
           {renaming && conversation !== null ? (
@@ -117,7 +131,7 @@ export function TopStrip({
           >
             <Icons.capture size="header" />
           </IconButton>
-          <IconButton
+          {controlsAtLeft ? null : <IconButton
             label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
             size="header"
             tooltipSide="bottom"
@@ -125,15 +139,15 @@ export function TopStrip({
             active={sidebarOpen}
           >
             <Icons.sidebar size="header" />
-          </IconButton>
-          <MaximizeControl />
+          </IconButton>}
+          {standard ? null : <MaximizeControl />}
           <ConversationMenu
             general
             conversation={conversation}
             onRename={() => setRenaming(true)}
             onOpenOverview={onOpenOverview}
           />
-          <CloseControl />
+          {standard ? null : <CloseControl />}
         </div>
       </div>
     </header>
