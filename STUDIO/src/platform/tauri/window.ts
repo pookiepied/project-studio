@@ -138,6 +138,8 @@ export interface WindowPanel {
   height: number
   inset: number
   radius: number
+  /** The rendered superellipse power; two is the circular fallback. */
+  cornerExponent?: number
 }
 
 /**
@@ -160,10 +162,10 @@ export function resizeDirectionAt(x: number, y: number, panel: WindowPanel): Res
   const nearTop = y < top + radius
   const nearBottom = y >= bottom - radius
   if ((nearLeft || nearRight) && (nearTop || nearBottom)) {
-    const distance = Math.hypot(
-      x - (nearLeft ? left + radius : right - radius),
-      y - (nearTop ? top + radius : bottom - radius),
-    )
+    const power = panel.cornerExponent ?? 2
+    const dx = Math.abs(x - (nearLeft ? left + radius : right - radius))
+    const dy = Math.abs(y - (nearTop ? top + radius : bottom - radius))
+    const distance = (dx ** power + dy ** power) ** (1 / power)
     if (distance < radius || distance >= radius + RESIZE_BAND) return null
     if (nearTop) return nearLeft ? 'NorthWest' : 'NorthEast'
     return nearLeft ? 'SouthWest' : 'SouthEast'
@@ -213,7 +215,8 @@ export async function installWindowFrame(): Promise<void> {
       width: window.innerWidth,
       height: window.innerHeight,
       inset: measure('--window-inset-px') / (measure('--ui-zoom') || 1),
-      radius: measure('--window-radius'),
+      radius: measure('--window-radius-px') / (measure('--ui-zoom') || 1),
+      cornerExponent: 2 ** (measure('--window-corner') || 1),
     })
 
   document.addEventListener('pointermove', (event) => {

@@ -10,26 +10,35 @@
   /* The panel's distance from the OS window, and its corner. Both are zero in a
      browser tab and a maximized window, where the host already has an edge. */
   --window-inset: 0px;
-  --window-radius: 0px;
+  --window-radius-px: 0;
+  --window-radius: calc(var(--window-radius-px) * 1px / var(--ui-zoom, 1));
+  --window-corner: 1;
 }
 
 /* The margin holds the shadow and stays 28 real pixels at any UI scale. */
 :root[data-window='framed'] {
   --window-inset-px: 28;
   --window-inset: calc(28px / var(--ui-zoom, 1));
-  --window-radius: 20px;
+  --window-radius-px: 24;
   --floating-edge: 36px;
 }
 
-/* Wide main windows keep the reference's soft corner without an outer rim. Keep the
-   compact frame, browser tabs and maximized windows on their existing geometry.
-   The breakpoint follows SHELL.compactWidth, independently of an open rail. */
+/* Wide main windows keep their flush fit; compact windows keep the shadow margin.
+   Both use the one corner above. The breakpoint follows SHELL.compactWidth,
+   independently of an open rail. */
 @media (min-width: 901px) {
   :root[data-window='framed']:has(.studio-main-window) {
     --window-inset-px: 0;
     --window-inset: 0px;
-    --window-radius: 28px;
     --floating-edge: 8px;
+  }
+}
+
+/* Ease into each straight edge instead of joining it to a circular arc.
+   Unsupported hosts keep the matching circular resize geometry. */
+@supports (corner-shape: superellipse(1.5)) {
+  :root {
+    --window-corner: 1.5;
   }
 }
 
@@ -132,6 +141,7 @@
 
   .studio-window {
     border-radius: var(--window-radius);
+    corner-shape: superellipse(var(--window-corner));
     box-shadow: var(--shadow-window);
   }
 
@@ -144,41 +154,28 @@
     outline: none;
   }
 
-  .studio-window-body {
-    border-radius: var(--window-radius);
-  }
-
   /* A layer that covers the panel, not the transparent margin around it. */
   .studio-window-fill {
     position: fixed;
     inset: var(--window-inset);
     border-radius: var(--window-radius);
+    corner-shape: superellipse(var(--window-corner));
   }
 
-  /* The compact draft opens to the reading column while it is being used.
+  /* The draft keeps its reading-column width in idle and focused states.
      The measured field and its attachment/voice state keep one implementation. */
   .studio-composer {
     caret-color: var(--foreground);
     position: relative;
     isolation: isolate;
     width: 100%;
-    max-width: calc(var(--control-md) * 14);
+    max-width: 100%;
     margin-inline: auto;
     padding: 6px;
     border-radius: 28px;
     background: var(--composer-surface);
     box-shadow: var(--shadow-raised);
-    transition: max-width var(--duration-slow) var(--ease-out-quint),
-      border-radius var(--duration-slow) var(--ease-out-quint),
-      box-shadow var(--duration-fast) ease-out;
-  }
-
-  .studio-composer[data-active='true'] {
-    max-width: 100%;
-  }
-
-  .studio-composer[data-expanded='true'] {
-    border-radius: 18px;
+    transition: box-shadow var(--duration-fast) ease-out;
   }
 
   .studio-composer[data-focused='true'] {

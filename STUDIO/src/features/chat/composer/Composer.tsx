@@ -379,7 +379,6 @@ export function Composer({
   const fieldWords = takeWords ? appendTake(text, dictation.transcript) : text
   const carriedContent = images.length > 0 || documents.length > 0 || quote !== ''
   const expanded = multiline || carriedContent || dictating
-  const active = fieldFocused || fieldWords !== '' || carriedContent || dictating || landing !== null
   const promptShown = dictating && !(takeLive && fieldWords.trim() !== '')
   const fieldAside = promptShown || landing !== null
 
@@ -559,7 +558,6 @@ export function Composer({
       ref={frame}
       data-composer-frame
       data-focused={fieldFocused}
-      data-active={active}
       data-expanded={expanded}
       onFocusCapture={(event) => {
         if (event.target instanceof HTMLTextAreaElement) setFieldFocused(true)

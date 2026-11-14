@@ -99,10 +99,11 @@ purpose: a CSS transition and a Framer animation on the same element must not
 disagree. They did — fourteen files had reached for `duration-150`, which was
 not a step in either system.
 
-**The composer opens without replacing its field.** An idle draft is a compact
-capsule. Focus and content open its width; wrapping or attachments move the tools
-below the field. Wrapping is judged against one stable width beside those tools
-in both arrangements, so the layout cannot oscillate between them.
+**The composer grows without changing its design.** Idle and focused drafts keep
+the same reading-column width and corner radius. Wrapping or attachments make
+room for the field without changing the controls' appearance. Wrapping is judged
+against one stable width beside those tools in both arrangements, so the layout
+cannot oscillate between them.
 
 **A handover between surfaces moves along the hierarchy, not the vertical.**
 Home sits under nothing, a project under home, a conversation under its

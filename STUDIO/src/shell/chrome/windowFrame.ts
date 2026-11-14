@@ -6,8 +6,8 @@ import { isTauri } from '@/platform/tauri'
  * The window's own edge: a rounded panel with a soft shadow, or nothing.
  *
  * On the desktop the app draws its own window. Decorations are off and the
- * surface is transparent, so `studio-window` is the window's edge: the panel
- * sits inset from the OS window and draws its own corner, outline and shadow.
+ * surface is transparent, so `studio-window` owns the rounded outer clip and
+ * shadow. Compact leaves a margin; Standard fills the native window.
  * `installWindowFrame` owns the behaviour that comes with the inset.
  *
  * In a browser the tab is the window. The page fills the viewport edge to

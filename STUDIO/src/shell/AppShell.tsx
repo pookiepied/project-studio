@@ -28,7 +28,7 @@ import { isTauri } from '@/platform/tauri'
  * The window.
  *
  * Compact leaves room for the panel's shadow and resize band; Standard's frame
- * fills the native window. Both clipping layers share the same soft corner.
+ * fills the native window. One outer rounded clip owns all four corners.
  * Windows' own border stays disabled so it cannot add a competing curve.
  *
  * `overflow-hidden` is what makes the corner real: without it a scrolling

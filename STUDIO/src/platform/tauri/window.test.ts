@@ -38,6 +38,22 @@ describe('desktop window presets', () => {
 const panel = { width: 776, height: 901, inset: 28, radius: 20 }
 
 describe('the resize band around the panel', () => {
+  it.each([1, 1.25, 2])('follows the smooth corners at %s interface zoom', (zoom) => {
+    const scale = 1 / zoom
+    const smooth = { width: 776 * scale, height: 901 * scale, inset: 28 * scale,
+      radius: 24 * scale, cornerExponent: 2 ** 1.5 }
+    // These points are inside the softer contour, although a circle cuts them off.
+    expect(resizeDirectionAt(34 * scale, 34 * scale, smooth)).toBeNull()
+    expect(resizeDirectionAt(742 * scale, 34 * scale, smooth)).toBeNull()
+    expect(resizeDirectionAt(34 * scale, 867 * scale, smooth)).toBeNull()
+    expect(resizeDirectionAt(742 * scale, 867 * scale, smooth)).toBeNull()
+    expect(resizeDirectionAt(30 * scale, 30 * scale, smooth)).toBe('NorthWest')
+    expect(resizeDirectionAt(746 * scale, 30 * scale, smooth)).toBe('NorthEast')
+    expect(resizeDirectionAt(30 * scale, 871 * scale, smooth)).toBe('SouthWest')
+    expect(resizeDirectionAt(746 * scale, 871 * scale, smooth)).toBe('SouthEast')
+    expect(resizeDirectionAt(20 * scale, 20 * scale, smooth)).toBeNull()
+  })
+
   it('sits just outside each straight edge', () => {
     expect(resizeDirectionAt(24, 400, panel)).toBe('West')
     expect(resizeDirectionAt(750, 400, panel)).toBe('East')
