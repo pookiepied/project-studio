@@ -116,9 +116,13 @@ describe('the box', () => {
     expect(screen.getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('offers the web as coming soon rather than as a working control', () => {
+  it('opens the real attachment picker from the compact tool row', () => {
     renderComposer(vi.fn(async () => ({ ok: true })))
-    expect(screen.getByRole('button', { name: 'Web search is coming soon' }).hasAttribute('disabled')).toBe(true)
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Attach files' }))
+    expect(click).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Web search is coming soon' })).toBeNull()
+    click.mockRestore()
   })
 
   it('holds the model control it is given among its tools', () => {

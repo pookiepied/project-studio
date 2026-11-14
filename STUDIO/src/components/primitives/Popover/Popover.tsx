@@ -299,7 +299,7 @@ export function Popover({
                 // panel's. The max-width is the same hard clamp the placement
                 // math applies, said in CSS as well, so a panel can never be
                 // the thing that gives the page a horizontal scrollbar.
-                'studio-floating-surface studio-blur fixed z-50 min-w-48 rounded-[20px] p-1.5',
+                'studio-floating-surface studio-blur fixed z-50 min-w-48 rounded-xl border p-1.5',
                 'shadow-overlay',
                 className,
               )}
@@ -327,7 +327,7 @@ export function Popover({
                 visibility: position?.companion ? 'visible' : 'hidden',
               }}
               className={cn(
-                'studio-floating-surface studio-blur studio-scroll-menu fixed z-50 w-64 rounded-[20px] p-1.5 shadow-overlay',
+                'studio-floating-surface studio-blur studio-scroll-menu fixed z-50 w-64 rounded-xl border p-1.5 shadow-overlay',
                 'max-h-[calc(100dvh-16px)] max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain',
               )}
             >

@@ -93,7 +93,7 @@ export function ConversationSelector({
           </span>
           <span
             className={cn(
-              'ml-4 min-w-0 truncate text-body font-medium text-foreground',
+              'ml-2 min-w-0 truncate text-ui font-medium text-foreground',
               running && 'studio-shimmer inline-block',
             )}
           >

@@ -315,7 +315,7 @@ const INTERFACE_FONT: Readonly<Record<Typeface, string>> = {
  */
 const SURFACE_FOR_THEME: Readonly<Record<ResolvedTheme, string>> = {
   light: '#ffffff',
-  dark: '#242424',
+  dark: '#171717',
 }
 
 /**

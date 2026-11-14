@@ -129,8 +129,8 @@ export function TurnMenu({ conversationId }: { conversationId: string | null }) 
     <Popover
       open={open}
       onOpenChange={setOpen}
-      side="top"
-      align="start"
+      side="bottom"
+      align="end"
       offset={COMPOSER.menuOffset}
       maxHeight="28rem"
       className="studio-scroll-menu w-64 overflow-y-auto overscroll-contain rounded-xl"
@@ -155,7 +155,7 @@ export function TurnMenu({ conversationId }: { conversationId: string | null }) 
             reasoning,
             breakdown === null ? null : `${breakdown.report.measured === null || breakdown.report.measured.estimated || breakdown.report.pending > 0 ? '~' : ''}${breakdown.total.toLocaleString('en-US')} tokens`,
           ].filter(Boolean).join(' · ')}
-          side="top"
+          side="bottom"
         >
           <button
             ref={trigger}
@@ -165,9 +165,9 @@ export function TurnMenu({ conversationId }: { conversationId: string | null }) 
             aria-haspopup="menu"
             aria-expanded={open}
             className={cn(
-              'flex h-[var(--button-xs)] min-w-0 max-w-56 items-center gap-1.5 rounded-full px-2.5 text-ui',
-              'bg-model-chip text-model-chip-foreground transition-[filter] duration-fast',
-              open ? 'brightness-95' : 'hover:brightness-[0.97]',
+              'flex h-[var(--header-control)] min-w-0 max-w-44 items-center gap-1.5 rounded-full px-2 text-ui text-muted-foreground',
+              'transition-colors duration-fast hover:bg-tint',
+              open && 'bg-selected',
             )}
           >
             <motion.span
@@ -177,11 +177,11 @@ export function TurnMenu({ conversationId }: { conversationId: string | null }) 
               transition={{ duration: DURATION.fast, ease: EASE_OUT }}
               className="flex min-w-0 items-center gap-1.5"
             >
-              {model ? <ProviderMark provider={model.author} bare /> : null}
-              <span className="min-w-0 truncate">{label}</span>
+              {model ? <ProviderMark provider={model.author} bare /> : <Icons.reasoning size="sm" />}
+              <span className="min-w-0 truncate @max-[48rem]:hidden">{label}</span>
             </motion.span>
             {percent !== null && percent >= 60 ? (
-              <span className="shrink-0 tabular-nums opacity-70">
+              <span className="shrink-0 tabular-nums opacity-70 @max-[48rem]:hidden">
                 {percent}%
               </span>
             ) : null}

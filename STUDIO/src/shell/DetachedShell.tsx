@@ -9,6 +9,7 @@ import { ConversationMenu, ConversationRename } from '@/shell/chrome/Conversatio
 import { ActionsMenu } from '@/shell/menus/ActionsMenu'
 import { SelectionMenu } from '@/shell/menus/SelectionMenu'
 import { WindowControls } from '@/shell/chrome/WindowControls'
+import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useWorkspace } from '@/stores/workspace'
 import { useOverview } from '@/stores/overview'
 import { OverviewPanel } from '@/features/rail'
@@ -76,6 +77,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
           )}
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <TurnMenu conversationId={conversationId} />
             <ConversationMenu
               conversation={conversation}
               onRename={() => setRenaming(true)}

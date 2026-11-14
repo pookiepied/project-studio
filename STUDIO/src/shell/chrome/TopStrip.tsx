@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { IconButton, Switch, Tooltip } from '@/components/primitives'
+import { IconButton } from '@/components/primitives'
 import { ConversationMenu, ConversationRename } from '@/shell/chrome/ConversationMenu'
 import { ConversationSelector } from '@/shell/chrome/ConversationSelector'
 import { CloseControl, MaximizeControl } from '@/shell/chrome/WindowControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
+import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { cn } from '@/lib/cn'
 import { startWindowDrag } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
@@ -19,16 +20,16 @@ const NEW_CONVERSATION = 'New conversation'
  *
  * Standard's controls belong to the page, so they move beside a resident
  * sidebar with the rest of the header. Compact keeps its right-hand controls.
- * Personalize and capture are drawn ahead of their features, so both say they
- * are coming rather than pretending to work.
+ * The centered title shares the page's bounds. The right end holds the model
+ * and the current work surfaces, so the draft can remain a compact input.
  *
  * It is a transparent layer over the page, which scrolls underneath behind a
  * gradient. Dragging belongs to the empty header, never to a child of it, and
  * goes through `startWindowDrag` for the reason given in `DetachedShell`.
  *
  * On a narrow window the sidebar is a drawer over the page. While it is out the
- * left end would paint over the drawer's rows and Personalize would run under
- * it, so both stand down and the header stops taking clicks between its
+ * title and model would paint over the drawer's rows, so both stand down and
+ * the header stops taking clicks between its
  * controls. The right end stays live: its panel button closes the drawer.
  */
 export function TopStrip({
@@ -87,7 +88,7 @@ export function TopStrip({
         </div>
       ) : null}
       {drawerOut ? null : (
-        <div className="flex min-w-0 items-center">
+        <div className="studio-header-title flex min-w-0 items-center justify-center">
           {renaming && conversation !== null ? (
             <ConversationRename conversation={conversation} onDone={() => setRenaming(false)} />
           ) : (
@@ -101,36 +102,13 @@ export function TopStrip({
       )}
 
       <div className={cn('ml-auto flex shrink-0 items-center', drawerOut && 'pointer-events-auto')}>
-        {drawerOut ? null : (
-          <>
-            {/* The first thing to go when the header runs out of room, as it
-                does at high UI scales: the title and the working controls stay. */}
-            <div className="flex items-center @max-[34rem]:hidden">
-              <Tooltip label="Personalization is coming soon" side="bottom" explainOnTap>
-                <span className="flex items-center gap-2.5">
-                  <span aria-hidden className="text-body font-medium text-foreground">Personalize</span>
-                  <Switch checked disabled resting label="Personalize" />
-                </span>
-              </Tooltip>
-              <span aria-hidden className="ml-[22px] mr-[17px] h-5 w-px bg-border" />
-            </div>
-          </>
-        )}
         <div className="flex items-center gap-1.5">
           {onToggleWorkspace ? <IconButton label={workspaceOpen ? 'Hide Workspace' : 'Show Workspace'} size="header"
             tooltipSide="bottom" active={workspaceOpen} onClick={onToggleWorkspace}><Icons.workspace size="header" /></IconButton> : null}
           <IconButton label="New conversation" size="header" tooltipSide="bottom" onClick={goHome}>
             <Icons.compose size="header" />
           </IconButton>
-          <IconButton
-            label="Screen capture is coming soon"
-            size="header"
-            tooltipSide="bottom"
-            disabled
-            className="disabled:opacity-100"
-          >
-            <Icons.capture size="header" />
-          </IconButton>
+          {route.kind !== 'settings' && !drawerOut ? <TurnMenu conversationId={conversationId} /> : null}
           {controlsAtLeft ? null : <IconButton
             label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
             size="header"

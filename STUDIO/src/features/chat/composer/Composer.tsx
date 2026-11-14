@@ -46,10 +46,9 @@ import { cn } from '@/lib/cn'
  *
  * ---- What it holds ---------------------------------------------------------
  *
- * Family A's box: the field on top and one row of tools under it. On the left,
- * what to add, the model, the web and everything else; on the right, voice and
- * send. The model arrives as `turnControl`, because which menu it opens is the
- * shell's concern and not this field's.
+ * The compact input holds attachments at the left and voice/send at the right.
+ * A long draft or carried content opens a second row without replacing the
+ * field, its live dictation, or the receipt-driven submission path.
  *
  * ---- Where a send goes -----------------------------------------------------
  *
@@ -74,9 +73,8 @@ import { cn } from '@/lib/cn'
  *
  * ---- The shape ------------------------------------------------------------
  *
- * One shape, always. It does not change when the caret arrives or a draft grows
- * past a line, apart from the field's own height. The caret brings the fine blue
- * edge and halo (`.studio-composer` in styles/layout.css), which cost no layout.
+ * Focus lifts the surface. Wrapping is judged at the same inline width in both
+ * arrangements, so moving the tools cannot make the field oscillate between them.
  *
  * ---- The quote -------------------------------------------------------------
  *
@@ -99,7 +97,7 @@ export function Composer({
   keepSentDraftForExit = false,
 }: {
   conversationId: string | null
-  /** The model chip, among the tools. */
+  /** Extra controls supplied by isolated hosts. The app's model lives in its header. */
   turnControl?: ReactNode
   draftPermission?: { value: PermissionMode; onChange: (value: PermissionMode) => void }
   /** Opens voice on a chat that does not exist yet; its first utterance creates it. */
@@ -219,6 +217,17 @@ export function Composer({
   // The frame itself, which the slash picker opens above — see
   // `SlashSuggestions` for why the panel is not part of this box.
   const frame = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLDivElement>(null)
+  const leftTools = useRef<HTMLDivElement>(null)
+  const rightTools = useRef<HTMLDivElement>(null)
+  const [multiline, setMultiline] = useState(false)
+  const inlineWidth = useCallback(() => {
+    const row = input.current
+    if (!row || row.clientWidth === 0) return 0
+    const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0
+    return Math.max(1, row.clientWidth - (leftTools.current?.offsetWidth ?? 0) -
+      (rightTools.current?.offsetWidth ?? 0) - gap * 2)
+  }, [])
   const voice = useVoiceModeContext()
 
   // Whether the mic is ours to ask for here (plan §3.7): read per render,
@@ -368,6 +377,9 @@ export function Composer({
   // as typed text does. The prompt has the slot only when there are none.
   const takeWords = takeLive && dictation.transcript !== ''
   const fieldWords = takeWords ? appendTake(text, dictation.transcript) : text
+  const carriedContent = images.length > 0 || documents.length > 0 || quote !== ''
+  const expanded = multiline || carriedContent || dictating
+  const active = fieldFocused || fieldWords !== '' || carriedContent || dictating || landing !== null
   const promptShown = dictating && !(takeLive && fieldWords.trim() !== '')
   const fieldAside = promptShown || landing !== null
 
@@ -547,6 +559,8 @@ export function Composer({
       ref={frame}
       data-composer-frame
       data-focused={fieldFocused}
+      data-active={active}
+      data-expanded={expanded}
       onFocusCapture={(event) => {
         if (event.target instanceof HTMLTextAreaElement) setFieldFocused(true)
       }}
@@ -635,10 +649,28 @@ export function Composer({
         </div>
       ) : null}
 
+      <div ref={input} className="studio-composer-input">
+        <div ref={leftTools} inert={dictating}
+          className={cn('studio-composer-attach flex items-center gap-1 transition-opacity duration-fast',
+            takeLive ? 'opacity-0' : dictating && 'opacity-50')}>
+          <IconButton label="Attach files" size="md" onClick={() => picker.current?.click()}>
+            <Icons.add size="md" />
+          </IconButton>
+          {turnControl}
+          <ComposerMenu
+            conversationId={conversationId}
+            draftPermission={draftPermission}
+            dictate={{
+              unavailable: voiceAvailable ? null : VOICE_UNAVAILABLE_REASON,
+              disabled: dictating,
+              onSelect: () => void dictation.start(),
+            }}
+          />
+        </div>
       {/* The field stays mounted under whatever stands in for it, hidden and
           inert, so a draft keeps its height while the microphone has the slot,
           and a passage landing reshapes the box as it arrives. */}
-      <div data-composer-slot className="relative flex min-h-[var(--button-md)] min-w-0 flex-col justify-center">
+      <div data-composer-slot className="studio-composer-field relative flex min-h-[var(--button-md)] min-w-0 flex-col justify-center">
         <div
           inert={fieldAside || dictating}
           className={cn(
@@ -650,6 +682,8 @@ export function Composer({
             handleRef={field}
             value={fieldWords}
             followEnd={takeWords}
+            inlineWidth={inlineWidth}
+            onMultilineChange={setMultiline}
             onChange={setText}
             onSubmit={submit}
             onKeyDownCapture={slashKey}
@@ -695,41 +729,9 @@ export function Composer({
         </AnimatePresence>
       </div>
 
-      {/* The tools stay mounted under a take's controls, so the row keeps its
-          height and nothing in it loses its state. */}
-      <div className="relative mt-1">
-      <div
-        inert={dictating}
-        className={cn(
-          'flex min-w-0 items-center justify-between gap-2 transition-opacity duration-fast',
-          takeLive ? 'opacity-0' : dictating && 'opacity-50',
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-1">
-          {/* Files are the one thing a turn can carry beyond its words, so the
-              paperclip opens the picker itself - the webview's own file input,
-              no plugin - rather than a menu with one live row in it. */}
-          <IconButton label="Attach files" size="xs" onClick={() => picker.current?.click()}>
-            <Icons.paperclip size="md" />
-          </IconButton>
-          {turnControl}
-          {/* Studio has no per-message web switch yet. It keeps the reference's
-              place and full colour, and says so rather than pretending. */}
-          <IconButton label="Web search is coming soon" size="xs" disabled className="disabled:opacity-100">
-            <Icons.web size="md" />
-          </IconButton>
-          <ComposerMenu
-            conversationId={conversationId}
-            draftPermission={draftPermission}
-            dictate={{
-              unavailable: voiceAvailable ? null : VOICE_UNAVAILABLE_REASON,
-              disabled: dictating,
-              onSelect: () => void dictation.start(),
-            }}
-          />
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
+        <div ref={rightTools} inert={dictating}
+          className={cn('studio-composer-send flex shrink-0 items-center gap-1 transition-opacity duration-fast',
+            takeLive ? 'opacity-0' : dictating && 'opacity-50')}>
           {/* Improve, once a take has landed. It acts on the field and it is
               brief, so it stands with the controls that do, rather than behind
               the menu. It leaves with the message. */}
@@ -756,31 +758,28 @@ export function Composer({
                   it belongs and answers as disabled, its label the reason. */}
               <IconButton
                 label={voiceAvailable ? 'Voice mode' : VOICE_UNAVAILABLE_REASON}
-                size="xs"
+                size="md"
                 disabled={!voiceAvailable || (conversationId === null && onStartVoice === undefined) || busy}
                 onClick={() => (conversationId === null ? onStartVoice?.() : voice.enter(conversationId))}
               >
                 <Icons.waveform size="md" />
               </IconButton>
-              {/* Always present and always the accent, as in the reference.
-                  With nothing to send it is inert, not dimmed. */}
+              {/* An admitted run keeps its Stop here even when the draft is empty. */}
               <IconButton
                 label={canSend ? (turnRunning ? 'Queue message' : 'Send') : busy ? 'Stop' : 'Send'}
-                size="xs"
+                size="md"
                 tone="accent"
                 disabled={(!canSend && !busy) || (pendingAttachments > 0 && !busy) || (canSend && turnRunning && queueFull)}
-                className={!canSend && !busy ? 'disabled:opacity-100' : undefined}
                 onClick={canSend ? () => submit() : halt}
               >
                 {busy && !canSend ? <Icons.stop size="md" /> : <Icons.sendUp size="md" />}
               </IconButton>
         </div>
-      </div>
       <AnimatePresence initial={false}>
         {takeLive ? (
           <motion.div
             key="take"
-            className="absolute inset-0"
+            className="studio-composer-transport"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

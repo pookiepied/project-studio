@@ -8,9 +8,10 @@ if the two ever disagree, this file is what they were both trying to say.
 Studio is a calm app for a person having a conversation. It is not a developer
 tool, and almost every rule below is downstream of that one sentence.
 
-Its look is Family A (ADR 0060): one compact rounded window, white and neutral
-grey surfaces, one blue accent, and a composer that holds its tools. When a
-choice here and the reference disagree, the reference wins and this file changes.
+Its look combines the earlier compact Studio layout with the supplied minimal
+reference: white panels, soft grey sections, charcoal actions and pill controls.
+The newer typography, scaling, accessibility and feature behavior remain the
+foundation. A visual recovery must not revert those improvements.
 
 ---
 
@@ -32,8 +33,8 @@ uses an inset stroke, and keyboard focus stays within the row's edge.
 
 **Focus is answered by register, not by one treatment.** A control answers
 with an edge: its border deepens, and that is all. A surface answers with
-elevation. The composer is the exception: the caret brings its fine blue edge
-and halo. The keyboard outline is the loudest register (`--ring`, the accent)
+elevation. The composer follows the same surface rule, without a colored halo.
+The keyboard outline is the loudest register (`--ring`)
 and is keyboard-only, because `:focus-visible` is what makes an assertive ring
 polite. One token never serves two registers; when the fields consumed `--ring`
 every click read as an error state.
@@ -98,8 +99,10 @@ purpose: a CSS transition and a Framer animation on the same element must not
 disagree. They did — fourteen files had reached for `duration-150`, which was
 not a step in either system.
 
-**The composer does not reshape.** It is one rounded box with the field above
-its tools, whatever it holds. Only the field's height moves.
+**The composer opens without replacing its field.** An idle draft is a compact
+capsule. Focus and content open its width; wrapping or attachments move the tools
+below the field. Wrapping is judged against one stable width beside those tools
+in both arrangements, so the layout cannot oscillate between them.
 
 **A handover between surfaces moves along the hierarchy, not the vertical.**
 Home sits under nothing, a project under home, a conversation under its
@@ -193,27 +196,24 @@ condition on it and silently disabled the composer's focus lift in dark mode.
 
 ## 5. Colour
 
-The chrome is neutral grey plus one accent, `--accent` (#3AA8FE), sampled from
-the reference. Blue means act or chosen: send, primary buttons, switches,
-selection, focus, the caret and the Reply pill. `--primary` is the same blue, so anything filled
-as the primary action follows it. Secondary actions use a muted fill, and
-capsules have no resting border. The model chip takes the reference's pale green
-in light and grey in dark. Red identifies destructive actions, with a solid fill
-reserved for the final confirmation. White on the accent is about 2.5:1, which
-is the reference's choice and is low for small text.
+The light palette is white, `#F7F7F7`, `#F0F0F0` and charcoal `#282828`.
+`--accent` follows `--primary`, so new features use the same neutral actions as
+the rest of the app. Selected pills use the primary fill and its contrasting
+foreground, including their icons. Content may still carry color: chart series,
+file kinds, maps, provider identities and operational states keep their meaning.
+Red identifies destructive actions; a solid fill belongs to final confirmation.
 
 Four state tokens, kept apart because they say different things:
 
 - `--tint` is hover, a faint neutral.
-- `--selected` is chosen, a faint blue: a menu row, a palette row, an active
+- `--selected` is chosen, a quiet neutral: a menu row, a palette row, an active
   control.
 - `--soft` is a neutral resting fill: skeletons, tags, a mark's backing. It is
   not selection, so it never uses `--selected`.
 - `--user-bubble` is the person's own message.
 
-All four are translucent, not opaque swatches. A tint composites, so the same
-value works on the page, inside a popover and over a raised card, each staying a
-shade of what is already there. Tooltips use solid black with white text in
+Hover tints composite with their surface. Light selection and user bubbles use
+the reference's soft grey; dark surfaces use a lifted neutral. Tooltips use solid black with white text in
 light mode and solid white with black text in dark mode. The inverted palette
 keeps labels distinct from the surface behind them.
 

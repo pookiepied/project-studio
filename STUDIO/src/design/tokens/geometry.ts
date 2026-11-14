@@ -55,8 +55,8 @@ export const SHELL = {
    * and is masked by a gradient rather than hidden behind a bar.
    */
   topStrip: {
-    height: 66,
-    paddingInline: 18,
+    height: 40,
+    paddingInline: SPACE.lg,
   },
 
   /** Window controls. Monochrome — see `TrafficLights`. */
@@ -66,7 +66,7 @@ export const SHELL = {
     /** Icon-only rail. Project marks, no labels; the name is a tooltip. */
     railWidth: 52,
     /** Expanded, showing conversation titles. */
-    expandedWidth: 256,
+    expandedWidth: 236,
   },
 
   /**
@@ -90,7 +90,7 @@ export const SHELL = {
    * Mirrored by `--scroll-inset-top` / `--scroll-inset-bottom` in `styles/tokens.css`,
    * which is what `.studio-scroll-inset` actually reads.
    */
-  scrollbarInset: { top: 66 + 20, bottom: 40 },
+  scrollbarInset: { top: 40 + 20, bottom: 40 },
 } as const
 
 /** The composer: one rounded box, with the field above its row of tools. */

@@ -22,8 +22,8 @@
    machine, so code reads identically here and on a Mac rather than
    inheriting whatever the OS happened to install.
 
-   Instrument Serif is no longer used: `--font-display` is Inter under Family
-   A (ADR 0060). An unused face is never fetched; removing it is a cleanup.
+   The interface and its headings use the selected sans face by default.
+   The optional Instrument Serif face below loads only when requested.
 
    The ranges are fontsource's own for the two subsets, copied verbatim. */
 

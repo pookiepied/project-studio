@@ -13,6 +13,44 @@ afterEach(() => {
 })
 
 describe('composer appearance changes', () => {
+  it('keeps wrapping stable when the tools move below a wider field', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    let width = 200
+    let besideTools = 200
+    const computedStyle = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element instanceof HTMLTextAreaElement) {
+        const style = document.createElement('div').style
+        style.lineHeight = '20px'
+        style.paddingTop = '8px'
+        style.paddingBottom = '8px'
+        return style
+      }
+      return computedStyle(element)
+    })
+    vi.spyOn(HTMLTextAreaElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+    vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {
+      return Number.parseFloat(this.style.width) < 300 ? 56 : 36
+    })
+    const changed = vi.fn()
+    const inlineWidth = () => besideTools
+    const props = { onChange: vi.fn(), onSubmit: vi.fn(), placeholder: 'Reply', inlineWidth, onMultilineChange: changed }
+    const { rerender } = render(<ComposerField {...props} value="A draft at its wrap boundary" />)
+    expect(changed).toHaveBeenLastCalledWith(true)
+
+    width = 400
+    rerender(<ComposerField {...props} value="A draft at its wrap boundary." />)
+    expect(changed).toHaveBeenLastCalledWith(true)
+    expect(screen.getByRole<HTMLTextAreaElement>('textbox').style.height).toBe('36px')
+
+    besideTools = 400
+    rerender(<ComposerField {...props} value="A draft at its wrap boundary.." />)
+    expect(changed).toHaveBeenLastCalledWith(false)
+  })
+
   it('dissolves only the ends that have more text past them', () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -57,7 +95,7 @@ describe('composer appearance changes', () => {
     const field = screen.getByRole<HTMLTextAreaElement>('textbox')
     expect(field.style.height).toBe(`${Math.ceil(11 * 1.55)}px`)
 
-    for (const size of [14, 12, 13, 11]) {
+    for (const size of [14, 15, 18, 12, 13, 11]) {
       root.style.setProperty('--ui-size', `${size}px`)
       await waitFor(() => expect(field.style.height).toBe(`${Math.ceil(size * 1.55)}px`))
       expect(field.value).toBe('Keep my draft')

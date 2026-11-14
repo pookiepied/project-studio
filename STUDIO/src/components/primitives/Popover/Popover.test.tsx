@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -60,7 +60,9 @@ function Harness({ maxHeight }: { maxHeight?: string }) {
 describe('a popover being dismissed', () => {
   it('is still on screen and still leaving a couple of frames in', async () => {
     render(<Harness />)
-    await frames(4)
+    // Time the departure of an open menu. Four frames can still be part of
+    // its entrance, making this assertion depend on worker scheduling.
+    await waitFor(() => expect(Number(screen.getByRole('menu').style.opacity)).toBe(1))
 
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))

@@ -243,19 +243,25 @@
     animation: none;
   }
 
-  /* Display sizes carry the page's one statement -- the home greeting, a page
-     title. The face is the window's own, so the Typeface setting reaches it. */
+  /* Quiet sans headings follow the same face as the interface. Their role
+     carries hierarchy while text size and whole-window zoom stay independent. */
   .studio-display {
+    font-family: var(--font-display);
+    font-weight: 500;
     font-size: var(--text-display);
     line-height: 1.15;
     font-optical-sizing: auto;
+    letter-spacing: -0.03em;
   }
 
   /* Display's heading size, for the short labelled moments: dialog headers and
      the sidebar wordmark. */
   .studio-heading {
+    font-family: var(--font-display);
+    font-weight: 500;
     font-size: var(--text-title);
     line-height: 1.25;
+    letter-spacing: -0.025em;
   }
 
   /* -- The type roles, as classes -----------------------------------------

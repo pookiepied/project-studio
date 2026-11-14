@@ -48,7 +48,7 @@ export function ArtifactShell({
 
 
   return (
-    <Arrive className="group/artifact my-4 w-full min-w-0 overflow-hidden rounded-xl bg-surface-sunken p-3">
+    <Arrive className="group/artifact my-4 w-full min-w-0 overflow-hidden rounded-[20px] bg-surface-sunken p-3">
       <div className="flex items-start gap-2.5">
         <WorkingHalo working={working}>{mark}</WorkingHalo>
 

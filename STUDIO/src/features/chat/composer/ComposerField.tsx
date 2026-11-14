@@ -80,6 +80,8 @@ export function ComposerField({
   handleRef,
   onKeyDownCapture,
   followEnd = false,
+  inlineWidth,
+  onMultilineChange,
 }: {
   value: string
   onChange: (value: string) => void
@@ -101,6 +103,9 @@ export function ComposerField({
   onKeyDownCapture?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean
   /** Keeps the end of the text in view, for words arriving rather than typed. */
   followEnd?: boolean
+  /** The stable width beside the tools, even while the field occupies a full row. */
+  inlineWidth?: () => number
+  onMultilineChange?: (multiline: boolean) => void
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
 
@@ -138,7 +143,15 @@ export function ComposerField({
     const element = field.current
     if (!element) return
 
-    const natural = measure(element, element.getBoundingClientRect().width)
+    const width = element.clientWidth || element.getBoundingClientRect().width
+    const natural = measure(element, width)
+    if (onMultilineChange) {
+      const style = getComputedStyle(element)
+      const line = Number.parseFloat(style.lineHeight) || 22
+      const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0)
+      const decisive = inlineWidth?.() || width
+      onMultilineChange(measure(element, decisive) - padding > line * 1.6)
+    }
     const clamped = Math.min(natural, COMPOSER.maxHeight)
     element.style.overflowY = natural > COMPOSER.maxHeight ? 'auto' : 'hidden'
     // `stable` reserves the thumb gutter whether it is needed or not. Otherwise
@@ -153,7 +166,7 @@ export function ComposerField({
       element.style.height = `${clamped}px`
     }
     fadeEdges()
-  }, [fadeEdges])
+  }, [fadeEdges, inlineWidth, onMultilineChange])
 
   // `value` is the trigger, not an input: the measurement reads the element,
   // which has already re-rendered with the new text by the time this runs.

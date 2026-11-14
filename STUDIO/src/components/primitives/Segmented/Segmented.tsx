@@ -54,14 +54,14 @@ export function Segmented<T extends string | number>({
               // two-word option once turned this into a two-line block.
               'studio-control-flat relative flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 [--control-size:var(--button-xs)]',
               'whitespace-nowrap text-ui transition-colors duration-fast',
-              selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+              selected ? 'text-primary-foreground [&_.studio-icon]:text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {selected ? (
               <motion.span
                 layoutId={layoutId}
                 transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-full bg-surface-raised shadow-chip"
+                className="absolute inset-0 rounded-full bg-primary"
               />
             ) : null}
             <span className="relative z-10 flex items-center gap-1.5">{option.label}</span>

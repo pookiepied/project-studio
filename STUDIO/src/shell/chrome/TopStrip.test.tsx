@@ -113,31 +113,31 @@ function openChatRoute(): void {
 }
 
 describe('the strip under a floating sidebar', () => {
-  it('stands its left end and Personalize down while the drawer covers them', async () => {
+  it('stands the title and model down while the drawer covers them', async () => {
     mountStrip({ compact: true, sidebarShown: true })
     openChatRoute()
     await screen.findByRole('button', { name: 'Show sidebar' })
     expect(screen.queryByText(CONVERSATION.title)).toBeNull()
-    expect(screen.queryByRole('switch', { name: 'Personalize' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Turn settings' })).toBeNull()
   })
 
   it('shows them again while the drawer is away', async () => {
     mountStrip({ compact: true, sidebarShown: false })
     openChatRoute()
     await screen.findByText(CONVERSATION.title)
-    expect(screen.getByRole('switch', { name: 'Personalize' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Turn settings' })).toBeTruthy()
   })
 
   it('keeps them beside a resident column, which covers nothing', async () => {
     mountStrip({ compact: false, sidebarShown: true })
     openChatRoute()
     await screen.findByText(CONVERSATION.title)
-    expect(screen.getByRole('switch', { name: 'Personalize' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Turn settings' })).toBeTruthy()
   })
 })
 
 describe('the selector', () => {
-  it('lets a long title shrink rather than run under Personalize', () => {
+  it('lets a long title shrink inside its centered region', () => {
     mountStrip({})
     const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
     expect(selector.parentElement?.className).toContain('min-w-0')
@@ -196,10 +196,13 @@ describe('the controls', () => {
     expect(screen.queryByRole('group', { name: 'Window controls' })).toBeNull()
   })
 
-  it('shows Personalize and capture as not yet working', () => {
+  it('opens model settings from the header without prototype placeholders', async () => {
     mountStrip({})
-    expect(screen.getByRole('switch', { name: 'Personalize' }).hasAttribute('disabled')).toBe(true)
-    expect(screen.getByRole('button', { name: 'Screen capture is coming soon' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Turn settings' }).hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByRole('switch', { name: 'Personalize' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Screen capture is coming soon' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
+    expect(await screen.findByRole('searchbox', { name: 'Search models' })).toBeTruthy()
   })
 
   it('offers no conversation actions before there is a conversation', async () => {

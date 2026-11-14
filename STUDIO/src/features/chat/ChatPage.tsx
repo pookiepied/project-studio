@@ -15,7 +15,6 @@ import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
 import { uploadDocuments } from '@/features/chat/connection/documents'
 import { Composer } from '@/features/chat/composer'
-import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { QueuedMessages } from '@/features/chat/composer/QueuedMessages'
 import { useQueuedMessages } from '@/features/chat/connection/useQueuedMessages'
 import { AnsweredElsewhere } from '@/features/chat/AnsweredElsewhere'
@@ -833,7 +832,6 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
                   <div ref={arrival.composer}>
                     <Composer
                       conversationId={conversation.id}
-                      turnControl={<TurnMenu conversationId={conversation.id} />}
                       queueFull={queue.messages.length >= 3}
                       restoredMessage={queue.restoredMessage}
                       placeholder={

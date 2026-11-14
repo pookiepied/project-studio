@@ -1,4 +1,4 @@
-/* Family A: white and neutral grey surfaces, one blue accent, colour for state. */
+/* Neutral Studio surfaces; colour identifies content and operational state. */
 :root {
   /* File-kind tones: a few shared values, so colour tells kinds apart without
      each kind bringing its own brand. See `fileTypes`. */
@@ -12,9 +12,9 @@
   --tone-purple: #8257d8;
 
   --surface: oklch(1 0 0);
-  --surface-sunken: oklch(0.979 0 0);
-  --surface-raised: oklch(1 0 0);
-  --hairline: oklch(0.145 0 0 / 7.5%);
+  --surface-sunken: #f7f7f7;
+  --surface-raised: #ffffff;
+  --hairline: rgb(40 40 40 / 9%);
 
   /* Translucent so `backdrop-filter` has something to show through, but only
      just. Below ~90% a white sheet over a dark scrim samples the scrim and
@@ -23,8 +23,8 @@
   --scrim: oklch(0.145 0 0 / 16%);
 
   --background: var(--surface);
-  --foreground: oklch(0.145 0 0);
-  --muted: oklch(0.968 0 0);
+  --foreground: #282828;
+  --muted: #f0f0f0;
   --muted-foreground: oklch(0.553 0 0);
   --border: var(--hairline);
 
@@ -37,33 +37,32 @@
      component; the whisper bloom that once confirmed the edge is gone on the
      person's word, because two greys stacked on one edge read as thickness,
      not as focus. */
-  --ring: #3aa8fe;
-  --primary: #3aa8fe;
+  --ring: oklch(0.145 0 0 / 45%);
+  --primary: #282828;
   --primary-foreground: #ffffff;
   --tooltip: #000;
   --tooltip-foreground: #fff;
-  --selection: rgb(58 168 254 / 22%);
-  --selection-foreground: #1878c4;
+  --selection: oklch(0.145 0 0 / 14%);
+  --selection-foreground: var(--foreground);
 
-  /* The accent, sampled from the reference's send button, Reply and toggle. The
-     wash is the ground of its quote strip. */
-  --accent: #3aa8fe;
-  --accent-foreground: #ffffff;
-  --accent-wash: #e8f4fe;
-  --accent-wash-foreground: #1878c4;
+  /* New features share the reference's neutral action palette. Content tones,
+     chart series and operational states keep their own meanings. */
+  --accent: var(--primary);
+  --accent-foreground: var(--primary-foreground);
+  --accent-wash: var(--selected);
+  --accent-wash-foreground: var(--foreground);
 
-  /* The composer, sampled from the reference: its ground, the fine edge the
-     caret brings, the halo around that edge, and the model chip. */
-  --composer-surface: var(--surface);
-  --composer-edge: #adbfd0;
-  --composer-halo: #d9ecf8;
+  /* The floating draft is a white surface with elevation on focus. */
+  --composer-surface: var(--surface-raised);
+  --composer-edge: var(--border);
+  --composer-halo: transparent;
   /* The question card: white, faintly see-through, as the reference's panel is. */
   --prompt-card-surface: rgb(255 255 255 / 76%);
   --prompt-card-edge: oklch(0 0 0 / 6%);
   --window-close: #f0f0f0;
   --switch-off: #dedede;
-  --model-chip: #ecfff4;
-  --model-chip-foreground: #0e4a1e;
+  --model-chip: var(--tint);
+  --model-chip-foreground: var(--foreground);
   --brand-ink: color-mix(in oklab, var(--muted-foreground) 65%, oklch(0.205 0 0));
   --danger-confirm: #b72740;
 
@@ -133,7 +132,7 @@
      it sits in, this is what makes it read as inset rather than as a region of
      the same sheet. Two steps down is enough -- any darker and it becomes a
      dark-on-light code editor, which is a different product. */
-  --code-surface: oklch(0.973 0 0);
+  --code-surface: #f7f7f7;
 
   /* The table header band. It cannot share a formula across palettes, because
      the direction inverts: on a dark ground a band lifts (0.235 over 0.164),
@@ -170,10 +169,10 @@
      without looking at it, which is what makes an interface feel quick rather
      than busy.
      -------------------------------------------------------------------- */
-  --tint: oklch(0.145 0 0 / 3%);
-  --selected: rgb(58 168 254 / 9%);
+  --tint: oklch(0.145 0 0 / 5%);
+  --selected: #f0f0f0;
   --soft: oklch(0.145 0 0 / 8%);
-  --user-bubble: oklch(0.145 0 0 / 5%);
+  --user-bubble: #f0f0f0;
 
   /* What the elevation scale is tinted with. Light mode casts a soft grey; the
      dark override below casts something much closer to black, because a shadow
@@ -194,34 +193,32 @@
   --tone-red: #f07a7a;
   --tone-purple: #ab8df0;
 
-  /* The reference's window (#242424) and menu (#2f2f2f) greys. */
-  --surface: oklch(0.26 0 0);
-  --surface-sunken: oklch(0.225 0 0);
-  --surface-raised: oklch(0.305 0 0);
+  --surface: oklch(0.205 0 0);
+  --surface-sunken: oklch(0.164 0 0);
+  --surface-raised: oklch(0.235 0 0);
   --hairline: oklch(1 0 0 / 8%);
 
-  --overlay: oklch(0.305 0 0 / 93%);
+  --overlay: oklch(0.235 0 0 / 93%);
   --scrim: oklch(0 0 0 / 40%);
 
   --background: var(--surface);
   --foreground: oklch(0.985 0 0);
-  --muted: oklch(0.33 0 0);
+  --muted: oklch(0.271 0 0);
   --muted-foreground: oklch(0.706 0 0);
   --border: var(--hairline);
+  --ring: oklch(1 0 0 / 45%);
+  --primary: oklch(0.94 0 0);
+  --primary-foreground: oklch(0.205 0 0);
   --tooltip: #fff;
   --tooltip-foreground: #000;
-  --accent-wash: #334e60;
-  --accent-wash-foreground: #d3e9f9;
-  --selection-foreground: #7cc4fb;
-  --composer-surface: #363636;
-  --composer-edge: #3e6e97;
-  --composer-halo: #3d5161;
+  --selection: oklch(1 0 0 / 18%);
+  --selection-foreground: var(--foreground);
   /* Frosted: the transcript shows faintly through, under a light hairline. */
-  --prompt-card-surface: rgb(56 56 56 / 72%);
+  --prompt-card-surface: oklch(0.235 0 0 / 88%);
   --prompt-card-edge: oklch(1 0 0 / 10%);
   --window-close: #454545;
   --switch-off: #373737;
-  --model-chip: #4e4e4e;
+  --model-chip: var(--tint);
   --model-chip-foreground: var(--foreground);
   --brand-ink: var(--foreground);
 
@@ -268,9 +265,9 @@
   /* Slightly stronger than light: a white tint over a dark surface lifts less
      per percent than a black tint darkens a light one. */
   --tint: oklch(1 0 0 / 8.7%);
-  --selected: rgb(58 168 254 / 10%);
+  --selected: oklch(1 0 0 / 11%);
   --soft: oklch(1 0 0 / 11%);
-  --user-bubble: oklch(1 0 0 / 17%);
+  --user-bubble: oklch(1 0 0 / 6%);
 
   /* Deeper, and the hairline inverts: on a dark surface the thing that
      separates a raised object from its background is a faint *light* edge, not
