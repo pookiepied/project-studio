@@ -3,7 +3,6 @@ import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { ConversationMenu, ConversationRename } from '@/shell/chrome/ConversationMenu'
-import { ConversationSelector } from '@/shell/chrome/ConversationSelector'
 import { CloseControl, MaximizeControl } from '@/shell/chrome/WindowControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
@@ -51,7 +50,7 @@ export function TopStrip({
   workspaceOpen?: boolean
   onToggleWorkspace?: () => void
 }) {
-  const { route, sidebarOpen, toggleSidebar, goHome } = useNavigation()
+  const { route, sidebarOpen, toggleSidebar } = useNavigation()
   const { conversations, projects } = useWorkspace()
   const { running } = useLiveWork()
   const [renaming, setRenaming] = useState(false)
@@ -92,22 +91,18 @@ export function TopStrip({
           {renaming && conversation !== null ? (
             <ConversationRename conversation={conversation} onDone={() => setRenaming(false)} />
           ) : (
-            <ConversationSelector
-              title={headerTitle(route, conversation?.title ?? null, projects)}
-              currentId={conversationId}
-              running={conversationId !== null && running.has(conversationId)}
-            />
+            <span className={cn('min-w-0 truncate text-ui font-medium text-foreground',
+              conversationId !== null && running.has(conversationId) && 'studio-shimmer')}>
+              {headerTitle(route, conversation?.title ?? null, projects)}
+            </span>
           )}
         </div>
       )}
 
       <div className={cn('ml-auto flex shrink-0 items-center', drawerOut && 'pointer-events-auto')}>
         <div className="flex items-center gap-1.5">
-          {onToggleWorkspace ? <IconButton label={workspaceOpen ? 'Hide Workspace' : 'Show Workspace'} size="header"
-            tooltipSide="bottom" active={workspaceOpen} onClick={onToggleWorkspace}><Icons.workspace size="header" /></IconButton> : null}
-          <IconButton label="New conversation" size="header" tooltipSide="bottom" onClick={goHome}>
-            <Icons.compose size="header" />
-          </IconButton>
+          {route.kind !== 'settings' && onToggleWorkspace ? <IconButton label={workspaceOpen ? 'Hide Workspace' : 'Show Workspace'} size="header"
+            tooltipSide="bottom" active={workspaceOpen} onClick={onToggleWorkspace}><Icons.workArea size="header" /></IconButton> : null}
           {route.kind !== 'settings' && !drawerOut ? <TurnMenu conversationId={conversationId} /> : null}
           {controlsAtLeft ? null : <IconButton
             label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
@@ -119,12 +114,12 @@ export function TopStrip({
             <Icons.sidebar size="header" />
           </IconButton>}
           {standard ? null : <MaximizeControl />}
-          <ConversationMenu
+          {route.kind !== 'settings' ? <ConversationMenu
             general
             conversation={conversation}
             onRename={() => setRenaming(true)}
             onOpenOverview={onOpenOverview}
-          />
+          /> : null}
           {standard ? null : <CloseControl />}
         </div>
       </div>
@@ -132,7 +127,7 @@ export function TopStrip({
   )
 }
 
-/** What the selector names: the page you are on, or the conversation about to start. */
+/** The page you are on, or the conversation about to start. */
 function headerTitle(
   route: Route,
   conversationTitle: string | null,

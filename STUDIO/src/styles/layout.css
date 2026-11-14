@@ -165,14 +165,16 @@
   /* The draft keeps its reading-column width in idle and focused states.
      The measured field and its attachment/voice state keep one implementation. */
   .studio-composer {
+    --composer-radius: 28px;
+    --composer-padding: 6px;
     caret-color: var(--foreground);
     position: relative;
     isolation: isolate;
     width: 100%;
     max-width: 100%;
     margin-inline: auto;
-    padding: 6px;
-    border-radius: 28px;
+    padding: var(--composer-padding);
+    border-radius: var(--composer-radius);
     background: var(--composer-surface);
     box-shadow: var(--shadow-raised);
     transition: box-shadow var(--duration-fast) ease-out;
@@ -183,29 +185,38 @@
   }
 
   .studio-composer-input {
+    --composer-tools-gap: 8px;
     position: relative;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: 'attach field send';
-    align-items: center;
-    column-gap: 8px;
-    row-gap: 4px;
+    min-height: var(--composer-tools-height, var(--button-md));
+    padding-bottom: 0;
+    transition: padding-bottom var(--duration-slow) var(--ease-out-quint);
   }
 
   .studio-composer[data-expanded='true'] .studio-composer-input {
-    grid-template-areas: 'field field field' 'attach . send';
+    padding-bottom: calc(var(--composer-tools-height, var(--button-md)) + 4px);
   }
 
   .studio-composer-field {
-    grid-area: field;
+    margin-inline: calc(var(--composer-left-tools, 0px) + var(--composer-tools-gap)) calc(var(--composer-right-tools, 0px) + var(--composer-tools-gap));
+    transition: margin-inline var(--duration-slow) var(--ease-out-quint);
+  }
+
+  .studio-composer[data-expanded='true'] .studio-composer-field {
+    margin-inline: 0;
+  }
+
+  .studio-composer-attach,
+  .studio-composer-send {
+    position: absolute;
+    bottom: 0;
   }
 
   .studio-composer-attach {
-    grid-area: attach;
+    inset-inline-start: 0;
   }
 
   .studio-composer-send {
-    grid-area: send;
+    inset-inline-end: 0;
   }
 
   .studio-composer-transport {
@@ -216,9 +227,7 @@
     border-radius: 999px;
   }
 
-  /* The dock reaches past the box's padding, so the strip sits 6px in from its
-     edge on three sides. It clips while it opens and closes, which is why the
-     reach belongs here: on the strip, this clip would cut the strip's corners. */
+  /* The reply is inset by the same amount on all three outer edges. */
   .studio-composer-quote-dock {
     margin-inline: 0;
     overflow: hidden;
@@ -233,7 +242,7 @@
     align-items: center;
     gap: 8px;
     padding-inline: 10px;
-    border-radius: 12px;
+    border-radius: calc(var(--composer-radius) - var(--composer-padding));
     background: var(--accent-wash);
     color: var(--accent-wash-foreground);
     transform-origin: center bottom;

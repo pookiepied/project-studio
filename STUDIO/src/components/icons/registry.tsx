@@ -78,6 +78,7 @@ import {
   KeyboardIcon,
   Link01Icon,
   LinkSquare02Icon,
+  Layout03Icon,
   MagicWand01Icon,
   Mic01Icon,
   MicOff01Icon,
@@ -205,6 +206,7 @@ const REGISTRY = {
   command: { mark: CommandIcon },
   reload: { mark: Refresh01Icon, motion: WIND },
   settings: { mark: Settings02Icon, motion: TURN_SLIGHT },
+  workArea: { mark: Layout03Icon },
 
   // — Conversation --------------------------------------------------------
   // A new bubble, in the bubble family the other conversation marks use.

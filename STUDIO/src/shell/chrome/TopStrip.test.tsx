@@ -97,11 +97,17 @@ function ChatOpener({ conversationId }: { conversationId: string }) {
   )
 }
 
+function SettingsOpener() {
+  const { openSettings } = useNavigation()
+  return <button type="button" onClick={() => openSettings()}>open settings</button>
+}
+
 function mountStrip(props: { compact?: boolean; standard?: boolean; sidebarShown?: boolean; onOpenOverview?: () => void; workspaceOpen?: boolean; onToggleWorkspace?: () => void }) {
   return render(
     <NavigationProvider>
       <WorkspaceProvider>
         <ChatOpener conversationId="cnv_1" />
+        <SettingsOpener />
         <TopStrip {...props} />
       </WorkspaceProvider>
     </NavigationProvider>,
@@ -136,11 +142,12 @@ describe('the strip under a floating sidebar', () => {
   })
 })
 
-describe('the selector', () => {
+describe('the title', () => {
   it('lets a long title shrink inside its centered region', () => {
     mountStrip({})
-    const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
-    expect(selector.parentElement?.className).toContain('min-w-0')
+    const title = screen.getByText('New conversation')
+    expect(title.className).toContain('truncate')
+    expect(title.parentElement?.className).toContain('min-w-0')
   })
 
   it('names a new conversation on home', () => {
@@ -148,19 +155,33 @@ describe('the selector', () => {
     expect(screen.getByText('New conversation')).toBeTruthy()
   })
 
-  it('finds a conversation and opens it', async () => {
+  it('keeps the conversation title as plain text without a selector or history icon', async () => {
     mountStrip({})
-    fireEvent.click(screen.getByRole('button', { name: /^Conversations\. Current:/ }))
-    fireEvent.change(await screen.findByRole('searchbox', { name: 'Search conversations' }), { target: { value: 'long enough' } })
-    fireEvent.click(await screen.findByRole('menuitemradio', { name: CONVERSATION.title }))
-    expect(await screen.findByRole('button', { name: `Conversations. Current: ${CONVERSATION.title}` })).toBeTruthy()
+    openChatRoute()
+    const title = await screen.findByText(CONVERSATION.title)
+    expect(title.closest('button')).toBeNull()
+    expect(title.closest('[tabindex]')).toBeNull()
+    fireEvent.click(title)
+    expect(screen.queryByRole('searchbox', { name: 'Search conversations' })).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.querySelector('header .studio-mark-history')).toBeNull()
   })
 
-  it('says so when nothing matches', async () => {
-    mountStrip({})
-    fireEvent.click(screen.getByRole('button', { name: /^Conversations\. Current:/ }))
-    fireEvent.change(await screen.findByRole('searchbox', { name: 'Search conversations' }), { target: { value: 'zzz' } })
-    expect((await screen.findByRole('status')).textContent).toContain('zzz')
+  it('leaves only page and window controls in Settings, even after a conversation', async () => {
+    mountStrip({ onToggleWorkspace: vi.fn(), onOpenOverview: vi.fn() })
+    openChatRoute()
+    await screen.findByText(CONVERSATION.title)
+    native.desktop = true
+    fireEvent.click(screen.getByRole('button', { name: 'open settings' }))
+    const header = screen.getByRole('banner')
+    expect(within(header).getByText('Settings').closest('button')).toBeNull()
+    expect(within(header).queryByRole('button', { name: 'More' })).toBeNull()
+    expect(within(header).queryByRole('button', { name: 'New conversation' })).toBeNull()
+    expect(within(header).queryByRole('button', { name: 'Turn settings' })).toBeNull()
+    expect(within(header).queryByRole('button', { name: 'Show Workspace' })).toBeNull()
+    expect(within(header).queryByRole('button', { name: /^Conversations/ })).toBeNull()
+    expect(within(header).getByRole('button', { name: 'Show sidebar' })).toBeTruthy()
+    expect(within(header).getByRole('group', { name: 'Window controls' })).toBeTruthy()
   })
 })
 
@@ -168,10 +189,10 @@ describe('the controls', () => {
   it.each([false, true])('keeps Standard controls before the title with a resident sidebar shown: %s', (sidebarShown) => {
     native.desktop = true
     mountStrip({ compact: false, sidebarShown })
-    const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
+    const title = screen.getByText('New conversation')
     const controls = screen.getByRole('group', { name: 'Window controls' })
     expect(within(controls).getAllByRole('button')).toHaveLength(3)
-    expect(controls.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(controls.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Maximize' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show sidebar' }))
@@ -188,9 +209,9 @@ describe('the controls', () => {
   it('keeps Compact window controls at the right of the title', () => {
     native.desktop = true
     mountStrip({ compact: true })
-    const selector = screen.getByRole('button', { name: /^Conversations\. Current:/ })
+    const title = screen.getByText('New conversation')
     const close = screen.getByRole('button', { name: 'Close' })
-    expect(selector.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(title.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Maximize' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Window controls' })).toBeNull()
@@ -220,12 +241,18 @@ describe('the controls', () => {
     expect(onOpenOverview).toHaveBeenCalledOnce()
   })
 
-  it('names the central work area separately from the activity overview', () => {
+  it('gives Workspace a different mark from Overview and removes the New conversation button', async () => {
     const onToggleWorkspace = vi.fn()
-    mountStrip({ onToggleWorkspace })
-    fireEvent.click(screen.getByRole('button', { name: 'Show Workspace' }))
+    mountStrip({ onToggleWorkspace, onOpenOverview: vi.fn() })
+    const workspace = screen.getByRole('button', { name: 'Show Workspace' })
+    fireEvent.click(workspace)
     expect(onToggleWorkspace).toHaveBeenCalledOnce()
+    expect(workspace.querySelector('.studio-mark-workArea')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'New conversation' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Show File Viewer' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    const overview = await screen.findByRole('menuitem', { name: 'Overview' })
+    expect(overview.querySelector('svg')?.outerHTML).not.toBe(workspace.querySelector('svg')?.outerHTML)
   })
 
   it('renames the open conversation where its title stood', async () => {

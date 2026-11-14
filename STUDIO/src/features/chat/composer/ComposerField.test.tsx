@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ComposerField } from './ComposerField'
 
@@ -13,6 +13,41 @@ afterEach(() => {
 })
 
 describe('composer appearance changes', () => {
+  it('measures the first settled width after the parent reserves space for its tools', () => {
+    let width = 400
+    let resize = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) {
+        resize = () => {
+          const target = screen.getByRole('textbox')
+          callback([{
+            target,
+            contentRect: new DOMRect(0, 0, width, 36),
+            borderBoxSize: [],
+            contentBoxSize: [],
+            devicePixelContentBoxSize: [],
+          }], this)
+        }
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+    vi.spyOn(HTMLTextAreaElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+    vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {
+      return Number.parseFloat(this.style.width) < 300 ? 56 : 36
+    })
+    render(<ComposerField value="A restored draft near its wrap boundary" onChange={vi.fn()} onSubmit={vi.fn()} placeholder="Reply" />)
+    const field = screen.getByRole<HTMLTextAreaElement>('textbox')
+    expect(field.style.height).toBe('36px')
+    width = 200
+    act(resize)
+    expect(field.style.height).toBe('56px')
+    width = 400
+    act(resize)
+    expect(field.style.height).toBe('36px')
+  })
+
   it('keeps wrapping stable when the tools move below a wider field', () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

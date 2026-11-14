@@ -197,10 +197,12 @@ export function ComposerField({
     const element = field.current
     if (!element) return
 
-    let lastWidth = -1
+    // The parent reserves tool space after this child's first layout measure.
+    // The first delivery must therefore measure the settled width as well.
+    let lastWidth: number | null = null
     const observer = new ResizeObserver((entries) => {
       const next = entries[0]?.contentRect.width ?? 0
-      if (lastWidth < 0 || Math.abs(next - lastWidth) < 0.5) {
+      if (lastWidth !== null && Math.abs(next - lastWidth) < 0.5) {
         lastWidth = next
         return
       }

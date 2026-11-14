@@ -133,6 +133,53 @@ describe('the box', () => {
     )
     expect(screen.getByRole('button', { name: 'Model' })).toBeTruthy()
   })
+
+  it('reserves the actual tool sizes as controls and text size change, without replacing the field', () => {
+    let leftWidth = 72
+    let toolHeight = 36
+    const observers: { resize: () => void; targets: Element[] }[] = []
+    const originalObserver = globalThis.ResizeObserver
+    vi.stubGlobal('ResizeObserver', class extends ResizeObserverStub {
+      readonly targets: Element[] = []
+      constructor(callback: ResizeObserverCallback) {
+        super()
+        observers.push({ resize: () => callback([], this), targets: this.targets })
+      }
+      override observe(target?: Element): void { if (target) this.targets.push(target) }
+    })
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('studio-composer-attach') ? leftWidth : 68
+    })
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => toolHeight)
+    try {
+      const { container } = renderComposer(vi.fn(async () => ({ ok: true })))
+      const field = screen.getByRole('textbox')
+      const row = container.querySelector<HTMLElement>('.studio-composer-input')
+      expect(row?.style.getPropertyValue('--composer-left-tools')).toBe('72px')
+      expect(row?.style.getPropertyValue('--composer-right-tools')).toBe('68px')
+      expect(row?.style.getPropertyValue('--composer-tools-height')).toBe('36px')
+
+      leftWidth = 112
+      toolHeight = 44
+      const tools = observers.find((item) => item.targets.some((target) => target.classList.contains('studio-composer-attach')))
+      expect(tools?.targets).toHaveLength(2)
+      act(() => tools?.resize())
+      expect(row?.style.getPropertyValue('--composer-left-tools')).toBe('112px')
+      expect(row?.style.getPropertyValue('--composer-tools-height')).toBe('44px')
+
+      act(() => writeQuote('cnv_1', 'A passage to reply to'))
+      expect(frame(container)?.getAttribute('data-expanded')).toBe('true')
+      expect(screen.getByRole('textbox')).toBe(field)
+      fireEvent.click(screen.getByRole('button', { name: 'Remove quote' }))
+      expect(frame(container)?.getAttribute('data-expanded')).toBe('false')
+      expect(screen.getByRole('textbox')).toBe(field)
+    } finally {
+      clearQuote('cnv_1')
+      vi.stubGlobal('ResizeObserver', originalObserver)
+      width.mockRestore()
+      height.mockRestore()
+    }
+  })
 })
 
 describe('the three dots', () => {

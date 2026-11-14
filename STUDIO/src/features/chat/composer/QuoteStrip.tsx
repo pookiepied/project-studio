@@ -59,7 +59,7 @@ export function QuoteStrip({ quote, onRemove }: { quote: string; onRemove: () =>
                 </motion.div>
               </AnimatePresence>
             </div>
-            <IconButton label="Remove quote" size="xs" tone="wash" onClick={onRemove} className="-ml-[7px]">
+            <IconButton label="Remove quote" size="xs" tone="wash" onClick={onRemove}>
               <Icons.close size="md" />
             </IconButton>
           </motion.div>

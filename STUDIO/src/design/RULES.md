@@ -104,6 +104,9 @@ the same reading-column width and corner radius. Wrapping or attachments make
 room for the field without changing the controls' appearance. Wrapping is judged
 against one stable width beside those tools in both arrangements, so the layout
 cannot oscillate between them.
+The 6px outer padding and single-line height stay the same. Field margins and
+the space for the tool row interpolate together, without scaling the text or
+replacing its field. A reply strip follows the inset curve of the composer.
 
 **A handover between surfaces moves along the hierarchy, not the vertical.**
 Home sits under nothing, a project under home, a conversation under its
@@ -380,13 +383,13 @@ a transparent window it paints the margin as a pale box. The margin still
 belongs to the OS window, so it blocks clicks to whatever is behind it.
 
 The header is transparent: no fill, no hairline. Content scrolls under it and
-is masked by a gradient rather than hidden behind a bar. It is 66px tall, with
-its marks at 20px in 29px circles on a 35px pitch. Left is the conversation
-selector. Right runs Personalize, a divider, then new conversation, capture,
-sidebar, maximize, more and close, in that order. There is no minimize, because
-the reference has none. Close sits in a grey circle in every window. Anything
-Studio needs beyond those lives in the three dots. A control drawn ahead of its
-feature is disabled and says it is coming.
+is masked by a gradient rather than hidden behind a bar. It is 40px tall.
+Standard keeps its window controls at the left, beside the sidebar toggle;
+Compact keeps its window controls at the right. The centered title is plain
+text, with no conversation icon or selector. Rename and the other conversation
+actions live in More. The Workspace control has a panel mark distinct from the
+Overview list mark. Settings keeps its page title and window/sidebar controls,
+without conversation actions or work-surface toggles.
 
 Drag uses `startDragging()`, not `data-tauri-drag-region`. The attribute also
 binds double-click-to-maximize, and a maximized window loses the panel's corner

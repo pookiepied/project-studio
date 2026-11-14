@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -221,10 +221,29 @@ export function Composer({
   const leftTools = useRef<HTMLDivElement>(null)
   const rightTools = useRef<HTMLDivElement>(null)
   const [multiline, setMultiline] = useState(false)
+  // Tools keep their intrinsic size while the field's margins and the space
+  // below it interpolate. Measuring the resting tools, rather than the moving
+  // field, also keeps the wrap threshold stable throughout that transition.
+  useLayoutEffect(() => {
+    const row = input.current
+    const left = leftTools.current
+    const right = rightTools.current
+    if (!row || !left || !right) return
+    const measure = () => {
+      row.style.setProperty('--composer-left-tools', `${left.offsetWidth}px`)
+      row.style.setProperty('--composer-right-tools', `${right.offsetWidth}px`)
+      row.style.setProperty('--composer-tools-height', `${Math.max(left.offsetHeight, right.offsetHeight)}px`)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(left)
+    observer.observe(right)
+    return () => observer.disconnect()
+  }, [])
   const inlineWidth = useCallback(() => {
     const row = input.current
     if (!row || row.clientWidth === 0) return 0
-    const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0
+    const gap = Number.parseFloat(getComputedStyle(row).getPropertyValue('--composer-tools-gap')) || 0
     return Math.max(1, row.clientWidth - (leftTools.current?.offsetWidth ?? 0) -
       (rightTools.current?.offsetWidth ?? 0) - gap * 2)
   }, [])
