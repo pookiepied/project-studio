@@ -101,12 +101,7 @@ export type CodeOffset = (typeof CODE_OFFSET_CHOICES)[number]
  * `assertScaleDefaults` below fails loudly in development if the two ever
  * disagree — the CSS is a safety net, these are the authority.
  */
-/**
- * 14, not the reference's 15: this one number sizes the whole chrome as well as
- * the conversation, and at 15 the sidebar and menus read a size large for a
- * desktop app. 15 is one step up in Settings.
- */
-export const DEFAULT_UI_SIZE: UiSize = 14
+export const DEFAULT_UI_SIZE: UiSize = 13
 export const DEFAULT_CODE_OFFSET: CodeOffset = -1
 
 /** What the code text actually resolves to, for labelling a settings row. */

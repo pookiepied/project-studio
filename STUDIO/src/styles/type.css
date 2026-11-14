@@ -11,7 +11,7 @@
    The offsets below mirror that file. If you change one, change both.
    --------------------------------------------------------------------------- */
 :root {
-  --ui-size: 14px;
+  --ui-size: 13px;
   /* Code text is an *offset* from the interface text, never an absolute size.
 
      A mono face at the same nominal size as its sans surroundings paints
