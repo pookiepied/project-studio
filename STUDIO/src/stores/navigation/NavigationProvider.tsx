@@ -79,46 +79,94 @@ const HOME: Route = { kind: 'home' }
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(HOME)
   const [move, setMove] = useState<NavigationMove>('push')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpenState] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
 
+  // ---- The Settings visit ---------------------------------------------------
+  //
+  // While Settings is the route, the sidebar column shows the settings tree and
+  // nothing else, so the column is the only way to move between sections. A
+  // column that was closed therefore has to open on entry, and a column the
+  // user had deliberately closed must not stay open afterwards -- so the state
+  // at entry is remembered and put back on the way out.
+  //
   // `settingsReturn` is where Settings was entered from, captured once per
   // entry and never updated while moving between sections. "Back" always means
   // this one place for the whole visit; a back whose destination drifted with
   // the last section clicked would be a back nobody could trust.
+  //
+  // `sidebarMoved` records that the user toggled the column themselves during
+  // the visit. Their last deliberate action then outranks restoration: leaving
+  // Settings puts back the entry state only when the user never touched it.
   const [settingsReturn, setSettingsReturn] = useState<Route>(HOME)
+  const [sidebarAtEntry, setSidebarAtEntry] = useState(false)
+  const [sidebarMoved, setSidebarMoved] = useState(false)
   /**
    * Whether the window is narrow enough that the column floats. False until
-   * the shell says otherwise, which is the desktop reading and the safe default.
+   * the shell says otherwise, which is the desktop reading and the safe
+   * default: the restore-on-leave rule below is written for the resident
+   * column first.
    */
   const [compact, setCompact] = useState(false)
 
   const go = useCallback(
     (next: Route, transition?: NavigationMove) => {
+      // Leaving Settings is any navigation out of it, not just the back
+      // control -- opening a conversation from the palette is also a leaving.
+      // The column was opened for Settings' sake; when that reason ends it
+      // returns to what it was, unless the user moved it in the meantime.
+      //
+      // On a narrow window the column is a drawer over the page, and restoring
+      // "as it was" would leave the drawer open over the surface being
+      // returned to: the route changes underneath a panel that covers it,
+      // which reads as the back control having done nothing. A drawer is
+      // summoned, not resident, so leaving Settings dismisses it whatever the
+      // entry state was.
+      if (route.kind === 'settings' && next.kind !== 'settings') {
+        if (compact) setSidebarOpenState(false)
+        else if (!sidebarMoved) setSidebarOpenState(sidebarAtEntry)
+      }
       setMove(transition ?? moveBetween(route, next))
       setRoute(next)
       setPaletteOpen(false)
     },
-    [route],
+    [route, sidebarMoved, sidebarAtEntry, compact],
   )
 
   const openSettings = useCallback(
     (sectionId = 'general') => {
-      // Entering, not switching: the visit's return point is settled once.
-      // Settings carries its own section list, so the sidebar stays as it is,
-      // except that a drawer must not stay open over the page it just opened.
+      // Entering, not switching: capture where to return to and open the
+      // column, which Settings navigation requires. Switching sections inside
+      // Settings changes neither -- the visit's return point was settled when
+      // it began.
       if (route.kind !== 'settings') {
         setSettingsReturn(route)
-        if (compact) setSidebarOpen(false)
+        setSidebarAtEntry(sidebarOpen)
+        setSidebarMoved(false)
+        if (!sidebarOpen) setSidebarOpenState(true)
       }
       go({ kind: 'settings', sectionId })
     },
-    [route, compact, go],
+    [route, sidebarOpen, go],
   )
 
   const leaveSettings = useCallback(() => {
     go(settingsReturn)
   }, [go, settingsReturn])
+
+  const setSidebarOpen = useCallback((open: boolean) => {
+    // Appearance's window-size choice is also a deliberate move of the column;
+    // it must outrank the state captured when Settings was entered.
+    setSidebarMoved(true)
+    setSidebarOpenState(open)
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    // Any manual move of the column -- strip toggle, Ctrl B, scrim tap --
+    // cancels the pending restoration for the current Settings visit.
+    setSidebarMoved(true)
+    setSidebarOpenState((open) => !open)
+  }, [])
 
   const value = useMemo<NavigationValue>(
     () => ({
@@ -132,12 +180,22 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       openProject: (projectId) => go({ kind: 'project', projectId }),
       openSettings,
       leaveSettings,
-      toggleSidebar: () => setSidebarOpen((open) => !open),
+      toggleSidebar,
       setSidebarOpen,
       setPaletteOpen,
       setCompactLayout: setCompact,
     }),
-    [route, move, sidebarOpen, paletteOpen, go, openSettings, leaveSettings],
+    [
+      route,
+      move,
+      sidebarOpen,
+      paletteOpen,
+      go,
+      openSettings,
+      leaveSettings,
+      toggleSidebar,
+      setSidebarOpen,
+    ],
   )
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>

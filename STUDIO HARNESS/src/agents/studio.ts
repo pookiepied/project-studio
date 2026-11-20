@@ -362,6 +362,11 @@ export function renderStudio(id: string, agentId: string, modelOverride?: string
   // runs after this and reads no delivery. A `signal` carries no attachments,
   // and an older test double without the host member copies nothing.
   const delivery = useDelivery();
+  // Whether this conversation has been given its remembered context. Durable
+  // instance state rather than a transcript scan, so a restart, a resumed
+  // submission or a later turn never delivers it a second time. Only the
+  // Studio agent's own conversations carry it; a worker inherits nothing.
+  const [memoryDelivered, setMemoryDelivered] = usePersistentState("memory_context_delivered", false);
   const attachmentCopies = delivery.kind === "user" && delivery.attachments !== undefined
     ? runtime.persistDeliveredAttachments?.(id, delivery.attachments)
     : undefined;
@@ -397,6 +402,19 @@ export function renderStudio(id: string, agentId: string, modelOverride?: string
     // A finished job's own signal wakes the same seam; a document waits for
     // the person's words, not for a background job's.
     if (delivery.kind !== "user") return;
+    // The remembered context, once, ahead of the person's first message being
+    // answered. A signal rather than the instructions: a profile edit or a new
+    // memory must not move the cached prefix every conversation shares, and a
+    // signal is a system entry the window never draws as the person's words.
+    // Marked delivered even when there was nothing to say, so a conversation
+    // that began empty is not handed a block halfway through.
+    if (!memoryDelivered && agentId === STUDIO_AGENT_ID) {
+      setMemoryDelivered(true);
+      const remembered = runtime.memoryContext?.(id);
+      if (remembered !== undefined) {
+        append({ kind: "signal", type: "memory_context", tagName: "memory_context", body: remembered });
+      }
+    }
     if ((delivery.attachments?.length ?? 0) > 0) {
       append({
         kind: "signal",

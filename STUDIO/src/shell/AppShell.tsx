@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_AWAY, EASE_SETTLE, RADIUS } from '@/design/tokens'
+import { motion, useReducedMotion } from 'framer-motion'
+import { RADIUS, SPRING_PANEL } from '@/design/tokens'
 import { PageTransition } from '@/components/primitives'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { ChatPage } from '@/features/chat'
@@ -57,6 +57,10 @@ export function AppShell() {
   const workspacePanel = useWorkspacePanel()
   const canOpenWorkspace = route.kind === 'chat' || route.kind === 'home'
   const workspaceOpen = canOpenWorkspace && workspacePanel?.open === true
+  const [workspaceMoving, setWorkspaceMoving] = useState(false)
+  const [workspaceMounted, setWorkspaceMounted] = useState(workspaceOpen)
+  const reducedMotion = useReducedMotion()
+  useEffect(() => { if (workspaceOpen) setWorkspaceMounted(true) }, [workspaceOpen])
 
   /**
    * The two columns are mutually exclusive, and the one asked for last wins:
@@ -205,7 +209,7 @@ export function AppShell() {
           the "why is this cut off" look. Closed, the page is simply the window
           again. */}
       <div
-        className={`relative min-w-0 flex-1 overflow-hidden bg-surface transition-[border-radius] duration-base ease-out ${reflowLight ? 'studio-reflow-light' : ''}`}
+        className={`relative min-w-0 flex-1 overflow-hidden bg-surface transition-[border-radius] duration-base ease-out ${reflowLight || workspaceMoving ? 'studio-reflow-light' : ''}`}
         // Inline rather than `rounded-l-xl`, so the radius comes from the same
         // token the window's own corner does and the two cannot drift apart.
         // A utility would work equally well; this just keeps one source.
@@ -221,29 +225,26 @@ export function AppShell() {
           borderBottomRightRadius: railShown ? RADIUS.xl : 0,
         }}
       >
-        {/* The strip is page furniture, so it reads the page's own layout
-            facts from the shell: whether the sidebar is the floating drawer
-            (narrow window) and whether that drawer is on screen decide both
-            the toggle's place and the centred title's. */}
-        <TopStrip compact={compact} standard={!compactWindow} sidebarShown={sidebarShown} onOpenOverview={route.kind === 'chat' ? openOverview : undefined}
-          workspaceOpen={workspaceOpen} onToggleWorkspace={canOpenWorkspace ? workspacePanel?.toggle : undefined} />
-
         <div className="studio-workspace-container h-full">
-        <div className="studio-workspace-layout h-full" data-workspace={workspaceOpen}>
+        <motion.div className="studio-workspace-layout relative h-full" data-workspace={workspaceOpen} data-moving={workspaceMoving}
+          initial={false} animate={{ '--workspace-share': workspaceOpen ? 1 : 0 }}
+          transition={reducedMotion ? { duration: 0 } : SPRING_PANEL}
+          onAnimationStart={() => setWorkspaceMoving(true)}
+          onAnimationComplete={() => {
+            setWorkspaceMoving(false)
+            if (!workspaceOpen) setWorkspaceMounted(false)
+          }}>
+        <TopStrip compact={compact} standard={!compactWindow} sidebarShown={sidebarShown} onOpenOverview={route.kind === 'chat' ? openOverview : undefined}
+          workspaceOpen={workspaceOpen} onToggleWorkspace={canOpenWorkspace && !workspaceOpen ? workspacePanel?.toggle : undefined} />
         <div className="studio-workspace-chat relative h-full min-h-0 min-w-0 overflow-hidden">
         <PageTransition view={routeKey(route)} move={move} main>
           {Surface({ route, conversations, projects })}
         </PageTransition>
         </div>
-        <AnimatePresence initial={false}>
-          {workspaceOpen ? <motion.div key="workspace" className="studio-workspace-slot h-full min-w-0 overflow-hidden"
-            initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 8, transition: { duration: DURATION.slow, ease: EASE_AWAY } }}
-            transition={{ duration: DURATION.slow, ease: EASE_SETTLE, opacity: { duration: DURATION.base } }}>
-            <div className="studio-workspace-panel-frame h-full"><WorkspacePanel /></div>
-          </motion.div> : null}
-        </AnimatePresence>
-        </div>
+        {workspaceOpen || workspaceMounted ? <div className="studio-workspace-slot h-full min-w-0" inert={!workspaceOpen}>
+          <div className="studio-workspace-panel-frame h-full"><WorkspacePanel visible={workspaceOpen} /></div>
+        </div> : null}
+        </motion.div>
         </div>
       </div>
 

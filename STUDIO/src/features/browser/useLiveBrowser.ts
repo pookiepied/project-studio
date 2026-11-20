@@ -5,7 +5,7 @@ import { useHarnessClient } from '@/platform/harness/react'
 import type { HarnessClient, HarnessResult } from '@/platform/harness'
 
 /** Poll only the newest screencast frame; never retry a human input. */
-export function useLiveBrowser(conversationId: string) {
+export function useLiveBrowser(conversationId: string, active = true) {
   const getClient = useHarnessClient()
   const client = useRef<HarnessClient | null>(null)
   const [viewerId] = useState(newUuid)
@@ -20,6 +20,7 @@ export function useLiveBrowser(conversationId: string) {
   const connected = useRef(false)
 
   useEffect(() => {
+    if (!active) return
     const current = ++epoch.current
     let timer: ReturnType<typeof setTimeout> | undefined
     let sequence: number | undefined
@@ -65,10 +66,11 @@ export function useLiveBrowser(conversationId: string) {
       connected.current = true
       setError(null)
       setReconnecting(false)
-      if (result.value.frame) sequence = result.value.frame.sequence
+      if (!result.value.running) sequence = undefined
+      else if (result.value.frame) sequence = result.value.frame.sequence
       setState((previous) => ({ ...result.value,
         frame: result.value.frameUnavailable ? null : result.value.frame ?? (previous?.frame?.tabId === result.value.activeTabId ? previous.frame : null) }))
-      timer = setTimeout(() => void read(), document.hidden ? 1500 : result.value.control === 'human' || result.value.busy ? 40 : 100)
+      timer = setTimeout(() => void read(), document.hidden || !result.value.running ? 1500 : 40)
     }
     void read()
     return () => {
@@ -78,7 +80,7 @@ export function useLiveBrowser(conversationId: string) {
       clearTimeout(timer)
       void client.current?.interactConversationBrowser(conversationId, viewerId, { action: 'detach' })
     }
-  }, [getClient, conversationId, viewerId, revision])
+  }, [active, getClient, conversationId, viewerId, revision])
 
   const send = useCallback((command: BrowserCommand) => {
     if (!connected.current) return
@@ -130,7 +132,22 @@ export function useLiveBrowser(conversationId: string) {
     })()
   }, [conversationId, viewerId])
 
-  return { state, error, inputError, reconnecting, send,
+  const [starting, setStarting] = useState(false)
+  const start = async () => {
+    const harness = client.current
+    if (!connected.current || !harness || starting) return
+    const current = epoch.current
+    setStarting(true)
+    setInputError(null)
+    try {
+      const result = await harness.interactConversationBrowser(conversationId, viewerId, { action: 'start' })
+      if (epoch.current === current && !result.ok) setInputError(result.error.message)
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  return { state, error, inputError, reconnecting, starting, start, send,
     reconnect: () => {
       setError(null)
       setRevision((value) => value + 1)

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type KeyboardEvent } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useMotionValue } from 'framer-motion'
 import { Icons } from '@/components/icons'
-import { IconButton } from '@/components/primitives/IconButton/IconButton'
+import { Button, IconButton, MenuItem, Popover } from '@/components/primitives'
 import { DURATION, EASE_OUT, ENTER, SHELL } from '@/design/tokens'
 import type { BrowserCommand, LiveBrowserState } from '@/domain/browser/live'
 import { cn } from '@/lib/cn'
@@ -10,105 +10,169 @@ import { WindowControls } from '@/shell/chrome/WindowControls'
 import { windowFrame } from '@/shell/chrome/windowFrame'
 import { useLiveBrowser } from './useLiveBrowser'
 import { StudioCursor } from './StudioCursor'
+import { SiteMark } from '@/features/artifacts/kinds/SiteMark'
 
-export function BrowserWindow({ conversationId, embedded = false }: { conversationId: string; embedded?: boolean }) {
-  const { state, error, inputError, reconnecting, send, reconnect } = useLiveBrowser(conversationId)
+const VIEW_ZOOMS = [null, 0.5, 0.75, 1] as const
+const zoomLabel = (zoom: number | null) => zoom === null ? 'Fit' : `${zoom * 100}%`
+
+export function BrowserWindow({ conversationId, embedded = false, active: visible = true, onPageTitle }: {
+  conversationId: string; embedded?: boolean; active?: boolean
+  onPageTitle?: (page: { conversationId: string; title: string; url: string }) => void
+}) {
+  const { state, error, inputError, reconnecting, starting, start, send, reconnect } = useLiveBrowser(conversationId, visible)
   const frame = windowFrame()
   const active = state?.tabs.find((tab) => tab.id === state.activeTabId)
   const [address, setAddress] = useState('')
-  const manual = state?.control === 'human' && !error && !reconnecting
+  const [addressFocused, setAddressFocused] = useState(false)
+  const [pagesOpen, setPagesOpen] = useState(false)
+  const [zoomOpen, setZoomOpen] = useState(false)
+  const [zoom, setZoom] = useState<number | null>(null)
+  const zoomTrigger = useRef<HTMLButtonElement>(null)
+  const connected = state !== null
+  const running = state?.running === true
+  const manual = visible && running && state.control === 'human' && !error && !reconnecting
+  const pageTitle = active ? active.title || (active.url === 'about:blank' ? 'New tab' : active.url) : ''
+  const control = (
+    <IconButton size="sm" active={manual} tooltipSide="bottom"
+      label={manual ? 'Resume Studio' : state?.control === 'other' ? 'Controlled in another window' : 'Take control'}
+      disabled={state?.control === 'other' || !!error || reconnecting}
+      onClick={() => send({ action: manual ? 'release' : 'claim' })}>
+      {manual ? <Icons.play size="sm" /> : <Icons.computerUse size="sm" />}
+    </IconButton>
+  )
 
   useEffect(() => { setAddress(active?.url === 'about:blank' ? '' : active?.url ?? '') }, [active?.url])
+  useEffect(() => {
+    if (visible && connected) onPageTitle?.({ conversationId, title: pageTitle, url: active?.url ?? '' })
+  }, [visible, connected, onPageTitle, conversationId, pageTitle, active?.url])
+  useEffect(() => {
+    if (!visible || !running) { setPagesOpen(false); setZoomOpen(false) }
+  }, [visible, running])
+  const addressParts = /^(https?:\/\/(?:[^/?#]*@)?)([^/?#]+)(.*)$/i.exec(address)
+  const emphasizeHost = !addressFocused && addressParts !== null
 
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }}
+    <motion.div initial={embedded ? false : { opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: DURATION.slow, ease: EASE_OUT }}
       className={cn('flex h-full flex-col overflow-hidden bg-surface', !embedded && frame.className)} style={embedded ? undefined : frame.style}>
-      <header className="flex shrink-0 items-center gap-3 px-4" style={{ height: embedded ? 44 : SHELL.topStrip.height }}
+      {embedded ? null : <header className="flex shrink-0 items-center gap-3 px-4" style={{ height: SHELL.topStrip.height }}
         onPointerDown={(event) => {
           if (event.button === 0 && event.target === event.currentTarget) void startWindowDrag()
         }}>
-        {embedded ? null : <span className="pointer-events-none text-caption text-muted-foreground">Studio Browser</span>}
-        <span className="ml-auto text-micro text-muted-foreground" role="status">
-          {reconnecting ? 'Reconnecting' : error ? 'Disconnected' : !state ? 'Connecting' : !state.running ? 'Session ended' : manual ? 'You have control' : state.control === 'other' ? 'Controlled in another window' : 'Studio has control'}
-        </span>
-        <button type="button" disabled={!state?.running || state.control === 'other' || !!error || reconnecting}
-          onClick={() => send({ action: manual ? 'release' : 'claim' })}
-          className="rounded-full bg-tint px-3 py-1 text-caption text-muted-foreground transition-colors duration-base hover:bg-muted disabled:opacity-40">
-          {manual ? 'Resume Studio' : 'Take control'}
-        </button>
-        {embedded ? null : <WindowControls />}
-      </header>
+        <span className="pointer-events-none mr-auto min-w-0 truncate text-caption text-muted-foreground">{pageTitle || 'Studio Browser'}</span>
+        <WindowControls />
+      </header>}
 
-      <div className="flex shrink-0 items-center gap-1 overflow-x-auto px-3 pb-1" aria-label="Browser tabs">
-        {state?.tabs.map((tab) => (
-          <motion.div layout key={tab.id} transition={{ duration: DURATION.base, ease: EASE_OUT }}
-            className={cn('group flex min-w-24 max-w-52 shrink-0 items-center rounded-lg', active?.id === tab.id && 'bg-tint')}>
-            <button type="button" aria-pressed={active?.id === tab.id} disabled={!manual}
-              onClick={() => send({ action: 'select', tabId: tab.id })}
-              className="min-w-0 flex-1 truncate px-3 py-2 text-left text-caption text-muted-foreground">
-              {tab.title || (tab.url === 'about:blank' ? 'New tab' : tab.url)}
-            </button>
-            <IconButton label={`Close ${tab.title || 'tab'}`} size="sm" disabled={!manual}
-              onClick={() => send({ action: 'close', tabId: tab.id })}><Icons.close /></IconButton>
-          </motion.div>
-        ))}
-        <IconButton label="New tab" disabled={!manual} onClick={() => send({ action: 'new' })}><Icons.add /></IconButton>
-        {state?.omittedTabs ? <span className="px-2 text-micro text-muted-foreground">{state.omittedTabs} more tabs</span> : null}
-      </div>
-
-      <form className="flex shrink-0 items-center gap-1 border-b border-border/50 px-3 pb-3 pt-1"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!active || !manual || !address.trim()) return
-          const url = /^https?:\/\//i.test(address.trim()) ? address.trim() : `https://${address.trim()}`
-          send({ action: 'navigate', tabId: active.id, url })
-        }}>
-        <IconButton label="Back" disabled={!manual || !active} onClick={() => active && send({ action: 'back', tabId: active.id })}><Icons.back /></IconButton>
-        <IconButton label="Forward" disabled={!manual || !active} onClick={() => active && send({ action: 'forward', tabId: active.id })}>
-          <span className="rotate-180"><Icons.back /></span>
-        </IconButton>
-        <IconButton label="Reload" disabled={!manual || !active} onClick={() => active && send({ action: 'reload', tabId: active.id })}><Icons.reload /></IconButton>
-        <input aria-label="Address" value={address} onChange={(event) => setAddress(event.target.value)} readOnly={!manual}
-          className="studio-selectable ml-2 min-w-0 flex-1 rounded-full bg-tint px-4 py-2 text-caption text-foreground outline-none transition-colors duration-base placeholder:text-muted-foreground focus:bg-muted"
-          placeholder="Enter a website address" spellCheck={false} />
-      </form>
+      {running ?
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
+        <Popover open={pagesOpen} onOpenChange={setPagesOpen} initialFocus='[role="menuitem"]:not(:disabled)' className="w-72 p-1.5" trigger={
+          <IconButton label="Browser tabs" size="sm" expanded={pagesOpen} hasPopup="menu"
+            onClick={() => setPagesOpen(open => !open)}><Icons.workspace size="sm" /></IconButton>
+        }>
+          <div className="flex flex-col gap-1">
+            {manual ? null : <p className="px-2 py-1 text-caption text-muted-foreground">
+              {state.control === 'other' ? 'Another window controls this browser.' : 'Take control to switch, open, or close browser tabs.'}
+            </p>}
+            {state.tabs.map(tab => {
+              const title = tab.title || (tab.url === 'about:blank' ? 'Untitled tab' : tab.url)
+              return <div key={tab.id} className={cn('flex min-w-0 items-center rounded-md', active?.id === tab.id && 'bg-selected')}>
+                <button type="button" role="menuitem" aria-current={active?.id === tab.id ? 'page' : undefined} disabled={!manual}
+                  onClick={() => { send({ action: 'select', tabId: tab.id }); setPagesOpen(false) }}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left text-caption enabled:hover:bg-tint">
+                  <SiteMark href={tab.url} compact /><span className="truncate">{title}</span>
+                </button>
+                <IconButton label={`Close ${title}`} role="menuitem" size="sm" disabled={!manual}
+                  onClick={() => send({ action: 'close', tabId: tab.id })}><Icons.close size="sm" /></IconButton>
+              </div>
+            })}
+            {state.omittedTabs ? <span className="px-2 text-micro text-muted-foreground">{state.omittedTabs} more tabs</span> : null}
+            <Button role="menuitem" size="sm" variant="ghost" icon={<Icons.add size="sm" />} disabled={!manual}
+              className="self-start" onClick={() => { send({ action: 'new' }); setPagesOpen(false) }}>New tab</Button>
+          </div>
+        </Popover>
+        <form className="flex min-w-36 flex-1 items-center gap-0.5"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!active || !manual || !address.trim()) return
+            const url = /^https?:\/\//i.test(address.trim()) ? address.trim() : `https://${address.trim()}`
+            send({ action: 'navigate', tabId: active.id, url })
+          }}>
+          <IconButton label="Back" size="xs" disabled={!manual || !active} onClick={() => active && send({ action: 'back', tabId: active.id })}><Icons.back /></IconButton>
+          <IconButton label="Forward" size="xs" disabled={!manual || !active} onClick={() => active && send({ action: 'forward', tabId: active.id })}>
+            <span className="rotate-180"><Icons.back /></span>
+          </IconButton>
+          <IconButton label="Reload" size="xs" disabled={!manual || !active} onClick={() => active && send({ action: 'reload', tabId: active.id })}><Icons.reload /></IconButton>
+          <div className="relative ml-1 min-w-0 flex-1">
+            {emphasizeHost ? <span aria-hidden className="pointer-events-none absolute inset-x-2 top-1/2 z-10 -translate-y-1/2 truncate text-caption text-muted-foreground">
+              {addressParts[1]}<strong className="font-medium text-foreground">{addressParts[2]}</strong>{addressParts[3]}
+            </span> : null}
+            <input aria-label="Address" value={address} onChange={(event) => setAddress(event.target.value)} readOnly={!manual}
+              onFocus={() => setAddressFocused(true)} onBlur={() => setAddressFocused(false)}
+              className={cn('studio-selectable w-full rounded-md bg-tint px-2 py-1.5 text-caption placeholder:text-muted-foreground focus:bg-muted',
+                emphasizeHost ? 'text-transparent' : 'text-foreground')}
+              placeholder="Enter a website address" spellCheck={false} />
+          </div>
+        </form>
+        <Popover open={zoomOpen} onOpenChange={setZoomOpen} initialFocus='[aria-checked="true"]' className="w-32 p-1" align="end" trigger={
+          <IconButton ref={zoomTrigger} label={`Browser view zoom: ${zoomLabel(zoom)}`} size="sm" expanded={zoomOpen} hasPopup="menu" tooltipSide="bottom"
+            onClick={() => setZoomOpen(open => !open)}><Icons.expand size="sm" /></IconButton>
+        }>
+          {VIEW_ZOOMS.map(scale => <MenuItem key={zoomLabel(scale)} selected={zoom === scale}
+            onSelect={() => { setZoom(scale); setZoomOpen(false); zoomTrigger.current?.focus() }}>{zoomLabel(scale)}</MenuItem>)}
+        </Popover>
+        {control}
+        </div> : null}
 
       <AnimatePresence>
-        {error ? <motion.div {...ENTER} role="alert" className="flex items-center gap-3 border-b border-border/50 px-5 py-3 text-caption text-muted-foreground">
+        {error && running ? <motion.div {...ENTER} role="alert" className="flex items-center gap-3 border-b border-border/50 px-5 py-3 text-caption text-muted-foreground">
           <span className="flex-1">{error}</span>
-          <button type="button" onClick={reconnect} className="rounded-full bg-tint px-3 py-1">Reconnect</button>
+          <Button size="sm" onClick={reconnect}>Reconnect</Button>
         </motion.div> : null}
       </AnimatePresence>
+      {reconnecting && running ? <p role="status" className="border-b px-3 py-1.5 text-caption text-muted-foreground">Reconnecting to the live page</p> : null}
       {inputError ? <p role="alert" className="border-b border-border/50 px-5 py-2 text-caption text-muted-foreground">{inputError}</p> : null}
 
-      {state?.frame && active?.id === state.frame.tabId ? (
-        <BrowserSurface state={state} manual={manual} send={send} />
+      {running && state.frame && active?.id === state.frame.tabId ? (
+        <BrowserSurface state={state} manual={manual} zoom={zoom} send={send} />
       ) : (
-        <div className="flex min-h-0 flex-1 items-center justify-center p-10 text-center">
-          <motion.div {...ENTER} className="flex max-w-sm flex-col gap-2">
-            <p className="studio-heading text-foreground">{state && !state.running ? 'This session has ended' : state?.tabs.length === 0 ? 'A little room to explore' : 'Opening your browser'}</p>
-            <p className="text-caption text-muted-foreground">{state?.frameUnavailable ? 'This live frame exceeded the delivery limit. Resize the window or wait for the next frame.' : state && !state.running ? 'Ask Studio to open a page, then reconnect here.' : state?.tabs.length === 0 ? 'Take control and open a new tab.' : 'The live page will appear here.'}</p>
+        <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">
+          <motion.div {...ENTER} className="flex max-w-sm flex-col items-center gap-2">
+            <p className="text-title font-medium text-foreground">
+              {error ? 'Browser disconnected' : reconnecting ? 'Reconnecting' : !state ? 'Connecting to Studio Browser' : !running ? 'No browser session' : state.tabs.length === 0 ? 'No browser tabs' : 'Waiting for the live page'}
+            </p>
+            {error && !running ? <>
+              <p role="alert" className="text-caption text-muted-foreground">{error}</p>
+              <Button size="sm" onClick={reconnect}>Reconnect</Button>
+            </> : null}
+            {state && !error && !reconnecting ? <p className="text-caption text-muted-foreground">
+              {!running ? 'Start a browser for this conversation.'
+                : state.frameUnavailable ? 'The live frame was too large to display. Wait for the next frame.'
+                : state.tabs.length === 0 ? 'Take control and open a new tab.' : null}
+            </p> : null}
+            {state && !running && !error && !reconnecting
+              ? <Button size="sm" variant="primary" busy={starting} onClick={() => void start()}>Start browser</Button>
+              : null}
           </motion.div>
         </div>
       )}
-      <footer className="flex shrink-0 items-center justify-between px-4 py-2 text-micro text-muted-foreground">
-        <span>{manual ? 'Click the page to type. Paste and keyboard shortcuts are available.' : 'Take control to interact with the page.'}</span>
-        <span>Private to this conversation</span>
-      </footer>
     </motion.div>
   )
 }
 
-function BrowserSurface({ state, manual, send }: {
-  state: LiveBrowserState; manual: boolean; send: (command: BrowserCommand) => void
+function BrowserSurface({ state, manual, zoom, send }: {
+  state: LiveBrowserState; manual: boolean; zoom: number | null; send: (command: BrowserCommand) => void
 }) {
   const area = useRef<HTMLDivElement>(null)
+  const page = useRef<HTMLDivElement>(null)
   const keyboard = useRef<HTMLTextAreaElement>(null)
   const click = useRef({ at: 0, x: 0, y: 0, button: 0, count: 1 })
   const presence = useRef({ at: -Infinity, x: 0, y: 0 })
   const activityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [size, setSize] = useState({ width: 1280, height: 800 })
+  const [size, setSize] = useState({ width: 1280, height: 720 })
+  const [pointerVisible, setPointerVisible] = useState(false)
+  const [pointerPress, setPointerPress] = useState({ pressed: false, pressSequence: 0 })
+  const pointerX = useMotionValue(0)
+  const pointerY = useMotionValue(0)
   const picture = state.frame
   const tabId = state.activeTabId
 
@@ -128,12 +192,16 @@ function BrowserSurface({ state, manual, send }: {
   }, [])
 
   useEffect(() => {
-    if (!manual || !tabId) return
-    const timer = setTimeout(() => send({ action: 'resize', tabId,
-      width: Math.max(320, Math.min(2560, Math.round(size.width))),
-      height: Math.max(320, Math.min(2560, Math.round(size.height))) }), 180)
-    return () => clearTimeout(timer)
-  }, [manual, tabId, size.width, size.height, send])
+    const element = page.current
+    if (!element || !manual || !tabId) return
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault()
+      send({ action: 'wheel', tabId, x: Math.max(-4000, Math.min(4000, event.deltaX)), y: Math.max(-4000, Math.min(4000, event.deltaY)) })
+    }
+    // The wheel scrolls the remote document. Use the surrounding scrollbars to pan a zoomed view.
+    element.addEventListener('wheel', wheel, { passive: false })
+    return () => element.removeEventListener('wheel', wheel)
+  }, [manual, tabId, send])
 
   useEffect(() => {
     if (!manual) return
@@ -143,13 +211,21 @@ function BrowserSurface({ state, manual, send }: {
   }, [manual, send])
 
   if (!picture || !tabId) return null
-  const scale = Math.min(1, size.width / picture.width, size.height / picture.height)
+  const scale = zoom ?? Math.min(1, size.width / picture.width, size.height / picture.height)
   const cursor = state.cursor?.tabId === tabId && state.running && state.control === 'agent' ? state.cursor : null
 
-  const pointer = (event: PointerEvent<HTMLDivElement>, kind: 'move' | 'down' | 'up') => {
+  const pointer = (event: PointerEvent<HTMLDivElement>, kind: 'enter' | 'move' | 'down' | 'up') => {
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(1, bounds.width)))
     const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)))
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      pointerX.set(x * picture.width * scale)
+      pointerY.set(y * picture.height * scale)
+      if (kind === 'enter' || kind === 'move') setPointerVisible(true)
+      if (kind === 'down') setPointerPress(current => ({ pressed: true, pressSequence: current.pressSequence + 1 }))
+      if (kind === 'up') setPointerPress(current => ({ ...current, pressed: event.buttons !== 0 }))
+    }
+    if (kind === 'enter') return
     if (!manual) {
       presence.current.x = x; presence.current.y = y
       if (kind === 'down') event.currentTarget.focus({ preventScroll: true })
@@ -193,19 +269,24 @@ function BrowserSurface({ state, manual, send }: {
   }
 
   return (
-    <div ref={area} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background">
-      <div role="application" aria-label="Live browser page" className="relative shrink-0 touch-none overflow-hidden"
+    <div ref={area} className="relative flex min-h-0 flex-1 overflow-auto bg-background">
+      <div ref={page} role="application" aria-label="Live browser page"
+        className={cn('relative m-auto shrink-0 touch-none overflow-hidden', pointerVisible && 'cursor-none')}
         tabIndex={manual ? -1 : 0}
         style={{ width: picture.width * scale, height: picture.height * scale }}
         onKeyDown={() => {
           if (!manual) send({ action: 'activity', tabId, kind: 'keyboard', x: presence.current.x, y: presence.current.y })
         }}
         onPointerDown={(event) => pointer(event, 'down')} onPointerMove={(event) => pointer(event, 'move')}
+        onPointerEnter={(event) => pointer(event, 'enter')}
+        onPointerLeave={() => {
+          setPointerVisible(false)
+          setPointerPress(current => current.pressed ? { ...current, pressed: false } : current)
+        }}
         onPointerUp={(event) => pointer(event, 'up')} onPointerCancel={(event) => pointer(event, 'up')}
         onContextMenu={(event) => event.preventDefault()}
-        onWheel={(event) => {
-          if (manual) send({ action: 'wheel', tabId, x: Math.max(-4000, Math.min(4000, event.deltaX)), y: Math.max(-4000, Math.min(4000, event.deltaY)) })
-          else send({ action: 'activity', tabId, kind: 'wheel', x: presence.current.x, y: presence.current.y })
+        onWheel={() => {
+          if (!manual) send({ action: 'activity', tabId, kind: 'wheel', x: presence.current.x, y: presence.current.y })
         }}>
         <img src={`data:image/jpeg;base64,${picture.data}`} alt="Live browser page" draggable={false} className="pointer-events-none h-full w-full select-none" />
         <textarea ref={keyboard} aria-label="Browser keyboard input" tabIndex={manual ? 0 : -1} readOnly={!manual}
@@ -222,11 +303,13 @@ function BrowserSurface({ state, manual, send }: {
             event.preventDefault()
             if (manual) send({ action: 'text', tabId, text: event.clipboardData.getData('text/plain').slice(0, 16384) })
           }} />
-        {cursor ? <motion.div aria-label="Studio cursor" data-cursor-kind={cursor.kind ?? 'default'} data-pressed={cursor.pressed === true} className="pointer-events-none absolute left-0 top-0 z-10"
+        {cursor && !pointerVisible ? <motion.div aria-label="Studio cursor" data-cursor-kind={cursor.kind ?? 'default'} data-pressed={cursor.pressed === true} className="pointer-events-none absolute left-0 top-0 z-10"
           animate={{ x: cursor.x * picture.width * scale, y: cursor.y * picture.height * scale }}
           transition={{ duration: DURATION.fast, ease: EASE_OUT }}>
           <StudioCursor key={cursor.tabId} cursor={cursor} />
         </motion.div> : null}
+        {pointerVisible ? <motion.div aria-hidden data-browser-pointer className="pointer-events-none absolute left-0 top-0 z-20"
+          style={{ x: pointerX, y: pointerY }}><StudioCursor cursor={pointerPress} /></motion.div> : null}
       </div>
     </div>
   )

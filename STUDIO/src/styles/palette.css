@@ -1,4 +1,4 @@
-/* Neutral Studio surfaces; colour identifies content and operational state. */
+/* Neutral Studio surfaces, one blue accent touch, and colour for content/state. */
 :root {
   /* File-kind tones: a few shared values, so colour tells kinds apart without
      each kind bringing its own brand. See `fileTypes`. */
@@ -30,27 +30,35 @@
 
   /* Focus is one token here, and it is the keyboard outline's. `--ring`
      appears only on Tab, is drawn outside the control where it cannot crowd
-     anything, and loud is correct there. Fields do not consume it: while they
-     did, they inherited the outline's 45% and every click read as an error
-     state -- the exact regression the field docblock was written against. A
-     field answers focus with its own border deepened instead, drawn by the
-     component; the whisper bloom that once confirmed the edge is gone on the
-     person's word, because two greys stacked on one edge read as thickness,
-     not as focus. */
-  --ring: oklch(0.145 0 0 / 45%);
+     anything, and loud is correct there. It is the chromatic accent: the one
+     place a pointer never goes, so blue can say "keyboard" without tinting the
+     ordinary chrome. Fields do not consume it: while they did, they inherited
+     the outline and every click read as an error state -- the exact regression
+     the field docblock was written against. A field answers focus with its own
+     border deepened instead, drawn by the component; the whisper bloom that
+     once confirmed the edge is gone on the person's word, because two greys
+     stacked on one edge read as thickness, not as focus. */
+  --ring: var(--accent);
   --primary: #282828;
   --primary-foreground: #ffffff;
-  --tooltip: #000;
+  --tooltip: var(--primary);
   --tooltip-foreground: #fff;
   --selection: oklch(0.145 0 0 / 14%);
   --selection-foreground: var(--foreground);
 
-  /* New features share the reference's neutral action palette. Content tones,
-     chart series and operational states keep their own meanings. */
-  --accent: var(--primary);
+  /* ---- The one chromatic accent ------------------------------------------
+     `--primary` is the graphite/black fill for a primary action. `--accent` is
+     the separate blue used for state and choice: an enabled switch, keyboard
+     focus, a selected mark, a live indicator, the streaming caret. It never
+     replaces the primary action fill, so a Send button stays monochrome while
+     the control that is *on* can still be blue. The wash is its pale ground for
+     quote strips and small selected chips. It matches `--tone-accent` today but
+     is declared separately: content tones may evolve without retuning controls.
+     -------------------------------------------------------------------- */
+  --accent: #1f8fe6;
   --accent-foreground: var(--primary-foreground);
-  --accent-wash: var(--selected);
-  --accent-wash-foreground: var(--foreground);
+  --accent-wash: color-mix(in oklab, var(--accent) 12%, transparent);
+  --accent-wash-foreground: color-mix(in oklab, var(--accent) 72%, var(--foreground));
 
   /* The floating draft is a white surface with elevation on focus. */
   --composer-surface: var(--surface-raised);
@@ -63,15 +71,14 @@
   --switch-off: #dedede;
   --model-chip: var(--tint);
   --model-chip-foreground: var(--foreground);
-  --brand-ink: color-mix(in oklab, var(--muted-foreground) 65%, oklch(0.205 0 0));
+  --brand-ink: #000;
   --danger-confirm: #b72740;
 
-  /* -- The one hue -------------------------------------------------------
-     Everything else in this file is greyscale on purpose, and this is the
-     exception that proves why: greyscale can say "quiet", "loud" and
-     "disabled", but it cannot say "this destroys something". Weight is
-     already spoken for -- the primary action is the heaviest thing on the
-     page -- so a destructive control drawn in grey either outranks the
+  /* -- The destructive hue -----------------------------------------------
+     The chrome is graphite and blue is the one interactive accent; red is
+     reserved for the fact greyscale cannot carry: "this destroys something".
+     Weight is already spoken for -- the primary action is the heaviest thing
+     on the page -- so a destructive control drawn in grey either outranks the
      action you actually came to perform, or disappears.
 
      Muted rather than a signal red. This colour appears on a settings page
@@ -82,7 +89,7 @@
   --danger-foreground: oklch(0.985 0 0);
 
   /* -- Diff notation -------------------------------------------------------
-     The third place hue is allowed, on the same terms as danger: greyscale
+     Another place hue is allowed, on the same terms as danger: greyscale
      can say quiet, loud and disabled, but a code change's DIRECTION is the
      fact being displayed, and the notation every diff reader already reads
      at a glance is red for removed, green for added. Inventing a private
@@ -185,6 +192,7 @@
 
 .dark {
   --tone-accent: #3aa8fe;
+  --accent: #3aa8fe;
   --tone-blue: #6b9df0;
   --tone-teal: #4cc2cd;
   --tone-green: #5cc585;
@@ -206,11 +214,9 @@
   --muted: oklch(0.271 0 0);
   --muted-foreground: oklch(0.706 0 0);
   --border: var(--hairline);
-  --ring: oklch(1 0 0 / 45%);
   --primary: oklch(0.94 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --tooltip: #fff;
-  --tooltip-foreground: #000;
+  --tooltip: oklch(0.33 0 0);
   --selection: oklch(1 0 0 / 18%);
   --selection-foreground: var(--foreground);
   /* Frosted: the transcript shows faintly through, under a light hairline. */
@@ -220,7 +226,7 @@
   --switch-off: #373737;
   --model-chip: var(--tint);
   --model-chip-foreground: var(--foreground);
-  --brand-ink: var(--foreground);
+  --brand-ink: #fff;
 
   /* Lifted, like every other colour here: the same lightness that reads as
      calm on white disappears into a 0.205 surface. */

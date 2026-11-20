@@ -45,14 +45,11 @@ try {
     $expectedGraphics.Clear([System.Drawing.Color]::White)
     $hotspot = New-Object System.Drawing.Point(($point.X - $marker.Left), ($point.Y - $marker.Top))
     [Studio.Activity]::PaintCursor($expectedGraphics, $hotspot, $expected.Size)
-    $arrow = $actual.GetPixel(($hotspot.X + 6), ($hotspot.Y + 8))
-    $badge = $actual.GetPixel(($hotspot.X + 16), ($hotspot.Y + 39))
-    $arrowExpected = $expected.GetPixel(($hotspot.X + 6), ($hotspot.Y + 8))
-    $badgeExpected = $expected.GetPixel(($hotspot.X + 16), ($hotspot.Y + 39))
+    $glow = $actual.GetPixel(($hotspot.X - 10), $hotspot.Y)
+    $glowExpected = $expected.GetPixel(($hotspot.X - 10), $hotspot.Y)
     [ordered]@{
         visible = $marker.Visible
-        arrowComposited = $arrow.ToArgb() -eq $arrowExpected.ToArgb()
-        badgeComposited = $badge.ToArgb() -eq $badgeExpected.ToArgb()
+        glowComposited = $glow.B -gt $glow.R -and [math]::Abs($glow.R - $glowExpected.R) -le 2
         focusPreserved = [MarkerBackdrop]::GetForegroundWindow() -eq $foreground
     } | ConvertTo-Json -Compress
 } finally {

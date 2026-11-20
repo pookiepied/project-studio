@@ -4,33 +4,14 @@ import { StudioMark } from '@/components/brand'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
 
 /**
- * One pass of the preload animation: the clover opens and holds its pose.
- * A splash still waiting when a pass ends plays it again.
+ * Leave a beat after the starburst settles before replaying the entrance.
  */
 const PASS_MS = 1_800
 
-/**
- * The preload screen: the brand, arriving.
- *
- * Plays once at startup, over the shell that has already painted beneath it.
- * The surface is the app's own, so the splash never reads as a different
- * program taking the window — it is the same object, still waking up. The
- * leaves open on the mark's own clock; this
- * component owns only the container's slow settle and the exit fade that hands
- * the window over.
- */
 export function SplashScreen({
   waiting = false,
 }: {
-  /**
-   * The store has not answered yet. The preload animation plays once and
-   * then stood still for as long as the store was loading, and a still mark
-   * over a harness that was starting read as a window that had hung. While
-   * waiting, the same animation plays again: each pass the assembled mark
-   * leaves and the clover opens once more, until the store answers and the
-   * splash lifts on the pass it is in. Nothing new is drawn for the wait -
-   * the preload animation is the wait.
-   */
+  /** Replay the entrance while the store loads, then fade into the app. */
   waiting?: boolean
 }) {
   const reducedMotion = useReducedMotion()
@@ -65,11 +46,8 @@ export function SplashScreen({
           transition: { duration: SPLASH.markExitDuration, ease: EASE_OUT },
         }}
         transition={{ duration: 0.8, ease: EASE_OUT }}
-        className="text-[color:var(--brand-ink)]"
       >
-        {/* Keyed by the pass: a new key is the animation from the start,
-            and `wait` lets the finished mark leave before the next pass
-            opens, so the replay crossfades between passes. */}
+        {/* Remount the mark after the previous pass fades. */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={pass}

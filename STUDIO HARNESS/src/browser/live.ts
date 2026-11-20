@@ -81,11 +81,12 @@ export class LiveBrowser {
       return this.#state(input.viewerId, input.since);
     }
     return this.#serial(async () => {
-      if (input.action === "claim") {
+      if (input.action === "claim" || input.action === "start") {
         if (this.#owner !== undefined && !this.#owned()) await this.#releaseKeys();
         if (this.#owned() && this.#owner !== input.viewerId) {
           throw new BrowserError("bad_input", { message: "Another window is controlling this browser." });
         }
+        if (input.action === "start") await this.session.page();
         this.#owner = input.viewerId;
         this.#expires = Date.now() + LEASE_MS;
       } else if (input.action === "release" || input.action === "detach") {
@@ -163,7 +164,7 @@ export class LiveBrowser {
     return next;
   }
 
-  async #input(page: Page, input: Exclude<BrowserInteraction, { action: "view" | "activity" | "claim" | "release" | "detach" | "new" | "close" | "select" | "reset" }>): Promise<void> {
+  async #input(page: Page, input: Exclude<BrowserInteraction, { action: "view" | "start" | "activity" | "claim" | "release" | "detach" | "new" | "close" | "select" | "reset" }>): Promise<void> {
     switch (input.action) {
       case "navigate": await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 10000 }); break;
       case "back": await page.goBack({ waitUntil: "domcontentloaded", timeout: 10000 }); break;
@@ -171,7 +172,7 @@ export class LiveBrowser {
       case "reload": await page.reload({ waitUntil: "domcontentloaded", timeout: 10000 }); break;
       case "resize": await page.setViewportSize({ width: input.width, height: input.height }); break;
       case "pointer": {
-        const viewport = page.viewportSize() ?? { width: 1280, height: 800 };
+        const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
         await page.mouse.move(input.x * viewport.width, input.y * viewport.height);
         if (input.kind === "down") await page.mouse.down({ button: input.button, clickCount: input.clicks });
         if (input.kind === "up") await page.mouse.up({ button: input.button, clickCount: input.clicks });
@@ -301,7 +302,7 @@ export class LiveBrowser {
       } else this.#frame = null;
       void cdp.send("Page.screencastFrameAck", { sessionId: event.sessionId }).catch(() => undefined);
     });
-    await cdp.send("Page.startScreencast", { format: "jpeg", quality: 60, maxWidth: 1600, maxHeight: 1200 });
+    await cdp.send("Page.startScreencast", { format: "jpeg", quality: 85, maxWidth: 1600, maxHeight: 1200 });
     await page.bringToFront();
   }
 

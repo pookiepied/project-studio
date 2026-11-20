@@ -78,7 +78,6 @@ import {
   KeyboardIcon,
   Link01Icon,
   LinkSquare02Icon,
-  Layout03Icon,
   MagicWand01Icon,
   Mic01Icon,
   MicOff01Icon,
@@ -122,7 +121,7 @@ import {
   Txt01Icon,
   Xls01Icon,
 } from '@hugeicons/core-free-icons'
-import { CaptureMark, ComposeMark, CursorMark, ExpandMark, HistoryMark, PanelMark, QuoteMark, ReplyMark, VsCodeMark } from '@/components/icons/familyMarks'
+import { CaptureMark, ComposeMark, CursorMark, ExpandMark, HistoryMark, PanelMark, QuoteMark, ReplyMark, VsCodeMark, WorkAreaMark } from '@/components/icons/familyMarks'
 import {
   AudioLines,
 } from 'lucide-react'
@@ -206,7 +205,6 @@ const REGISTRY = {
   command: { mark: CommandIcon },
   reload: { mark: Refresh01Icon, motion: WIND },
   settings: { mark: Settings02Icon, motion: TURN_SLIGHT },
-  workArea: { mark: Layout03Icon },
 
   // — Conversation --------------------------------------------------------
   // A new bubble, in the bubble family the other conversation marks use.
@@ -536,6 +534,7 @@ export const Icons = {
   expand: fromHugeicons(ExpandMark, 'expand'),
   windowClose: fromHugeicons(Cancel01Icon, 'windowClose'),
   sidebar: fromHugeicons(PanelMark, 'sidebar'),
+  workArea: fromHugeicons(WorkAreaMark, 'workArea'),
   workspace: WorkspaceOverviewMark,
   mcp: McpMark,
   voice: VoiceWave,

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Tooltip } from '@/components/primitives'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { useAttachmentFrame } from '@/features/chat/useAttachmentFrame'
 
@@ -172,9 +171,7 @@ function BrowserStepRow({
             <span className={failed ? 'shrink-0 text-danger' : 'shrink-0'}>
               {failed ? 'Failed' : step.verb}
             </span>
-            {step.subject === null ? null : <Tooltip label={step.subject} overflowOnly className="min-w-0">
-              <span className="truncate">{step.subject}</span>
-            </Tooltip>}
+            {step.subject === null ? null : <span className="min-w-0 truncate">{step.subject}</span>}
           </span>
         }
         open={open}

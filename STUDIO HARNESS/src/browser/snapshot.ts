@@ -8,9 +8,8 @@ import { BrowserError } from "./errors.js";
  * it invents from a screenshot are wrong most of the time — a class name it
  * guessed, a structure that changed one build ago. So every readable element
  * is stamped with a number as the page is read, and the model points at the
- * number. `ref_12` means "the twelfth thing you just showed me", which cannot
- * drift, cannot be guessed wrong, and needs no knowledge of the page's
- * internals.
+ * number. The server reserves a fresh range for every read so a reference
+ * from an earlier read, tab, or navigation cannot bind to a new element.
  *
  * The stamp is an attribute on the element rather than a remembered handle,
  * because a handle does not survive a navigation and an attribute does not
@@ -26,12 +25,19 @@ import { BrowserError } from "./errors.js";
 
 /** The attribute a ref is written into. Namespaced so no real page owns it. */
 const REF_ATTRIBUTE = "data-studio-ref";
+let lastReference = 0;
+const activeReferences = new WeakMap<Page, { start: number; end: number }>();
+
+export function forgetReferences(page: Page): void {
+  activeReferences.delete(page);
+}
 
 export interface SnapshotOptions {
   /** Include elements that are not interactive, for reading structure. */
   readonly all?: boolean;
   /** Cap on lines, so an enormous page cannot fill a context window. */
   readonly limit?: number;
+  readonly query?: string;
 }
 
 /**
@@ -44,11 +50,13 @@ export interface SnapshotOptions {
  * actually being asked.
  */
 export async function snapshot(page: Page, options: SnapshotOptions = {}): Promise<string> {
-  const limit = options.limit ?? 400;
+  const limit = Math.max(1, Math.min(2_000, Math.trunc(options.limit ?? 400)));
   const all = options.all === true;
+  const start = lastReference;
+  lastReference += limit;
 
-  return page.evaluate(
-    ([attribute, includeAll, max]) => {
+  const { outline, end } = await page.evaluate(
+    ([attribute, includeAll, max, first, query]) => {
       const INTERACTIVE = new Set([
         "a",
         "button",
@@ -100,6 +108,9 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
         const aria = element.getAttribute("aria-label");
         if (aria !== null && aria.trim() !== "") return aria.trim();
         const input = element as HTMLInputElement;
+        const associated = Array.from(input.labels ?? [])
+          .map((label) => label.innerText.trim()).filter(Boolean).join(" ");
+        if (associated !== "") return associated;
         if (typeof input.placeholder === "string" && input.placeholder.trim() !== "") {
           return input.placeholder.trim();
         }
@@ -111,8 +122,10 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
         return text.replace(/\s+/g, " ").trim().slice(0, 120);
       };
 
-      const lines: string[] = [];
-      let counter = 0;
+      const primary: { element: Element; depth: number; name: string }[] = [];
+      const secondary: typeof primary = [];
+      let matched = 0;
+      let counter = first;
       const walk = (element: Element, depth: number): void => {
         // Cleared as it is reached, so a ref never means two different things
         // across two reads of the same page. A stale number that silently
@@ -122,9 +135,6 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
         element.removeAttribute(attribute);
         const tag = element.tagName.toLowerCase();
         if (tag === "script" || tag === "style" || tag === "noscript") return;
-        // Past the cap the walk keeps going, because clearing must reach the
-        // whole page even when listing does not; it just stops stamping.
-        const full = lines.length >= max;
 
         // A rich-text editor is a div that takes typing; without this line it
         // is invisible to a read and the model has nothing to type into. The
@@ -136,20 +146,15 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
         const interactive = INTERACTIVE.has(tag) || editable || element.hasAttribute("onclick");
         const wanted = interactive || (includeAll && STRUCTURAL.has(tag));
 
-        if (wanted && !full && visible(element)) {
-          counter += 1;
-          element.setAttribute(attribute, String(counter));
-          const parts = [`${"  ".repeat(Math.min(depth, 8))}${role(element)}`];
+        const candidates = query !== null && !interactive ? secondary : primary;
+        if (wanted && candidates.length < max && visible(element)) {
           const name = label(element);
-          if (name !== "") parts.push(`"${name}"`);
-          const href = element.getAttribute("href");
-          if (href !== null && href !== "") parts.push(`href=${href}`);
-          const value = (element as HTMLInputElement).value;
-          if (typeof value === "string" && value !== "") parts.push(`value="${value.slice(0, 60)}"`);
-          if ((element as HTMLInputElement).disabled === true) parts.push("disabled");
-          if ((element as HTMLInputElement).checked === true) parts.push("checked");
-          parts.push(`[ref_${counter}]`);
-          lines.push(parts.join(" "));
+          const matches = query === null || [name, element.getAttribute("title"), (element as HTMLInputElement).placeholder]
+            .some((value) => value?.toLowerCase().includes(query) === true);
+          if (matches) {
+            candidates.push({ element, depth, name });
+            matched += 1;
+          }
         }
 
         // `children` never enters a shadow root, so a web component's insides
@@ -164,11 +169,30 @@ export async function snapshot(page: Page, options: SnapshotOptions = {}): Promi
       };
 
       walk(document.body, 0);
-      if (lines.length >= max) lines.push(`… more elements than ${String(max)}, not listed.`);
-      return lines.join("\n");
+      // For find, prefer an actionable control over a container whose text
+      // merely repeats the control's label. Ordinary reads stay in DOM order.
+      const lines = [...primary, ...secondary].slice(0, max).map(({ element, depth, name }) => {
+        counter += 1;
+        element.setAttribute(attribute, String(counter));
+        const parts = [`${"  ".repeat(Math.min(depth, 8))}${role(element)}`];
+        if (name !== "") parts.push(`"${name}"`);
+        const href = element.getAttribute("href");
+        if (href !== null && href !== "") parts.push(`href=${href}`);
+        const input = element as HTMLInputElement;
+        const value = input.value;
+        if (input.type !== "password" && typeof value === "string" && value !== "") parts.push(`value="${value.slice(0, 60)}"`);
+        if (input.disabled === true) parts.push("disabled");
+        if (input.checked === true) parts.push("checked");
+        parts.push(`[ref_${counter}]`);
+        return parts.join(" ");
+      });
+      if (matched >= max) lines.push(`… listing capped at ${String(max)} elements.`);
+      return { outline: lines.join("\n"), end: counter };
     },
-    [REF_ATTRIBUTE, all, limit] as const,
+    [REF_ATTRIBUTE, all, limit, start, options.query?.toLowerCase() ?? null] as const,
   );
+  activeReferences.set(page, { start, end });
+  return outline;
 }
 
 /**
@@ -185,6 +209,11 @@ function byRef(page: Page, ref: string): Locator {
     throw new BrowserError("bad_input", {
       message: `"${ref}" is not an element reference. A reference looks like ref_12 and comes from reading the page.`,
     });
+  }
+  const range = activeReferences.get(page);
+  const id = Number(match[1]);
+  if (range === undefined || id <= range.start || id > range.end) {
+    throw new BrowserError("bad_input", { message: `"${ref}" is no longer current for this tab. Use a reference from the latest read_page or find result for this tab.` });
   }
   return page.locator(`[${REF_ATTRIBUTE}="${match[1] as string}"]`);
 }

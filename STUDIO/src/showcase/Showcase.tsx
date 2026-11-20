@@ -435,7 +435,7 @@ function ColourSection() {
   return (
     <Section
       title="Colour registers"
-      note="Monochrome on purpose. White is the ground, ink is the primary, and the greys are registers with different jobs — not one secondary."
+      note="Graphite and white carry the structure. Blue is the one accent for state and choice; red and the diff colours keep their own meanings."
     >
       <Card>
         <div className="grid grid-cols-4 gap-4">
@@ -454,7 +454,9 @@ function ColourSection() {
             note="secondary text, every mark"
           />
           <Swatch token="--primary" className="bg-primary" note="the primary action" />
-          <Swatch token="--danger" className="bg-danger" note="the one hue, quiet at rest" />
+          <Swatch token="--accent" className="bg-accent" note="on, focus, live" />
+          <Swatch token="--ring" className="bg-ring" note="keyboard focus" />
+          <Swatch token="--danger" className="bg-danger" note="destructive only" />
           <Swatch token="--diff-add" className="bg-diff-add" note="added" />
           <Swatch token="--diff-del" className="bg-diff-del" note="removed — danger itself" />
         </div>

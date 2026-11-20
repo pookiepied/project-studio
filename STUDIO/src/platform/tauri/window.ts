@@ -306,9 +306,9 @@ export function indicatorKind(): string | null {
  * Put up the pill that says Studio is using the computer, for a conversation.
  * Nothing outside Tauri: a browser tab has no desktop to indicate on.
  */
-export async function showComputerIndicator(conversationId: string, mode = 'active'): Promise<void> {
+export async function showComputerIndicator(conversationId: string, mode = 'active', target?: { handle: number; pid: number }): Promise<void> {
   if (!isTauri()) return
-  await invoke('computer_indicator_show', { conversationId, mode })
+  await invoke('computer_indicator_show', { conversationId, mode, target })
 }
 
 /** Take the pill down. */

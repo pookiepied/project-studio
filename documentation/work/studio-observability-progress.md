@@ -1,5 +1,29 @@
 # Studio observability implementation tracker
 
+## Studio Memory, first slice (2026-11-21)
+
+New built-in MCP server `studio-memory` (on by default, discovered, relay to
+`/api/memory/conversations/:id/...`) with five tools: `studio_memory_search`,
+`studio_memory_save`, `studio_memory_update`, `studio_memory_forget` (the three
+writes take lists of up to 50 and answer per entry), and `studio_memory_profile`.
+Settings - Personalization edits the profile, the "use memory" switch and every
+memory (add, edit, delete, batch priority, batch delete) through `/api/memory`.
+Migration 31 adds `memory_item` plus an FTS5 external-content index.
+
+Boundaries: MCP and HTTP reuse their existing observation; the relay joins
+`RELAY_SERVER_IDS` so the launcher injects and waits for the management
+endpoint. The only new event is `memory.context` / `memory.context.built`
+(hook kind, counts only). No content in attributes; no new capture, upload or
+identity kind. Coverage: `memory` unit suite (store, scope derivation and
+project isolation, batch partial success, context order/budget/omission count,
+tools through the relay into the real routes; two mutations - body-supplied
+project and inverted visibility - failed as expected), `builtin-servers`
+(memory row, default on, person's off survives restart), client
+`PersonalizationPane` (profile save, switch, add, batch delete).
+Not covered by a test: the once-per-conversation delivery in `agents/studio.ts`
+(Flue persistent state), and a live run of the bundled relay against a running
+harness.
+
 ## Computer-use capability, wave 3 (2026-10-31)
 
 One new tool, `studio_computer_get_window` (read; not in the voice list),
@@ -156,6 +180,29 @@ shadow and spacing, and stays compact within its native window. The original Sto
 label change widened the button by about 23 px in the real browser fixture. The
 new isolated `computer-indicator-layout` suite checks aligned text, stable button
 width and unclipped status labels across 96 font/theme/status/DPI combinations.
+
+## Chrome DevTools by Studio
+
+The separate `studio-chrome` system server uses the existing MCP launcher,
+discovery catalog, tool gate and connection observations. It defaults off.
+Chrome's active profile provides a loopback discovery file outside Studio's
+storage. Studio does not record that file or CDP frames. RPC metadata remains
+observable and Chrome tool arguments and results are excluded from MCP frame
+capture. Tests cover opt-in registration, endpoint validation, ownership,
+attachment to an isolated Chrome, window separation and cursor cleanup.
+
+## Windows native pointer replacement
+
+The existing desktop presence command renews a host-owned helper outside the
+Harness job. The helper takes a short lease for the verified window, replaces
+common Windows cursor slots, and restores saved cursors on focus loss or lease
+end. An abandoned Windows mutex allows a surviving host to restore the configured
+scheme after unexpected helper termination. The existing halo renderer paints
+only the glow and press ring. The helper pipe carries only the projected window
+handle and PID. No pointer coordinates, button data or lease messages enter
+diagnostics. Native tests validate cursor resource construction, original cursor
+capture and lease parsing. An executable-level test checks pipe closure and
+heartbeat expiry without applying an override to the test desktop.
 
 ## Desktop presence and cursor refinement (2026-10-30)
 
@@ -711,7 +758,9 @@ with success/failure. Paint and IPC-arrival parent joining remain unsupported. T
 child's CDP frames and numeric cursor events are transient product data;
 per-frame diagnostic observations are unsupported. Manual input and frames are
 excluded from MCP content capture even under scoped consent. No resend owner
-is introduced. Tests cover lease exclusion/expiry, cross-conversation isolation,
+is introduced. Idle viewer reads and explicit browser start use that same
+operation. Start checks the conversation's browser enablement. Tests cover
+lease exclusion/expiry, cross-conversation isolation,
 admission/validation, capture privacy, and actual installed-browser input,
 frames, cursor telemetry, popups and detach preservation. Validation outcomes
 are recorded with the implementation report; earlier gate counts above remain

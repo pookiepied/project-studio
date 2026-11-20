@@ -24,9 +24,9 @@ import {
   bootstrappedQuietThinkingLevel,
 } from "../gateway/language/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
-import type { BrowserInteraction } from "../browser/interaction.js";
+import { IDLE_BROWSER_VIEW, type BrowserInteraction } from "../browser/interaction.js";
 import { BrowserError } from "../browser/errors.js";
-import { observeOperation } from "../observability/operation.js";
+import { observeOperation, observeSynchronousOperation } from "../observability/operation.js";
 import { createObservationWriter, recordObservation } from "../observability/recorder.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
@@ -115,6 +115,8 @@ import { ConnectionStore } from "../gateway/connections/connection-store.js";
 import { ModelCatalog } from "../gateway/connections/model-catalog.js";
 import { mediaFinishedNotice, mediaJobLines } from "../tools/media/index.js";
 import type { LibraryStore } from "../library/store.js";
+import type { MemoryStore } from "../memory/store.js";
+import { memoryContextBlock } from "../memory/context.js";
 import { ConversationStore } from "../conversations/store.js";
 import { VoiceSettings } from "../gateway/language/voice-settings.js";
 import { dispatchBackgroundAgent } from "../agents/definitions/dispatch.js";
@@ -228,6 +230,8 @@ export interface StudioRuntimeOptions {
    * kept file can be found and then read or edited in any conversation.
    */
   readonly library?: LibraryStore;
+  /** The profile and saved memories a new conversation's context block is read from. */
+  readonly memory?: MemoryStore;
   /**
    * Where a finished job's news goes: one conversation, one message.
    *
@@ -584,6 +588,13 @@ export interface AgentHost {
    */
   libraryDirectory?(): string | undefined;
   /**
+   * The remembered context a conversation starts with: profile, long-term
+   * and recent memories, and its project's memories. Undefined when memory
+   * is switched off or there is nothing to say. Read once, at the first
+   * user delivery, by the render's start hook.
+   */
+  memoryContext?(conversationId: string): string | undefined;
+  /**
    * The documents attached since the conversation's last announcement, as
    * the signal that tells the model of them, and marked announced in the
    * same call. Undefined when nothing was attached. Called from the
@@ -853,6 +864,7 @@ export class StudioRuntime implements AgentHost {
    */
   readonly #mediaJobs: MediaJobs | undefined;
   readonly #library: LibraryStore | undefined;
+  readonly #memory: MemoryStore | undefined;
   readonly #documents: ConversationDocumentStore;
   /**
    * The task index: one row per dispatched background agent task (ADR 0058
@@ -912,6 +924,7 @@ export class StudioRuntime implements AgentHost {
     this.#tasks.onSettled(() => this.#drainVoiceQueue());
     this.#mediaJobs = options.mediaJobs;
     this.#library = options.library;
+    this.#memory = options.memory;
     this.#documents = new ConversationDocumentStore(this.#db);
     this.#media =
       options.mediaJobs === undefined
@@ -1515,6 +1528,38 @@ export class StudioRuntime implements AgentHost {
     return this.#library?.directory;
   }
 
+  memoryContext(conversationId: string): string | undefined {
+    const memory = this.#memory;
+    if (memory === undefined) return undefined;
+    return observeSynchronousOperation("hook", "memory.context", () => {
+      if (!memory.settings().enabled) {
+        recordObservation({ name: "memory.context.built", phase: "progress", attributes: { enabled: false, delivered: false } });
+        return undefined;
+      }
+      const projectId = this.#conversationProject(conversationId);
+      const project = projectId === undefined ? undefined : this.#projects.get(projectId);
+      const block = memoryContextBlock({
+        profile: memory.profile(),
+        items: memory.forContext(project === undefined ? {} : { projectId: project.id }),
+        project: project === undefined ? undefined : { id: project.id, name: project.name },
+        now: Date.now(),
+      });
+      // Counts and size only; the remembered text is the model's content and
+      // reaches the transcript through the signal, never an attribute.
+      recordObservation({
+        name: "memory.context.built",
+        phase: "progress",
+        attributes: {
+          enabled: true,
+          delivered: block !== undefined,
+          inProject: project !== undefined,
+          ...(block === undefined ? {} : { ...block.counts, chars: block.body.length }),
+        },
+      });
+      return block?.body;
+    });
+  }
+
   announceDocuments(conversationId: string): DocumentAnnouncement | undefined {
     return this.#documents.announce(conversationId);
   }
@@ -1875,8 +1920,20 @@ export class StudioRuntime implements AgentHost {
   async interactBrowser(conversationId: string, input: BrowserInteraction): Promise<unknown> {
     return observeOperation("mcp", "browser.interaction", async () => {
       const record = this.#registry.get(BROWSER_SERVER_ID);
+      if (input.action === "start") {
+        if (record?.provenance !== "system") {
+          throw new BrowserError("no_browser", { message: "Studio Browser is unavailable in this Harness build." });
+        }
+        if (!this.#selection.resolve("mcp", record.id, this.#enablementContext(conversationId)).enabled) {
+          throw new BrowserError("no_browser", { message: "Enable Studio Browser for this conversation before starting it." });
+        }
+        const connection = await this.#supervisor.ensure(record);
+        return connection.request("studio/browser", { input, _meta: { "studio/conversation": conversationId } });
+      }
       if (record?.provenance !== "system" || this.#supervisor.status(record.id)?.state !== "ready") {
-        throw new BrowserError("no_tab", { message: "This browser session has ended. Ask Studio to open a page again." });
+        if (input.action === "view") return IDLE_BROWSER_VIEW;
+        if (input.action === "detach") return { accepted: true };
+        throw new BrowserError("no_tab", { message: "Ask Studio to open a page for this conversation first." });
       }
       const connection = await this.#supervisor.ensure(record);
       return connection.request("studio/browser", { input, _meta: { "studio/conversation": conversationId } });
@@ -1885,7 +1942,8 @@ export class StudioRuntime implements AgentHost {
 
   /**
    * Reads live desktop ownership without starting a server or driver. This
-   * global product projection contains no window, pointer or screen content.
+   * global product projection exposes the target identity for native placement
+   * without window titles, pointer coordinates or screen content.
    */
   async computerActivity(): Promise<unknown> {
     return observeOperation("mcp", "computer.activity", async () => {

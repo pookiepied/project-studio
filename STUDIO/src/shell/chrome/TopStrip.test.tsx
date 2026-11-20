@@ -143,16 +143,25 @@ describe('the strip under a floating sidebar', () => {
 })
 
 describe('the title', () => {
-  it('lets a long title shrink inside its centered region', () => {
+  it('lets a long title shrink inside its centered region', async () => {
     mountStrip({})
-    const title = screen.getByText('New conversation')
+    openChatRoute()
+    const title = await screen.findByText(CONVERSATION.title)
     expect(title.className).toContain('truncate')
     expect(title.parentElement?.className).toContain('min-w-0')
+    expect(title.parentElement?.className).toContain('studio-header-title')
   })
 
-  it('names a new conversation on home', () => {
+  it('aligns the title to the chat pane only while the workspace is open', async () => {
+    mountStrip({ workspaceOpen: true })
+    openChatRoute()
+    const title = await screen.findByText(CONVERSATION.title)
+    expect(title.parentElement?.className).not.toContain('studio-header-title')
+  })
+
+  it('omits the conversation title on home', () => {
     mountStrip({})
-    expect(screen.getByText('New conversation')).toBeTruthy()
+    expect(within(screen.getByRole('banner')).queryByText('New conversation')).toBeNull()
   })
 
   it('keeps the conversation title as plain text without a selector or history icon', async () => {
@@ -174,13 +183,14 @@ describe('the title', () => {
     native.desktop = true
     fireEvent.click(screen.getByRole('button', { name: 'open settings' }))
     const header = screen.getByRole('banner')
-    expect(within(header).getByText('Settings').closest('button')).toBeNull()
+    expect(within(header).queryByText('Settings')).toBeNull()
     expect(within(header).queryByRole('button', { name: 'More' })).toBeNull()
     expect(within(header).queryByRole('button', { name: 'New conversation' })).toBeNull()
     expect(within(header).queryByRole('button', { name: 'Turn settings' })).toBeNull()
     expect(within(header).queryByRole('button', { name: 'Show Workspace' })).toBeNull()
     expect(within(header).queryByRole('button', { name: /^Conversations/ })).toBeNull()
-    expect(within(header).getByRole('button', { name: 'Show sidebar' })).toBeTruthy()
+    // Settings navigation lives in the column, so entering Settings opens it.
+    expect(within(header).getByRole('button', { name: 'Hide sidebar' })).toBeTruthy()
     expect(within(header).getByRole('group', { name: 'Window controls' })).toBeTruthy()
   })
 })
@@ -189,6 +199,7 @@ describe('the controls', () => {
   it.each([false, true])('keeps Standard controls before the title with a resident sidebar shown: %s', (sidebarShown) => {
     native.desktop = true
     mountStrip({ compact: false, sidebarShown })
+    openChatRoute()
     const title = screen.getByText('New conversation')
     const controls = screen.getByRole('group', { name: 'Window controls' })
     expect(within(controls).getAllByRole('button')).toHaveLength(3)
@@ -209,6 +220,7 @@ describe('the controls', () => {
   it('keeps Compact window controls at the right of the title', () => {
     native.desktop = true
     mountStrip({ compact: true })
+    openChatRoute()
     const title = screen.getByText('New conversation')
     const close = screen.getByRole('button', { name: 'Close' })
     expect(title.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -248,6 +260,12 @@ describe('the controls', () => {
     fireEvent.click(workspace)
     expect(onToggleWorkspace).toHaveBeenCalledOnce()
     expect(workspace.querySelector('.studio-mark-workArea')).not.toBeNull()
+    const sidebar = screen.getByRole('button', { name: /sidebar$/ })
+    const workspaceMark = workspace.querySelector('svg')
+    const sidebarMark = sidebar.querySelector('svg')
+    expect(workspaceMark?.parentElement?.style.width).toBe(sidebarMark?.parentElement?.style.width)
+    expect(workspaceMark?.querySelector('rect')?.outerHTML).toBe(sidebarMark?.querySelector('rect')?.outerHTML)
+    expect(workspaceMark?.innerHTML).not.toBe(sidebarMark?.innerHTML)
     expect(screen.queryByRole('button', { name: 'New conversation' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Show File Viewer' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More' }))

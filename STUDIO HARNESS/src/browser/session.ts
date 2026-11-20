@@ -4,6 +4,7 @@ import { chromium } from "playwright-core";
 import { candidates, noBrowserMessage } from "./resolve.js";
 import { BrowserError } from "./errors.js";
 import { LiveBrowser } from "./live.js";
+import { forgetReferences } from "./snapshot.js";
 
 /**
  * One browser, its tabs, and the reasons it is allowed to exist.
@@ -72,6 +73,7 @@ interface Tab {
   readonly console: ConsoleEntry[];
   readonly network: NetworkEntry[];
   readonly bodies: Map<string, Response>;
+  nextDialog?: { readonly accept: boolean; readonly reply: string | undefined };
 }
 
 export class BrowserSession {
@@ -143,7 +145,7 @@ export class BrowserSession {
         this.#browser = browser;
         this.#driving = candidate.name;
         this.#context = await browser.newContext({
-          viewport: { width: 1280, height: 800 },
+          viewport: { width: 1280, height: 720 },
           // Ours, disposable, and never the person's: a fresh in-memory
           // context, not a profile on disk. Downloads are refused because a
           // file arriving on the machine is a policy question this tool does
@@ -211,6 +213,21 @@ export class BrowserSession {
     this.#counter += 1;
     const id = `tab_${this.#counter}`;
     const tab: Tab = { id, page, console: [], network: [], bodies: new Map() };
+    let requestSequence = 0;
+    const recordRequest = (request: Request, response: Response | null) => {
+      const entryId = `req_${++requestSequence}`;
+      const evicted = tab.network.length === LOG_LIMIT ? tab.network[0] : undefined;
+      if (evicted !== undefined) tab.bodies.delete(evicted.id);
+      push(tab.network, {
+        id: entryId,
+        method: request.method(),
+        url: request.url(),
+        status: response?.status() ?? null,
+        type: request.resourceType(),
+        at: Date.now(),
+      });
+      if (response !== null) tab.bodies.set(entryId, response);
+    };
 
     // Attached now, because none of this can be asked for later. A console
     // message is emitted once; a listener added after the fact reads silence
@@ -222,35 +239,20 @@ export class BrowserSession {
       push(tab.console, { level: "error", text: error.message, at: Date.now() });
     });
     page.on("requestfinished", (request: Request) => {
-      void request.response().then((response) => {
-        const entryId = `req_${tab.network.length + 1}`;
-        push(tab.network, {
-          id: entryId,
-          method: request.method(),
-          url: request.url(),
-          status: response?.status() ?? null,
-          type: request.resourceType(),
-          at: Date.now(),
-        });
-        if (response !== null) tab.bodies.set(entryId, response);
-      });
+      void request.response().then((response) => recordRequest(request, response), () => recordRequest(request, null));
     });
-    page.on("requestfailed", (request: Request) => {
-      push(tab.network, {
-        id: `req_${tab.network.length + 1}`,
-        method: request.method(),
-        url: request.url(),
-        status: null,
-        type: request.resourceType(),
-        at: Date.now(),
-      });
+    page.on("requestfailed", (request: Request) => recordRequest(request, null));
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) forgetReferences(page);
     });
     // A dialog left unanswered blocks the page forever, and the model has no
     // way to see that it is blocked. Dismissing is the safe default: it is
     // what a page gets when nobody is watching, and a tool exists for the
     // cases where an answer is actually wanted.
     page.on("dialog", (dialog) => {
-      void dialog.dismiss().catch(() => undefined);
+      const next = tab.nextDialog;
+      delete tab.nextDialog;
+      void (next?.accept === true ? dialog.accept(next.reply) : dialog.dismiss()).catch(() => undefined);
     });
     page.on("close", () => {
       this.#tabs.delete(id);

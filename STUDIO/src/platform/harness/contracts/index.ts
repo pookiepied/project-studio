@@ -202,6 +202,24 @@ export {
 } from './library'
 
 export {
+  MEMORY_KINDS,
+  MEMORY_SCOPES,
+  type MemoryKind,
+  type MemoryScope,
+  type MemoryPriority,
+  type MemoryItem,
+  type MemoryListing,
+  type MemoryProfile,
+  type MemorySettings,
+  type MemoryEntryResult,
+  parseMemoryItem,
+  parseMemoryListing,
+  parseMemoryProfile,
+  parseMemorySettings,
+  parseMemoryBatch,
+} from './memory'
+
+export {
   PAGE_UNITS,
   type PageUnit,
   type ConversationDocument,

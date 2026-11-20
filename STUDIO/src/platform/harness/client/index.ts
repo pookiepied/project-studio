@@ -34,6 +34,7 @@ import { createRequester, type HarnessClientOptions } from './request'
 import { skillClient, type SkillClient } from './skills'
 import { commandClient, type CommandClient } from './commands'
 import { libraryClient, type LibraryClient } from './library'
+import { memoryClient, type MemoryClient } from './memory'
 import { documentClient, type DocumentClient } from './documents'
 import { taskClient, type TaskClient } from './tasks'
 import { agentClient, type AgentClient } from './agents'
@@ -47,6 +48,7 @@ export type {
 } from './request'
 export type { ManualModelInput } from './providers'
 export { libraryBytesPath, type LibraryQuery, type LibraryAddition } from './library'
+export type { MemoryQuery, MemoryDraft, MemoryEdit } from './memory'
 export type { DocumentUpload } from './documents'
 
 export interface HarnessClient
@@ -55,6 +57,7 @@ export interface HarnessClient
     SkillClient,
     CommandClient,
     LibraryClient,
+    MemoryClient,
     DocumentClient,
     MediaClient,
     ConversationIndexClient,
@@ -72,6 +75,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     ...skillClient(request),
     ...commandClient(request),
     ...libraryClient(request),
+    ...memoryClient(request),
     ...documentClient(request),
     ...mediaClient(request),
     ...conversationIndexClient(request),

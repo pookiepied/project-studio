@@ -31,14 +31,14 @@ describe.skipIf(process.platform !== "win32")("native physical input policy with
     expect(checks["drained"]).toMatchObject({ Moves: 0, Buttons: 0, Wheels: 0, Keys: 0 });
     expect(checks["overlayAbsent"]).toBe(true);
   });
-  it("draws the browser-style arrow and custom rounded badge, including at screen edges", () => {
-    expect(checks).toMatchObject({ arrowPainted: true, badgePainted: true, badgeRounded: true, edgeBadgeVisible: true });
+  it("draws the blue halo at screen edges without painting a second arrow", () => {
+    expect(checks).toMatchObject({ noSecondArrow: true, edgeGlowVisible: true });
   });
-  it("renders the white pointer and charcoal edge without coloured transparency fringes", () => {
-    expect(checks).toMatchObject({ arrowPainted: true, transparentBackground: true, neutralEdges: true });
+  it("keeps the blue glow translucent and leaves the rest of the overlay transparent", () => {
+    expect(checks).toMatchObject({ transparentBackground: true, blueGlow: true });
   });
-  it("draws a press ring and an expanding release pulse that fades away", () => {
-    expect(checks).toMatchObject({ pressRing: true, releaseRing: true, releaseFades: true });
+  it("highlights presses and respects the Windows animation setting on release", () => {
+    expect(checks).toMatchObject({ pressGlow: true, releaseFades: true });
   });
 });
 
@@ -51,11 +51,11 @@ describe.skipIf(process.platform !== "win32")("desktop marker visibility after d
     const { stdout } = await promisify(execFile)(windowsPowerShell(), ["-NoProfile", "-NonInteractive", "-File", fixture, "-Source", source, "-Driver", driver], { windowsHide: true, timeout: 30_000 });
     checks = JSON.parse(stdout.trim());
   }, 35_000);
-  it("restores the marker after pointer correction and renews it after successful input", () => {
-    expect(checks).toMatchObject({ moveVisible: true, inputVisible: true, visibleForFiveSeconds: true });
+  it("keeps the marker visible during quiet intervals, pointer movement and keyboard work", () => {
+    expect(checks).toMatchObject({ moveVisible: true, inputVisible: true, visibleAfterInactivity: true, manualMoveKeepsMarker: true, keyboardKeepsMarker: true });
   });
   it("keeps manual takeover, cleanup and refused input distinct from active input", () => {
-    expect(checks).toMatchObject({ manualMoveHides: true, manualButtonClearsPress: true, releaseHides: true, refused: true, refusedInputHidden: true, refusedInputNotPressed: true, monitorNotStarted: true });
+    expect(checks).toMatchObject({ manualButtonClearsPress: true, refusalKeepsMarker: true, releaseHides: true, refused: true, refusedInputHidden: true, refusedInputNotPressed: true, monitorNotStarted: true });
   });
   it("tracks overlapping button presses until the last release and does not animate wheel input as a click", () => {
     expect(checks).toMatchObject({ pressSurvivesMove: true, multiButtonPress: true, partialReleaseStaysPressed: true, finalReleaseAnimates: true, wheelNotClick: true });

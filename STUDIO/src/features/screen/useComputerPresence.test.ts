@@ -11,6 +11,10 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 describe('computer presence delivery', () => {
   it('validates the projection and discards foreign content', () => {
     expect(parseComputerPresence({ conversationId: 'chat', mode: 'paused', prompt: 'private' })).toEqual({ conversationId: 'chat', mode: 'paused' })
+    expect(parseComputerPresence({ conversationId: 'chat', mode: 'active', target: { handle: 100, pid: 12, title: 'private' } }))
+      .toEqual({ conversationId: 'chat', mode: 'active', target: { handle: 100, pid: 12 } })
+    expect(parseComputerPresence({ conversationId: 'chat', mode: 'active', target: { handle: -1, pid: 12 } }))
+      .toEqual({ conversationId: 'chat', mode: 'active' })
     for (const value of [null, {}, { conversationId: '', mode: 'active' }, { conversationId: 'chat', mode: 'finished' }]) {
       expect(parseComputerPresence(value)).toBeNull()
     }

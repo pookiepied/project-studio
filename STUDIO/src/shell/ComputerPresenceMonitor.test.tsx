@@ -25,7 +25,8 @@ vi.mock('@/stores/workspace', () => ({ useWorkspace: () => ({ computer: { stop }
   ] }) },
 }) }))
 vi.mock('@/platform/tauri', () => ({
-  showComputerIndicator: (id: string, mode: string) => show(id, mode), hideComputerIndicator: () => hide(),
+  showComputerIndicator: (...args: [string, string, ComputerPresence['target']?]) => show(...args),
+  hideComputerIndicator: () => hide(),
   reportComputerStopResult: (id: string, failed: boolean) => report(id, failed),
   onComputerStopRequested: async (next: (id: string, requestId: string) => void) => { handler = next; return () => { handler = undefined } },
 }))
@@ -57,6 +58,14 @@ describe('desktop presence ownership', () => {
     act(() => { vi.advanceTimersByTime(2000) })
     expect(show).toHaveBeenCalledTimes(count)
     expect(hide).toHaveBeenCalledOnce()
+  })
+  it('passes a changed desktop target to the native pill without changing its owner', () => {
+    presence = { conversationId: 'chat', mode: 'active', target: { handle: 100, pid: 10 } }
+    const view = render(<ComputerPresenceMonitor />)
+    expect(show).toHaveBeenLastCalledWith('chat', 'active', { handle: 100, pid: 10 })
+    presence = { ...presence, target: { handle: 101, pid: 10 } }
+    view.rerender(<ComputerPresenceMonitor />)
+    expect(show).toHaveBeenLastCalledWith('chat', 'active', { handle: 101, pid: 10 })
   })
   it('stops the addressed driver, run and owning worker even when that chat is not open', async () => {
     render(<ComputerPresenceMonitor />)

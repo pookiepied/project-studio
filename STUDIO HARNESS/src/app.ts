@@ -54,6 +54,7 @@ import { manageQueuedMessages } from "./conversations/queued-messages.js";
 import { CommandRegistry } from "./extend/commands/registry.js";
 import { ImageDescriber } from "./library/describer.js";
 import { LibraryStore } from "./library/store.js";
+import { MemoryStore } from "./memory/store.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
 import { ConnectionStore } from "./gateway/connections/connection-store.js";
@@ -218,6 +219,10 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // the read root every conversation gets). Built here because the
     // runtime needs it before the routes do.
     const library = new LibraryStore(database);
+    // Memory: the profile and the saved memories, shared the same way - the
+    // routes serve the settings pane and the studio-memory relay, the runtime
+    // reads it for the context block a new conversation starts with.
+    const memory = new MemoryStore(database);
     const runtime = new StudioRuntime({
       database,
       logger: observability.logger,
@@ -229,6 +234,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       mediaJobs,
       mediaAdapters,
       library,
+      memory,
       // The finished-job ping's one Flue seam: when a background job ends, its
       // news is dispatched to the conversation's own agent instance as a
       // signal - a delivery, not a turn-settings-carrying prompt, so it needs
@@ -398,6 +404,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       skills: runtime.skills,
       commands: new CommandRegistry(),
       library,
+      memory,
       describer,
       // Awaited before the run renders. `start()` memoises, so this costs one
       // wait on the first submission after a harness starts and nothing at

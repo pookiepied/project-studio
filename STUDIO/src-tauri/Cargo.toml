@@ -163,7 +163,7 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # no new crate.
 # `Win32_UI_WindowsAndMessaging` gates `ShellExecuteW`, the one association
 # launch in `open_file.rs`, which holds it to a fixed list of inert file types.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
 
 # The permission grant (`permissions.rs`): WebView2's PermissionRequested,
 # answered by Studio instead of by a stall or by Edge's own prompt. The

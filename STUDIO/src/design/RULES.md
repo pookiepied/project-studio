@@ -34,10 +34,10 @@ uses an inset stroke, and keyboard focus stays within the row's edge.
 **Focus is answered by register, not by one treatment.** A control answers
 with an edge: its border deepens, and that is all. A surface answers with
 elevation. The composer follows the same surface rule, without a colored halo.
-The keyboard outline is the loudest register (`--ring`)
-and is keyboard-only, because `:focus-visible` is what makes an assertive ring
-polite. One token never serves two registers; when the fields consumed `--ring`
-every click read as an error state.
+The keyboard outline is the loudest register (`--ring`, the blue accent) and is
+keyboard-only, because `:focus-visible` is what makes an assertive ring polite.
+One token never serves two registers; when the fields consumed `--ring` every
+click read as an error state.
 
 **An interface mark is always `--muted-foreground`.** In every state, in every row, on
 every surface. `.studio-icon` enforces it; nothing inherits `currentColor` from
@@ -201,11 +201,18 @@ condition on it and silently disabled the composer's focus lift in dark mode.
 ## 5. Colour
 
 The light palette is white, `#F7F7F7`, `#F0F0F0` and charcoal `#282828`.
-`--accent` follows `--primary`, so new features use the same neutral actions as
-the rest of the app. Selected pills use the primary fill and its contrasting
-foreground, including their icons. Content may still carry color: chart series,
-file kinds, maps, provider identities and operational states keep their meaning.
-Red identifies destructive actions; a solid fill belongs to final confirmation.
+Graphite and black stay the primary action: a filled Send or Continue is
+`--primary`, and selected pills keep the neutral `--selected` ground.
+
+`--accent` is the one chromatic accent, a blue that carries state and choice:
+an enabled switch, keyboard focus, a selected check, a live indicator, the
+streaming caret and the map route. It never replaces a primary action fill, so
+the chrome can stay monochrome while the control that is *on* is blue. Its pale
+ground is `--accent-wash`, for quote strips and small chosen chips.
+
+Content may still carry colour: chart series, file kinds, maps, provider
+identities and operational states keep their meaning. Red identifies
+destructive actions; a solid fill belongs to final confirmation.
 
 Four state tokens, kept apart because they say different things:
 
@@ -217,9 +224,9 @@ Four state tokens, kept apart because they say different things:
 - `--user-bubble` is the person's own message.
 
 Hover tints composite with their surface. Light selection and user bubbles use
-the reference's soft grey; dark surfaces use a lifted neutral. Tooltips use solid black with white text in
-light mode and solid white with black text in dark mode. The inverted palette
-keeps labels distinct from the surface behind them.
+soft grey, and dark surfaces use a lifted neutral. Tooltips use graphite
+with white text in both themes. See [Studio design](../../../documentation/architecture/design.md)
+for shared rules on color, workspace chrome, and help labels.
 
 An on/off choice is a `Switch`. `Segmented` is for three or more options, or two
 that are not on and off.

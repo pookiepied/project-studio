@@ -13,6 +13,8 @@ import { createSkillRoutes } from "./routes/skills.js";
 import { createCommandRoutes } from "./routes/commands.js";
 import { createLibraryRoutes } from "./routes/library.js";
 import type { LibraryStore } from "../../library/store.js";
+import { createMemoryRoutes } from "./routes/memory.js";
+import type { MemoryStore } from "../../memory/store.js";
 import type { ImageDescriberPort } from "../../library/describer.js";
 import type { CommandRegistry } from "../../extend/commands/registry.js";
 import type { ProviderAdministration } from "../../gateway/connections/management.js";
@@ -78,6 +80,11 @@ export interface CreateHttpAppOptions {
    */
   readonly library?: LibraryStore;
   readonly describer?: ImageDescriberPort;
+  /**
+   * The person's profile and saved memories. Optional for tests; production
+   * wires it, and the studio-memory relay speaks these routes.
+   */
+  readonly memory?: MemoryStore;
   /**
    * Re-asks a conversation's capability note, called by the turn-settings
    * middleware between submissions. A port of the same shape as `servers`:
@@ -282,6 +289,21 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
     app.route(
       "/api/library",
       createLibraryRoutes(options.library, options.describer === undefined ? {} : { describer: options.describer }),
+    );
+  }
+  if (options.memory !== undefined) {
+    app.route(
+      "/api/memory",
+      createMemoryRoutes(options.memory, {
+        conversationProject: (conversationId) => {
+          const record = options.conversations.get(conversationId);
+          if (record === undefined) return undefined;
+          if (record.projectId === undefined || record.projectId === null) return null;
+          const project = options.projects.get(record.projectId);
+          return project === undefined ? null : { id: project.id, name: project.name };
+        },
+        projectExists: (projectId) => options.projects.get(projectId) !== undefined,
+      }),
     );
   }
   app.route("/api/providers", createProviderRoutes(options.providers));

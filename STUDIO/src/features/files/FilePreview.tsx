@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { IconButton, Tooltip } from '@/components/primitives'
 import { fileTypeOf, splitFilePath } from '@/components/icons/fileTypes'
-import { CodeBlock } from '@/features/chat/markdown/blocks/CodeBlock'
+import { CodeBlock, CodeBody } from '@/features/chat/markdown/blocks/CodeBlock'
 import { Markdown } from '@/features/chat/markdown/Markdown'
 import { ReplyConversation } from '@/features/chat/markdown/ReplyImage'
 import { harnessBytesDataUrl } from '@/platform/harness'
@@ -29,8 +29,35 @@ export function FilePreview({ file, conversationId, source = false, revision = 0
   source?: boolean
   revision?: number
 }) {
-  const { readFileText } = useWorkspace()
   const { verbs, run, error, copied, copy } = useFileVerbs(file, null)
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 items-center gap-1">
+        <Tooltip label={file.path} overflowOnly className="min-w-0 flex-1">
+          <span className="truncate text-caption text-muted-foreground">{file.path}</span>
+        </Tooltip>
+        {verbs.map((verb) => {
+          const Mark = FILE_VERB_ICONS[verb.icon]
+          return <IconButton key={verb.id} size="sm" label={verb.label} onClick={() => { void run(verb) }}><Mark size="sm" /></IconButton>
+        })}
+        <IconButton size="sm" label={copied ? 'Copied' : 'Copy path'} active={copied} onClick={() => copy(file.path)}>
+          {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
+        </IconButton>
+      </div>
+      {error !== null ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
+      <FileContent file={file} conversationId={conversationId} source={source} revision={revision} />
+    </div>
+  )
+}
+
+export function FileContent({ file, conversationId, source = false, revision = 0, standalone = false }: {
+  file: LocatedFile
+  conversationId: string
+  source?: boolean
+  revision?: number
+  standalone?: boolean
+}) {
+  const { readFileText } = useWorkspace()
   const [content, setContent] = useState<Content>({ state: 'loading' })
   const mode = traitsOf(file.kind, file.path).preview
 
@@ -55,19 +82,6 @@ export function FilePreview({ file, conversationId, source = false, revision = 0
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex min-w-0 items-center gap-1">
-        <Tooltip label={file.path} overflowOnly className="min-w-0 flex-1">
-          <span className="truncate text-caption text-muted-foreground">{file.path}</span>
-        </Tooltip>
-        {verbs.map((verb) => {
-          const Mark = FILE_VERB_ICONS[verb.icon]
-          return <IconButton key={verb.id} size="sm" label={verb.label} onClick={() => { void run(verb) }}><Mark size="sm" /></IconButton>
-        })}
-        <IconButton size="sm" label={copied ? 'Copied' : 'Copy path'} active={copied} onClick={() => copy(file.path)}>
-          {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
-        </IconButton>
-      </div>
-      {error !== null ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
       {content.state === 'loading' ? <p className="text-caption text-muted-foreground">Loading…</p> : null}
       {content.state === 'failed' ? <p className="text-caption text-muted-foreground">This file cannot be shown here.</p> : null}
       {content.state === 'picture'
@@ -77,7 +91,9 @@ export function FilePreview({ file, conversationId, source = false, revision = 0
         <ReplyConversation.Provider value={conversationId}>
           {mode === 'markdown' && !source
             ? <div className="studio-prose min-w-0"><Markdown text={content.text} /></div>
-            : <CodeBlock code={content.text} fence={fileTypeOf(file.path) ?? 'text'} />}
+            : standalone
+              ? <CodeBody code={content.text} language={fileTypeOf(file.path) ?? 'text'} />
+              : <CodeBlock code={content.text} fence={fileTypeOf(file.path) ?? 'text'} />}
           {content.truncated ? <p className="text-caption text-muted-foreground">Showing the start of this file.</p> : null}
         </ReplyConversation.Provider>
       ) : null}

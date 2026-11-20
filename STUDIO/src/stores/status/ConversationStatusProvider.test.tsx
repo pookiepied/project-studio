@@ -14,14 +14,20 @@ const harness = vi.hoisted(() => ({
   approvals: [] as { conversationId: string }[],
   questions: [] as { conversationId: string }[],
   reachable: true,
+  questionsReachable: true,
+  beforeRunningRead: null as Promise<void> | null,
 }))
 const live = vi.hoisted(() => ({ witnessed: new Set<string>(), markRunning: vi.fn() }))
-const page = vi.hoisted(() => ({ openId: null as string | null }))
+const page = vi.hoisted(() => ({ openId: null as string | null, settings: false }))
 
 const workspace = {
-  runningConversations: async () => (harness.reachable ? ok(harness.running) : down),
+  runningConversations: async () => {
+    const snapshot = harness.running
+    if (harness.beforeRunningRead) await harness.beforeRunningRead
+    return harness.reachable ? ok(snapshot) : down
+  },
   approvals: { list: async () => (harness.reachable ? ok(harness.approvals) : down) },
-  questions: { list: async () => (harness.reachable ? ok(harness.questions) : down) },
+  questions: { list: async () => (harness.reachable && harness.questionsReachable ? ok(harness.questions) : down) },
 }
 
 vi.mock('@/stores/workspace', () => ({
@@ -30,7 +36,7 @@ vi.mock('@/stores/workspace', () => ({
 }))
 vi.mock('@/stores/navigation', () => ({
   useNavigation: () => ({
-    route: page.openId === null ? { kind: 'home' } : { kind: 'chat', conversationId: page.openId },
+    route: page.settings ? { kind: 'settings' } : page.openId === null ? { kind: 'home' } : { kind: 'chat', conversationId: page.openId },
   }),
 }))
 
@@ -53,9 +59,12 @@ beforeEach(() => {
   harness.approvals = []
   harness.questions = []
   harness.reachable = true
+  harness.questionsReachable = true
+  harness.beforeRunningRead = null
   live.witnessed = new Set()
   live.markRunning.mockClear()
   page.openId = null
+  page.settings = false
   localStorage.clear()
 })
 
@@ -126,6 +135,33 @@ describe('conversation status', () => {
     render(tree())
     await nextPoll()
     expect(shown()).toBe('a:input')
+  })
+
+  it('clears an answered approval even if the question read fails', async () => {
+    harness.running = ['a', 'b']
+    harness.approvals = [{ conversationId: 'a' }]
+    harness.questions = [{ conversationId: 'b' }]
+    render(tree())
+    await nextPoll()
+
+    harness.approvals = []
+    harness.questionsReachable = false
+    await nextPoll()
+    expect(shown()).toBe('a:running b:input')
+  })
+
+  it('leaves a new run alone when a poll predates sending and opening Settings', async () => {
+    let complete: () => void = () => {}
+    harness.beforeRunningRead = new Promise<void>(resolve => { complete = resolve })
+    page.openId = 'a'
+    const { rerender } = render(tree())
+
+    live.witnessed = new Set(['a'])
+    page.settings = true
+    rerender(tree())
+    await act(async () => { complete() })
+    expect(live.markRunning).not.toHaveBeenCalled()
+    expect(shown()).toBe('a:running')
   })
 
   it('clears a mark a closed page left behind, but not the open page’s', async () => {

@@ -35,7 +35,7 @@ import { cn } from '@/lib/cn'
  */
 
 type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'header'
-type Tone = 'quiet' | 'solid' | 'accent' | 'wash'
+type Tone = 'quiet' | 'solid' | 'wash'
 
 /**
  * The three control steps, read from the scale rather than written as rem.
@@ -91,8 +91,6 @@ const TONE_CLASS: Record<Tone, string> = {
   // quiet. The arbitrary variant lands in the utilities layer, which is what
   // lets it beat the `.studio-icon` default in `styles/components.css`.
   solid: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary [&_.studio-icon]:text-primary-foreground',
-  // The composer's send: the one filled control in Family A.
-  accent: 'bg-accent text-accent-foreground hover:bg-accent/90 active:bg-accent [&_.studio-icon]:text-accent-foreground',
   // On the accent wash, where a grey mark reads as a different control.
   wash: 'text-accent-wash-foreground hover:bg-accent-wash-foreground/12 active:bg-accent-wash-foreground/20 [&_.studio-icon]:text-accent-wash-foreground',
 }
@@ -100,6 +98,8 @@ const TONE_CLASS: Record<Tone, string> = {
 interface IconButtonProps {
   label: string
   role?: AriaRole
+  expanded?: boolean
+  hasPopup?: 'menu'
   onClick?: () => void
   size?: Size
   tone?: Tone
@@ -112,7 +112,7 @@ interface IconButtonProps {
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, role, onClick, size = 'md', tone = 'quiet', active = false, disabled = false, tooltipSide = 'top', className, children },
+  { label, role, expanded, hasPopup, onClick, size = 'md', tone = 'quiet', active = false, disabled = false, tooltipSide = 'top', className, children },
   ref,
 ) {
   const [pointer, setPointer] = useState<'rest' | 'hover' | 'press'>('rest')
@@ -129,6 +129,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         onClick={onClick}
         disabled={disabled}
         aria-label={label}
+        aria-expanded={expanded}
+        aria-haspopup={hasPopup}
         onPointerEnter={() => setPointer('hover')}
         onPointerLeave={() => setPointer('rest')}
         onPointerDown={() => setPointer('press')}

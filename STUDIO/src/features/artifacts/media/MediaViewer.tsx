@@ -352,7 +352,7 @@ function ToolButton({
         'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-caption transition-colors duration-fast',
         'disabled:pointer-events-none disabled:opacity-45 [&_.studio-icon]:size-[1.1em]',
         primary
-          ? 'bg-accent text-white hover:bg-accent/85'
+          ? 'bg-primary text-primary-foreground hover:bg-primary/85'
           : cn('text-white/85 hover:bg-white/10 [&_.studio-icon]:text-white/85', lit && 'bg-white/12 text-white'),
       )}
     >

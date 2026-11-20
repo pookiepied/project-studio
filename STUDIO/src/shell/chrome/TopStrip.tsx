@@ -19,8 +19,7 @@ const NEW_CONVERSATION = 'New conversation'
  *
  * Standard's controls belong to the page, so they move beside a resident
  * sidebar with the rest of the header. Compact keeps its right-hand controls.
- * The centered title shares the page's bounds. The right end holds the model
- * and the current work surfaces, so the draft can remain a compact input.
+ * The title shares the conversation pane with the model and its actions.
  *
  * It is a transparent layer over the page, which scrolls underneath behind a
  * gradient. Dragging belongs to the empty header, never to a child of it, and
@@ -60,6 +59,7 @@ export function TopStrip({
       ? conversations.find((item) => item.id === route.conversationId) ?? null
       : null
   const conversationId = conversation?.id ?? null
+  const title = headerTitle(route, conversation?.title ?? null, projects)
   useEffect(() => setRenaming(false), [conversationId])
 
   const drawerOut = compact && sidebarShown
@@ -72,7 +72,7 @@ export function TopStrip({
         void startWindowDrag()
       }}
       className={cn(
-        '@container absolute inset-x-0 top-0 z-30 flex items-center gap-4',
+        '@container absolute left-0 right-[var(--chat-header-right,0px)] top-0 z-30 flex items-center gap-2',
         drawerOut && 'pointer-events-none',
       )}
       style={{ height: SHELL.topStrip.height, paddingInline: standard ? 12 : SHELL.topStrip.paddingInline }}
@@ -82,18 +82,19 @@ export function TopStrip({
           <TrafficLights />
           <IconButton label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'} size="header"
             tooltipSide="bottom" onClick={toggleSidebar} active={sidebarOpen}>
-            <Icons.sidebar size="header" />
+            <Icons.sidebar size="header" className="-scale-x-100" />
           </IconButton>
         </div>
       ) : null}
-      {drawerOut ? null : (
-        <div className="studio-header-title flex min-w-0 items-center justify-center">
+      {drawerOut || title === null ? null : (
+        <div className={cn('flex min-w-0 flex-1 items-center overflow-hidden',
+          !workspaceOpen && 'studio-header-title')}>
           {renaming && conversation !== null ? (
             <ConversationRename conversation={conversation} onDone={() => setRenaming(false)} />
           ) : (
-            <span className={cn('min-w-0 truncate text-ui font-medium text-foreground',
+            <span className={cn('pointer-events-none min-w-0 truncate text-ui font-medium text-foreground',
               conversationId !== null && running.has(conversationId) && 'studio-shimmer')}>
-              {headerTitle(route, conversation?.title ?? null, projects)}
+              {title}
             </span>
           )}
         </div>
@@ -111,7 +112,7 @@ export function TopStrip({
             onClick={toggleSidebar}
             active={sidebarOpen}
           >
-            <Icons.sidebar size="header" />
+            <Icons.sidebar size="header" className="-scale-x-100" />
           </IconButton>}
           {standard ? null : <MaximizeControl />}
           {route.kind !== 'settings' ? <ConversationMenu
@@ -127,13 +128,13 @@ export function TopStrip({
   )
 }
 
-/** The page you are on, or the conversation about to start. */
+/** The title of the current conversation or project. */
 function headerTitle(
   route: Route,
   conversationTitle: string | null,
   projects: ReadonlyArray<{ id: string; name: string }>,
-): string {
-  if (route.kind === 'settings') return 'Settings'
-  if (route.kind === 'project') return projects.find((item) => item.id === route.projectId)?.name ?? NEW_CONVERSATION
-  return conversationTitle ?? NEW_CONVERSATION
+): string | null {
+  if (route.kind === 'chat') return conversationTitle ?? NEW_CONVERSATION
+  if (route.kind === 'project') return projects.find((item) => item.id === route.projectId)?.name ?? null
+  return null
 }

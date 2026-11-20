@@ -88,6 +88,21 @@
     vector-effect: non-scaling-stroke;
   }
 
+  /* The working ring keeps its own loop when the sidebar skips its entrance. */
+  @media (prefers-reduced-motion: no-preference) {
+    .studio-activity-mark {
+      transform-box: view-box;
+      transform-origin: center;
+      animation: studio-activity-mark 960ms steps(12) infinite;
+    }
+  }
+
+  @keyframes studio-activity-mark {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
   /* -- Work in flight, written in the label itself --------------------------
 
      A valley of lower opacity sweeps through the words of a row that is

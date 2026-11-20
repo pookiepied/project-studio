@@ -94,7 +94,7 @@ export function AnswerField({
       <IconButton
         label={stopping ? 'Stop the run' : sendLabel}
         size="xs"
-        tone="accent"
+        tone="solid"
         disabled={disabled || busy || (!canSend && onStop === null)}
         onClick={stopping ? (onStop ?? undefined) : onSend}
       >
@@ -134,7 +134,7 @@ export function AnswerField({
  */
 export function StopButton({ onStop, disabled = false }: { readonly onStop: () => void; readonly disabled?: boolean }) {
   return (
-    <IconButton label="Stop the run" size="xs" tone="accent" disabled={disabled} onClick={onStop}>
+    <IconButton label="Stop the run" size="xs" tone="solid" disabled={disabled} onClick={onStop}>
       <Icons.stop size="md" />
     </IconButton>
   )

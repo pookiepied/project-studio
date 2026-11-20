@@ -6,8 +6,13 @@ import { ExtensionInventory } from "../../src/extend/inventory.js";
 import {
   BROWSER_SERVER_ID,
   browserServerPath,
+  CHROME_SERVER_ID,
+  chromeServerPath,
   COMPUTER_SERVER_ID,
   computerServerPath,
+  MEMORY_SERVER_ID,
+  memoryServerPath,
+  RELAY_SERVER_IDS,
   registerBuiltInServers,
 } from "../../src/extend/mcp/builtin.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
@@ -81,6 +86,17 @@ describe("Studio's own capabilities become ordinary rows", () => {
     expect(selection.decisionAt(KEY)).toBe(false);
   });
 
+  it("ships Chrome as a separate opt-in and preserves the user's decision", () => {
+    if (chromeServerPath() === undefined) return;
+    registerBuiltInServers(registry, selection);
+    const key = { kind: "mcp", extensionId: CHROME_SERVER_ID, scope: GLOBAL_SCOPE } as const;
+    expect(registry.get(CHROME_SERVER_ID)).toMatchObject({ title: "Chrome DevTools by Studio", provenance: "system", args: [chromeServerPath()] });
+    expect(selection.decisionAt(key)).toBe(false);
+    selection.set(key, true);
+    registerBuiltInServers(registry, selection);
+    expect(selection.decisionAt(key)).toBe(true);
+  });
+
   it("installs the computer beside it, on by default only where it can work", () => {
     // ADR 0055. The row exists everywhere so a person can see the capability
     // and what it needs; the default is on only on Windows, because a default
@@ -96,6 +112,24 @@ describe("Studio's own capabilities become ordinary rows", () => {
     expect((record?.description ?? "").length).toBeGreaterThan(40);
     const key = { kind: "mcp", extensionId: COMPUTER_SERVER_ID, scope: GLOBAL_SCOPE } as const;
     expect(selection.decisionAt(key)).toBe(process.platform === "win32");
+  });
+
+  it("installs Studio Memory as a relay, on by default like the browser", () => {
+    if (memoryServerPath() === undefined) return;
+    registerBuiltInServers(registry, selection);
+    const record = registry.get(MEMORY_SERVER_ID);
+    expect(record?.provenance).toBe("system");
+    expect(record?.command).toBe(process.execPath);
+    expect(record?.args[0]).toMatch(/memory\.mjs$/);
+    expect(record?.needsNetwork).toBe(false);
+    // The launcher injects the harness endpoint only into relays it knows.
+    expect(RELAY_SERVER_IDS.has(MEMORY_SERVER_ID)).toBe(true);
+    const key = { kind: "mcp", extensionId: MEMORY_SERVER_ID, scope: GLOBAL_SCOPE } as const;
+    expect(selection.decisionAt(key)).toBe(true);
+    // A person's off survives the next start.
+    selection.set(key, false);
+    registerBuiltInServers(registry, selection);
+    expect(selection.decisionAt(key)).toBe(false);
   });
 
   it("is idempotent, because the harness restarts constantly", () => {

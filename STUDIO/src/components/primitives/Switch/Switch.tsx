@@ -3,6 +3,12 @@ import { cn } from '@/lib/cn'
 /**
  * The on/off control, as Family A draws it: a small blue track and a white knob.
  *
+ * The on state is the app's one chromatic accent (`--accent`, blue in both
+ * themes). It is deliberately not `--primary`: the primary token is the
+ * graphite/black fill for a filled action, and in dark mode it lifts almost to
+ * white, which made an enabled switch read as an empty white pill. The white
+ * knob keeps the same contrast against either the off track or the accent one.
+ *
  * `resting` keeps a disabled switch at full strength, for a control shown as
  * the reference shows it before its feature exists.
  */
@@ -40,7 +46,7 @@ export function Switch({
       <span
         aria-hidden
         className={cn(
-          'absolute left-[2px] size-[15px] rounded-full bg-white shadow-sm transition-transform duration-fast',
+          'absolute left-[2px] size-[15px] rounded-full bg-white shadow-sm transition-transform duration-fast ease-out',
           checked && 'translate-x-[11px]',
         )}
       />

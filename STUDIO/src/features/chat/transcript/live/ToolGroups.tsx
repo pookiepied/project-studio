@@ -106,7 +106,7 @@ function ResearchRow({ call, live }: { call: ToolCallView; live: boolean }) {
   return <DisclosureRow leading={searching ? <Icons.search /> : <Icons.browserUse />} entering={live} open={open}
     onToggle={() => setOpen((value) => !value)} chevron="hover" flush
     label={<>
-      <Tooltip label={rowLabel} overflowOnly className="min-w-0"><span className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{rowLabel}</span></Tooltip>
+      <span className={cn('min-w-0 truncate', failed && 'text-danger', state === 'running' && 'studio-shimmer')}>{rowLabel}</span>
       {searching && state === 'success' && sources.length > 0
         ? <span className="shrink-0">· {sources.length} {sources.length === 1 ? 'source' : 'sources'}</span>
         : null}
@@ -328,7 +328,7 @@ function ToolCallRow({ call, live }: { call: ToolCallView; live: boolean }) {
           {file !== null ? (
             <FileSubject path={file} />
           ) : subject !== null ? (
-            <Tooltip label={subject} overflowOnly className="min-w-0"><span className="truncate">{subject}</span></Tooltip>
+            <span className="min-w-0 truncate">{subject}</span>
           ) : null}
           {diff !== null ? (
             <span className="shrink-0 font-mono">
@@ -459,10 +459,10 @@ function OutcomeSentence({ outcome }: { outcome: FileToolOutcome }) {
 function FileSubject({ path }: { path: string }) {
   const { name, dir } = splitFilePath(path)
   return (
-    <Tooltip label={path} overflowOnly className="min-w-0 items-center gap-1.5">
+    <span className="flex min-w-0 items-center gap-1.5">
       <span className="min-w-0 truncate font-medium text-foreground">{name}</span>
       {dir !== null ? <span className="min-w-0 truncate text-muted-foreground">{dir}</span> : null}
-    </Tooltip>
+    </span>
   )
 }
 

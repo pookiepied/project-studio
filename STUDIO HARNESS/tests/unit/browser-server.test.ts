@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
@@ -264,7 +265,7 @@ describe.skipIf(!existsSync(BUNDLE))("the server on the wire", () => {
       input: { action: "view", viewerId: createStudioUuid() },
       _meta: { "studio/conversation": createStudioUuid() },
     });
-    expect(response["error"]).toHaveProperty("message", "This browser session has ended. Ask Studio to open a page again.");
+    expect(response["result"]).toMatchObject({ running: false, activeTabId: null, tabs: [], frame: null });
   });
 
   it("answers a bad call as a tool result, not as a dead transport", async () => {
@@ -277,5 +278,63 @@ describe.skipIf(!existsSync(BUNDLE))("the server on the wire", () => {
     }))["result"] as Record<string, unknown>;
     expect(result["isError"]).toBe(true);
     expect((result["content"] as { text: string }[])[0]?.text).toContain("selector");
+  });
+
+  it.skipIf(engineReport().seen === undefined)("keeps browser receipts scoped to the actual element, dialog, or request", async () => {
+    const site = createServer((req, res) => {
+      if (req.url?.startsWith("/items/")) { res.end(req.url); return; }
+      res.setHeader("Content-Type", "text/html");
+      res.end(`<!doctype html><main><label for="visitor">Visitor name</label><input id="visitor">
+        <input type="password" value="fixture-password"><form><button type="button"
+        onclick="this.dataset.reply=prompt('Fixture')??'dismissed'">Save plan</button></form></main>`);
+    });
+    await new Promise<void>((resolve) => site.listen(0, "127.0.0.1", resolve));
+    const address = site.address();
+    if (address === null || typeof address === "string") throw new Error("Browser fixture did not listen");
+    const meta = { "studio/conversation": createStudioUuid() };
+    const tool = async (name: string, args: Record<string, unknown> = {}) => {
+      const result = (await call("tools/call", { name: `studio_browser_${name}`, arguments: args, _meta: meta }))["result"] as {
+        isError?: boolean; content: { type: string; text?: string }[];
+      };
+      return { error: result.isError === true, text: result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n") };
+    };
+    try {
+      expect((await tool("open", { url: `http://127.0.0.1:${address.port}` })).error).toBe(false);
+      const initial = await tool("read_page");
+      expect(initial.text).toContain('text "Visitor name"');
+      expect(initial.text).not.toContain("fixture-password");
+      const stale = /button "Save plan" \[(ref_\d+)\]/.exec(initial.text)?.[1];
+      expect(stale).toBeDefined();
+      expect(await tool("read_text", { selector: "#missing" })).toMatchObject({ error: true });
+
+      const found = await tool("find", { query: "Save plan" });
+      const first = found.text.split("\n").find((line) => line.includes("[ref_"));
+      expect(first).toContain('button "Save plan"');
+      const current = /ref_\d+/.exec(first ?? "")?.[0];
+      expect(current).toBeDefined();
+      expect(current).not.toBe(stale);
+      expect(await tool("click", { ref: stale })).toMatchObject({ error: true, text: expect.stringContaining("latest read_page or find") });
+
+      await tool("dialog", { text: "first plan" });
+      await tool("dialog", { text: "latest plan" });
+      expect((await tool("click", { ref: current })).error).toBe(false);
+      expect((await tool("evaluate", { expression: "document.querySelector('button').dataset.reply" })).text).toContain('"latest plan"');
+      expect((await tool("click", { ref: current })).error).toBe(false);
+      expect((await tool("evaluate", { expression: "document.querySelector('button').dataset.reply" })).text).toContain('"dismissed"');
+      expect(await tool("close_tab", { tab: "tab_999" })).toMatchObject({ error: true });
+
+      const before = await tool("network", { urlContains: `:${address.port}/` });
+      const oldRequest = /req_\d+/.exec(before.text)?.[0];
+      expect(oldRequest).toBeDefined();
+      await tool("evaluate", { expression: "Promise.all(Array.from({length: 205}, (_, i) => fetch('/items/' + i).then(r => r.text()))).then(() => true)" });
+      await tool("wait_for", { state: "networkidle" });
+      const recent = (await tool("network", { urlContains: "/items/", limit: 200 })).text.match(/req_\d+/g) ?? [];
+      expect(recent).toHaveLength(200);
+      expect(new Set(recent).size).toBe(200);
+      expect(await tool("network", { request: oldRequest })).toMatchObject({ error: true });
+    } finally {
+      await tool("quit");
+      await new Promise<void>((resolve) => site.close(() => resolve()));
+    }
   });
 });

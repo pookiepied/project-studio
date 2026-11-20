@@ -90,6 +90,8 @@ export const LOOP = {
 /** Panels that track a drag or a toggle: the sidebar and anything paced to it. */
 export const SPRING_PANEL = { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 } as const
 
+export const PANEL_VIEW_TRANSITION = { duration: DURATION.slow, ease: 'easeInOut' } as const
+
 /** Small parts: popovers, chips, the segmented thumb. */
 export const SPRING_SNAPPY = { type: 'spring', stiffness: 460, damping: 36, mass: 0.6 } as const
 
@@ -183,21 +185,21 @@ const SURFACE_PUSH = {
   initial: { opacity: 0, x: 32 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -24 },
-  transition: { duration: DURATION.slow, ease: 'easeInOut' },
+  transition: PANEL_VIEW_TRANSITION,
 } as const
 
 const SURFACE_POP = {
   initial: { opacity: 0, x: -32 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: 24 },
-  transition: { duration: DURATION.slow, ease: 'easeInOut' },
+  transition: PANEL_VIEW_TRANSITION,
 } as const
 
 const SURFACE_SIBLING = {
   initial: { opacity: 0, x: 0 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: 0 },
-  transition: { duration: DURATION.base, ease: 'easeInOut' },
+  transition: PANEL_VIEW_TRANSITION,
 } as const
 
 // Both elements travel across the same screen, so they share one curve and

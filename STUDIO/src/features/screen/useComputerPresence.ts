@@ -6,13 +6,20 @@ import { createRequester } from '@/platform/harness/client/request'
 export interface ComputerPresence {
   readonly conversationId: string | null
   readonly mode: 'active' | 'paused' | 'demonstrating' | 'stopping'
+  readonly target?: { readonly handle: number; readonly pid: number }
 }
 
 export function parseComputerPresence(value: unknown): ComputerPresence | null {
   if (!isRecord(value)) return null
   if (value.conversationId !== null && (typeof value.conversationId !== 'string' || value.conversationId.length === 0)) return null
   if (value.mode !== 'active' && value.mode !== 'paused' && value.mode !== 'demonstrating' && value.mode !== 'stopping') return null
-  return { conversationId: value.conversationId, mode: value.mode }
+  const target = value.target
+  const handle = isRecord(target) ? target.handle : undefined
+  const pid = isRecord(target) ? target.pid : undefined
+  const validTarget = typeof handle === 'number' && Number.isSafeInteger(handle) && handle > 0
+    && typeof pid === 'number' && Number.isInteger(pid) && pid > 0 && pid <= 0xffff_ffff
+  return { conversationId: value.conversationId, mode: value.mode,
+    ...(validTarget ? { target: { handle, pid } } : {}) }
 }
 
 let snapshot: ComputerPresence | null = null
@@ -21,7 +28,8 @@ let epoch = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 
 function publish(next: ComputerPresence | null) {
-  if (snapshot === next || (snapshot !== null && next !== null && snapshot.conversationId === next.conversationId && snapshot.mode === next.mode)) return
+  if (snapshot === next || (snapshot !== null && next !== null && snapshot.conversationId === next.conversationId
+    && snapshot.mode === next.mode && snapshot.target?.handle === next.target?.handle && snapshot.target?.pid === next.target?.pid)) return
   snapshot = next
   for (const listener of listeners) listener()
 }

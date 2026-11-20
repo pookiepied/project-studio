@@ -101,7 +101,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const { markRunning, markContextReport, contextRevisions, compacting } = useLiveWork()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
-  const live = useConversationTranscript(conversation.id)
+  const workspacePanel = useWorkspacePanel()
+  const live = useConversationTranscript(conversation.id,
+    !gallery && workspacePanel?.conversationId === conversation.id ? workspacePanel.revealAgentBrowser : undefined)
   const queue = useQueuedMessages(conversation.id, isTurnRunning(live.phase), live.followQueued)
   // Built once per gallery visit: the list is fixed, and a fresh array each
   // render would re-key the memoized rows for nothing.
@@ -167,7 +169,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   // with no witness behind it is the invented progress the mark exists to
   // refuse, and resuming re-marks it within one replay.
   useEffect(() => {
-    if (gallery) return
+    // Returning from Settings mounts a new reader. Its catch-up phase has
+    // no evidence that a turn witnessed by the previous reader has settled.
+    if (gallery || (!sending && live.phase.status === 'attaching')) return
     markRunning(conversation.id, sending || isTurnRunning(live.phase))
     // The status is the whole question here, and `live.phase` is a fresh
     // object on every update: depending on it would re-mark the sidebar on
@@ -469,7 +473,6 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
   const [viewing, setViewing] = useState<ViewerSpec | null>(null)
   const [sheet, setSheet] = useState<SheetSpec | null>(null)
   const [sheetFromList, setSheetFromList] = useState(false)
-  const workspacePanel = useWorkspacePanel()
   const viewer = useRef<MediaViewerHandle>(null)
   const viewerHost = useMemo<MediaViewerHost>(() => ({ open: (spec) => { setSheet(null); setViewing(spec) } }), [])
   const openSheet = useCallback((spec: SheetSpec, fromList = false) => {

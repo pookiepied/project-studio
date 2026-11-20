@@ -89,6 +89,8 @@ export function useMcpServers(scope: McpScopeTarget = {}): McpServers {
    * that lands afterwards must not resurrect it.
    */
   const live = useRef(true)
+  const latestRead = useRef(0)
+  const reading = useRef(false)
 
   useEffect(() => {
     live.current = true
@@ -106,39 +108,52 @@ export function useMcpServers(scope: McpScopeTarget = {}): McpServers {
   const conversationId = scope.conversationId
 
   const read = useCallback(
-    async (quiet: boolean) => {
-      const harness = await connect()
-      if (!live.current) return
-      if (harness === null) {
-        setView({ status: 'no-harness' })
-        return
+    async (mode: 'initial' | 'refresh' | 'poll') => {
+      if (mode === 'poll' && reading.current) return
+      const id = ++latestRead.current
+      reading.current = true
+      const isCurrent = () => live.current && id === latestRead.current
+      if (mode === 'refresh') setRefreshing(true)
+      try {
+        const harness = await connect()
+        if (!isCurrent()) return
+        if (harness === null) {
+          if (mode !== 'poll') setView({ status: 'no-harness' })
+          return
+        }
+        const result = await harness.listMcpServers(readScope(projectId, conversationId))
+        if (!isCurrent()) return
+        if (!result.ok) {
+          if (mode === 'initial') setView({ status: 'failed', error: result.error })
+          return
+        }
+        setView({ status: 'ready', servers: result.value })
+      } finally {
+        if (isCurrent()) {
+          reading.current = false
+          setRefreshing(false)
+        }
       }
-      if (quiet) setRefreshing(true)
-      // The scope travels on the read: a project's rows carry that project's
-      // readings, a conversation's carry the conversation's, and the global
-      // read carries neither, because it edits the default and nothing else
-      // answers to it.
-      const result = await harness.listMcpServers(readScope(projectId, conversationId))
-      if (!live.current) return
-      setRefreshing(false)
-      // A failed refresh leaves the previous list on screen rather than
-      // replacing it with an error: the servers did not stop existing because
-      // one read failed, and blanking the pane loses the user's place.
-      if (!result.ok) {
-        if (!quiet) setView({ status: 'failed', error: result.error })
-        return
-      }
-      setView({ status: 'ready', servers: result.value })
     },
     [connect, projectId, conversationId],
   )
 
   useEffect(() => {
-    void read(false)
+    void read('initial')
   }, [read])
 
+  const settling = view.status === 'ready' && view.servers.some(({ status }) =>
+    status?.state === 'starting' || status?.state === 'stopping' || status?.state === 'failed',
+  )
+  useEffect(() => {
+    if (!settling) return
+    // Launch and handshake settle after the enable request returns.
+    const timer = window.setInterval(() => void read('poll'), 1_000)
+    return () => window.clearInterval(timer)
+  }, [read, settling])
+
   const refresh = useCallback(async () => {
-    await read(true)
+    await read('refresh')
   }, [read])
 
   /**
@@ -166,7 +181,7 @@ export function useMcpServers(scope: McpScopeTarget = {}): McpServers {
       }
       const result = await run(harness)
       if (!result.ok) return result.error
-      await read(true)
+      await read('refresh')
       return null
     },
     [connect, read],

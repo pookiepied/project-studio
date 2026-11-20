@@ -24,7 +24,7 @@ vi.mock("node:child_process", async (load) => {
     // for app "later" or "person" stands in for a click the person made
     // between calls - on Studio's approval, or ("person") somewhere else -
     // which the real driver reports with its next answer, not this one.
-    let browserTarget = false, pendingHuman = false, personInFront = false;
+    let browserTarget = false, pendingHuman = false, personInFront = false, studioInFront = false, restoreRefused = false, targetPassword = false;
     console.log(JSON.stringify({ id: 'ready', ok: true }));
     const answer = (request) => {
       shots++;
@@ -35,18 +35,25 @@ vi.mock("node:child_process", async (load) => {
         : request.op === 'pulse' ? { pointer: { x: 150, y: 40, display: 1 }, front: { title: 'Form', app: 'app', handle: 42 }, input: { buttons: 0, keys: 0, wheels: 0, moves: 0 }, monitored: true }
         : request.op === 'displays' ? [{ index: 0, x: 0, y: 0, width: 100, height: 100 }, { index: 1, x: 100, y: 0, width: 200, height: 100 }]
         : request.op === 'status' ? { target: null, front: null, cursor: { x: 1, y: 2, display: 0 }, displays: [] }
+        : request.op === 'wait_window' ? { found: true, handle: 77, pid: 5, processStarted: '7', title: 'Form', app: 'notepad', display: 0, foreground: true, currentTarget: browserTarget }
         // x 66 is a terminal; a ref naming pw is a password field; anything else is an ordinary app.
         : request.op === 'sensitivity' ? (request.args.x === 66 ? { app: 'WindowsTerminal', pid: 9, processStarted: '1', category: 'terminal', password: false }
           : request.args.kind === 'ref' && String(request.args.ref).includes('pw') ? { app: 'app', pid: 3, processStarted: '1', category: null, password: true }
-          : request.args.kind === 'keys' && browserTarget ? { app: 'chrome', pid: 5, processStarted: '1', category: 'browser', password: false }
+          : request.args.kind === 'keys' && browserTarget ? { app: 'chrome', pid: 5, processStarted: '1', category: 'browser', password: request.args.text === true && (studioInFront || targetPassword) }
           : { app: 'app', pid: 1, processStarted: '1', category: null, password: false })
         : request.op === 'approval_front' ? { studioKnown: true, studioInFront: !personInFront, targetIntact: true, targetInFront: false }
-        : request.op === 'restore_target' ? (personInFront ? { restored: false, reason: 'front_not_studio' } : { restored: true, reason: 'restored', title: 'Form', handle: 77 })
+        : request.op === 'restore_target' ? (restoreRefused ? { restored: false, reason: 'refused_by_windows' } : { restored: true, reason: 'restored', title: 'Form', handle: 77 })
         : { said: 'Sent.', typed: 5, done: true, released: true, observation: { available: true, refsInvalidated: true } };
       if (request.op === 'focus') browserTarget = request.args.window === 77;
       // The window list stands in for any answer that carries the person's own clicks.
-      const deferred = request.op === 'windows' && (request.args.app === 'later' || request.args.app === 'person');
-      if (deferred) personInFront = request.args.app === 'person';
+      const deferred = request.op === 'windows' && ['later', 'person', 'restore-refused', 'password-later'].includes(request.args.app);
+      if (deferred) {
+        personInFront = request.args.app === 'person';
+        studioInFront = !personInFront;
+        restoreRefused = request.args.app === 'restore-refused';
+        targetPassword = request.args.app === 'password-later';
+      }
+      if (request.op === 'restore_target' && result.restored) studioInFront = false;
       const human = (request.op === 'windows' && !deferred) || (pendingHuman && !deferred);
       if (human) pendingHuman = false;
       if (deferred) pendingHuman = true;
@@ -536,10 +543,24 @@ describe("the shared screen between pictures", () => {
     computer.setSharing(CHAT, true);
     const shown = await computer.call("studio_computer_mark", { display: 1, marks: [{ kind: "ring", x: 10, y: 10, width: 40, height: 20, label: "Save" }] }, voice);
     expect(shown.isError).toBeUndefined();
+    expect(said(shown)).toContain("Rendering is handled by the Studio desktop client");
     expect(shown.structuredContent).toMatchObject({ marks: { display: { index: 1, x: 100, y: 0, width: 200, height: 100 }, marks: [{ kind: "ring", label: "Save" }] } });
     const worker = await computer.call("studio_computer_mark", { display: 1, marks: [{ kind: "point", x: 1, y: 1 }] }, hazel);
     expect(worker.isError).toBe(true);
     expect(said(worker)).toContain("not for tasks");
+  });
+
+  it("returns the waited-for window's identity for a subsequent focus call", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    const found = await computer.call("studio_computer_wait_for_window", { text: "Form", seconds: 1 }, hazel);
+    expect(found.structuredContent).toMatchObject({ window: { handle: 77, pid: 5, processStarted: "7" }, foreground: true, adopted: false });
+    expect(said(found)).toContain("Process 5 started 7.");
+    expect(said(found)).toContain("focus it by handle before keys");
+    await computer.call("studio_computer_focus", { window: 77 }, hazel);
+    const current = await computer.call("studio_computer_wait_for_window", { text: "Form", seconds: 1 }, hazel);
+    expect(current.structuredContent?.["currentTarget"]).toBe(true);
+    expect(said(current)).toContain("already the working window");
   });
 });
 
@@ -703,6 +724,54 @@ describe("the person is asked before input reaches what Studio asks about (P1-4)
     expect(spawned.ops.slice(ops).filter((op) => ["approval_front", "restore_target", "key"].includes(op))).toEqual(["approval_front", "restore_target", "key"]);
     expect(said(sent)).toContain('put "Form" back in front');
     expect(computer.desktop.state({ conversation: CHAT, id: "voice_hazel", role: "worker" }).fresh).toBe(true);
+  });
+
+  it("restores an approved typing target before checking the focused field", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await computer.call("studio_computer_focus", { window: 77 }, hazel);
+    await look(computer, hazel);
+    const asked = await computer.call("studio_computer_type", { text: "Hello" }, hazel);
+    expect(request(asked)).toMatchObject({ category: "browser" });
+    await computer.call("studio_computer_windows", { app: "later" }, hazel);
+    const ops = spawned.ops.length;
+    const sent = await computer.call("studio_computer_type", { text: "Hello" },
+      { ...hazel, "studio/approval": String(request(asked)["id"]), "studio/asked": "1" });
+    expect(sent.isError).toBeUndefined();
+    expect(spawned.ops.slice(ops).filter(op => ["approval_front", "restore_target", "sensitivity", "type"].includes(op)))
+      .toEqual(["approval_front", "restore_target", "sensitivity", "type"]);
+  });
+
+  it("sends no input and keeps approval when Windows refuses to restore the target", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await computer.call("studio_computer_focus", { window: 77 }, hazel);
+    await look(computer, hazel);
+    const asked = await computer.call("studio_computer_type", { text: "Hello" }, hazel);
+    const approved = { ...hazel, "studio/approval": String(request(asked)["id"]), "studio/asked": "1" };
+    await computer.call("studio_computer_windows", { app: "restore-refused" }, hazel);
+    const ops = spawned.ops.length;
+    const refused = await computer.call("studio_computer_type", { text: "Hello" }, approved);
+    expect(said(refused)).toContain("No input was sent");
+    expect(spawned.ops.slice(ops)).not.toContain("type");
+    await computer.call("studio_computer_windows", { app: "later" }, hazel);
+    const sent = await computer.call("studio_computer_type", { text: "Hello" }, { ...hazel, "studio/asked": "1" });
+    expect(sent.isError).toBeUndefined();
+  });
+
+  it("does not use a browser approval to type into a password field on the restored target", async () => {
+    const computer = service();
+    await own(computer, hazel);
+    await computer.call("studio_computer_focus", { window: 77 }, hazel);
+    await look(computer, hazel);
+    const input = { text: "Hello" };
+    const asked = await computer.call("studio_computer_type", input, hazel);
+    await computer.call("studio_computer_windows", { app: "password-later" }, hazel);
+    const ops = spawned.ops.length;
+    const result = await computer.call("studio_computer_type", input,
+      { ...hazel, "studio/approval": String(request(asked)["id"]), "studio/asked": "1" });
+    expect(request(result)["category"]).toBe("password_field");
+    expect(spawned.ops.slice(ops)).not.toContain("type");
   });
 
   it("restores nothing and still asks for a look when the harness did not say the person was asked", async () => {

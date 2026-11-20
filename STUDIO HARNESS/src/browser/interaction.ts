@@ -8,6 +8,7 @@ const size = v.pipe(v.number(), v.integer(), v.minValue(320), v.maxValue(2560));
 /** Private human-control protocol; these commands are never model tools. */
 export const browserInteractionSchema = v.variant("action", [
   v.strictObject({ action: v.literal("view"), ...viewer, since: v.optional(v.number()) }),
+  v.strictObject({ action: v.literal("start"), ...viewer }),
   v.strictObject({ action: v.literal("activity"), ...viewer, ...tab,
     kind: v.picklist(["move", "button", "wheel", "keyboard"]), x: coordinate, y: coordinate }),
   v.strictObject({ action: v.literal("claim"), ...viewer }),
@@ -36,3 +37,7 @@ export const browserInteractionSchema = v.variant("action", [
 ]);
 
 export type BrowserInteraction = v.InferOutput<typeof browserInteractionSchema>;
+
+export const IDLE_BROWSER_VIEW = {
+  running: false, activeTabId: null, tabs: [], control: "agent", busy: false, cursor: null, frame: null,
+} as const;

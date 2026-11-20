@@ -75,7 +75,7 @@ export function BrowserPanel({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {family.id === 'browser' && workspacePanel?.conversationId === entry.conversationId ? (
-            <IconButton label="Open browser in Workspace" onClick={workspacePanel.openBrowser}><Icons.workspace /></IconButton>
+            <IconButton label="Open browser in Workspace" onClick={() => workspacePanel.openBrowser()}><Icons.workspace /></IconButton>
           ) : null}
           {family.id !== 'browser' ? null : (
             <IconButton label="Open browser in new window" onClick={() => {

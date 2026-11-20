@@ -22,6 +22,10 @@ describe.skipIf(process.platform !== "win32")("computer driver policies without 
     missing = replies.find((reply) => reply["id"] === "missing") ?? {};
   }, 35_000);
 
+  it("includes only the handle and process ID in the indicator target sidecar", () => {
+    expect(receipt["indicatorTarget"]).toEqual({ handle: 10, pid: 100 });
+  });
+
   it("names a refusal's kind in a code, and leaves a plain throw uncoded (P1-7)", () => {
     expect(checks["codes"]).toEqual({ staleRef: "no_element", plain: null });
   });

@@ -120,7 +120,7 @@ export function HarnessDownPage() {
             down and stays down until someone presses. A mark pulsing over a
             stopped engine reads as "still trying", which is the one thing this
             page must not imply. `entrance` instead: assembles once, then holds. */}
-        <StudioMark entrance size={44} className="text-foreground" />
+        <StudioMark entrance size={44} />
 
         <div className="flex flex-col items-center">
           <h1 className="studio-display text-foreground">{failure.headline}</h1>

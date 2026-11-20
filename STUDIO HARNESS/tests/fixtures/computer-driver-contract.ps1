@@ -6,7 +6,7 @@ if ($parseErrors.Count -ne 0) { throw $parseErrors[0].Message }
 
 # Load only the actual pure policy functions. The driver's top-level native
 # initialization and input loop must never run on the user's desktop in tests.
-foreach ($name in @("Window-Identity", "Same-Window", "Root-Of", "Set-Target", "Owned-ByTarget", "Adopt-Dialog", "Resume-Owner", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Encoded-Bytes", "Encode-Picture", "One-Line", "Element-Record", "Element-Line", "Ui-SetValue", "Observe-Window", "Fail", "App-Category", "Get-Sensitivity", "Is-Release", "Window-Matches", "Assert-Identity", "Get-Window", "Pattern-Of", "Ui-ActionTable", "Ui-Actions", "Ui-Act", "Toggle-Chord", "Is-Blank")) {
+foreach ($name in @("Window-Identity", "Same-Window", "Root-Of", "Set-Target", "Owned-ByTarget", "Adopt-Dialog", "Resume-Owner", "Assert-Target", "Reset-UiRefs", "Begin-UiRead", "Ui-Ref", "Control-Point", "Select-UniqueWindow", "Wait-NewWindow", "Wait-ForWindow", "Observe-Action", "Needs-ActionObservation", "Collect-UserInput", "Take-InputUpdate", "Release-HeldInput", "Answer", "Indicator-Target", "Encoded-Bytes", "Encode-Picture", "One-Line", "Element-Record", "Element-Line", "Ui-SetValue", "Observe-Window", "Fail", "App-Category", "Get-Sensitivity", "Is-Release", "Window-Matches", "Assert-Identity", "Get-Window", "Pattern-Of", "Ui-ActionTable", "Ui-Actions", "Ui-Act", "Toggle-Chord", "Is-Blank")) {
   $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
   if ($null -eq $function) { throw "Missing production function $name" }
   . ([scriptblock]::Create($function.Extent.Text))
@@ -18,6 +18,7 @@ foreach ($name in @("Window-Identity", "Same-Window", "Root-Of", "Set-Target", "
 public static long Front = 10;
 public static System.Collections.Generic.Dictionary<long, long> Owners = new System.Collections.Generic.Dictionary<long, long>();
 public static System.IntPtr GetForegroundWindow() { return new System.IntPtr(Front); }
+public static uint GetWindowThreadProcessId(System.IntPtr h, out uint pid) { pid = h.ToInt64() == 10 ? 100u : 0u; return pid == 0 ? 0u : 1u; }
 public static System.IntPtr GetAncestor(System.IntPtr h, uint flags) { return System.IntPtr.Zero; }
 public static bool IsChild(System.IntPtr parent, System.IntPtr h) { return false; }
 public static System.IntPtr GetWindow(System.IntPtr h, uint cmd) { long o; return Owners.TryGetValue(h.ToInt64(), out o) ? new System.IntPtr(o) : System.IntPtr.Zero; }

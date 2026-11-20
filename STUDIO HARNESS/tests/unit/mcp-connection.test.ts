@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ExtendError } from "../../src/extend/errors.js";
 import { McpConnection, oversizeResponseId, type McpChannel } from "../../src/extend/mcp/connection.js";
+import { CHROME_SERVER_ID } from "../../src/extend/mcp/builtin.js";
 import { DEFAULT_MAX_MESSAGE_BYTES } from "../../src/extend/mcp/wire/framing.js";
 import { diagnosticRecorder } from "../../src/observability/recorder.js";
 import { createRootExecutionContext, runWithExecutionContext } from "../../src/execution/context.js";
@@ -61,14 +62,17 @@ class FakeChannel implements McpChannel {
 }
 
 describe("one conversation with one MCP server", () => {
-  it("excludes manual browser input and live frames from scoped diagnostic content", async () => {
+  it.each([
+    { method: "studio/browser", serverId: undefined },
+    { method: "tools/call", serverId: CHROME_SERVER_ID },
+  ])("excludes personal browser data from $method diagnostic frames", async ({ method, serverId }) => {
     diagnosticRecorder.clear();
     diagnosticRecorder.configure({ enabled: true, captureContent: true, conversations: ["selected"] });
     const channel = new FakeChannel();
-    const connection = new McpConnection(channel);
+    const connection = new McpConnection(channel, serverId === undefined ? {} : { serverId });
     try {
       const pending = runWithExecutionContext(createRootExecutionContext({ flue: { instanceId: "selected" } }),
-        () => connection.request("studio/browser", { input: { action: "text", text: "private password sentinel" } }));
+        () => connection.request(method, { input: { action: "text", text: "private password sentinel" } }));
       const id = channel.lastSent().id;
       channel.emit({ jsonrpc: "2.0", id, result: { frame: "private live frame sentinel" } });
       expect(await pending).toEqual({ frame: "private live frame sentinel" });

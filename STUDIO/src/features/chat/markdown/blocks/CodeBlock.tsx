@@ -13,6 +13,12 @@ const HighlightedCode = lazyNamed(
   'HighlightedCode',
 )
 
+export function CodeBody({ code, language, streaming = false }: { code: string; language: string; streaming?: boolean }) {
+  return streaming ? <PlainCode code={code} /> : <Deferred label="Syntax highlighting" immediateFallback fallback={<PlainCode code={code} />}>
+    <HighlightedCode code={code} language={resolveLanguage(language)} />
+  </Deferred>
+}
+
 /**
  * A code block's glyph is the language's own mark -- the same marks the tool
  * chips carry -- keyed on the fence's own word, because a fence names a
@@ -93,9 +99,7 @@ export function CodeBlock({ code, fence, streaming = false }: { code: string; fe
           block a session draws waits a few frames for it. Until it lands the
           same code stands in the same place in plain text, gutter and all, so
           the only thing that changes when the chunk arrives is the colour. */}
-      {streaming ? <PlainCode code={code} /> : <Deferred label="Syntax highlighting" immediateFallback fallback={<PlainCode code={code} />}>
-        <HighlightedCode code={code} language={resolveLanguage(language)} />
-      </Deferred>}
+      <CodeBody code={code} language={language} streaming={streaming} />
     </BlockFrame>
   )
 }

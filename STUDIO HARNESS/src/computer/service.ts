@@ -216,13 +216,24 @@ export class ComputerService {
     let answered = false;
     try {
       const answer = await session.runTool(async () => {
+        let restored: string | undefined;
         // A new turn ends the references its actor read in the last one.
         if (newTurn && session.running && this.#refsReader.get(actor.conversation) === actor.id) {
           await session.request("reset_refs");
           this.#refsReader.delete(actor.conversation);
         }
-        if (keyboard && askedFrom(meta) && session.running) {
+        if (keyboard && askedFrom(meta) && session.running && this.desktop.ownerIs(actor)
+          && this.desktop.wouldRefuse(actor, name, args, ticket) === undefined) {
           answered = answeredInStudio(await session.request("approval_front"));
+          if (answered && this.desktop.wouldRefuse(actor, name, args, ticket) === undefined) {
+            // UI Automation's focused element is global. Probe only after the
+            // approved target is back, or the probe can classify Studio's UI.
+            const result = await session.request("restore_target");
+            if (!isRecord(result) || (result["restored"] !== true && result["reason"] !== "already_in_front")) {
+              return { isError: true, content: [{ type: "text", text: "No input was sent. Studio could not return focus to the approved window. Check the active window before trying again." }] };
+            }
+            restored = restoredSentence(result);
+          }
         }
         const gated = await this.#gate(session, actor, name, args, ticket, answered);
         if (gated.request !== undefined) {
@@ -244,7 +255,6 @@ export class ComputerService {
         return this.desktop.run(session, name, async () => {
           // Admitted: the person's yes is spent only now, when input goes out.
           if (gated.held !== undefined) this.#approvals.spend(gated.held);
-          const restored = answered ? restoredSentence(await session.request("restore_target")) : undefined;
           const result = await tool.run(session, args, granted);
           return restored === undefined ? result : { ...result, content: [...result.content, { type: "text", text: restored }] };
         }, actor, args, ticket);
@@ -511,7 +521,10 @@ export class ComputerService {
    */
   async control(params: Record<string, unknown>): Promise<unknown> {
     const input = isRecord(params["input"]) ? params["input"] : {};
-    if (input["action"] === "activity") return this.desktop.activity();
+    if (input["action"] === "activity") {
+      const activity = this.desktop.activity();
+      return { ...activity, target: this.desktop.ownerSession?.indicatorTarget ?? null };
+    }
     const conversation = conversationKey(params["_meta"]);
     const action = input["action"];
     const asking = conversationActor(conversation);

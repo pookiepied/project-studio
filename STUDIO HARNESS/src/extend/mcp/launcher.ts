@@ -2,7 +2,7 @@ import type { SecureCredentialStore } from "../../credentials/credential-store.j
 import { containCommand, programRoots } from "../../sandbox/isolation/index.js";
 import { createSandboxPolicy } from "../../sandbox/policy.js";
 import { ExtendError } from "../errors.js";
-import { CUSTOMIZATION_SERVER_ID } from "./builtin.js";
+import { RELAY_SERVER_IDS } from "./builtin.js";
 import type { McpChannel } from "./connection.js";
 import { HttpChannel } from "./http-channel.js";
 import { McpServerRegistry, type McpServerRecord } from "./registry.js";
@@ -174,20 +174,20 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
       // and the supervisor's retry remains the net if the wait expires.
       let management = managementChildEnv(process.env);
       if (
-        record.id === CUSTOMIZATION_SERVER_ID &&
+        RELAY_SERVER_IDS.has(record.id) &&
         (management.STUDIO_MANAGEMENT_URL === undefined ||
           management.STUDIO_MANAGEMENT_CREDENTIAL === undefined)
       ) {
         management = await managementEnvOncePublished();
       }
       if (
-        record.id === CUSTOMIZATION_SERVER_ID &&
+        RELAY_SERVER_IDS.has(record.id) &&
         (management.STUDIO_MANAGEMENT_URL === undefined ||
           management.STUDIO_MANAGEMENT_CREDENTIAL === undefined)
       ) {
         throw new ExtendError("internal", {
           message:
-            "The harness's management endpoint is not published yet, so its customization relay cannot " +
+            "The harness's management endpoint is not published yet, so its relay cannot " +
             "start. This is retried; once the harness's listen has bound, the next attempt goes through.",
         });
       }

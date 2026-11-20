@@ -23,4 +23,14 @@ describe('Switch', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Sounds' }))
     expect(onChange).not.toHaveBeenCalled()
   })
+
+  it('uses the shared accent for the enabled track', () => {
+    const { rerender } = render(<Switch checked={false} label="Sounds" />)
+    const control = screen.getByRole('switch', { name: 'Sounds' })
+    expect(control.className).toContain('bg-switch-off')
+    expect(control.className).not.toContain('bg-accent')
+
+    rerender(<Switch checked label="Sounds" />)
+    expect(control.className).toContain('bg-accent')
+  })
 })

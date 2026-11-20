@@ -210,7 +210,7 @@ export function DictationControls({
         >
           {paused ? <Icons.play size="md" /> : <Icons.pause size="md" />}
         </IconButton>
-        <IconButton label="Stop and transcribe" size="xs" tone="accent" disabled={processing} onClick={onFinish}>
+        <IconButton label="Stop and transcribe" size="xs" tone="solid" disabled={processing} onClick={onFinish}>
           <Icons.check size="md" />
         </IconButton>
       </div>

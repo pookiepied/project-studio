@@ -48,10 +48,20 @@ export const CaptureMark = [
   line('plus-across', 'M9.5 12h5'),
 ] as unknown as IconSvgElement
 
+const panelFrame = ['rect', {
+  key: 'frame', x: '3.5', y: '3.5', width: '17', height: '17', rx: '5', stroke: 'currentColor', strokeWidth: '1.5',
+}] as const
+
 /** A rounded frame holding a filled panel. */
 export const PanelMark = [
-  ['rect', { key: 'frame', x: '3.5', y: '3.5', width: '17', height: '17', rx: '5', stroke: 'currentColor', strokeWidth: '1.5' }],
+  panelFrame,
   ['rect', { key: 'panel', x: '12', y: '7', width: '5.2', height: '10', rx: '1.6', fill: 'currentColor' }],
+] as unknown as IconSvgElement
+
+export const WorkAreaMark = [
+  panelFrame,
+  line('tab-rail', 'M4 10h16'),
+  line('active-tab', 'M8 7h4'),
 ] as unknown as IconSvgElement
 
 /** A line turning back on itself, as the quote strip leads with it. */

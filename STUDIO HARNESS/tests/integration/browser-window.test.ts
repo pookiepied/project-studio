@@ -93,10 +93,18 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`http://127.0.0.1:${address.port}/__browser-viewer`);
+    await page.getByRole("button", { name: "Browser view zoom: Fit" }).click();
+    await page.getByRole("menuitemradio", { name: "75%" }).click();
+    const livePage = page.getByRole("application", { name: "Live browser page" });
+    await expect.poll(async () => (await livePage.boundingBox())?.width).toBe(960);
+    await livePage.hover();
+    await expect.poll(() => livePage.evaluate(element => getComputedStyle(element).cursor)).toBe("none");
+    expect(await livePage.locator("[data-browser-pointer] svg").count()).toBe(1);
     await page.getByRole("button", { name: "Take control" }).click();
     await page.getByRole("button", { name: "Resume Studio" }).waitFor();
     await page.getByRole("img", { name: "Live browser page" }).waitFor();
-    await expect.poll(async () => tab.page.viewportSize()?.height).not.toBe(800);
+    expect(tab.page.viewportSize()).toEqual({ width: 1280, height: 720 });
+    expect((await livePage.boundingBox())?.width).toBe(960);
     await expect.poll(async () => {
       const image = page.getByRole("img", { name: "Live browser page" });
       return image.evaluate((element) => {
@@ -123,10 +131,13 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
     await page.screenshot({ path: resolve(artifacts, "light.png") });
     await page.evaluate(() => document.documentElement.classList.add("dark"));
     await page.screenshot({ path: resolve(artifacts, "dark.png") });
-    await page.getByRole("button", { name: "New tab", exact: true }).click();
+    await page.getByRole("button", { name: "Browser tabs" }).click();
+    await page.getByRole("menuitem", { name: "New tab", exact: true }).click();
     await expect.poll(() => engine.tabIds.length).toBe(2);
     await page.getByRole("button", { name: "Resume Studio" }).click();
     await page.getByRole("button", { name: "Take control" }).waitFor();
+    await page.getByRole("button", { name: "Browser view zoom: 75%" }).waitFor();
+    expect(tab.page.viewportSize()).toEqual({ width: 1280, height: 720 });
     expect(await engine.live.agent(async () => "agent resumed")).toBe("agent resumed");
     engine.selectTab(tab.id);
     const observer = createStudioUuid();
@@ -138,6 +149,11 @@ describe.skipIf(engineReport().seen === undefined)("detached browser window end 
     await page.screenshot({ path: resolve(artifacts, "cursor-dark.png") });
     await page.evaluate(() => document.documentElement.classList.remove("dark"));
     await page.screenshot({ path: resolve(artifacts, "cursor-light.png") });
+    await livePage.hover();
+    await expect.poll(() => livePage.locator("[data-browser-pointer] svg").count()).toBe(1);
+    expect(await page.getByLabel("Studio cursor").count()).toBe(0);
+    await page.getByRole("button", { name: "Take control" }).hover();
+    await expect.poll(() => page.getByLabel("Studio cursor").count()).toBe(1);
     await tab.page.mouse.up();
     await expect.poll(() => page.getByLabel("Studio cursor").getAttribute("data-pressed")).toBe("false");
     expect(errors).toEqual([]);

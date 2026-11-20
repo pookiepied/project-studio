@@ -76,6 +76,7 @@ function studioServerEntry(): PluginOption {
             // buy nothing but a third `pnpm install` and a third staleness
             // check in `start.ps1`.
             browser: "src/browser/server.ts",
+            chrome: "src/chrome/server.ts",
             // The computer-use capability, the second server of Studio's
             // own (ADR 0055). Its PowerShell driver travels inside this
             // bundle as a string (`?raw`) and is written out at first use.
@@ -84,7 +85,10 @@ function studioServerEntry(): PluginOption {
             // tools relay to the harness's own management routes over
             // loopback, so the bundle carries no state of its own - the
             // endpoint it needs is injected by the launcher at spawn.
-            customization: "src/customization/server.ts"
+            customization: "src/customization/server.ts",
+            // Studio Memory, the fourth: a relay to the harness's memory
+            // routes, owning no state, injected with the same endpoint.
+            memory: "src/memory/server.ts"
           },
           // Playwright resolves its own driver files by path at runtime and
           // cannot survive being bundled. It stays a real dependency, resolved

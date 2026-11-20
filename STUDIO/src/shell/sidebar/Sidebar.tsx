@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { COLLAPSE, DURATION, EASE_OUT, RADIUS, SHELL, SPRING_PANEL } from '@/design/tokens'
+import { AnimatePresence, motion, useIsPresent, useReducedMotion, type Variants } from 'framer-motion'
+import { COLLAPSE, DURATION, EASE_OUT, PANEL_VIEW_TRANSITION, RADIUS, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { StudioMark } from '@/components/brand'
 import { IconButton, NavRow, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
+import { SettingsNav } from '@/features/settings/SettingsNav'
 import { SidebarLoading, SidebarUnavailable } from '@/shell/sidebar/SidebarStates'
 import { startWindowDrag } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
@@ -29,10 +30,12 @@ const PANEL_SHADOW_REACH = 32
  *
  * ---- What the column is ---------------------------------------------------
  *
- * The left column holds conversations and projects, on every route. Settings
- * carries its own section list inside its page (see `SettingsNav`), because at
- * Studio's default window size this column is a drawer, and a settings list
- * kept here was out of sight on the page that needed it.
+ * The left column holds where you can go, one list at a time. On the app
+ * surfaces that list is conversations and projects. On the settings route the
+ * same column shows the settings tree instead -- same width, same ground, same
+ * drag region -- because Settings' navigation lives there too, and a second
+ * list beside the first was the two-column mistake this app already tried and
+ * untried. The page beside it is only the selected pane.
  *
  * ---- One state, not two ---------------------------------------------------
  *
@@ -51,12 +54,12 @@ const PANEL_SHADOW_REACH = 32
  *
  * ---- What that costs, and why it is paid ---------------------------------
  *
- * Closing the sidebar takes Account and Settings off screen with it. That is
- * acceptable only because neither is lost: the toggle sits in the strip, Ctrl B
- * brings the column back, Ctrl K reaches every destination by name, and Ctrl ,
- * opens Settings directly -- which now opens the column with it, since the
- * column is where Settings' own navigation lives. If any of those went away the
- * rail would have to come back.
+ * Closing the sidebar takes Settings off screen with it. That is acceptable only
+ * because it is not lost: the toggle sits in the strip, Ctrl B brings the column
+ * back, Ctrl K reaches every destination by name, and Ctrl , opens Settings
+ * directly -- which opens the column with it, since the column is where
+ * Settings' own navigation lives. If any of those went away the rail would have
+ * to come back.
  *
  * ---- Why the inner column is a fixed width -------------------------------
  *
@@ -93,13 +96,19 @@ export function Sidebar({
   onReflow?: (moving: boolean) => void
 }) {
   const {
+    route,
     toggleSidebar,
     goHome,
     openSettings,
+    leaveSettings,
     setPaletteOpen,
   } = useNavigation()
   const { projects, conversations, storePhase, ensureStore } = useWorkspace()
   const [sectionOpen, setSectionOpen] = useState(true)
+  const reducedMotion = useReducedMotion()
+
+  const inSettings = route.kind === 'settings'
+  const activeSection = route.kind === 'settings' ? route.sectionId : 'general'
 
   /**
    * A closed column changing layout mode does not move. The two modes hold
@@ -160,7 +169,7 @@ export function Sidebar({
             ? { x: sidebarOpen ? 0 : -(SHELL.sidebar.expandedWidth + PANEL_SHADOW_REACH), width: SHELL.sidebar.expandedWidth }
             : { x: 0, width: sidebarOpen ? SHELL.sidebar.expandedWidth : 0 }
         }
-        transition={changingWhileClosed ? { duration: 0 } : SPRING_PANEL}
+        transition={changingWhileClosed || reducedMotion ? { duration: 0 } : SPRING_PANEL}
         onAnimationStart={() => onReflow?.(true)}
         onAnimationComplete={() => onReflow?.(false)}
         // Two different objects, so two different edges. Wide, the column is
@@ -190,145 +199,199 @@ export function Sidebar({
           than a visible one: focus disappears into a panel nobody can see. */}
       <div
         inert={!sidebarOpen}
-        className="flex h-full flex-col"
+        className="relative flex h-full flex-col overflow-hidden"
         style={{ width: SHELL.sidebar.expandedWidth }}
       >
-        {/* The brand, on the top strip's own band, so the wordmark and the strip's
-            controls share one line. It is title bar too: a frameless window whose
-            most handle-shaped strip does not move it is one people try to drag and
-            give up on. `startWindowDrag` rather than `data-tauri-drag-region`,
-            because the attribute also toggles maximize on double-click. */}
-        <div
-          onPointerDown={(event) => {
-            if (event.button !== 0 || event.target !== event.currentTarget) return
-            void startWindowDrag()
-          }}
-          className="flex shrink-0 items-center justify-between gap-1.5 px-4 select-none"
-          style={{ height: SHELL.topStrip.height }}
-        >
-          <div className="flex min-w-0 items-center gap-1.5">
-            <StudioMark size={16} className="pointer-events-none text-foreground" />
-            <span className="studio-heading pointer-events-none text-foreground">Studio</span>
-          </div>
-
-        </div>
-
-        {/* Spacing in this column separates things that are different in kind,
-            not merely adjacent. The two standing actions sit closer to each
-            other than to the list below them, and the list's groups sit further
-            apart than the rows inside a group — so the eye gets the hierarchy
-            from the gaps before it reads a single title. */}
-        <div className="mt-1 flex shrink-0 flex-col gap-0.5 px-2 pb-4">
-          <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
-          <Action
-            label="Search"
-            hint="Ctrl K"
-            icon={<Icons.command />}
-            onClick={() => setPaletteOpen(true)}
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-            <>
-              {/* A store that cannot be read says so, above the column it
-                  failed -- the note is the column's state, and the rows below
-                  it are whatever local rows exist. The loading state lives
-                  further down, holding the rows' own place. The states and
-                  their argument live in `SidebarStates`. */}
-              {storePhase.status === 'no-harness' || storePhase.status === 'failed' ? (
-                <SidebarUnavailable phase={storePhase} onEnsure={ensureStore} />
-              ) : null}
-
-              <div className="group/section flex items-center gap-0.5 pr-0.5 pl-2 pb-1">
-                <button
-                  type="button"
-                  onClick={() => setSectionOpen((value) => !value)}
-                  aria-expanded={sectionOpen}
-                  className="flex min-w-0 flex-1 items-center gap-1 rounded text-caption text-muted-foreground transition-colors duration-fast hover:text-foreground"
-                >
-                  Projects
-                  <Icons.disclosure
-                    state={sectionOpen ? 'on' : 'rest'}
-                    size="sm"
-                    className={cn(
-                      'transition-opacity duration-fast',
-                      sectionOpen && 'opacity-0 group-hover/section:opacity-100 group-focus-within/section:opacity-100',
-                    )}
-                  />
-                </button>
-
-                {/* The row's last control, at its far end: the only action the
-                    header carries now that the options menu is gone. */}
-                <Tooltip label="New project">
-                  <button
-                    type="button"
-                    aria-label="New project"
-                    onClick={onNewProject}
-                    className="flex size-[var(--control-xs)] shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
-                  >
-                    <Icons.projectNew />
-                  </button>
-                </Tooltip>
+        {/* The column holds one list at a time. Both views are keyed and sit in
+            the same box, so entering or leaving Settings is a short crossfade
+            with a hint of travel -- the old list leaves the way the new one
+            arrives, and neither the width nor the rest of the window moves. */}
+        <AnimatePresence initial={false} custom={inSettings}>
+          {inSettings ? (
+            <SidebarView key="settings" settings>
+              <SettingsNav
+                variant="sidebar"
+                active={activeSection}
+                onSelect={(sectionId) => openSettings(sectionId)}
+                onBack={leaveSettings}
+              />
+            </SidebarView>
+          ) : (
+            <SidebarView key="app" settings={false}>
+              {/* The brand, on the top strip's own band, so the wordmark and the strip's
+                  controls share one line. It is title bar too: a frameless window whose
+                  most handle-shaped strip does not move it is one people try to drag and
+                  give up on. `startWindowDrag` rather than `data-tauri-drag-region`,
+                  because the attribute also toggles maximize on double-click. */}
+              <div
+                onPointerDown={(event) => {
+                  if (event.button !== 0 || event.target !== event.currentTarget) return
+                  void startWindowDrag()
+                }}
+                className="flex shrink-0 items-center justify-between gap-1.5 px-4 select-none"
+                style={{ height: SHELL.topStrip.height }}
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <StudioMark size={16} className="pointer-events-none" />
+                  <span className="studio-heading pointer-events-none text-foreground">Studio</span>
+                </div>
               </div>
 
-              <AnimatePresence initial={false}>
-                {sectionOpen ? (
-                  <motion.div {...COLLAPSE} className="overflow-hidden">
-                    {storePhase.status === 'loading' ? (
-                      // The wait, where the rows will be. Above the header
-                      // would be a state claiming to be the column; in here
-                      // it is only the list holding its own place.
-                      <SidebarLoading />
-                    ) : projects.length === 0 ? (
-                      <NavRow icon={<Icons.projectNew />} className="w-full" onClick={onNewProject}>
-                        Add a project
-                      </NavRow>
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        {projects.map((project) => (
-                          <ProjectSection
-                            key={project.id}
-                            project={project}
-                            conversations={sorted.filter(
-                              (conversation) => conversation.projectId === project.id,
-                            )}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
+              {/* Spacing in this column separates things that are different in kind,
+                  not merely adjacent. The two standing actions sit closer to each
+                  other than to the list below them, and the list's groups sit further
+                  apart than the rows inside a group — so the eye gets the hierarchy
+                  from the gaps before it reads a single title. */}
+              <div className="mt-1 flex shrink-0 flex-col gap-0.5 px-2 pb-4">
+                <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
+                <Action
+                  label="Search"
+                  hint="Ctrl K"
+                  icon={<Icons.command />}
+                  onClick={() => setPaletteOpen(true)}
+                />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+                {/* A store that cannot be read says so, above the column it
+                    failed -- the note is the column's state, and the rows below
+                    it are whatever local rows exist. The loading state lives
+                    further down, holding the rows' own place. The states and
+                    their argument live in `SidebarStates`. */}
+                {storePhase.status === 'no-harness' || storePhase.status === 'failed' ? (
+                  <SidebarUnavailable phase={storePhase} onEnsure={ensureStore} />
                 ) : null}
-              </AnimatePresence>
 
-              {loose.length > 0 ? (
-                <>
-                  <p className="px-2 pt-5 pb-1 text-caption text-muted-foreground">Conversations</p>
-                  <div className="flex flex-col gap-0.5">
-                    {loose.map((conversation) => (
-                      <ConversationRow key={conversation.id} conversation={conversation} />
-                    ))}
-                  </div>
-                </>
-              ) : null}
-            </>
-        </div>
+                <div className="group/section flex items-center gap-0.5 pr-0.5 pl-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setSectionOpen((value) => !value)}
+                    aria-expanded={sectionOpen}
+                    className="flex min-w-0 flex-1 items-center gap-1 rounded text-caption text-muted-foreground transition-colors duration-fast hover:text-foreground"
+                  >
+                    Projects
+                    <Icons.disclosure
+                      state={sectionOpen ? 'on' : 'rest'}
+                      size="sm"
+                      className={cn(
+                        'transition-opacity duration-fast',
+                        sectionOpen && 'opacity-0 group-hover/section:opacity-100 group-focus-within/section:opacity-100',
+                      )}
+                    />
+                  </button>
 
-        {/* No rule above it. The gap already separates this from the list --
-            a footer pinned to the bottom of a column reads as a footer without
-            being underlined, and the line was one more piece of furniture in a
-            panel whose whole job is to be quiet. Position does the work. */}
-        <div className="flex shrink-0 items-center justify-between px-2 pt-3 pb-2">
-          <NavRow icon={<Icons.account />} className="min-w-0" onClick={() => openSettings('account')}>
-            <span className="truncate">Account</span>
-          </NavRow>
+                  {/* The row's last control, at its far end: the only action the
+                      header carries now that the options menu is gone. */}
+                  <Tooltip label="New project">
+                    <button
+                      type="button"
+                      aria-label="New project"
+                      onClick={onNewProject}
+                      className="flex size-[var(--control-xs)] shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
+                    >
+                      <Icons.projectNew />
+                    </button>
+                  </Tooltip>
+                </div>
 
-          <IconButton label="Settings" onClick={() => openSettings()}>
-            <Icons.settings size="md" />
-          </IconButton>
-        </div>
-        </div>
+                <AnimatePresence initial={false}>
+                  {sectionOpen ? (
+                    <motion.div {...COLLAPSE} className="overflow-hidden">
+                      {storePhase.status === 'loading' ? (
+                        // The wait, where the rows will be. Above the header
+                        // would be a state claiming to be the column; in here
+                        // it is only the list holding its own place.
+                        <SidebarLoading />
+                      ) : projects.length === 0 ? (
+                        <NavRow icon={<Icons.projectNew />} className="w-full" onClick={onNewProject}>
+                          Add a project
+                        </NavRow>
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          {projects.map((project) => (
+                            <ProjectSection
+                              key={project.id}
+                              project={project}
+                              conversations={sorted.filter(
+                                (conversation) => conversation.projectId === project.id,
+                              )}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+
+                {loose.length > 0 ? (
+                  <>
+                    <p className="px-2 pt-5 pb-1 text-caption text-muted-foreground">Conversations</p>
+                    <div className="flex flex-col gap-0.5">
+                      {loose.map((conversation) => (
+                        <ConversationRow key={conversation.id} conversation={conversation} />
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {/* No rule above it. The gap already separates this from the list --
+                  a footer pinned to the bottom of a column reads as a footer without
+                  being underlined, and the line was one more piece of furniture in a
+                  panel whose whole job is to be quiet. Position does the work.
+
+                  The account shortcut is deliberately absent. Account is not in
+                  use yet, and the settings tree already carries it for the one
+                  place it is still relevant. The settings control stays, because
+                  it is how this column hands over to that tree. */}
+              <div className="flex shrink-0 items-center justify-end px-2 pt-3 pb-2">
+                <IconButton label="Settings" onClick={() => openSettings()}>
+                  <Icons.settings size="md" />
+                </IconButton>
+              </div>
+            </SidebarView>
+          )}
+        </AnimatePresence>
+      </div>
       </motion.aside>
     </>
+  )
+}
+
+/**
+ * One of the column's two views.
+ *
+ * Absolute in the same box so the outgoing and incoming lists overlap for the
+ * length of the handover rather than pushing each other around. Eight pixels of
+ * travel is enough to say which way the column changed without turning a list
+ * swap into a page transition; the opacity is the house fade. `custom` is the
+ * destination -- Settings or the app surfaces -- so the exit and entrance read
+ * as the two halves of one move even while `AnimatePresence` freezes the
+ * leaving element's other props.
+ */
+const SIDEBAR_VIEW: Variants = {
+  initial: (settings: boolean) => ({ opacity: 0, x: settings ? 8 : -8 }),
+  animate: { opacity: 1, x: 0 },
+  exit: (settings: boolean) => ({ opacity: 0, x: settings ? -8 : 8 }),
+}
+
+function SidebarView({ settings, children }: { settings: boolean; children: ReactNode }) {
+  const present = useIsPresent()
+
+  return (
+    <motion.div
+      custom={settings}
+      variants={SIDEBAR_VIEW}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={PANEL_VIEW_TRANSITION}
+      inert={!present}
+      aria-hidden={present ? undefined : true}
+      className="absolute inset-0 flex flex-col"
+    >
+      {children}
+    </motion.div>
   )
 }
 

@@ -32,7 +32,8 @@ namespace Studio {
         private Thread thread;
         private Marker marker;
         private IntPtr mouseHook, keyboardHook;
-        private long lastAt, showUntil, releasedAt;
+        private long lastAt, releasedAt;
+        private bool presentationActive;
         private long actingUntil, escapeSince, lastKeyAt;
         private bool stopRequested;
         private int mouseButtons;
@@ -51,7 +52,8 @@ namespace Studio {
         public void Pulse() {
             lock (gate) {
                 long now = Stopwatch.GetTimestamp();
-                showUntil = now + Stopwatch.Frequency * 5; actingUntil = now + Stopwatch.Frequency * 10;
+                presentationActive = true;
+                actingUntil = now + Stopwatch.Frequency * 10;
             }
         }
         // Peeked by the driver between input events; cleared only by Read.
@@ -74,7 +76,10 @@ namespace Studio {
                 if (!stopRequested && IsDeliberateStop(now, escapeSince, lastKeyAt, actingUntil, Stopwatch.Frequency)) stopRequested = true;
             }
         }
-        public void Dismiss() { lock (gate) { showUntil = 0; mouseButtons = 0; releasedAt = 0; } }
+        public void ResetPress() { lock (gate) { mouseButtons = 0; releasedAt = 0; } }
+        public void Dismiss() {
+            lock (gate) { presentationActive = false; mouseButtons = 0; releasedAt = 0; }
+        }
         public void MouseButton(int flags) {
             lock (gate) {
                 int before = mouseButtons;
@@ -101,7 +106,7 @@ namespace Studio {
         public void Record(string kind) {
             if (kind != "mouse_move" && kind != "mouse_button" && kind != "mouse_wheel" && kind != "keyboard") return;
             lock (gate) {
-                lastAt = Stopwatch.GetTimestamp(); showUntil = 0; releasedAt = 0;
+                lastAt = Stopwatch.GetTimestamp(); releasedAt = 0;
                 if (kind == "mouse_button") mouseButtons = 0;
                 if (kind == "mouse_move") Increment(ref moves);
                 else if (kind == "mouse_button") Increment(ref buttons);
@@ -144,7 +149,7 @@ namespace Studio {
                         float releaseProgress;
                         lock (gate) {
                             long now = Stopwatch.GetTimestamp();
-                            end = stopped; show = showUntil > now; pressed = mouseButtons != 0;
+                            end = stopped; show = presentationActive; pressed = mouseButtons != 0;
                             releaseProgress = releasedAt == 0 ? -1 : (float)((now - releasedAt) / (Stopwatch.Frequency * 0.26));
                             if (releaseProgress >= 1) releaseProgress = -1;
                         }
@@ -168,53 +173,38 @@ namespace Studio {
                 lock (gate) { available = false; marker = null; }
             }
         }
-        public void Dispose() { lock (gate) { stopped = true; showUntil = 0; } if (thread != null) thread.Join(1000); }
+        public void Dispose() { lock (gate) { stopped = true; presentationActive = false; } if (thread != null) thread.Join(1000); }
 
-        // Same compact pointer and neutral Studio badge as BrowserWindow.tsx.
-        // Paint our own badge, never a native tooltip or a global cursor change.
+        // Draw feedback around the real system cursor. The desktop compositor
+        // already draws its pointer above every window, including this layer.
         public static void PaintCursor(Graphics graphics, Point hotspot, Size size) {
             PaintCursor(graphics, hotspot, size, false, -1);
         }
         public static void PaintCursor(Graphics graphics, Point hotspot, Size size, bool pressed, float releaseProgress) {
             GraphicsState state = graphics.Save();
             try {
+                graphics.SetClip(new Rectangle(Point.Empty, size), CombineMode.Intersect);
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                using (Brush fill = new SolidBrush(Color.FromArgb(30, 30, 30)))
-                using (Brush ink = new SolidBrush(Color.White))
-                using (Pen outline = new Pen(Color.FromArgb(30, 30, 30), 1.1f))
-                using (Font font = new Font("Segoe UI", 7.5f, FontStyle.Regular, GraphicsUnit.Point))
-                using (GraphicsPath arrow = new GraphicsPath())
-                using (GraphicsPath badge = new GraphicsPath()) {
-                    if (pressed || releaseProgress >= 0) {
-                        float progress = Math.Max(0, Math.Min(1, releaseProgress));
-                        float radius = pressed ? 7 : 7 + progress * 10;
-                        int alpha = pressed ? 90 : (int)(90 * (1 - progress));
-                        using (Pen ring = new Pen(Color.FromArgb(alpha, 30, 30, 30), 2.5f))
-                        using (Pen highlight = new Pen(Color.FromArgb(Math.Min(255, alpha * 2), 255, 255, 255), 1)) {
-                            graphics.DrawEllipse(ring, hotspot.X - radius, hotspot.Y - radius, radius * 2, radius * 2);
-                            graphics.DrawEllipse(highlight, hotspot.X - radius, hotspot.Y - radius, radius * 2, radius * 2);
-                        }
-                    }
-                    arrow.AddPolygon(new Point[] { new Point(hotspot.X, hotspot.Y), new Point(hotspot.X + 5, hotspot.Y + 20),
-                        new Point(hotspot.X + 9, hotspot.Y + 12), new Point(hotspot.X + 18, hotspot.Y + 8) });
-                    outline.LineJoin = LineJoin.Round;
-                    GraphicsState pointerState = graphics.Save();
-                    if (pressed) {
-                        graphics.TranslateTransform(hotspot.X, hotspot.Y);
-                        graphics.ScaleTransform(0.9f, 0.9f);
-                        graphics.TranslateTransform(-hotspot.X, -hotspot.Y);
-                    }
-                    graphics.FillPath(ink, arrow); graphics.DrawPath(outline, arrow);
-                    graphics.Restore(pointerState);
-                    int x = Math.Max(0, Math.Min(size.Width - 50, hotspot.X + 10));
-                    int y = hotspot.Y + 24 + 18 <= size.Height ? hotspot.Y + 24 : Math.Max(0, hotspot.Y - 22);
-                    badge.AddArc(x, y, 18, 18, 90, 180);
-                    badge.AddArc(x + 32, y, 18, 18, 270, 180); badge.CloseFigure();
-                    graphics.FillPath(fill, badge);
-                    graphics.DrawString("Studio", font, ink, x + 8, y + 1);
-                }
+                float progress = Math.Max(0, Math.Min(1, releaseProgress));
+                bool animate = SystemInformation.IsMenuAnimationEnabled;
+                bool releasing = animate && releaseProgress >= 0 && progress < 1;
+                PaintGlow(graphics, hotspot, pressed && animate ? 23 : 28, pressed ? 133 : 112);
+                if (releasing) PaintGlow(graphics, hotspot, 16 + 16 * progress, (int)(100 * (1 - progress)));
             } finally { graphics.Restore(state); }
+        }
+
+        private static void PaintGlow(Graphics graphics, Point hotspot, float radius, int opacity) {
+            using (GraphicsPath circle = new GraphicsPath()) {
+                circle.AddEllipse(hotspot.X - radius, hotspot.Y - radius, radius * 2, radius * 2);
+                using (PathGradientBrush glow = new PathGradientBrush(circle)) {
+                    glow.InterpolationColors = new ColorBlend {
+                        Colors = new Color[] { Color.FromArgb(0, 35, 133, 255), Color.FromArgb(opacity / 6, 35, 133, 255),
+                            Color.FromArgb(opacity / 2, 40, 143, 255), Color.FromArgb(opacity, 57, 159, 255) },
+                        Positions = new float[] { 0, 0.3f, 0.61f, 1 }
+                    };
+                    graphics.FillPath(glow, circle);
+                }
+            }
         }
 
         private sealed class Marker : Form {
@@ -230,17 +220,17 @@ namespace Studio {
             [DllImport("user32.dll")] private static extern bool UpdateLayeredWindow(IntPtr window, IntPtr screen, ref Point position,
                 ref Size size, IntPtr source, ref Point origin, int key, ref Blend blend, int flags);
             public readonly IntPtr NativeHandle;
-            private Point hotspot = new Point(20, 20);
+            private Point hotspot = new Point(36, 36);
             private bool pressed, paintedPressed;
             private float releaseProgress = -1, paintedProgress = -1;
             public Marker() {
                 FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
-                ClientSize = new Size(112, 80); DoubleBuffered = true; NativeHandle = Handle;
+                ClientSize = new Size(80, 80); DoubleBuffered = true; NativeHandle = Handle;
             }
             public void SetFeedback(bool down, float progress) { pressed = down; releaseProgress = progress; }
             public void Follow(Point point, Rectangle area) {
-                Point location = new Point(Math.Max(area.Left, Math.Min(area.Right - Width, point.X - 20)),
-                    Math.Max(area.Top, Math.Min(area.Bottom - Height, point.Y - 20)));
+                Point location = new Point(Math.Max(area.Left, Math.Min(area.Right - Width, point.X - 36)),
+                    Math.Max(area.Top, Math.Min(area.Bottom - Height, point.Y - 36)));
                 Point next = new Point(point.X - location.X, point.Y - location.Y);
                 bool redraw = hotspot != next || !Visible || pressed != paintedPressed || releaseProgress != paintedProgress;
                 hotspot = next;

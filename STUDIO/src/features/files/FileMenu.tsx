@@ -1,5 +1,5 @@
 import { Icons } from '@/components/icons'
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { splitFilePath } from '@/components/icons/fileTypes'
 import { MenuItem, MenuLabel, MenuSeparator, MenuViews } from '@/components/primitives'
 import type { FileVerb } from './useFileVerbs'
@@ -26,12 +26,13 @@ export const FILE_VERB_ICONS = {
  * `MenuViews` carries the height, because the rows only arrive once the file is
  * found and the panel should grow to them, not jump.
  */
-export function FileMenu({ lookup, written, onPreview, onDone }: {
+export function FileMenu({ lookup, written, onPreview, onDone, actions }: {
   lookup: FileLookup
   /** The reference as the reply wrote it, which is all there is to copy if nothing was found. */
   written: string
   onPreview: (() => void) | null
   onDone: () => void
+  actions?: ReactNode
 }) {
   const file = lookup.state === 'found' ? lookup.file : null
   const { verbs, run, error, copied, copy } = useFileVerbs(file, onPreview)
@@ -60,6 +61,7 @@ export function FileMenu({ lookup, written, onPreview, onDone }: {
         {lookup.state === 'locating' ? <p className="px-2 pb-1.5 text-caption text-muted-foreground">Finding file…</p> : null}
         {lookup.state === 'missing' ? <p className="px-2 pb-1.5 text-caption text-muted-foreground">{lookup.reason}</p> : null}
         {error !== null ? <p role="alert" className="px-2 py-1 text-caption text-danger">{error}</p> : null}
+        {actions ? <>{actions}<MenuSeparator /></> : null}
         {shown.map((group, index) => (
           <Fragment key={index}>
             {index > 0 ? <MenuSeparator /> : null}

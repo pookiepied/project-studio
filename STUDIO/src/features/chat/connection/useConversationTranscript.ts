@@ -5,6 +5,8 @@ import { useConversation } from '@/features/chat/connection/useConversation'
 import type { ConversationContent } from '@/features/chat/connection/useConversation'
 import type { SeamFailure, TurnImageWire, TurnSettingsWire } from '@/platform/harness'
 import { firstAdmission } from '@/features/chat/connection/first-attach'
+import { browserAction } from '@/features/chat/transcript/live/browserCall'
+import { callsIn } from '@/features/chat/transcript/live/taskEvidence'
 import { queuedMessages, forgetQueued } from './queued-messages'
 import {
   applyChunks,
@@ -72,7 +74,7 @@ function openingProjection(conversationId: string): TranscriptProjection {
       })
 }
 
-export function useConversationTranscript(conversationId: string): {
+export function useConversationTranscript(conversationId: string, onBrowserOpen?: () => void): {
   items: readonly TranscriptItem[]
   /** Words this window sent that the log has not echoed back yet. */
   pending: PendingSubmission | null
@@ -113,6 +115,11 @@ export function useConversationTranscript(conversationId: string): {
           consumed.add(chunk.submissionId)
         }
       }
+      if (!content.replaying && onBrowserOpen && content.chunks.some(chunk => {
+        if (chunk.type !== 'tool-input' || chunk.messageId === null || chunk.toolCallId === null || chunk.toolName === null) return false
+        const action = browserAction(chunk.toolName)
+        return action === 'open' || action === 'navigate'
+      })) onBrowserOpen()
     }
     forgetQueued(conversationId, consumed)
     setQueued(queuedMessages(conversationId))
@@ -122,9 +129,25 @@ export function useConversationTranscript(conversationId: string): {
         ? reseeded(current, content.snapshot)
         : applyChunks(current, content.chunks, arrivedAt),
     )
-  }, [conversationId])
+  }, [conversationId, onBrowserOpen])
 
   const conversation = useConversation(conversationId, { onContent })
+  const activeSubmission = conversation.phase.status === 'streaming' ? conversation.phase.submissionId : null
+  const revealedSubmission = useRef<string | null>(null)
+  useEffect(() => {
+    if (activeSubmission === null || revealedSubmission.current === activeSubmission
+      || !onBrowserOpen || seededFor.current !== conversationId) return
+    // Catch-up can carry parts of a turn that is still running. Scope the
+    // fallback to that submission so opening an old chat cannot reveal Workspace.
+    if (projection.items.some(item => item.kind === 'assistant' && item.submissionId === activeSubmission
+      && callsIn(item.segments).some(call => {
+        const action = browserAction(call.toolName)
+        return call.errorText === null && (action === 'open' || action === 'navigate')
+      }))) {
+      revealedSubmission.current = activeSubmission
+      onBrowserOpen()
+    }
+  }, [activeSubmission, onBrowserOpen, conversationId, projection.items])
 
   // Switching conversations starts a new transcript immediately: the old
   // items belong to another id, and a delivery for the new one must never

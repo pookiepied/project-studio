@@ -32,6 +32,7 @@ import type { ConversationSnapshots } from "../../../snapshots/store.js";
 import { TaskStore } from "../../../agents/definitions/task-store.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
 import { browserInteractionSchema, type BrowserInteraction } from "../../../browser/interaction.js";
+import { BrowserError } from "../../../browser/errors.js";
 
 export interface ConversationRoutesOptions {
   readonly queuedMessages?: (conversationId: string, submissionId: string | null, action: "list" | "steer" | "remove" | "edit") => Promise<unknown>;
@@ -387,10 +388,25 @@ export function createConversationRoutes(
     context.header("Cache-Control", "no-store");
     const id = context.req.param("id");
     if (store.get(id) === undefined) return context.json({ error: { code: "not_found", message: "Conversation not found." } }, 404);
-    const parsed = v.safeParse(browserInteractionSchema, await body(context));
-    if (!parsed.success) throw invalidBody("The browser interaction is invalid.");
-    if (options.browser?.interact === undefined) return context.json({ error: { message: "Live browser control is unavailable." } }, 503);
-    return context.json(await options.browser.interact(id, parsed.output));
+    const parsed = v.safeParse(browserInteractionSchema, await context.req.json().catch(() => null));
+    if (!parsed.success) return context.json(failure(invalidBody("The browser interaction is invalid.")), 400);
+    if (options.browser?.interact === undefined) return context.json({ error: "Live browser control is unavailable." }, 503);
+    try {
+      return context.json(await options.browser.interact(id, parsed.output));
+    } catch (error) {
+      if (error instanceof BrowserError && error.kind === "no_tab") {
+        return context.json({ error: "Ask Studio to open a page for this conversation first." }, 409);
+      }
+      if (parsed.output.action === "start") {
+        return error instanceof BrowserError && error.kind === "no_browser"
+          ? context.json({ error: error.message }, 409)
+          : context.json({ error: "Studio could not start the browser. Check that Chrome or Edge is installed on the Harness computer, then try again." }, 502);
+      }
+      const message = parsed.output.action === "view"
+        ? "Studio could not load the live browser. Select Reconnect to try again."
+        : "Studio could not complete that browser action. Check the page before trying again.";
+      return context.json({ error: message }, 502);
+    }
   });
 
   routes.post("/:id/computer/stop", async (context) => {

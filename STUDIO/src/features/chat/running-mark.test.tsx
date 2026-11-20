@@ -66,7 +66,7 @@ const CONVERSATION: Conversation = {
   permissionMode: 'ask',
 }
 
-function tree(conversation: Conversation) {
+function tree(conversation: Conversation, showChat = true) {
   return (
     <NavigationProvider>
       <WorkspaceProvider>
@@ -74,7 +74,7 @@ function tree(conversation: Conversation) {
           {/* ChatPage reads the rail store since the plan pill arrived, and
               this harness never carried it; the assertions are unchanged. */}
           <OverviewProvider>
-            <ChatPage conversation={conversation} />
+            {showChat ? <ChatPage conversation={conversation} /> : null}
             <RunningProbe />
           </OverviewProvider>
         </VoiceModeProvider>
@@ -126,6 +126,21 @@ afterEach(() => {
 })
 
 describe('the working mark mirrors the phase machine into the workspace', () => {
+  it('keeps the last run status while returning from Settings and catching up', () => {
+    live.phase = { status: 'submitted', submissionId: 'sub_1' }
+    const view = render(tree(CONVERSATION))
+    expect(workingList().textContent).toBe(CONVERSATION.id)
+
+    view.rerender(tree(CONVERSATION, false))
+    live.phase = { status: 'attaching' }
+    view.rerender(tree(CONVERSATION))
+    expect(workingList().textContent).toBe(CONVERSATION.id)
+
+    live.phase = { status: 'live' }
+    view.rerender(tree(CONVERSATION))
+    expect(workingList().textContent).toBe('')
+  })
+
   it('marks a conversation while its turn runs and un-marks it when it settles', async () => {
     const view = render(tree(CONVERSATION))
     expect(workingList().textContent).toBe('')

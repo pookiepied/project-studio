@@ -22,6 +22,14 @@ function sameMembers(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   return a.size === b.size && [...a].every((id) => b.has(id))
 }
 
+function waitingIds(rows: readonly { readonly conversationId: string | null }[]): ReadonlySet<string> {
+  const ids = new Set<string>()
+  for (const row of rows) {
+    if (row.conversationId !== null) ids.add(row.conversationId)
+  }
+  return ids
+}
+
 function readRemembered(): { readonly active: ReadonlySet<string>; readonly done: ReadonlySet<string> } {
   const ids = (value: unknown) =>
     new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [])
@@ -69,7 +77,8 @@ export function ConversationStatusProvider({ children }: { children: ReactNode }
   const openId = route.kind === 'chat' ? route.conversationId : null
 
   const [reported, setReported] = useState<ReadonlySet<string>>(NOTHING)
-  const [waiting, setWaiting] = useState<ReadonlySet<string>>(NOTHING)
+  const [awaitingApproval, setAwaitingApproval] = useState<ReadonlySet<string>>(NOTHING)
+  const [awaitingAnswer, setAwaitingAnswer] = useState<ReadonlySet<string>>(NOTHING)
   const [remembered] = useState(readRemembered)
   const [done, setDone] = useState<ReadonlySet<string>>(remembered.done)
   const [heard, setHeard] = useState(false)
@@ -77,7 +86,7 @@ export function ConversationStatusProvider({ children }: { children: ReactNode }
   // The poll reads these rather than depending on them, so a change of page or a
   // new mark does not restart its timer.
   const latest = useRef({ witnessed, openId, busy: false })
-  latest.current = { witnessed, openId, busy: reported.size + waiting.size + witnessed.size > 0 }
+  latest.current = { witnessed, openId, busy: reported.size + awaitingApproval.size + awaitingAnswer.size + witnessed.size > 0 }
 
   useEffect(() => {
     let live = true
@@ -85,6 +94,7 @@ export function ConversationStatusProvider({ children }: { children: ReactNode }
     let reading = false
 
     const read = async () => {
+      const atStart = latest.current
       const [runs, permissions, asked] = await Promise.all([
         runningConversations(),
         approvals.list(),
@@ -96,19 +106,21 @@ export function ConversationStatusProvider({ children }: { children: ReactNode }
         const next = new Set(runs.value)
         setHeard(true)
         setReported((current) => (sameMembers(current, next) ? current : next))
-        // A page that closed mid-turn left its mark behind with nobody to clear
-        // it. The open page still speaks for itself, including before admission.
-        for (const id of latest.current.witnessed) {
-          if (id !== latest.current.openId && !next.has(id)) markRunning(id, false)
+        // A read that predates a local send or a page close can return before
+        // the new run is listed. A later poll can reconcile the closed page.
+        if (atStart.witnessed === latest.current.witnessed) {
+          for (const id of atStart.witnessed) {
+            if (id !== atStart.openId && id !== latest.current.openId && !next.has(id)) markRunning(id, false)
+          }
         }
       }
-      if (permissions.ok && asked.ok) {
-        const next = new Set<string>()
-        for (const row of [...permissions.value, ...asked.value]) {
-          // A row with no conversation has no row in any list to mark.
-          if (row.conversationId !== null) next.add(row.conversationId)
-        }
-        setWaiting((current) => (sameMembers(current, next) ? current : next))
+      if (permissions.ok) {
+        const next = waitingIds(permissions.value)
+        setAwaitingApproval((current) => (sameMembers(current, next) ? current : next))
+      }
+      if (asked.ok) {
+        const next = waitingIds(asked.value)
+        setAwaitingAnswer((current) => (sameMembers(current, next) ? current : next))
       }
     }
 
@@ -164,9 +176,10 @@ export function ConversationStatusProvider({ children }: { children: ReactNode }
     for (const id of active) next.set(id, 'running')
     // Last, because a run parked on a question is both, and the question is the
     // part that needs a person.
-    for (const id of waiting) next.set(id, 'input')
+    for (const id of awaitingApproval) next.set(id, 'input')
+    for (const id of awaitingAnswer) next.set(id, 'input')
     return next
-  }, [done, active, waiting])
+  }, [done, active, awaitingApproval, awaitingAnswer])
 
   return <ConversationStatusContext.Provider value={statuses}>{children}</ConversationStatusContext.Provider>
 }

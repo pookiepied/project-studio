@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { ShowMoreButton, ShowMoreContent, Tooltip } from '@/components/primitives'
+import { ShowMoreButton, ShowMoreContent } from '@/components/primitives'
 import { FileTypeMark } from '@/components/icons/fileTypes'
 import type { ToolCallView } from '@/features/chat/transcript/projection'
 import { recordedChanges, type RecordedChange } from '@/features/changes/recordedChanges'
@@ -62,7 +62,7 @@ function ChangedFiles({ changes, conversationId }: {
       {(all ? changes : changes.slice(0, 3)).map((change) => <li key={change.path}>
         <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md py-1.5 text-left hover:bg-tint" onClick={() => review([change])}>
           <FileTypeMark path={change.path} />
-          <Tooltip label={change.path} overflowOnly className="min-w-0 flex-1"><span className="min-w-0 truncate">{change.path}</span></Tooltip>
+          <span className="min-w-0 flex-1 truncate">{change.path}</span>
           {change.diff !== null ? <span className="shrink-0 font-mono"><span className="text-diff-add">+{change.diff.added}</span>{' '}<span className="text-diff-del">-{change.diff.removed}</span></span>
             : <span className="shrink-0 text-muted-foreground">{change.action}</span>}
         </button>

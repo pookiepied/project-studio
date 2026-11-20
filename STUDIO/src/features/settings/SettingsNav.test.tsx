@@ -21,6 +21,8 @@ describe('the settings side panel', () => {
     expect(button('Providers').getAttribute('aria-expanded')).toBe('false')
     expect(button('Appearance').getAttribute('aria-current')).toBe('page')
     expect(button('General').getAttribute('aria-current')).toBeNull()
+    expect(button('Appearance').closest('[title]')).toBeNull()
+    expect(button('General').closest('[title]')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Models' })).toBeNull()
   })
 
@@ -76,5 +78,13 @@ describe('the settings side panel', () => {
 
     fireEvent.click(button('Back'))
     expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes the sidebar form when the column owns the tree', () => {
+    render(<SettingsNav variant="sidebar" active="general" onSelect={vi.fn()} onBack={vi.fn()} />)
+
+    expect(screen.getByRole('navigation', { name: 'Settings sections' }).className).toContain(
+      'studio-settings-nav-sidebar',
+    )
   })
 })

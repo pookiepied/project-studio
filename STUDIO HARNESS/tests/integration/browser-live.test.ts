@@ -67,13 +67,11 @@ describe.skipIf(engineReport().seen === undefined)("live control of an installed
     try {
       await tab.page.evaluate(() => { document.body.style.backgroundColor = "#ddd"; });
       await expect.poll(() => session.live.interact({ action: "view", viewerId, since: before.frame.sequence }))
-        .toMatchObject({ frame: { width: 1280, height: 800 } });
+        .toMatchObject({ frame: { width: 1280, height: 720 } });
     } finally { viewport.mockRestore(); }
     await tab.page.mouse.move(240, 160, { steps: 3 });
-    await expect.poll(async () => {
-      const value = await session.live.interact({ action: "view", viewerId });
-      return JSON.stringify(value).includes('"x":0.1875,"y":0.2');
-    }).toBe(true);
+    await expect.poll(() => session.live.interact({ action: "view", viewerId }))
+      .toMatchObject({ cursor: { x: 240 / 1280, y: 160 / 720 } });
     const title = vi.spyOn(tab.page, "title").mockImplementation(() => new Promise<string>(() => {}));
     try {
       // A document waiting on navigation must not turn a healthy session into
@@ -87,6 +85,7 @@ describe.skipIf(engineReport().seen === undefined)("live control of an installed
       expect(title).toHaveBeenCalledTimes(1);
     } finally { title.mockRestore(); }
     await session.live.interact({ action: "claim", viewerId });
+    expect(tab.page.viewportSize()).toEqual({ width: 1280, height: 720 });
     await session.live.interact({ action: "pointer", viewerId, tabId: tab.id, kind: "down", x: 0.05, y: 0.04, button: "left", clicks: 1 });
     await session.live.interact({ action: "pointer", viewerId, tabId: tab.id, kind: "up", x: 0.05, y: 0.04, button: "left", clicks: 1 });
     await session.live.interact({ action: "text", viewerId, tabId: tab.id, text: "human input" });
@@ -102,6 +101,7 @@ describe.skipIf(engineReport().seen === undefined)("live control of an installed
     await session.live.interact({ action: "detach", viewerId });
     expect(session.running).toBe(true);
     expect(await tab.page.locator("input").inputValue()).toBe("human input");
+    expect(tab.page.viewportSize()).toEqual({ width: 1280, height: 720 });
     expect(await session.live.agent(async () => "resumed")).toBe("resumed");
   }, 30000);
 });

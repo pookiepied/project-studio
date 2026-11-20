@@ -15,16 +15,18 @@ export function ComputerPresenceMonitor() {
   current.current = { computer, tasks, approvals, questions }
   const conversationId = presence?.conversationId ?? null
   const mode = presence?.mode ?? 'active'
+  const target = presence?.target
   useEffect(() => {
     const refresh = () => {
-      const command = conversationId === null ? hideComputerIndicator() : showComputerIndicator(conversationId, mode)
+      const command = conversationId === null ? hideComputerIndicator()
+        : target === undefined ? showComputerIndicator(conversationId, mode) : showComputerIndicator(conversationId, mode, target)
       void command.catch(() => undefined)
     }
     refresh()
     if (conversationId === null) return
     const timer = setInterval(refresh, 1000)
     return () => clearInterval(timer)
-  }, [conversationId, mode])
+  }, [conversationId, mode, target])
   useEffect(() => {
     let live = true
     let unlisten: (() => void) | undefined

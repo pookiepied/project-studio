@@ -57,6 +57,24 @@ eviction and missing events can make progress unavailable. Existing HTTP,
 framework-tool, runtime lifecycle and media gateway boundaries observe these
 paths; audio frames and microphone levels do not enter diagnostic attributes.
 
+Studio Memory adds no new identity kind or diagnostic route. Memory ids are
+`mem_` plus a central Studio UUID; profile and settings are `app_setting` keys
+under the `memory` namespace. The `studio-memory` built-in MCP server is a
+relay like Studio Customization: its calls keep the existing MCP connection,
+RPC, tool-gate and kernel-approval identities, and the harness `/api/memory`
+routes it reaches are observed by the existing HTTP boundary. Which project a
+memory belongs to and what a call may see are derived from the conversation id
+in the call's harness-written `_meta`, never from tool arguments. The
+first-turn context block is built under `memory.context` (kind `hook`); its
+`memory.context.built` observation records only whether memory is enabled,
+whether a block was delivered, whether the conversation is in a project, and
+counts (long-term, recent, project, omitted, profile fields, characters).
+Profile text and memory content never enter attributes; they reach the model
+as the `memory_context` signal and tool results, under the existing gated
+transcript and MCP frame capture. Delivery is once per conversation, recorded
+in Flue instance state; a later edit does not reach a conversation that
+already started, and forgetting does not unread what a model already saw.
+
 This contract applies to all current and new Project Studio features. The harness
 owns execution. Observations explain execution without changing it. The external
 inspector will consume this contract later; it is not implemented here.
@@ -523,8 +541,13 @@ connection and RPC identities. Viewer leases use client UUIDs and convey control
 ownership, never admission authority. Native window labels encode the complete
 opaque conversation ID without lossy sanitizing; opening a viewer never creates
 a second conversation identity. Inputs are not retried. The viewer reads one
-latest bounded screencast frame, dropping superseded frames by design;
-these frames are product delivery, not diagnostic recordings. Manual text,
+latest bounded screencast frame, dropping superseded frames by design.
+An idle read reports session availability. The explicit Start browser action
+inherits the same admitted conversation and viewer lease. It checks extension
+enablement and opens a blank page through the existing private control RPC.
+The fixed action name is available as operational metadata. Unexpected
+interaction failures return fixed HTTP error text.
+Live frames are delivered to the viewer. Manual text,
 keys, addresses, raw page cursor telemetry and live frames are excluded from MCP
 diagnostic content even with scoped capture enabled. The browser child does
 not claim per-frame diagnostic capture. Native `open_browser_window` records
@@ -569,6 +592,12 @@ execution/event IDs. Session-local accumulation keeps reports from internal
 cursor/screenshot requests with their originating tool and preserves the actual
 result or refusal. Unsupported monitoring/state is explicit.
 
+For keyboard input approved in Studio, the existing driver requests confirm
+Studio took the foreground and the selected target is intact. Focus returns to
+that target before the driver classifies its focused field. A failed restoration
+sends no input and leaves the local approval unspent. Coordinate input keeps
+its existing frame checks.
+
 Since ADR 0059 the lease is per actor, not per conversation: the actor is the
 Flue instance id the harness puts in a system server's `_meta`, never a model
 argument, and it is coordination, not a permission grant. The person's controls
@@ -608,24 +637,25 @@ physical human attribution or secure-desktop/elevated-window coverage. Cursor
 styles within child frames remain best effort; no native marker/focus, physical
 input or multi-monitor hands-on verification is claimed. Tests compile the helper
 without starting hooks and exercise controlled browser sessions.
-The desktop marker paints the browser's arrow geometry and a rounded custom
-Studio badge. Screen-edge placement keeps the badge visible and arrow hotspot
-aligned. It does not replace the OS-wide cursor. Offscreen drawing tests exercise
-the shipped renderer; these are not evidence of live desktop focus or hook delivery.
-The compact white pointer face and thin charcoal edge use Studio's neutral palette.
-Its five-second visual pulse renews after successful input dispatch and exact
-pointer correction; manual non-injected input, refusal and held-input release
-dismiss it. These paint-only pulses add no input, retry, collected field or new
-execution identity. Existing action results and exceptions are unchanged.
+The Windows desktop marker paints the blue glow around the OS pointer hotspot
+for the active lease. The desktop host launches a cursor helper outside the
+Harness job. It temporarily replaces the Windows arrow, hand and text cursor
+slots with Studio's rounded pointer while the selected window owns foreground
+and the pointer is within its bounds. Keyboard and clipboard actions retain the
+pointer. The helper restores saved cursors when focus leaves, the host closes its
+pipe, or heartbeats expire. If Windows reports an abandoned override, a surviving
+host or helper reloads the configured cursor scheme before taking ownership.
+The pipe carries the existing handle and PID only. Cursor position and button
+state stay local to paint and are excluded from capture. No action results,
+input authority, or execution identities change.
 The opt-in `computer-marker-live.ps1` fixture composes the shipped layered window
 over an owned test backdrop without hooks or injected input, checking its pixels
 and foreground preservation. This verifies that component's live composition,
 not physical-input attribution or the running agent's end-to-end delivery.
-Successful native mouse-button dispatch updates only a bounded visual button mask
-and release timestamp. The cursor compresses on press, retains held-button feedback
-until the last button is released, then draws a 260 ms expanding, fading neutral
-ring. Wheels and refused input never start click feedback. No button identities or
-timestamps are added to results or diagnostic attributes.
+The native pointer compresses on button press and rebounds on release when
+Windows animations are enabled. Successful driver-issued presses also produce
+the marker's expanding release ring. No button identities or timestamps are added
+to results or diagnostic attributes.
 
 Browser cursor snapshots retain a bounded `pressSequence` counter so a complete
 page press/release between viewer polls can still produce feedback. This is visual
@@ -646,13 +676,15 @@ means a run left that list; it does not claim the submission succeeded.
 
 Desktop presence uses admitted `GET /api/computer/activity`, the child operation
 `computer.activity`, and the existing private `studio/computer` RPC. The desktop
-lease owns the returned existing conversation ID and mode; no new entity ID,
-screen sampling, content attribute, permission or automatic resend is introduced.
+lease owns the returned existing conversation ID and mode. The existing driver
+answer carries the latest target handle and process ID for the indicator and
+cursor helper. Both check locally against the foreground window. The projection
+contains no window title, screen sample, or pointer coordinates.
 An unavailable server has no owner; a failed read remains unavailable rather than
 proving exit. The shared client poll drives the main window's native indicator
 and rail controls independently of transcript replay and navigation. Native sign
-renewal expires after four seconds without the UI, and pointer-monitor placement
-uses physical work-area coordinates. Renewal, placement and paint remain
+renewal expires after four seconds without the UI. Placement uses the selected
+foreground window's physical bounds and display work area. Renewal, placement and paint remain
 housekeeping rather than diagnostic events; existing native commands retain
 their arrival observations. Driver release, submission settlement and confirmed
 exit remain the authority for lease loss. Physical monitor switching, overlay
@@ -693,6 +725,19 @@ content policy, unsupported observations and relevant coverage tests. Check dire
 queued, cancelled, refused and failed paths as applicable. Keep execution,
 delivery and capture health separate. Returned `isError` values and thrown errors
 must not be silently collapsed into one outcome.
+
+Chrome DevTools by Studio is an opt-in system MCP server for the user's running
+Google Chrome. Discovery stays passive. An admitted connect call initiates the
+Chrome-owned consent flow. The built-in MCP supervisor and tool gate retain
+their operation, request and conversation identities. Page operations run under
+that call and do not retry uncertain input. The separately owned Chrome process
+is never launched or terminated by this server. Disconnect, idle expiry and
+stdio shutdown release only the attachment. Raw CDP frames and this server's
+MCP tool frames are omitted from diagnostics, including when content capture is
+on. Returned page text is conversation content. Tab UUIDs identify pages only
+within the current attachment and are never translated into external paths or
+used as authorization. The page-local cursor and badge have their own expiry
+after a broken connection and record no pointer activity.
 
 MCP discovery keeps the existing `native/discover` capability and tool gate.
 Its `discover.list`, `discover.inspect` and `discover.load` child operations

@@ -3,6 +3,8 @@ mod diagnostics;
 mod identity;
 mod inspector;
 mod clipboard;
+#[cfg(target_os = "windows")]
+mod cursor_manager;
 mod external;
 mod permissions;
 mod remote;
@@ -12,6 +14,15 @@ mod screen_overlay;
 mod services;
 mod tray;
 mod window;
+
+#[cfg(target_os = "windows")]
+pub fn run_cursor_manager_if_requested() -> bool {
+  if std::env::args_os().nth(1).as_deref() != Some(std::ffi::OsStr::new(cursor_manager::ARG)) {
+    return false;
+  }
+  cursor_manager::run_guard();
+  true
+}
 
 use harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -132,9 +143,8 @@ async fn app_ready(window: tauri::WebviewWindow) -> Result<(), String> {
   // model is typing into some other window, and focusing it would take the
   // keyboard away from the very window the model was just told is the target.
   if window.label() == COMPUTER_INDICATOR_LABEL {
-    if app_indicator_live(window.app_handle()) {
-      let _ = window.show();
-    }
+    window.app_handle().state::<ComputerIndicator>().ready.store(true, Ordering::SeqCst);
+    refresh_computer_indicator(window.app_handle());
     return Ok(());
   }
   // The screen overlay is shown only by its own commands, when there is
@@ -164,13 +174,28 @@ const COMPUTER_INDICATOR_TOP: f64 = 12.0;
 /// this side, and this side tells the main window which run to end.
 #[derive(Default)]
 struct ComputerIndicator {
-  conversation: Mutex<Option<(String, std::time::Instant)>>,
+  conversation: Mutex<Option<IndicatorPresence>>,
+  ready: AtomicBool,
+  #[cfg(target_os = "windows")]
+  cursor: Mutex<cursor_manager::CursorManager>,
 }
 
-fn app_indicator_live(app: &AppHandle) -> bool {
-  app.state::<ComputerIndicator>().conversation.lock().ok()
-    .and_then(|current| current.as_ref().map(|(_, at)| indicator_is_fresh(at.elapsed())))
-    .unwrap_or(false)
+struct IndicatorPresence {
+  conversation_id: String,
+  renewed: std::time::Instant,
+  target: Option<IndicatorTarget>,
+  #[cfg(target_os = "windows")]
+  driving: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
+struct IndicatorTarget {
+  handle: usize,
+  pid: u32,
+}
+
+fn indicator_target_is_foreground(target: IndicatorTarget, foreground: usize, root: usize, pid: u32) -> bool {
+  foreground != 0 && target.pid == pid && pid != 0 && (target.handle == foreground || target.handle == root)
 }
 
 fn indicator_is_fresh(age: std::time::Duration) -> bool {
@@ -191,7 +216,7 @@ struct ComputerStopRequest {
 /// Show the pill that says Studio is using the computer (ADR 0055 §7).
 ///
 /// Not a border and not a resize of the app: a second window, frameless and
-/// transparent, always on top, at the top centre of the pointer's display, with
+/// transparent, always on top, anchored to the verified foreground target, with
 /// only the pill painted in it. It is never given focus (see `app_ready`) and
 /// never takes the taskbar, so the desktop looks the same as before except
 /// for one small sign that says who is at the keyboard.
@@ -199,24 +224,29 @@ struct ComputerStopRequest {
 /// Built once and then hidden and shown, because a webview takes a moment to
 /// come up and a turn may drive the computer several times.
 #[tauri::command]
-async fn computer_indicator_show(app: AppHandle, conversation_id: String, mode: Option<String>) -> Result<(), String> {
+async fn computer_indicator_show(app: AppHandle, conversation_id: String, mode: Option<String>, target: Option<IndicatorTarget>) -> Result<(), String> {
+  let mode = mode.unwrap_or_else(|| "active".into());
   if let Ok(mut current) = app.state::<ComputerIndicator>().conversation.lock() {
-    let changed = current.as_ref().map(|(id, _)| id) != Some(&conversation_id);
-    *current = Some((conversation_id, std::time::Instant::now()));
+    let changed = current.as_ref().map(|presence| &presence.conversation_id) != Some(&conversation_id);
+    *current = Some(IndicatorPresence {
+      conversation_id, renewed: std::time::Instant::now(), target,
+      #[cfg(target_os = "windows")]
+      driving: mode == "active",
+    });
     if changed {
       let _ = app.emit("studio://computer-indicator/changed", ());
     }
   }
-  let _ = app.emit("studio://computer-indicator/status", mode.unwrap_or_else(|| "active".into()));
+  let _ = app.emit("studio://computer-indicator/status", mode);
 
-  if let Some(existing) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) {
-    position_computer_indicator(&app, &existing);
-    let _ = existing.show();
+  if app.get_webview_window(COMPUTER_INDICATOR_LABEL).is_some() {
+    refresh_computer_indicator(&app);
     return Ok(());
   }
+  if target.is_none() { return Ok(()); }
 
   let (width, height) = COMPUTER_INDICATOR_SIZE;
-  let window = WebviewWindowBuilder::new(
+  WebviewWindowBuilder::new(
     &app,
     COMPUTER_INDICATOR_LABEL,
     WebviewUrl::App("index.html?indicator=computer".into()),
@@ -245,41 +275,64 @@ async fn computer_indicator_show(app: AppHandle, conversation_id: String, mode: 
   .visible(false)
   .build()
   .map_err(|error| error.to_string())?;
-  position_computer_indicator(&app, &window);
 
   Ok(())
 }
 
 /// Work-area placement stays in physical pixels so mixed monitor scales do
 /// not rescale the virtual desktop's origin.
-fn position_computer_indicator(app: &AppHandle, window: &tauri::WebviewWindow) {
-  let monitor = app.cursor_position().ok()
-    .and_then(|point| app.monitor_from_point(point.x, point.y).ok().flatten())
-    .or_else(|| app.primary_monitor().ok().flatten());
-  let Some(monitor) = monitor else {
-    return;
-  };
-  let scale = monitor.scale_factor();
-  let area = monitor.work_area();
-  let (x, y) = indicator_position(area.position.x, area.position.y, area.size.width, scale);
-  let position = tauri::PhysicalPosition::new(x, y);
-  if window.outer_position().ok() != Some(position) {
-    let _ = window.set_position(position);
+#[cfg(target_os = "windows")]
+fn computer_indicator_position(app: &AppHandle, target: IndicatorTarget) -> Option<tauri::PhysicalPosition<i32>> {
+  use windows::Win32::Foundation::{HWND, RECT};
+  use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, GA_ROOT};
+  let target_window = HWND(target.handle as *mut std::ffi::c_void);
+  let mut pid = 0;
+  let mut bounds = RECT::default();
+  unsafe {
+    let foreground = GetForegroundWindow();
+    let root = GetAncestor(foreground, GA_ROOT);
+    if GetWindowThreadProcessId(target_window, Some(&mut pid)) == 0
+      || !indicator_target_is_foreground(target, foreground.0 as usize, root.0 as usize, pid) {
+      return None;
+    }
+    GetWindowRect(target_window, &mut bounds).ok()?;
   }
+  let width = bounds.right.checked_sub(bounds.left).filter(|width| *width > 0)?;
+  let height = bounds.bottom.checked_sub(bounds.top).filter(|height| *height > 0)?;
+  let monitor = app.monitor_from_point(f64::from(bounds.left) + f64::from(width) / 2.0,
+    f64::from(bounds.top) + f64::from(height) / 2.0).ok()??;
+  let area = monitor.work_area();
+  let scale = monitor.scale_factor();
+  let (x, y) = indicator_position(bounds.left, bounds.top, width as u32, scale);
+  let max_x = area.position.x + (f64::from(area.size.width) - COMPUTER_INDICATOR_SIZE.0 * scale).max(0.0) as i32;
+  let max_y = area.position.y + (f64::from(area.size.height) - COMPUTER_INDICATOR_SIZE.1 * scale).max(0.0) as i32;
+  Some(tauri::PhysicalPosition::new(x.clamp(area.position.x, max_x), y.clamp(area.position.y, max_y)))
 }
+
+#[cfg(not(target_os = "windows"))]
+fn computer_indicator_position(_: &AppHandle, _: IndicatorTarget) -> Option<tauri::PhysicalPosition<i32>> { None }
 
 fn refresh_computer_indicator(app: &AppHandle) {
   let state = app.state::<ComputerIndicator>();
   let Ok(mut current) = state.conversation.lock() else { return; };
-  let live = current.as_ref().map(|(_, at)| indicator_is_fresh(at.elapsed())).unwrap_or(false);
+  let live = current.as_ref().is_some_and(|presence| indicator_is_fresh(presence.renewed.elapsed()));
   // A webview's late ready/show can race a hide; absence must keep enforcing hide.
-  if !live {
-    *current = None;
-    if let Some(window) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) {
-      if window.is_visible().unwrap_or(false) { let _ = window.hide(); }
-    }
-  } else if let Some(window) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) {
-    position_computer_indicator(app, &window);
+  if !live { *current = None; }
+  let target = current.as_ref().and_then(|presence| presence.target);
+  #[cfg(target_os = "windows")]
+  if let Ok(mut cursor) = state.cursor.lock() {
+    let cursor_target = current.as_ref().filter(|presence| presence.driving)
+      .and_then(|presence| presence.target);
+    cursor.update(cursor_target);
+  }
+  drop(current);
+  let Some(window) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) else { return; };
+  if let Some(position) = target.and_then(|target| computer_indicator_position(app, target))
+    .filter(|_| state.ready.load(Ordering::SeqCst)) {
+    if window.outer_position().ok() != Some(position) { let _ = window.set_position(position); }
+    if !window.is_visible().unwrap_or(false) { let _ = window.show(); }
+  } else if window.is_visible().unwrap_or(false) {
+    let _ = window.hide();
   }
 }
 
@@ -290,7 +343,17 @@ fn indicator_position(x: i32, y: i32, width: u32, scale: f64) -> (i32, i32) {
 
 #[cfg(test)]
 mod indicator_tests {
-  use super::{indicator_is_fresh, indicator_position};
+  use super::{indicator_is_fresh, indicator_position, indicator_target_is_foreground, IndicatorTarget};
+
+  #[test]
+  fn only_the_matching_foreground_window_or_its_child_can_show_the_pill() {
+    let target = IndicatorTarget { handle: 100, pid: 10 };
+    assert!(indicator_target_is_foreground(target, 100, 100, 10));
+    assert!(indicator_target_is_foreground(target, 101, 100, 10));
+    assert!(!indicator_target_is_foreground(target, 200, 200, 10));
+    assert!(!indicator_target_is_foreground(target, 100, 100, 99));
+    assert!(!indicator_target_is_foreground(target, 0, 100, 10));
+  }
 
   #[test]
   fn a_missing_ui_renewal_cannot_keep_or_reveal_a_stale_sign() {
@@ -311,6 +374,8 @@ mod indicator_tests {
 async fn computer_indicator_hide(app: AppHandle) -> Result<(), String> {
   if let Ok(mut current) = app.state::<ComputerIndicator>().conversation.lock() {
     *current = None;
+    #[cfg(target_os = "windows")]
+    if let Ok(mut cursor) = app.state::<ComputerIndicator>().cursor.lock() { cursor.update(None); }
   }
   if let Some(window) = app.get_webview_window(COMPUTER_INDICATOR_LABEL) {
     let _ = window.hide();
@@ -328,7 +393,7 @@ async fn computer_indicator_stop(app: AppHandle, request_id: String) -> Result<(
     .conversation
     .lock()
     .ok()
-    .and_then(|current| current.as_ref().map(|(id, _)| id.clone()));
+    .and_then(|current| current.as_ref().map(|presence| presence.conversation_id.clone()));
   let Some(conversation) = conversation else {
     return Ok(());
   };
@@ -997,6 +1062,10 @@ pub fn run() {
     .expect("error while building tauri application")
     .run(move |app_handle, event| {
       if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
+        #[cfg(target_os = "windows")]
+        if let Some(state) = app_handle.try_state::<ComputerIndicator>() {
+          if let Ok(mut cursor) = state.cursor.lock() { cursor.update(None); }
+        }
         inspector::shutdown();
         if let Some(remote) = app_handle.try_state::<remote::RemoteAccess>() {
           remote.stop();

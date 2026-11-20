@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useArriving } from '@/components/motion/Arrive'
-import { Tooltip } from '@/components/primitives'
 import { cn } from '@/lib/cn'
 import { DisclosureRow } from '@/features/chat/transcript/DisclosureRow'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
@@ -131,7 +130,7 @@ export function ActivityBlock({
         <span className="flex min-w-0 items-center gap-2">
           {/* One line at any length: a running command is the label here, and a
               wrapped one pushes the whole list down and back as it changes. */}
-          <Tooltip label={label ?? ''} overflowOnly className="min-w-0"><span className={cn('min-w-0 truncate', active && 'studio-shimmer')}>{label}</span></Tooltip>
+          <span className={cn('min-w-0 truncate', active && 'studio-shimmer')}>{label}</span>
           {state.failed > 0 ? <>{' '}<span className="shrink-0 text-danger">Some tools failed</span></> : null}
           {state.unfinished ? <>{' '}<span className="shrink-0">Unfinished</span></> : null}
         </span>

@@ -1285,7 +1285,8 @@ function Wait-ForWindow($text, $seconds, $match) {
       $pick = Select-UniqueWindow $found
       $adopted = Owned-ByTarget $pick
       if ($adopted) { Adopt-Dialog $pick.handle }
-      return [ordered]@{ found = $true; handle = $pick.handle; title = $pick.title; app = $pick.app; display = $pick.display; foreground = $pick.foreground; adopted = $adopted }
+      $currentTarget = [int64]$pick.handle -eq $script:Target -and (Window-Identity $pick) -eq $script:TargetIdentity
+      return [ordered]@{ found = $true; handle = $pick.handle; title = $pick.title; app = $pick.app; pid = $pick.pid; processStarted = $pick.processStarted; display = $pick.display; foreground = $pick.foreground; adopted = $adopted; currentTarget = $currentTarget }
     }
     if ([DateTime]::UtcNow -ge $deadline) { return [ordered]@{ found = $false; waited = $limit } }
     Start-Sleep -Milliseconds 250
@@ -1489,8 +1490,11 @@ function Get-Sensitivity($a) {
     }
     "keys" {
       $handle = $script:Target
-      if ($a.text -eq $true) {
-        try { $focused = [System.Windows.Automation.AutomationElement]::FocusedElement; $password = $null -ne $focused -and [bool]$focused.Current.IsPassword } catch {}
+      if ($a.text -eq $true -and $handle -ne 0 -and (Same-Window ([int64][Studio.Native]::GetForegroundWindow()) $handle)) {
+        try {
+          $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+          $password = $null -ne $focused -and [bool]$focused.Current.IsPassword -and (Same-Window ([int64][Studio.Native]::GetForegroundWindow()) $handle)
+        } catch {}
       }
     }
     default { throw "Say what the input would reach: point, ref or keys." }
@@ -1786,6 +1790,14 @@ function Take-InputUpdate {
   return $update
 }
 
+function Indicator-Target {
+  if ($script:Target -le 0) { return $null }
+  [uint32]$pidOfTarget = 0
+  [void][Studio.Native]::GetWindowThreadProcessId([IntPtr]$script:Target, [ref]$pidOfTarget)
+  if ($pidOfTarget -eq 0) { return $null }
+  return [ordered]@{ handle = [int64]$script:Target; pid = $pidOfTarget }
+}
+
 function Answer($id, $result) {
   if ($null -ne $script:ActionBefore) {
     $observation = try {
@@ -1793,7 +1805,7 @@ function Answer($id, $result) {
     } catch { [ordered]@{ available = $false; observationId = $script:ObservationId; refsInvalidated = $true } }
     if ($result -is [System.Collections.IDictionary]) { $result["observation"] = $observation }
   }
-  $o = [ordered]@{ id = $id; ok = $true; result = $result }
+  $o = [ordered]@{ id = $id; ok = $true; result = $result; indicatorTarget = (Indicator-Target) }
   if ($null -ne $script:Activity -or $null -ne $script:InputPending) { $o.userInput = Take-InputUpdate }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 8))
   [Console]::Out.Flush()
@@ -1811,17 +1823,17 @@ function Answer-Pulse($id) {
   $counts = if ($null -eq $pending) { [ordered]@{ buttons = 0; keys = 0; wheels = 0; moves = 0 } }
     else { [ordered]@{ buttons = $pending.buttons; keys = $pending.keys; wheels = $pending.wheels; moves = $pending.moves } }
   $result = [ordered]@{ pointer = (Get-Cursor); front = $front; input = $counts; monitored = ($null -ne $script:Activity); stop = (Stop-Requested) }
-  [Console]::Out.WriteLine((ConvertTo-Json ([ordered]@{ id = $id; ok = $true; result = $result }) -Compress -Depth 6))
+  [Console]::Out.WriteLine((ConvertTo-Json ([ordered]@{ id = $id; ok = $true; result = $result; indicatorTarget = (Indicator-Target) }) -Compress -Depth 6))
   [Console]::Out.Flush()
 }
 
 function Refuse($id, $message, $code) {
-  if ($null -ne $script:Activity) { $script:Activity.Dismiss() }
+  if ($null -ne $script:Activity) { $script:Activity.ResetPress() }
   Reset-UiRefs
   if ($null -ne $script:ActionBefore) {
     $message += " Observe status and read the intended window again before any further input; do not replay this action automatically."
   }
-  $o = [ordered]@{ id = $id; ok = $false; error = $message }
+  $o = [ordered]@{ id = $id; ok = $false; error = $message; indicatorTarget = (Indicator-Target) }
   if ($null -ne $code -and $code -ne "") { $o.code = [string]$code }
   if ($null -ne $script:Activity -or $null -ne $script:InputPending) { $o.userInput = Take-InputUpdate }
   [Console]::Out.WriteLine((ConvertTo-Json $o -Compress -Depth 4))
@@ -1902,6 +1914,7 @@ try { while ($true) {
         if ($a.allowPassword -ne $true -and (Get-Sensitivity ([pscustomobject]@{ kind = "keys"; text = $true })).password) {
           Fail "refused" "The control taking text is a password field, so nothing was typed. Studio asks the person before typing into one."
         }
+        Assert-Target "type"
         Type-Text ([string]$a.text); Answer $id ([ordered]@{ typed = ([string]$a.text).Length; front = (Front-Note) })
       }
       "key" { Assert-Target "press keys"; Press-Chord ([string]$a.keys) $a.repeat; Answer $id ([ordered]@{ done = $true; front = (Front-Note) }) }
@@ -1912,6 +1925,7 @@ try { while ($true) {
         Answer $id ([ordered]@{ done = $true; held = $held; front = (Front-Note) })
       }
       "paste" {
+        Assert-Target "paste"
         if ($a.allowPassword -ne $true -and (Get-Sensitivity ([pscustomobject]@{ kind = "keys"; text = $true })).password) {
           Fail "refused" "The control taking text is a password field, so nothing was pasted. Studio asks the person before filling one."
         }

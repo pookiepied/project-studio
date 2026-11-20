@@ -22,10 +22,11 @@ function To-Absolute($display, $x, $y) { return @{ x = $x; y = $y } }
 function Send-MouseTo($x, $y, $flags) { $script:Activity.Record("mouse_move") }
 function Start-Sleep { param($Milliseconds) }
 $script:Activity = New-Object Studio.Activity
-$until = [Studio.Activity].GetField("showUntil", [System.Reflection.BindingFlags]"NonPublic,Instance")
+$active = [Studio.Activity].GetField("presentationActive", [System.Reflection.BindingFlags]"NonPublic,Instance")
+$acting = [Studio.Activity].GetField("actingUntil", [System.Reflection.BindingFlags]"NonPublic,Instance")
 $buttons = [Studio.Activity].GetField("mouseButtons", [System.Reflection.BindingFlags]"NonPublic,Instance")
 $released = [Studio.Activity].GetField("releasedAt", [System.Reflection.BindingFlags]"NonPublic,Instance")
-function Marker-Visible { return [long]$until.GetValue($script:Activity) -gt [System.Diagnostics.Stopwatch]::GetTimestamp() }
+function Marker-Visible { return [bool]$active.GetValue($script:Activity) }
 try {
     $checks = [ordered]@{}
     Move-Pointer 0 10 10
@@ -34,9 +35,12 @@ try {
     $markerInput = New-Object Studio.Native+INPUT
     Send-Inputs ([Studio.Native+INPUT[]]@($markerInput)) "test input"
     $checks.inputVisible = Marker-Visible
-    $checks.visibleForFiveSeconds = ([long]$until.GetValue($script:Activity) - [System.Diagnostics.Stopwatch]::GetTimestamp()) -gt [System.Diagnostics.Stopwatch]::Frequency * 4
+    $acting.SetValue($script:Activity, [long]0)
+    $checks.visibleAfterInactivity = Marker-Visible
     $script:Activity.Record("mouse_move")
-    $checks.manualMoveHides = -not (Marker-Visible)
+    $checks.manualMoveKeepsMarker = Marker-Visible
+    $script:Activity.Record("keyboard")
+    $checks.keyboardKeepsMarker = Marker-Visible
     Send-Mouse 2 0
     Move-Pointer 0 14 14
     $checks.pressSurvivesMove = $buttons.GetValue($script:Activity) -eq 1 -and (Marker-Visible)
@@ -51,7 +55,9 @@ try {
     $checks.wheelNotClick = $buttons.GetValue($script:Activity) -eq 0 -and $released.GetValue($script:Activity) -eq $beforeWheel
     Send-Mouse 2 0
     $script:Activity.Record("mouse_button")
-    $checks.manualButtonClearsPress = $buttons.GetValue($script:Activity) -eq 0 -and -not (Marker-Visible)
+    $checks.manualButtonClearsPress = $buttons.GetValue($script:Activity) -eq 0 -and (Marker-Visible)
+    $script:Activity.ResetPress()
+    $checks.refusalKeepsMarker = Marker-Visible
     $script:Activity.Pulse()
     $script:Activity.Dismiss()
     $checks.releaseHides = -not (Marker-Visible)

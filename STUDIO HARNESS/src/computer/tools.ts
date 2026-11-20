@@ -195,10 +195,12 @@ function actionAnswer(body: string, result: unknown): ToolAnswer {
   if (observation["available"] !== true) {
     lines.push("Post-action observation is unavailable. Get status and read the intended window before further input. Do not replay the action automatically.");
   } else {
-    for (const [field, label] of [["target", "Target"], ["front", "In front"]] as const) {
-      const row = observation[field];
-      if (isRecord(row)) lines.push(`${label}: ${windowLine(row)}.`);
-    }
+    const { target, front } = observation;
+    const targetInFront = isRecord(target) && isRecord(front) && typeof target["handle"] === "number"
+      && target["handle"] === front["handle"] && target["pid"] === front["pid"]
+      && target["processStarted"] === front["processStarted"];
+    if (isRecord(target)) lines.push(`Target${targetInFront ? " (in front)" : ""}: ${windowLine(target)}.`);
+    if (!targetInFront && isRecord(front)) lines.push(`In front: ${windowLine(front)}.`);
     if (observation["returnedToOwner"] === true) lines.push("The dialog being worked in has closed; the work is back in the window that raised it.");
     if (observation["targetGone"] === true) lines.push("The previous target has closed or changed identity. Choose the intended replacement explicitly; foreground alone is not authority to continue.");
     for (const [field, label] of [["newWindows", "Opened"], ["closedWindows", "Closed"], ["candidates", "Recovery candidate"]] as const) {
@@ -207,8 +209,8 @@ function actionAnswer(body: string, result: unknown): ToolAnswer {
     }
     if (observation["truncated"] === true) lines.push("Window changes were truncated; list windows for the current inventory.");
     lines.push(observation["refsInvalidated"] === false
-      ? "References from the latest read_ui still work while their controls exist; a stale one is refused, then read_ui again. Never repeat input just because verification is unavailable."
-      : "Previous UI references are invalid. Observe the result and call read_ui again before using a control reference. Never repeat input just because verification is unavailable.");
+      ? "References from the latest read_ui are still current while their controls exist."
+      : "Previous UI references are invalid. Call read_ui before using a control reference.");
   }
   return { content: [text(lines.join("\n"))], structuredContent: { observation } };
 }
@@ -1122,19 +1124,28 @@ export const TOOLS: readonly ToolDefinition[] = [
       ["text"],
     ),
     run: async (session, input) => {
-      const text = required(input, "text");
+      const query = required(input, "text");
       const match = str(input, "match");
       if (match !== undefined && !["title", "app", "automationid", "class"].includes(match)) {
         throw new ComputerError("bad_input", { message: "match must be title, app, automationid or class." });
       }
-      const result = await session.request("wait_window", { text, seconds: num(input, "seconds") ?? "", match: match ?? "" });
+      const result = await session.request("wait_window", { text: query, seconds: num(input, "seconds") ?? "", match: match ?? "" });
       if (!isRecord(result) || result["found"] !== true) {
-        return answer(`No window matching "${text}" appeared within ${String(isRecord(result) ? result["waited"] : "")} seconds.`);
+        return answer(`No window matching "${query}" appeared within ${String(isRecord(result) ? result["waited"] : "")} seconds.`);
       }
       const front = result["adopted"] === true
         ? " It is in front and was raised by the window being worked in, so it is now the one being worked in; keys go to it, and once it closes the work returns to the window that raised it."
-        : result["foreground"] === true ? " It is in front; focus it by handle before keys." : " It is not in front; focus it before keys.";
-      return answer(`${windowName(result)} (${String(result["app"])}) is on display ${String(result["display"])}.${front}`);
+        : result["foreground"] !== true ? " It is not in front; focus it before keys."
+          : result["currentTarget"] === true ? " It is in front and is already the working window."
+            : " It is in front; focus it by handle before keys.";
+      const { handle, pid, processStarted, title, app, display } = result;
+      const identity = typeof pid === "number" && typeof processStarted === "string" && processStarted !== ""
+        ? ` Process ${String(pid)} started ${processStarted}.` : "";
+      return {
+        content: [text(`${windowName(result)} (${String(app)}) is on display ${String(display)}.${front}${identity}`)],
+        structuredContent: { window: { handle, pid, processStarted, title, app, display },
+          foreground: result["foreground"] === true, adopted: result["adopted"] === true, currentTarget: result["currentTarget"] === true },
+      };
     },
   },
 
@@ -1433,7 +1444,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "Point at things on the person's screen while you talk: a point (\"this one\"), a ring around something, a box around an area, " +
       "or an arrow from x,y to toX,toY, each with an optional short label. Up to 6 at once on one display, in the display's pixels like a click; " +
       "they fade after seconds (default 6, at most 30). clear: true takes yours down early. A mark sends no input and needs no desktop. " +
-      "Studio draws them above every window, so they show in screenshots taken while they are up. Point from a fresh picture, never a stale one.",
+      "The result contains a mark request for the Studio desktop client to draw. Point from a fresh picture, never a stale one.",
     // No input, but it changes what the person's screen shows.
     effect: "write",
     inputSchema: object({
@@ -1461,13 +1472,13 @@ export const TOOLS: readonly ToolDefinition[] = [
     }),
     run: async (session, input) => {
       if (input["clear"] === true) {
-        return { content: [text("Your marks were taken down.")], structuredContent: { marks: { clear: true } } };
+        return { content: [text("Clear request returned for the Studio desktop client.")], structuredContent: { marks: { clear: true } } };
       }
       const set = markSet(input, displaysFrom(await session.request("displays")), Date.now());
       const seconds = Math.round((set.expiresAt - Date.now()) / 1_000);
       return {
-        content: [text(`Showing ${String(set.marks.length)} mark${set.marks.length === 1 ? "" : "s"} on display ${String(set.display.index)} for ${String(seconds)} seconds. ` +
-          "The person sees them now, and pictures taken while they are up include them. Marks point; they do not click.")],
+        content: [text(`Prepared ${String(set.marks.length)} mark${set.marks.length === 1 ? "" : "s"} for display ${String(set.display.index)} for ${String(seconds)} seconds. ` +
+          "Rendering is handled by the Studio desktop client.")],
         structuredContent: { marks: set },
       };
     },

@@ -1,5 +1,3 @@
-import { motion } from 'framer-motion'
-
 /**
  * A conversation that is working.
  *
@@ -20,22 +18,15 @@ import { motion } from 'framer-motion'
  */
 
 const DOTS = 12
-/** One full turn, in seconds: a dot every 80ms. */
-const TURN = 0.96
-
-/** Moves only on each dot's beat, so the head jumps dot to dot. */
-const stepped = (progress: number) => Math.floor(progress * DOTS) / DOTS
 
 export function ActivityMark({ size = 14, label = 'Working' }: { size?: number | string; label?: string }) {
   return (
-    <motion.svg
+    <svg
       role="img"
       aria-label={label}
       viewBox="0 0 24 24"
-      className="block shrink-0 text-accent"
+      className="studio-activity-mark block shrink-0 text-accent"
       style={{ width: size, height: size }}
-      animate={{ rotate: 360 }}
-      transition={{ duration: TURN, ease: stepped, repeat: Infinity }}
     >
       {Array.from({ length: DOTS }, (_, index) => {
         // 0 at the head, 1 at the very end of the tail.
@@ -54,6 +45,6 @@ export function ActivityMark({ size = 14, label = 'Working' }: { size?: number |
           />
         )
       })}
-    </motion.svg>
+    </svg>
   )
 }

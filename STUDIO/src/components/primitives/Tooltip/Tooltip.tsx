@@ -166,7 +166,7 @@ export function Tooltip({
                 visibility: position ? 'visible' : 'hidden',
               }}
               className={cn(
-                // The solid, inverted palette keeps the label legible over any surface.
+                // A solid graphite surface keeps the label legible over either theme.
                 'studio-floating-surface pointer-events-none fixed z-50 max-w-80 whitespace-normal break-words rounded-lg px-2 py-1',
                 'bg-tooltip text-tooltip-foreground',
                 'text-caption shadow-overlay',

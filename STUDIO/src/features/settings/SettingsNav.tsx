@@ -15,11 +15,13 @@ function landingPage(group: SettingsGroup) {
 }
 
 /**
- * Settings' side panel, inside the Settings page.
+ * Settings' navigation.
  *
- * It belongs to the page rather than to the sidebar column because of Studio's
- * default window: at that size the sidebar is a drawer, and a list kept there
- * was out of sight on the one page that needs it. Here it is always on screen.
+ * It belongs to the sidebar column: entering Settings replaces the conversation
+ * list with this list in the same column, so there is never a second navigation
+ * column beside the app's own. The page beside it is only the selected pane.
+ * `variant="sidebar"` keeps the column's own ground and padding; the panel form
+ * remains for the narrow-page layout and for the component's own tests.
  *
  * It lists the seven groups, with the pages of one open beneath it. All 23 pages
  * at once had to scroll; this is at most thirteen rows. The open group follows
@@ -37,10 +39,13 @@ export function SettingsNav({
   active,
   onSelect,
   onBack,
+  variant = 'panel',
 }: {
   active: string
   onSelect: (sectionId: string) => void
   onBack: () => void
+  /** `sidebar` is the column's form; `panel` is the page's narrow fallback. */
+  variant?: 'panel' | 'sidebar'
 }) {
   // Laid out as a row, the open section can sit off the end of it.
   const nav = useRef<HTMLElement>(null)
@@ -51,16 +56,26 @@ export function SettingsNav({
   const openGroup = groupOf(active)
 
   return (
-    <nav ref={nav} aria-label="Settings sections" className="studio-settings-nav">
+    <nav
+      ref={nav}
+      aria-label="Settings sections"
+      className={cn('studio-settings-nav', variant === 'sidebar' && 'studio-settings-nav-sidebar')}
+    >
       <div className="studio-settings-nav-head">
         <button
           type="button"
           aria-label="Back"
           onClick={onBack}
-          className="studio-control-flat studio-settings-nav-row relative flex items-center gap-2 rounded-md px-2 text-left text-ui text-muted-foreground transition-colors duration-fast hover:text-foreground"
+          className="studio-control-flat studio-settings-nav-row relative flex items-center gap-2 rounded-md px-2 text-left text-ui leading-none text-muted-foreground transition-colors duration-fast hover:text-foreground"
         >
-          <Icons.back />
-          <span className="studio-settings-nav-title">Back</span>
+          {/* The same flex-centred mark wrapper the group rows use. Together
+              with `leading-none` on the row it keeps the arrow and the label
+              on one optical centre instead of letting the text's 1.55 line box
+              push the glyph a pixel low. */}
+          <span className="flex shrink-0 items-center justify-center">
+            <Icons.back />
+          </span>
+          <span className="studio-settings-nav-title leading-none">Back</span>
         </button>
       </div>
 
@@ -101,7 +116,6 @@ export function SettingsNav({
                         <button
                           key={section.id}
                           type="button"
-                          title={planned ? `${section.name} (planned)` : section.name}
                           aria-current={selected ? 'page' : undefined}
                           onClick={() => onSelect(section.id)}
                           className={cn(

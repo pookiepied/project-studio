@@ -9,6 +9,40 @@ afterEach(cleanup)
 const file: LocatedFile = { path: 'C:\\work\\notes.md', kind: 'markdown', line: null, column: null, inConversation: true, others: 0 }
 
 describe('the document desk', () => {
+  it('reveals the first agent browser and respects both workspace and browser-tab dismissal', () => {
+    const { result } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId="a">{children}</WorkspacePanelProvider> })
+    act(() => result.current?.revealAgentBrowser())
+    expect(result.current?.open).toBe(true)
+    expect(result.current?.active?.kind).toBe('browser')
+    act(() => { result.current?.toggle(); result.current?.revealAgentBrowser() })
+    expect(result.current?.open).toBe(false)
+    act(() => result.current?.toggle())
+    expect(result.current?.tabs).toHaveLength(1)
+    act(() => { result.current?.closeTab('browser'); result.current?.revealAgentBrowser() })
+    expect(result.current?.tabs).toHaveLength(0)
+    act(() => { result.current?.openBrowser(); result.current?.openFile(file); result.current?.revealAgentBrowser() })
+    expect(result.current?.active?.kind).toBe('file')
+  })
+
+  it('keeps a hidden workspace closed even when a different chat first uses the browser', () => {
+    let scope = 'a'
+    const { result, rerender } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId={scope}>{children}</WorkspacePanelProvider> })
+    act(() => result.current?.close())
+    scope = 'b'
+    rerender()
+    act(() => result.current?.revealAgentBrowser())
+    expect(result.current?.open).toBe(false)
+    act(() => result.current?.toggle())
+    expect(result.current?.active?.kind).toBe('browser')
+  })
+  it('moves workspace tabs without changing the selected document', () => {
+    const { result } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId="a">{children}</WorkspacePanelProvider> })
+    act(() => { result.current?.openBrowser(); result.current?.openFile(file); result.current?.addTab() })
+    const fileKey = `file:${file.path}`
+    act(() => { result.current?.select(fileKey); result.current?.moveTab('browser', fileKey) })
+    expect(result.current?.tabs.map(tab => tab.kind)).toEqual(['file', 'browser', 'new'])
+    expect(result.current?.active?.key).toBe(fileKey)
+  })
   it('reuses a file tab and restores its document after visiting the browser', () => {
     const { result } = renderHook(useWorkspacePanel, { wrapper: ({ children }: { children: ReactNode }) => <WorkspacePanelProvider conversationId="a">{children}</WorkspacePanelProvider> })
     act(() => { result.current?.openFile(file); result.current?.openFile({ ...file, line: 42 }) })

@@ -8,18 +8,18 @@
     transform: translateY(-3px);
   }
 
-  .studio-home-clover {
-    transform-origin: 50% 80%;
+  .studio-home-mark {
+    transform-origin: center;
     transition: transform var(--duration-base) ease-out;
   }
 
   @media (hover: hover) {
-    .studio-home-intro:not([data-leaving]) .studio-home-clover-hitbox:hover .studio-home-clover {
+    .studio-home-intro:not([data-leaving]) .studio-home-mark-hitbox:hover .studio-home-mark {
       transform: rotate(-8deg) scale(1.07);
     }
   }
 
-  .studio-home-intro:not([data-leaving]) .studio-home-clover-hitbox:active .studio-home-clover {
+  .studio-home-intro:not([data-leaving]) .studio-home-mark-hitbox:active .studio-home-mark {
     transform: rotate(4deg) scale(0.93);
   }
 }

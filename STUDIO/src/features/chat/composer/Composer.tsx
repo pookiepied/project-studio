@@ -785,7 +785,7 @@ export function Composer({
               <IconButton
                 label={canSend ? (turnRunning ? 'Queue message' : 'Send') : busy ? 'Stop' : 'Send'}
                 size="md"
-                tone="accent"
+                tone="solid"
                 disabled={(!canSend && !busy) || (pendingAttachments > 0 && !busy) || (canSend && turnRunning && queueFull)}
                 onClick={canSend ? () => submit() : halt}
               >

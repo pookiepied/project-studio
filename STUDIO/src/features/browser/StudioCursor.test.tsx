@@ -13,7 +13,8 @@ describe('Studio click feedback', () => {
     await act(async () => view.rerender(<StudioCursor cursor={{ ...cursor, pressSequence: 6 }} />))
     const pulse = view.container.querySelector('[data-feedback="click"]')
     expect(pulse?.getAttribute('data-press-sequence')).toBe('6')
-    view.rerender(<StudioCursor cursor={{ ...cursor, pressSequence: 6, x: 0.7 }} />)
+    const moved = { ...cursor, pressSequence: 6, x: 0.7 }
+    view.rerender(<StudioCursor cursor={moved} />)
     expect(view.container.querySelector('[data-feedback="click"]')).toBe(pulse)
   })
   it('shows held input and keeps an older sample from generating a new pulse', async () => {

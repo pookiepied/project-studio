@@ -26,6 +26,10 @@ const PermissionsPane = lazyNamed(
 )
 const AgentsPane = lazyNamed(() => import('@/features/settings/agents/AgentsPane'), 'AgentsPane')
 const LibraryPane = lazyNamed(() => import('@/features/settings/library/LibraryPane'), 'LibraryPane')
+const PersonalizationPane = lazyNamed(
+  () => import('@/features/settings/personalization/PersonalizationPane'),
+  'PersonalizationPane',
+)
 const EnvironmentsPane = lazyNamed(
   () => import('@/features/settings/environments/EnvironmentsPane'),
   'EnvironmentsPane',
@@ -61,6 +65,7 @@ const BUILT: Readonly<Record<string, () => ReactNode>> = {
   permissions: deferred('Permissions', <PermissionsPane />),
   agents: deferred('Agents', <AgentsPane />),
   library: deferred('Library', <LibraryPane />),
+  personalization: deferred('Personalization', <PersonalizationPane />),
   environments: deferred('Environments', <EnvironmentsPane />),
   devices: deferred('Other devices', <DevicesPane />),
   diagnostics: deferred('Diagnostics', <DiagnosticsPane />),

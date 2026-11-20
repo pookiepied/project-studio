@@ -63,7 +63,7 @@ export function ActionItems({
       </Action>
       {conversation !== null ? (
         <Action
-          accent
+          primary
           icon={<Icons.quote />}
           onSelect={() => {
             writeQuote(conversation, selection)
@@ -79,13 +79,13 @@ export function ActionItems({
 
 function Action({
   icon,
-  accent = false,
+  primary = false,
   disabled = false,
   onSelect,
   children,
 }: {
   icon: ReactNode
-  accent?: boolean
+  primary?: boolean
   disabled?: boolean
   onSelect: () => void
   children: ReactNode
@@ -98,7 +98,7 @@ function Action({
       // before the click reads it.
       onMouseDown={(event) => event.preventDefault()}
       onClick={onSelect}
-      className={cn('studio-action text-ui font-medium', accent && 'studio-action-accent')}
+      className={cn('studio-action text-ui font-medium', primary && 'studio-action-primary')}
     >
       {icon}
       {children}

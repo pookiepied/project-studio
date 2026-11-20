@@ -1,7 +1,7 @@
 export type BrowserCommand =
   | { action: 'view'; since?: number }
   | { action: 'activity'; tabId: string; kind: 'move' | 'button' | 'wheel' | 'keyboard'; x: number; y: number }
-  | { action: 'claim' | 'release' | 'detach' | 'new' | 'reset' }
+  | { action: 'start' | 'claim' | 'release' | 'detach' | 'new' | 'reset' }
   | { action: 'select' | 'close' | 'back' | 'forward' | 'reload'; tabId: string }
   | { action: 'navigate'; tabId: string; url: string }
   | { action: 'resize'; tabId: string; width: number; height: number }

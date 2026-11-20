@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { harnessBytesDataUrl } from '@/platform/harness'
 import { hostOf } from '@/lib/url'
+import { Icons } from '@/components/icons'
 
 /**
  * A site's mark beside a source: its own icon, or its first letter.
@@ -19,8 +20,12 @@ import { hostOf } from '@/lib/url'
  * The icon fades in over it when it lands, so a list of sources never
  * flickers between two kinds of mark as the lookups settle.
  */
-export function SiteMark({ href }: { href: string }) {
+export function SiteMark({ href, compact = false }: { href: string; compact?: boolean }) {
   const host = hostOf(href)
+  return <HostMark key={host} host={host} compact={compact} />
+}
+
+function HostMark({ host, compact }: { host: string; compact: boolean }) {
   const icon = useSiteIcon(host)
   const [broken, setBroken] = useState(false)
   const shown = icon !== null && !broken
@@ -31,15 +36,16 @@ export function SiteMark({ href }: { href: string }) {
     // keeps its own size on the inside — it is a shape, not a glyph, and it
     // should not resize with the line it happens to sit on.
     <span aria-hidden className="flex h-[1lh] shrink-0 items-center text-ui">
-      <span className="relative flex size-5 items-center justify-center overflow-hidden rounded-full bg-soft text-micro font-semibold text-muted-foreground">
-        {host.charAt(0).toUpperCase()}
+      <span className={compact ? 'relative flex size-4 items-center justify-center overflow-hidden rounded-sm'
+        : 'relative flex size-5 items-center justify-center overflow-hidden rounded-full bg-soft text-micro font-semibold text-muted-foreground'}>
+        {compact ? shown ? null : <Icons.browserUse size="sm" /> : host.charAt(0).toUpperCase()}
         {shown ? (
           <motion.img
             src={icon}
             alt=""
             draggable={false}
             onError={() => setBroken(true)}
-            className="absolute inset-0 size-full object-cover"
+            className="absolute inset-0 size-full object-contain"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: DURATION.base, ease: EASE_OUT }}

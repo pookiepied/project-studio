@@ -6,8 +6,7 @@ import type { ParticipantProfile } from './participants'
 /**
  * The faces of a voice call.
  *
- * Studio, the voice you talk to, wears the brand: the Studio clover in
- * `currentColor`, so it is dark on the light theme and light on the dark one,
+ * Studio, the voice you talk to, wears the brand: the theme-aware Studio starburst,
  * with a small sound badge that says this is the speaking Studio.
  *
  * Workers wear critters. A worker is a short-lived helper with a borrowed

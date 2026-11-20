@@ -147,6 +147,8 @@ export function classify(message: string, code: unknown): ComputerError {
 }
 
 export class ComputerSession {
+  #indicatorTarget: { readonly handle: number; readonly pid: number } | null = null;
+  get indicatorTarget() { return this.#indicatorTarget; }
   #child: ChildProcessWithoutNullStreams | undefined;
   #ready: Promise<void> | undefined;
   #closing: Promise<boolean> | undefined;
@@ -346,6 +348,13 @@ export class ComputerSession {
         if (id === undefined) return;
         const waiting = this.#pending.get(id);
         if (waiting === undefined) return;
+        const target = record["indicatorTarget"];
+        this.#indicatorTarget = null;
+        if (typeof target === "object" && target !== null && "handle" in target && "pid" in target
+          && typeof target.handle === "number" && Number.isSafeInteger(target.handle) && target.handle > 0
+          && typeof target.pid === "number" && Number.isInteger(target.pid) && target.pid > 0 && target.pid <= 0xffff_ffff) {
+          this.#indicatorTarget = { handle: target.handle, pid: target.pid };
+        }
         this.#pending.delete(id);
         clearTimeout(waiting.timer);
         waiting.input?.add(record["userInput"]);
@@ -458,6 +467,7 @@ export class ComputerSession {
   }
 
   #forget(): void {
+    this.#indicatorTarget = null;
     this.#interactionEpoch++;
     if (this.#idle !== undefined) clearTimeout(this.#idle);
     this.#idle = undefined;

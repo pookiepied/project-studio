@@ -2,8 +2,6 @@ import { PageTransition } from '@/components/primitives'
 import { SHELL } from '@/design/tokens'
 import { paneFor } from '@/features/settings/panes/registry'
 import { findSection } from '@/features/settings/sections'
-import { SettingsNav } from '@/features/settings/SettingsNav'
-import { useNavigation } from '@/stores/navigation'
 
 /**
  * Settings: one page, one section at a time, one column.
@@ -23,33 +21,30 @@ import { useNavigation } from '@/stores/navigation'
  * were rather than at the top. Local state would have needed a mechanism for
  * each of those.
  *
- * ---- Two columns, inside the page ---------------------------------------
+ * ---- The page is only the pane -------------------------------------------
  *
- * The section list sits beside the pane, as part of this page: see
- * `SettingsNav` for why. The transition covers the pane alone, so moving between
- * sections never moves the list.
+ * Settings' navigation lives in the sidebar column (see `SettingsNav`), so this
+ * page has no section list of its own. It renders the selected pane and nothing
+ * else; the column supplies the tree and the way back. The transition covers
+ * the pane alone, so moving between sections never disturbs that tree.
  */
 const DEFAULT_SECTION = 'general'
 
 export function SettingsPage({ sectionId }: { sectionId: string }) {
-  const { openSettings, leaveSettings } = useNavigation()
   const section = findSection(sectionId) ?? findSection(DEFAULT_SECTION)
   const active = section?.id ?? DEFAULT_SECTION
 
   return (
-    <div className="studio-settings-frame h-full" style={{ paddingTop: SHELL.topStrip.height }}>
-      <div className="studio-settings">
-        <SettingsNav active={active} onSelect={openSettings} onBack={leaveSettings} />
-        <div className="relative min-h-0 min-w-0 overflow-hidden">
-          <PageTransition
-            view={active}
-            className="studio-scroll-inset min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
-          >
-            <div className="studio-content-column studio-settings-column pt-4 pb-24">
-              {paneFor(active)}
-            </div>
-          </PageTransition>
-        </div>
+    <div className="h-full min-h-0" style={{ paddingTop: SHELL.topStrip.height }}>
+      <div className="relative h-full min-h-0 overflow-hidden">
+        <PageTransition
+          view={active}
+          className="studio-scroll-inset min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
+        >
+          <div className="studio-content-column studio-settings-column pt-4 pb-24">
+            {paneFor(active)}
+          </div>
+        </PageTransition>
       </div>
     </div>
   )

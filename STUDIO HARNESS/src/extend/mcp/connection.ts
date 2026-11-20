@@ -12,6 +12,7 @@ import { observeOperation, observeSynchronousOperation } from "../../observabili
 import { createObservationWriter, diagnosticRecorder } from "../../observability/recorder.js";
 import { diagnosticJsonContent } from "../../observability/diagnostic-value.js";
 import { currentExecutionContext } from "../../execution/context.js";
+import { CHROME_SERVER_ID } from "./builtin.js";
 
 /**
  * One conversation with one MCP server.
@@ -232,7 +233,8 @@ export class McpConnection {
     const recordObservation = createObservationWriter();
     // Human browser input can contain passwords; live frames and keystrokes
     // never enter diagnostics, even when tool-content capture is enabled.
-    const captureContent = method !== "studio/browser" && diagnosticRecorder.capturesContent(currentExecutionContext()?.flueInstanceId);
+    const privateBrowserInput = method === "studio/browser" || (this.#serverId === CHROME_SERVER_ID && method === "tools/call");
+    const captureContent = !privateBrowserInput && diagnosticRecorder.capturesContent(currentExecutionContext()?.flueInstanceId);
     const waiting = this.#pending
       .register(id, { timeoutMs: this.#timeoutMs, ...(signal ? { signal } : {}) })
       // However this settles, the id stops being special. Written as part of

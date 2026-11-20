@@ -7,10 +7,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { NavigationProvider, useNavigation } from './NavigationProvider'
 
 /**
- * The Settings visit. Settings carries its own section list, so the visit owns
- * one fact: where Back returns to. The sidebar stays as the user left it, except
- * that a drawer does not stay open over the page it just opened. Every way in
- * and out funnels through the functions below, so holding the contract here
+ * The Settings visit. Settings navigation lives in the sidebar column, so the
+ * visit owns three facts: where Back returns to, the column state at entry, and
+ * whether the user moved the column themselves while they were there. Every way
+ * in and out funnels through the functions below, so holding the contract here
  * holds it everywhere.
  */
 
@@ -62,26 +62,26 @@ function click(label: string): void {
 }
 
 describe('entering Settings', () => {
-  it('leaves a closed column closed and an open column open', () => {
+  it('opens a closed column, because the tree lives there', () => {
     mount()
     click('open settings')
-    expect(screen.getByText('sidebar:false')).toBeTruthy()
+    expect(screen.getByText('route:settings:general')).toBeTruthy()
+    expect(screen.getByText('sidebar:true')).toBeTruthy()
+  })
 
-    click('leave settings')
+  it('leaves an open column open', () => {
+    mount()
     click('toggle sidebar')
     click('open settings')
     expect(screen.getByText('sidebar:true')).toBeTruthy()
   })
 
-  it('dismisses the drawer on a narrow window', () => {
+  it('opens the drawer on a narrow window too', () => {
     mount()
     click('go compact')
-    click('toggle sidebar')
-    expect(screen.getByText('sidebar:true')).toBeTruthy()
-
     click('open settings')
     expect(screen.getByText('route:settings:general')).toBeTruthy()
-    expect(screen.getByText('sidebar:false')).toBeTruthy()
+    expect(screen.getByText('sidebar:true')).toBeTruthy()
   })
 })
 
@@ -106,11 +106,28 @@ describe('leaving Settings', () => {
     expect(screen.getByText('route:home')).toBeTruthy()
   })
 
+  it('restores a closed column that Settings had opened', () => {
+    mount()
+    click('open settings')
+    click('leave settings')
+    expect(screen.getByText('sidebar:false')).toBeTruthy()
+  })
+
   it('leaves the column as the user set it during the visit', () => {
     mount()
     click('open settings')
     click('toggle sidebar')
     click('leave settings')
+    expect(screen.getByText('sidebar:false')).toBeTruthy()
+  })
+
+  it('dismisses the drawer on a narrow window', () => {
+    mount()
+    click('go compact')
+    click('open settings')
     expect(screen.getByText('sidebar:true')).toBeTruthy()
+
+    click('leave settings')
+    expect(screen.getByText('sidebar:false')).toBeTruthy()
   })
 })

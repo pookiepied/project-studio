@@ -3,6 +3,15 @@
 Status: proposal for discussion; no runtime changes implemented.
 Prepared 2026-10-16 against main at 3e6fe0ba.
 
+Update 2026-11-21: a first slice shipped with deliberately narrower choices.
+Capture is tool-call only (no organizer model, no keyword extraction) to spend
+no tokens of its own; search is SQLite FTS5/BM25 without embeddings; scope is
+`personal` or `project`, with the project derived from the conversation; the
+standing profile is a person-edited record rather than a projection; the
+context block is a once-per-conversation `memory_context` signal, not the
+system prompt. Entities, relations, episodes, Library links, semantic search
+and automatic recent-context extraction from this proposal are not built.
+
 ## 1. Product direction
 
 Studio should carry useful continuity across conversations without asking the

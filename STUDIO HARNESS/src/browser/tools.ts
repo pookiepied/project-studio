@@ -188,9 +188,11 @@ export const TOOLS: readonly ToolDefinition[] = [
       const limit = num(input, "limit") ?? 20_000;
       const body = await tab.page.evaluate((where) => {
         const root = where === null ? null : document.querySelector(where);
+        if (where !== null && root === null) return null;
         const from = root ?? document.querySelector("main") ?? document.querySelector("article") ?? document.body;
         return (from as HTMLElement | null)?.innerText ?? "";
       }, selector ?? null);
+      if (body === null) return failure(`No element matches "${selector ?? ""}". Check the selector or read the page structure.`);
       const trimmed = body.replace(/\n{3,}/g, "\n\n").trim();
       const cut = trimmed.length > limit ? `${trimmed.slice(0, limit)}\n\n… truncated.` : trimmed;
       return read(tab.page, tab.id, cut === "" ? "The page has no readable text." : cut);
@@ -201,6 +203,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     name: "studio_browser_read_page",
     description:
       "Read the page's structure as a list of elements, each with a reference like ref_12. " +
+      "Read again to refresh references. Each read_page or find replaces the earlier references for that tab. " +
       "Use this before clicking or typing: the references it returns are the reliable way to " +
       "point at something, and they beat guessing a CSS selector from a screenshot.",
     inputSchema: object({
@@ -255,35 +258,11 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const tab = await pageFor(session, input);
       const query = required(input, "query");
-      await snapshot(tab.page, { all: true });
-      const found = await tab.page.evaluate(
-        ([needle, attribute]) => {
-          const out: string[] = [];
-          for (const element of Array.from(document.querySelectorAll(`[${attribute}]`))) {
-            const label = [
-              (element as HTMLElement).innerText ?? "",
-              element.getAttribute("aria-label") ?? "",
-              element.getAttribute("placeholder") ?? "",
-              element.getAttribute("alt") ?? "",
-              element.getAttribute("title") ?? "",
-            ]
-              .join(" ")
-              .replace(/\s+/g, " ")
-              .trim();
-            if (!label.toLowerCase().includes(needle.toLowerCase())) continue;
-            out.push(
-              `${element.tagName.toLowerCase()} "${label.slice(0, 100)}" [ref_${element.getAttribute(attribute) ?? ""}]`,
-            );
-            if (out.length >= 20) break;
-          }
-          return out;
-        },
-        [query, "data-studio-ref"] as const,
-      );
+      const found = await snapshot(tab.page, { all: true, query, limit: 20 });
       return read(
         tab.page,
         tab.id,
-        found.length === 0 ? `Nothing on the page matches "${query}".` : found.join("\n"),
+        found === "" ? `Nothing on the page matches "${query}".` : found,
       );
     },
   },
@@ -442,8 +421,8 @@ export const TOOLS: readonly ToolDefinition[] = [
     run: async (session, input) => {
       const tab = await pageFor(session, input);
       const values = input["values"];
-      if (!Array.isArray(values)) {
-        throw new BrowserError("bad_input", { message: 'This tool needs "values" as a list.' });
+      if (!Array.isArray(values) || values.some((value) => typeof value !== "string")) {
+        throw new BrowserError("bad_input", { message: 'This tool needs "values" as a list of text strings.' });
       }
       await locate(tab.page, target(input)).selectOption(values as string[], { timeout: TIMEOUT });
       return acted(tab.page, tab.id, `Selected ${(values as string[]).join(", ")}.`);
@@ -564,9 +543,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       const tab = await pageFor(session, input);
       const accept = input["accept"] !== false;
       const reply = str(input, "text");
-      tab.page.once("dialog", (dialog) => {
-        void (accept ? dialog.accept(reply) : dialog.dismiss()).catch(() => undefined);
-      });
+      tab.nextDialog = { accept, reply };
       return answer(
         `The next dialog will be ${accept ? "accepted" : "dismissed"}. Do the thing that opens it now.`,
       );
@@ -831,6 +808,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     inputSchema: object({ tab: STRING }, ["tab"]),
     run: async (session, input) => {
       const id = required(input, "tab");
+      if (session.tab(id) === undefined) return failure(`No open tab named "${id}". Use tabs to see the current tab IDs.`);
       await session.closeTab(id);
       return answer(`Closed ${id}. Open tabs: ${session.tabIds.join(", ") || "none"}.`);
     },

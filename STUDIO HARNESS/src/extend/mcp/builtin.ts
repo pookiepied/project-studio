@@ -9,7 +9,7 @@ import type { McpServerInput, McpServerRegistry } from "./registry.js";
 /**
  * The capabilities Studio ships as MCP servers of its own.
  *
- * There are two — the browser and the computer — and the shape exists because
+ * The shared registry shape exists because
  * the alternative is a special case for each threaded through the registry,
  * the settings screen and the reconciler.
  *
@@ -27,11 +27,23 @@ import type { McpServerInput, McpServerRegistry } from "./registry.js";
 /** The browser's stable id. Referred to by name in the UI and in tests. */
 export const BROWSER_SERVER_ID = "studio-browser";
 
+/** The user's running Google Chrome, separate from Studio Browser. */
+export const CHROME_SERVER_ID = "studio-chrome";
+
 /** The computer-use server's stable id. */
 export const COMPUTER_SERVER_ID = "studio-computer";
 
 /** The customization server's stable id. */
 export const CUSTOMIZATION_SERVER_ID = "studio-customization";
+
+/** The memory server's stable id. */
+export const MEMORY_SERVER_ID = "studio-memory";
+
+/**
+ * Studio's servers whose tools relay to the harness's own routes, and so need
+ * the management endpoint injected - and waited for - at launch.
+ */
+export const RELAY_SERVER_IDS: ReadonlySet<string> = new Set([CUSTOMIZATION_SERVER_ID, MEMORY_SERVER_ID]);
 
 /**
  * Where the built bundle is, from wherever this code is running.
@@ -46,6 +58,10 @@ export function browserServerPath(): string | undefined {
   return bundledEntry("browser.mjs");
 }
 
+export function chromeServerPath(): string | undefined {
+  return bundledEntry("chrome.mjs");
+}
+
 /** Where the computer server's bundle is, by the same search. */
 export function computerServerPath(): string | undefined {
   return bundledEntry("computer.mjs");
@@ -54,6 +70,11 @@ export function computerServerPath(): string | undefined {
 /** Where the customization server's bundle is, by the same search. */
 export function customizationServerPath(): string | undefined {
   return bundledEntry("customization.mjs");
+}
+
+/** Where the memory server's bundle is, by the same search. */
+export function memoryServerPath(): string | undefined {
+  return bundledEntry("memory.mjs");
 }
 
 function bundledEntry(file: string): string | undefined {
@@ -161,7 +182,35 @@ function customizationRecord(entry: string): McpServerInput {
 }
 
 /**
- * Puts the built-in servers in the registry, and switches them on by default.
+ * What the memory server's row says.
+ *
+ * The remembered context reaches every new conversation through the
+ * harness's own first-turn signal, so this sentence sells only the tools:
+ * looking further back than that block, and keeping, correcting or dropping
+ * a memory. `needsNetwork` is false - it speaks loopback to the harness and
+ * nothing else - and like every system record it runs uncontained anyway.
+ */
+function memoryRecord(entry: string): McpServerInput {
+  return {
+    id: MEMORY_SERVER_ID,
+    title: "Studio Memory",
+    description:
+      "Studio's memory of the user across conversations: search what is remembered about them and their " +
+      "projects, save a lasting fact, preference or instruction when they ask you to remember it, correct or " +
+      "forget one, and update their profile. Discover it when earlier context matters or the user asks you to " +
+      "remember or forget something.",
+    provenance: "system",
+    transport: "stdio",
+    command: process.execPath,
+    args: [entry],
+    env: {},
+    auth: "none",
+    needsNetwork: false,
+  };
+}
+
+/**
+ * Puts the built-in servers in the registry with their initial enablement.
  *
  * Called once at start. Both halves are idempotent, which they have to be: the
  * harness restarts often, and a second call must leave the row and the person's
@@ -182,6 +231,14 @@ export function registerBuiltInServers(
   const browser = browserServerPath();
   if (browser !== undefined) install(registry, selection, browserRecord(browser), true);
 
+  const chrome = chromeServerPath();
+  if (chrome !== undefined) install(registry, selection, {
+    ...browserRecord(chrome),
+    id: CHROME_SERVER_ID,
+    title: "Chrome DevTools by Studio",
+    description: "Use your open tabs and signed-in web sessions in Google Chrome. Enable remote debugging at chrome://inspect/#remote-debugging and approve Studio's connection in Chrome. Use Studio Browser for ordinary browsing in an isolated session.",
+  }, false);
+
   const computer = computerServerPath();
   if (computer !== undefined) {
     install(registry, selection, computerRecord(computer), platform() === "win32");
@@ -195,6 +252,12 @@ export function registerBuiltInServers(
   if (customization !== undefined) {
     install(registry, selection, customizationRecord(customization), true);
   }
+
+  // On by default: memory that has to be switched on before it remembers
+  // anything is memory nobody has. The person can still switch the server off
+  // here, and the context block off in Personalization, independently.
+  const memory = memoryServerPath();
+  if (memory !== undefined) install(registry, selection, memoryRecord(memory), true);
 }
 
 function install(

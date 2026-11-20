@@ -22,11 +22,6 @@ export const PLACEHOLDERS: Readonly<Record<string, Placeholder>> = {
     description: 'Who you are signed in as.',
     items: ['Signed-in account', 'Sign out', 'Where credentials are stored on this machine'],
   },
-  personalization: {
-    title: 'Personalization',
-    description: 'What Studio should know about you across every conversation.',
-    items: ['How you want replies written', 'Standing context about your work', 'Saved memories'],
-  },
   shortcuts: {
     title: 'Keyboard shortcuts',
     description: 'Every shortcut, and how to change it.',

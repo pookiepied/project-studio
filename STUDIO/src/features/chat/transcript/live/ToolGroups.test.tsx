@@ -136,7 +136,7 @@ describe('the chip is the default', () => {
     expect(screen.queryByText('React documentation')).toBeNull()
   })
 
-  it('reveals a clipped tool subject through Studio\'s tooltip', () => {
+  it('reveals a clipped tool subject by opening the row without showing a tooltip', () => {
     vi.useFakeTimers()
     const command = 'pnpm exec vitest run src/features/chat/transcript/live/ToolGroups.test.tsx'
     render(<ToolGroups conversationId="conv" groups={groupsOf({ toolName: 'shell', calls: [call({
@@ -147,7 +147,9 @@ describe('the chip is the default', () => {
     expect(subject.closest('[title]')).toBeNull()
     fireEvent.pointerEnter(subject)
     act(() => { vi.advanceTimersByTime(500) })
-    expect(screen.getByRole('tooltip').textContent).toBe(command)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: (name) => name.includes(command) }))
+    expect(screen.getAllByText(command)).toHaveLength(2)
   })
 
   it('limits search previews independently and shows fetched pages as links', () => {

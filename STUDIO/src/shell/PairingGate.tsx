@@ -104,7 +104,7 @@ function BrowserGate({ children }: { children: ReactNode }) {
     // greeting. The mark is simply there, and leaves when the answer comes.
     return (
       <div className="flex h-full w-full flex-col items-center justify-center bg-surface">
-        <StudioMark size={44} className="text-foreground" />
+        <StudioMark size={44} />
       </div>
     )
   }
@@ -189,7 +189,7 @@ function PairingScreen({ onPaired, initialRefusal }: { onPaired: () => void; ini
 
   return (
     <div className="studio-content-column flex h-full flex-col items-center justify-center gap-5 bg-surface text-center">
-      <StudioMark entrance size={44} className="text-foreground" />
+      <StudioMark entrance size={44} />
 
       <div className="flex flex-col items-center">
         <h1 className="studio-display text-foreground">Pair this device</h1>

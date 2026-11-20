@@ -1302,6 +1302,64 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 31,
+    name: "memory_items",
+    up(db) {
+      // Studio's memory: short claims the model or the person chose to keep
+      // across conversations. A row is a sentence, not a transcript excerpt -
+      // the transcript stays Flue's, and nothing here points into it beyond
+      // the conversation a memory was saved from.
+      //
+      // `scope` is `personal` (about the person, shown everywhere) or
+      // `project` (about one project's work, shown only in that project's
+      // conversations). `project_id` is set exactly when the scope is
+      // `project`, and is derived by the harness from the conversation, never
+      // chosen by the model. `priority` is 1..3; priority 3 is the long-term
+      // section of the context block every new conversation receives.
+      //
+      // The FTS table is an external-content index over `content` and `tags`,
+      // kept in step by the three triggers, so search ranks by BM25 without a
+      // second copy of the text to drift.
+      db.exec(`
+        CREATE TABLE memory_item (
+          id                     TEXT PRIMARY KEY,
+          scope                  TEXT NOT NULL,
+          project_id             TEXT,
+          kind                   TEXT NOT NULL,
+          content                TEXT NOT NULL,
+          tags                   TEXT NOT NULL DEFAULT '[]',
+          priority               INTEGER NOT NULL DEFAULT 2,
+          author                 TEXT NOT NULL,
+          source_conversation_id TEXT,
+          created_at             INTEGER NOT NULL,
+          updated_at             INTEGER NOT NULL
+        ) STRICT;
+
+        CREATE INDEX memory_item_recent ON memory_item (updated_at DESC);
+        CREATE INDEX memory_item_scope ON memory_item (scope, project_id, priority DESC);
+
+        CREATE VIRTUAL TABLE memory_item_fts USING fts5(
+          content, tags,
+          content = 'memory_item',
+          tokenize = 'unicode61 remove_diacritics 2'
+        );
+
+        CREATE TRIGGER memory_item_fts_insert AFTER INSERT ON memory_item BEGIN
+          INSERT INTO memory_item_fts (rowid, content, tags) VALUES (new.rowid, new.content, new.tags);
+        END;
+        CREATE TRIGGER memory_item_fts_delete AFTER DELETE ON memory_item BEGIN
+          INSERT INTO memory_item_fts (memory_item_fts, rowid, content, tags)
+            VALUES ('delete', old.rowid, old.content, old.tags);
+        END;
+        CREATE TRIGGER memory_item_fts_update AFTER UPDATE ON memory_item BEGIN
+          INSERT INTO memory_item_fts (memory_item_fts, rowid, content, tags)
+            VALUES ('delete', old.rowid, old.content, old.tags);
+          INSERT INTO memory_item_fts (rowid, content, tags) VALUES (new.rowid, new.content, new.tags);
+        END;
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

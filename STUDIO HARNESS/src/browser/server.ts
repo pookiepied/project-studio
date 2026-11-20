@@ -3,7 +3,7 @@ import { BrowserError } from "./errors.js";
 import { BrowserSession } from "./session.js";
 import { definitions, toolByName } from "./tools.js";
 import * as v from "valibot";
-import { browserInteractionSchema } from "./interaction.js";
+import { browserInteractionSchema, IDLE_BROWSER_VIEW } from "./interaction.js";
 
 /**
  * The browser capability, as an MCP server in its own process.
@@ -20,10 +20,8 @@ import { browserInteractionSchema } from "./interaction.js";
  * What is here is what is the browser's alone: one session per conversation,
  * and the one error whose library wording would mislead a model.
  *
- * **Nothing here launches a browser.** Connecting, discovering and listing all
- * happen with no Chromium anywhere. The first `tools/call` is what costs
- * something, which is the fourth state in ADR 0049 §4 and the reason the other
- * three are cheap.
+ * Connecting, discovering, listing and viewing stay passive. A page opens
+ * through a tool call or the viewer's explicit Start browser action.
  */
 
 /**
@@ -97,8 +95,12 @@ serveStdio({
   control: async (_method, params) => {
     const parsed = v.safeParse(browserInteractionSchema, params["input"]);
     if (!parsed.success) throw new BrowserError("bad_input", { message: "The browser interaction is invalid." });
-    const session = sessions.get(conversationKey(params["_meta"]));
-    if (session === undefined) throw new BrowserError("no_tab", { message: "This browser session has ended. Ask Studio to open a page again." });
+    const session = parsed.output.action === "start" ? sessionFor(params["_meta"]) : sessions.get(conversationKey(params["_meta"]));
+    if (session === undefined) {
+      if (parsed.output.action === "view") return IDLE_BROWSER_VIEW;
+      if (parsed.output.action === "detach") return { accepted: true };
+      throw new BrowserError("no_tab", { message: "Ask Studio to open a page for this conversation first." });
+    }
     try {
       return await session.live.interact(parsed.output);
     } catch (error) {
