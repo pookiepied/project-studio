@@ -10,11 +10,13 @@ import {
   chromeServerPath,
   COMPUTER_SERVER_ID,
   computerServerPath,
+  MEMORY_SERVER_DESCRIPTION,
   MEMORY_SERVER_ID,
   memoryServerPath,
   RELAY_SERVER_IDS,
   registerBuiltInServers,
 } from "../../src/extend/mcp/builtin.js";
+import { assertSafeMcpRecord } from "../../src/extend/mcp/input-security.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
 import { ExtensionSelectionStore, GLOBAL_SCOPE } from "../../src/extend/selection.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
@@ -112,6 +114,13 @@ describe("Studio's own capabilities become ordinary rows", () => {
     expect((record?.description ?? "").length).toBeGreaterThan(40);
     const key = { kind: "mcp", extensionId: COMPUTER_SERVER_ID, scope: GLOBAL_SCOPE } as const;
     expect(selection.decisionAt(key)).toBe(process.platform === "win32");
+  });
+
+  it("gives Studio Memory a description the registry accepts, bundle or not", () => {
+    // The registry refuses a description over its one-sentence limit, and a
+    // refused built-in row stops the whole harness from starting. The test
+    // below skips when the bundle is not built, so this one must not.
+    expect(() => assertSafeMcpRecord({ description: MEMORY_SERVER_DESCRIPTION })).not.toThrow();
   });
 
   it("installs Studio Memory as a relay, on by default like the browser", () => {

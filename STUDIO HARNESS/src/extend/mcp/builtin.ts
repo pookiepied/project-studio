@@ -190,15 +190,21 @@ function customizationRecord(entry: string): McpServerInput {
  * a memory. `needsNetwork` is false - it speaks loopback to the harness and
  * nothing else - and like every system record it runs uncontained anyway.
  */
+/**
+ * Held to `MCP_DESCRIPTION_LIMIT` (one sentence, 300 characters) by the
+ * registry, which refuses the row - and with it the whole harness start -
+ * when it is longer. Exported so a test pins it without the built bundle.
+ */
+export const MEMORY_SERVER_DESCRIPTION =
+  "Studio's memory of the user across conversations: search, save, correct or forget what is remembered " +
+  "about them and their projects, and update their profile, when earlier context matters or they ask you " +
+  "to remember or forget something.";
+
 function memoryRecord(entry: string): McpServerInput {
   return {
     id: MEMORY_SERVER_ID,
     title: "Studio Memory",
-    description:
-      "Studio's memory of the user across conversations: search what is remembered about them and their " +
-      "projects, save a lasting fact, preference or instruction when they ask you to remember it, correct or " +
-      "forget one, and update their profile. Discover it when earlier context matters or the user asks you to " +
-      "remember or forget something.",
+    description: MEMORY_SERVER_DESCRIPTION,
     provenance: "system",
     transport: "stdio",
     command: process.execPath,
